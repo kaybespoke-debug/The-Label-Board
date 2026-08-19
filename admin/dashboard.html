@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#010817">
+<meta name="description" content="The Label Board SaaS Business Admin Dashboard">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23e2ad4f' width='192' height='192'/><text x='96' y='120' font-size='100' font-weight='bold' text-anchor='middle' fill='%23010817' font-family='Georgia'>L</text></svg>">
+<title>Label Board Business Dashboard</title>
+<style>
+  :root{
+    --navy:#010817; --navy-2:#020b1d; --panel:#0d1526; --panel-2:#111b30;
+    --line:#1e2c47; --line-soft:#16233a;
+    --text:#eef1f6; --text-dim:#a8b3c6; --text-faint:#697894;
+    --gold:#e2ad4f; --green:#3ec98a; --amber:#e0a838; --red:#e06a6a; --blue:#5b9bd8;
+  }
+  /* LIGHT THEME */
+  [data-theme="light"] {
+    --navy:#ffffff; --navy-2:#f9f9fb; --panel:#f3f4f8; --panel-2:#eef1f6;
+    --line:#dfe5f0; --line-soft:#e8ecf5;
+    --text:#010817; --text-dim:#334155; --text-faint:#64748b;
+    --gold:#d9933c; --green:#2d9d78; --amber:#b8860b; --red:#c73e3e; --blue:#4080b8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--navy);color:var(--text);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px}
+  a{color:var(--gold);text-decoration:none}
+
+  #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);
+    border-radius:18px;padding:30px 26px;text-align:center}
+  .mark{font-size:11px;letter-spacing:5px;color:var(--text-faint);margin-bottom:6px}
+  .name{font-family:Georgia,serif;font-size:22px;letter-spacing:4px;margin-bottom:4px}
+  .sub{color:var(--text-faint);font-size:12px;margin-bottom:24px}
+  input,select,textarea{width:100%;height:46px;border-radius:11px;border:1px solid var(--line);
+    background:#0a1120;color:var(--text);padding:0 13px;outline:none;font-family:inherit;font-size:15px}
+  .btn{height:46px;border:0;border-radius:11px;background:var(--gold);color:#101728;
+    font-weight:700;cursor:pointer;font-family:inherit;font-size:15px;padding:0 18px}
+  .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
+
+  #app{display:flex;min-height:100dvh;gap:0}
+
+  /* SIDEBAR */
+  aside{width:280px;background:var(--navy-2);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;padding:24px 0;overflow-y:auto;position:fixed;height:100dvh;left:0;top:0;z-index:100;transition:.3s}
+  aside.collapsed{width:80px;padding:20px 0}
+  .sidebar-toggle{position:absolute;top:20px;right:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;width:36px;height:36px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);font-size:16px;transition:.2s}
+  .sidebar-toggle:hover{background:var(--panel-2)}
+  aside.collapsed .sidebar-toggle{right:16px}
+  aside.collapsed .logo,aside.collapsed .section-label,aside.collapsed .nav-label{display:none}
+  aside.collapsed .nav-section{padding:8px 0}
+  aside.collapsed .nav-item{margin:4px auto;width:52px;height:52px;padding:0;justify-content:center;border:none}
+  aside.collapsed .nav-item.active{border-left:none;padding:0;background:var(--panel)}
+  aside.collapsed .nav-icon{font-size:24px}
+  aside.collapsed .nav-badge{position:absolute;top:-8px;right:-8px;width:20px;height:20px;padding:0;font-size:10px}
+  main{margin-left:280px;transition:.3s}
+  aside.collapsed ~ main{margin-left:80px}
+  .logo{padding:0 20px;margin-bottom:32px;font-family:Georgia,serif;font-size:28px;font-weight:500;letter-spacing:4px}
+  .nav-section{padding:0 16px;margin-bottom:24px}
+  .section-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);
+    padding:0 8px;margin-bottom:12px;font-weight:600}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 12px;border-radius:10px;
+    cursor:pointer;color:var(--text-dim);transition:.2s;position:relative;margin-bottom:4px}
+  .nav-item:hover{background:var(--panel-2);color:var(--text)}
+  .nav-item.active{background:var(--panel);color:var(--gold);border-left:3px solid var(--gold);padding-left:9px}
+  .nav-icon{font-size:20px;min-width:24px;text-align:center}
+  .nav-label{font-size:14px;flex:1;font-weight:500}
+  .nav-badge{background:var(--gold);color:#101728;font-size:11px;font-weight:700;
+    border-radius:999px;padding:2px 8px;min-width:24px;text-align:center}
+  .nav-spacer{flex:1}
+  .logout{border-top:1px solid var(--line);padding:16px;margin-top:auto}
+  .logout .nav-item{color:var(--red)}
+
+  /* MOBILE TOGGLE */
+  .mobile-toggle{display:none;position:fixed;top:16px;left:16px;z-index:101;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;width:44px;height:44px;
+    align-items:center;justify-content:center;cursor:pointer;color:var(--gold)}
+  @media(max-width:768px){
+    .mobile-toggle{display:flex}
+    aside{transform:translateX(-100%);transition:.3s;width:240px}
+    aside.show{transform:translateX(0)}
+    main{margin-left:0}
+  }
+
+  /* MAIN */
+  main{flex:1;margin-left:280px;display:flex;flex-direction:column;overflow-y:auto}
+  @media(max-width:768px){ main{margin-left:0} }
+
+  header{background:var(--navy-2);border-bottom:1px solid var(--line);padding:28px 32px;display:flex;align-items:flex-start;gap:24px}
+  .greeting{flex:1}
+  .greeting-time{font-size:12px;color:var(--text-faint);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+  .greeting-text{font-family:Georgia,serif;font-size:32px;font-weight:500;margin-bottom:4px}
+  .greeting-name{font-size:16px;color:var(--text-dim)}
+  .user-panel{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--panel);border-radius:12px}
+  .user-badge{display:flex;align-items:center;gap:8px}
+  .user-role{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint)}
+  .user-name{font-weight:600;color:var(--text)}
+  .user-avatar{width:40px;height:40px;border-radius:8px;background:var(--gold);
+    display:flex;align-items:center;justify-content:center;color:#101728;font-weight:700}
+  .theme-toggle{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:44px;height:44px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);font-size:20px;transition:.2s}
+  .theme-toggle:hover{background:var(--panel-2);color:var(--text)}
+  @media(max-width:768px){
+    header{flex-direction:column;padding:16px 16px 80px;gap:12px}
+    .user-panel{flex-direction:column;align-items:flex-start}
+  }
+
+  .content{padding:32px;flex:1}
+  @media(max-width:768px){ .content{padding:16px} }
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+  .kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:20px;
+    position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold)}
+  .kpi.kpi-alert::before{background:var(--red)}
+  .kpi.kpi-warning::before{background:var(--amber)}
+  .kpi.kpi-success::before{background:var(--green)}
+  .kpi b{display:block;font-size:28px;font-family:Georgia,serif;font-weight:500;margin-bottom:4px}
+  .kpi span{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint)}
+  .kpi .detail{font-size:13px;color:var(--text-dim);margin-top:8px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:24px}
+  .panel-head{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .panel-head h2{margin:0;font-family:Georgia,serif;font-size:18px;font-weight:500;flex:1}
+  .search-sort{display:flex;align-items:center;gap:8px}
+  .search-input{height:36px;width:180px;border-radius:8px;border:1px solid var(--line);background:#0a1120;color:var(--text);
+    padding:0 12px;outline:none;font-size:13px}
+  .search-input::placeholder{color:var(--text-faint)}
+  .sort-btn{height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:#0a1120;color:var(--text-dim);
+    cursor:pointer;font-size:13px;transition:.2s}
+  .sort-btn:hover{background:var(--panel-2);color:var(--text);border-color:var(--gold)}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--text-faint);
+    font-weight:600;padding:12px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:14px 16px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr{cursor:pointer;transition:.2s}
+  tbody tr:hover{background:var(--panel-2)}
+  tr:last-child td{border-bottom:none}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--text-faint)}
+  .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+  .t-owner{background:rgba(224,168,56,.15);color:var(--amber)}
+  .t-sales{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-operations{background:rgba(91,155,216,.15);color:var(--blue)}
+  .t-support{background:rgba(224,106,106,.16);color:var(--red)}
+  .t-active{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-pending{background:rgba(224,168,56,.14);color:var(--amber)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+  .card-item{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card-item h3{margin:0 0 8px;font-size:14px;color:var(--text)}
+  .card-item p{margin:0;font-size:13px;color:var(--text-faint)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login">
+  <div class="card">
+    <div class="mark">THE LABEL BOARD</div>
+    <div class="name">BUSINESS</div>
+    <div class="sub">Dashboard</div>
+    <label for="em">Email</label>
+    <input id="em" type="email" autocomplete="username" placeholder="staff@thelabelboard.app">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div style="margin-top:20px"><button class="btn" style="width:100%" id="go">Sign in</button></div>
+    <div class="err" id="err"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <!-- MOBILE TOGGLE -->
+  <div class="mobile-toggle" id="mobileToggle">☰</div>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-toggle" id="sidebarToggle" title="Collapse sidebar">‹</div>
+    <div class="logo">LABEL</div>
+
+    <!-- OVERVIEW -->
+    <div class="nav-section">
+      <div class="section-label">Overview</div>
+      <div class="nav-item active" data-section="dashboard">
+        <div class="nav-icon">📊</div>
+        <div class="nav-label">Dashboard</div>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS -->
+    <div class="nav-section">
+      <div class="section-label">Customers</div>
+      <div class="nav-item" data-section="customers">
+        <div class="nav-icon">👥</div>
+        <div class="nav-label">All Customers</div>
+        <div class="nav-badge" id="badge-customers">5</div>
+      </div>
+      <div class="nav-item" data-section="pipeline">
+        <div class="nav-icon">🎯</div>
+        <div class="nav-label">Pipeline</div>
+      </div>
+      <div class="nav-item" data-section="renewals">
+        <div class="nav-icon">🔔</div>
+        <div class="nav-label">Renewals</div>
+        <div class="nav-badge" id="badge-renewals">2</div>
+      </div>
+    </div>
+
+    <!-- FINANCE -->
+    <div class="nav-section">
+      <div class="section-label">Finance</div>
+      <div class="nav-item" data-section="payments">
+        <div class="nav-icon">💳</div>
+        <div class="nav-label">Payments</div>
+        <div class="nav-badge" id="badge-payments">5</div>
+      </div>
+      <div class="nav-item" data-section="commissions" id="navCommissions" style="display:none">
+        <div class="nav-icon">💰</div>
+        <div class="nav-label">Commissions</div>
+      </div>
+    </div>
+
+    <!-- OPERATIONS -->
+    <div class="nav-section">
+      <div class="section-label">Operations</div>
+      <div class="nav-item" data-section="tasks">
+        <div class="nav-icon">✓</div>
+        <div class="nav-label">Tasks</div>
+        <div class="nav-badge" id="badge-tasks">0</div>
+      </div>
+    </div>
+
+    <!-- TEAM & SETTINGS -->
+    <div class="nav-section">
+      <div class="section-label">Team & Settings</div>
+      <div class="nav-item" data-section="staff" id="navStaff" style="display:none">
+        <div class="nav-icon">👔</div>
+        <div class="nav-label">Staff</div>
+        <div class="nav-badge" id="badge-staff">1</div>
+      </div>
+      <div class="nav-item" data-section="newsletters" id="navNewsletter" style="display:none">
+        <div class="nav-icon">📧</div>
+        <div class="nav-label">Newsletters</div>
+      </div>
+      <div class="nav-item" data-section="analytics" id="navAnalytics" style="display:none">
+        <div class="nav-icon">📈</div>
+        <div class="nav-label">Analytics</div>
+      </div>
+      <div class="nav-item" data-section="settings">
+        <div class="nav-icon">⚙️</div>
+        <div class="nav-label">Settings</div>
+      </div>
+    </div>
+
+    <div class="nav-spacer"></div>
+
+    <!-- LOGOUT -->
+    <div class="logout">
+      <div class="nav-item" id="logoutBtn">
+        <div class="nav-icon">🚪</div>
+        <div class="nav-label">Sign Out</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+    <!-- HEADER -->
+    <header>
+      <div class="greeting">
+        <div class="greeting-time" id="greetingTime"></div>
+        <div class="greeting-text" id="greetingText">Welcome</div>
+        <div class="greeting-name" id="businessName">Label Board</div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</div>
+        <div class="user-panel">
+          <div class="user-avatar" id="userAvatar">K</div>
+          <div class="user-badge">
+            <div class="user-role" id="userRole">Owner</div>
+            <div class="user-name" id="userName">Kayode Ojomo</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div id="section-dashboard" class="section active">
+        <div class="kpis" id="kpis"></div>
+        <div class="panel">
+          <div class="panel-head"><h2>Overview</h2></div>
+          <div id="dashboardContent" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- CUSTOMERS -->
+      <div id="section-customers" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>All Customers</h2></div>
+          <div id="customersList" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- PIPELINE -->
+      <div id="section-pipeline" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Sales Pipeline</h2></div>
+          <div id="pipelineView" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- RENEWALS -->
+      <div id="section-renewals" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Upcoming Renewals</h2></div>
+          <div id="renewalsList" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- PAYMENTS -->
+      <div id="section-payments" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Recent Payments</h2></div>
+          <div id="paymentsList" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- TASKS -->
+      <div id="section-tasks" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>My Tasks</h2></div>
+          <div id="tasksList" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- COMMISSIONS -->
+      <div id="section-commissions" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>My Commissions</h2></div>
+          <div id="commissionsList" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- STAFF -->
+      <div id="section-staff" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Staff Management</h2></div>
+          <div id="staffList" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- NEWSLETTERS -->
+      <div id="section-newsletters" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Newsletters</h2></div>
+          <div id="newsletterList" style="padding:20px"><div class="empty">Coming soon</div></div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS -->
+      <div id="section-analytics" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Business Analytics</h2></div>
+          <div id="analyticsView" style="padding:20px"></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="section-settings" class="section">
+        <div class="panel">
+          <div class="panel-head"><h2>Settings</h2></div>
+          <div id="settingsView" style="padding:20px"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPA_URL = 'https://gcdrkoitjqwbidcfgyzl.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZHJrb2l0anF3YmlkY2ZneXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMxODcsImV4cCI6MjEwMjcxOTE4N30.XYiBkZCGgyhtRgQfmCPVErLRQY0SvmVEgHMddEpFcy8';
+
+const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+let ME = null, MYSTAFF = null, CUSTOMERS = [], SUBSCRIPTIONS = [], PAYMENTS = [], STAFF = [], TASKS = [];
+let SEARCH_STATE = {}, SORT_STATE = {}; // Track search and sort per section
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = v => v ? new Date(v).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+const fmtCurrency = v => new Intl.NumberFormat('en-NG', { style:'currency', currency:'NGN' }).format(v);
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    $('themeToggle').textContent = '☀️';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    $('themeToggle').textContent = '🌙';
+  }
+  try { localStorage.setItem('theme', theme); } catch (_) {}
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+}
+
+async function signIn() {
+  const btn = $('go'); btn.disabled = true; $('err').textContent = 'Signing in…';
+  try {
+    const { error } = await supa.auth.signInWithPassword({
+      email: $('em').value.trim().toLowerCase(),
+      password: $('pw').value
+    });
+    if (error) throw error;
+    await enter();
+  } catch (e) {
+    $('err').textContent = e.message || 'Sign-in failed';
+    try { await supa.auth.signOut(); } catch (_) {}
+  } finally { btn.disabled = false; }
+}
+
+async function enter() {
+  try {
+    const { data: { user } } = await supa.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    ME = user;
+
+    const { data: staff, error: staffErr } = await supa.from('tlb_staff').select('*').eq('auth_user_id', user.id).single();
+    if (staffErr || !staff) throw new Error('Staff profile not found');
+
+    MYSTAFF = staff;
+    $('login').style.display = 'none';
+    $('app').style.display = 'flex';
+    $('greetingText').textContent = getGreeting();
+    $('userName').textContent = staff.name;
+    $('userRole').textContent = staff.role.charAt(0).toUpperCase() + staff.role.slice(1);
+    $('userAvatar').textContent = staff.name.charAt(0).toUpperCase();
+
+    // Show role-specific nav items
+    if (staff.role === 'owner') {
+      $('navStaff').style.display = 'flex';
+      $('navAnalytics').style.display = 'flex';
+      $('navNewsletter').style.display = 'flex';
+    } else if (staff.role === 'sales') {
+      $('navCommissions').style.display = 'flex';
+    }
+
+    // Setup nav items
+    document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+      item.onclick = () => switchSection(item.dataset.section);
+    });
+    $('mobileToggle').onclick = () => $('sidebar').classList.toggle('show');
+    $('sidebarToggle').onclick = () => $('sidebar').classList.toggle('collapsed');
+    $('themeToggle').onclick = toggleTheme;
+    $('logoutBtn').onclick = async () => { await supa.auth.signOut(); location.reload(); };
+
+    // Register PWA service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(e => console.log('SW registration failed:', e));
+    }
+
+    // Restore theme from localStorage (with fallback for data: URLs)
+    let savedTheme = 'dark';
+    try { savedTheme = localStorage.getItem('theme') || 'dark'; } catch (_) {}
+    applyTheme(savedTheme);
+
+    await loadData();
+  } catch (e) {
+    $('err').textContent = e.message;
+    try { await supa.auth.signOut(); } catch (_) {}
+  }
+}
+
+async function loadData() {
+  try {
+    const [custsRes, subsRes, paysRes, staffRes, tasksRes] = await Promise.all([
+      supa.from('tlb_customers').select('*').order('created_at', { ascending: false }),
+      supa.from('tlb_subscriptions').select('*'),
+      supa.from('tlb_payments').select('*').order('payment_date', { ascending: false }),
+      supa.from('tlb_staff').select('*').eq('is_active', true),
+      MYSTAFF.role === 'owner' ? supa.from('tlb_tasks').select('*') : supa.from('tlb_tasks').select('*').eq('assigned_to', MYSTAFF.id)
+    ]);
+
+    CUSTOMERS = custsRes.data || [];
+    SUBSCRIPTIONS = subsRes.data || [];
+    PAYMENTS = paysRes.data || [];
+    STAFF = staffRes.data || [];
+    TASKS = tasksRes.data || [];
+
+    updateBadges();
+    renderDashboard();
+  } catch (e) {
+    console.error('Error:', e.message);
+  }
+}
+
+function updateBadges() {
+  const renewals = SUBSCRIPTIONS.filter(s => s.renewal_date && new Date(s.renewal_date) <= new Date(Date.now() + 30*86400000)).length;
+  const pendingTasks = TASKS.filter(t => t.status !== 'completed').length;
+
+  $('badge-customers').textContent = CUSTOMERS.length;
+  $('badge-renewals').textContent = renewals;
+  $('badge-payments').textContent = PAYMENTS.length;
+  $('badge-tasks').textContent = pendingTasks;
+  $('badge-staff').textContent = STAFF.length;
+}
+
+function switchSection(section) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-section]').forEach(i => i.classList.remove('active'));
+  $('section-' + section)?.classList.add('active');
+  document.querySelector('[data-section="' + section + '"]')?.classList.add('active');
+  $('sidebar').classList.remove('show'); // Close mobile menu
+
+  // Render the section
+  if (section === 'dashboard') renderDashboard();
+  else if (section === 'customers') renderCustomers();
+  else if (section === 'pipeline') renderPipeline();
+  else if (section === 'renewals') renderRenewals();
+  else if (section === 'payments') renderPayments();
+  else if (section === 'tasks') renderTasks();
+  else if (section === 'commissions') renderCommissions();
+  else if (section === 'staff') renderStaff();
+  else if (section === 'analytics') renderAnalytics();
+  else if (section === 'settings') renderSettings();
+}
+
+function renderDashboard() {
+  let kpis = '', content = '';
+  const total = CUSTOMERS.length;
+  const active = CUSTOMERS.filter(c => c.status === 'active').length;
+  const revenue = PAYMENTS.filter(p => p.status === 'completed').reduce((s, p) => s + p.amount, 0);
+  const pending = PAYMENTS.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
+  const failed = PAYMENTS.filter(p => p.status === 'failed').length;
+
+  // State-reactive classes: success (green), warning (amber), alert (red)
+  kpis = `<div class="kpi ${active === total ? 'kpi-success' : 'kpi-warning'}"><b>${total}</b><span>Customers</span><div class="detail">Total businesses</div></div>
+    <div class="kpi ${active === total ? 'kpi-success' : 'kpi-warning'}"><b>${active}</b><span>Active</span><div class="detail">Paying subscriptions</div></div>
+    <div class="kpi kpi-success"><b>${fmtCurrency(revenue)}</b><span>Revenue</span><div class="detail">Completed payments</div></div>
+    <div class="kpi ${pending > 0 ? (failed > 0 ? 'kpi-alert' : 'kpi-warning') : ''}"><b>${fmtCurrency(pending)}</b><span>Pending</span><div class="detail">Awaiting payment</div></div>`;
+
+  const renewalsSoon = SUBSCRIPTIONS.filter(s => s.renewal_date && new Date(s.renewal_date) <= new Date(Date.now() + 7*86400000)).length;
+  const healthPercent = total > 0 ? (active/total*100).toFixed(0) : 0;
+  content = `<div class="grid">
+    <div class="card-item" style="border-left:4px solid var(--amber)"><h3>This Week</h3><p>${renewalsSoon} customer${renewalsSoon !== 1 ? 's' : ''} renewing</p></div>
+    <div class="card-item" style="border-left:4px solid ${healthPercent >= 80 ? 'var(--green)' : healthPercent >= 50 ? 'var(--amber)' : 'var(--red)'}"><h3>Payment Health</h3><p>${healthPercent}% active</p></div>
+    <div class="card-item"><h3>Team</h3><p>${STAFF.length} staff member${STAFF.length !== 1 ? 's' : ''}</p></div>
+  </div>`;
+
+  $('kpis').innerHTML = kpis;
+  if ($('dashboardContent')) $('dashboardContent').innerHTML = content;
+}
+
+function renderCustomers() {
+  if (!$('customersList')) return;
+
+  // Add search and sort controls to panel head
+  const panelHead = document.querySelector('#section-customers .panel-head');
+  if (panelHead && !panelHead.querySelector('.search-sort')) {
+    panelHead.innerHTML += `<div class="search-sort">
+      <input type="text" class="search-input" id="search-customers" placeholder="Search by business, email...">
+      <button class="sort-btn" id="sort-customers" title="Toggle sort direction">↑↓ Date</button>
+    </div>`;
+    $('search-customers').oninput = () => renderCustomers();
+    $('sort-customers').onclick = () => { SORT_STATE.customers = !SORT_STATE.customers; renderCustomers(); };
+  }
+
+  if (!CUSTOMERS.length) {
+    $('customersList').innerHTML = '<div class="empty">No customers yet.</div>';
+    return;
+  }
+
+  const search = $('search-customers')?.value.toLowerCase() || '';
+  let filtered = CUSTOMERS.filter(c =>
+    c.business_name.toLowerCase().includes(search) ||
+    c.owner_email.toLowerCase().includes(search)
+  );
+
+  filtered.sort((a, b) => {
+    const order = SORT_STATE.customers ? -1 : 1;
+    return order * (new Date(b.created_at) - new Date(a.created_at));
+  });
+
+  $('customersList').innerHTML = '<table><thead><tr><th>Business</th><th>Contact</th><th>Status</th><th>Added</th></tr></thead><tbody>' +
+    filtered.slice(0, 10).map(c => `<tr><td>${esc(c.business_name)}</td><td>${esc(c.owner_email)}</td>
+      <td><span class="tag t-${c.status}">${esc(c.status)}</span></td><td>${fmtDate(c.created_at)}</td></tr>`).join('') + '</tbody></table>';
+}
+
+function renderPipeline() {
+  if (!$('pipelineView')) return;
+  const stages = ['prospect', 'interested', 'active', 'churned'];
+  let html = '<div class="grid">';
+  stages.forEach(stage => {
+    const count = CUSTOMERS.filter(c => c.status === stage).length;
+    html += `<div class="card-item"><h3>${stage}</h3><p style="font-size:24px;color:var(--gold)">${count}</p></div>`;
+  });
+  html += '</div>';
+  $('pipelineView').innerHTML = html;
+}
+
+function renderRenewals() {
+  if (!$('renewalsList')) return;
+
+  // Add search and sort controls
+  const panelHead = document.querySelector('#section-renewals .panel-head');
+  if (panelHead && !panelHead.querySelector('.search-sort')) {
+    panelHead.innerHTML += `<div class="search-sort">
+      <input type="text" class="search-input" id="search-renewals" placeholder="Search by business, plan...">
+      <button class="sort-btn" id="sort-renewals" title="Toggle sort direction">↑↓ Date</button>
+    </div>`;
+    $('search-renewals').oninput = () => renderRenewals();
+    $('sort-renewals').onclick = () => { SORT_STATE.renewals = !SORT_STATE.renewals; renderRenewals(); };
+  }
+
+  const now = new Date();
+  const in30 = new Date(now.getTime() + 30 * 86400000);
+  let renewals = SUBSCRIPTIONS.filter(s => s.renewal_date && new Date(s.renewal_date) > now && new Date(s.renewal_date) <= in30)
+    .map(s => ({ ...s, customer: CUSTOMERS.find(c => c.id === s.customer_id) }));
+
+  const search = $('search-renewals')?.value.toLowerCase() || '';
+  renewals = renewals.filter(r =>
+    (r.customer?.business_name || '').toLowerCase().includes(search) ||
+    (r.plan_tier || '').toLowerCase().includes(search)
+  );
+
+  renewals.sort((a, b) => {
+    const order = SORT_STATE.renewals ? -1 : 1;
+    return order * (new Date(a.renewal_date) - new Date(b.renewal_date));
+  });
+
+  if (!renewals.length) {
+    $('renewalsList').innerHTML = '<div class="empty">No renewals in next 30 days.</div>';
+    return;
+  }
+  $('renewalsList').innerHTML = '<table><thead><tr><th>Business</th><th>Plan</th><th>Renewal Date</th><th>MRR</th></tr></thead><tbody>' +
+    renewals.map(r => `<tr><td>${esc(r.customer?.business_name || 'Unknown')}</td><td>${esc(r.plan_tier)}</td>
+      <td>${fmtDate(r.renewal_date)}</td><td>${fmtCurrency(r.monthly_equivalent_price)}</td></tr>`).join('') + '</tbody></table>';
+}
+
+function renderPayments() {
+  if (!$('paymentsList')) return;
+
+  // Add search and sort controls
+  const panelHead = document.querySelector('#section-payments .panel-head');
+  if (panelHead && !panelHead.querySelector('.search-sort')) {
+    panelHead.innerHTML += `<div class="search-sort">
+      <input type="text" class="search-input" id="search-payments" placeholder="Search by customer, status...">
+      <button class="sort-btn" id="sort-payments" title="Toggle sort direction">↑↓ Date</button>
+    </div>`;
+    $('search-payments').oninput = () => renderPayments();
+    $('sort-payments').onclick = () => { SORT_STATE.payments = !SORT_STATE.payments; renderPayments(); };
+  }
+
+  if (!PAYMENTS.length) {
+    $('paymentsList').innerHTML = '<div class="empty">No payments yet.</div>';
+    return;
+  }
+
+  const search = $('search-payments')?.value.toLowerCase() || '';
+  let filtered = PAYMENTS.filter(p => {
+    const cust = CUSTOMERS.find(c => c.id === p.customer_id);
+    return (cust?.business_name || '').toLowerCase().includes(search) || p.status.toLowerCase().includes(search);
+  });
+
+  filtered.sort((a, b) => {
+    const order = SORT_STATE.payments ? -1 : 1;
+    return order * (new Date(b.payment_date) - new Date(a.payment_date));
+  });
+
+  $('paymentsList').innerHTML = '<table><thead><tr><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>' +
+    filtered.slice(0, 10).map(p => {
+      const cust = CUSTOMERS.find(c => c.id === p.customer_id);
+      return `<tr><td>${esc(cust?.business_name || 'Unknown')}</td><td>${fmtCurrency(p.amount)}</td>
+        <td><span class="tag t-${p.status}">${p.status}</span></td><td>${fmtDate(p.payment_date)}</td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+function renderTasks() {
+  if (!$('tasksList')) return;
+  if (!TASKS.length) {
+    $('tasksList').innerHTML = '<div class="empty">No tasks.</div>';
+    return;
+  }
+  $('tasksList').innerHTML = '<table><thead><tr><th>Title</th><th>Status</th><th>Due</th><th>Priority</th></tr></thead><tbody>' +
+    TASKS.slice(0, 10).map(t => `<tr><td>${esc(t.title)}</td><td><span class="tag t-${t.status}">${t.status}</span></td>
+      <td>${fmtDate(t.due_date)}</td><td>${esc(t.priority)}</td></tr>`).join('') + '</tbody></table>';
+}
+
+function renderCommissions() {
+  if (!$('commissionsList')) return;
+  $('commissionsList').innerHTML = '<div class="empty">No commissions yet.</div>';
+}
+
+function renderStaff() {
+  if (!$('staffList')) return;
+  if (MYSTAFF.role !== 'owner') {
+    $('staffList').innerHTML = '<div class="empty">Owner only.</div>';
+    return;
+  }
+
+  // Add search and sort controls
+  const panelHead = document.querySelector('#section-staff .panel-head');
+  if (panelHead && !panelHead.querySelector('.search-sort')) {
+    panelHead.innerHTML += `<div class="search-sort">
+      <input type="text" class="search-input" id="search-staff" placeholder="Search by name, email, role...">
+      <button class="sort-btn" id="sort-staff" title="Toggle sort direction">↑↓ Name</button>
+    </div>`;
+    $('search-staff').oninput = () => renderStaff();
+    $('sort-staff').onclick = () => { SORT_STATE.staff = !SORT_STATE.staff; renderStaff(); };
+  }
+
+  if (!STAFF.length) {
+    $('staffList').innerHTML = '<div class="empty">No staff yet.</div>';
+    return;
+  }
+
+  const search = $('search-staff')?.value.toLowerCase() || '';
+  let filtered = STAFF.filter(s =>
+    s.name.toLowerCase().includes(search) ||
+    s.email.toLowerCase().includes(search) ||
+    s.role.toLowerCase().includes(search)
+  );
+
+  filtered.sort((a, b) => {
+    const order = SORT_STATE.staff ? -1 : 1;
+    return order * a.name.localeCompare(b.name);
+  });
+
+  $('staffList').innerHTML = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody>' +
+    filtered.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.email)}</td><td><span class="tag t-${s.role}">${s.role}</span></td></tr>`).join('') + '</tbody></table>';
+}
+
+function renderAnalytics() {
+  if (!$('analyticsView')) return;
+  const revenue = PAYMENTS.filter(p => p.status === 'completed').reduce((s, p) => s + p.amount, 0);
+  const customers = CUSTOMERS.length || 1;
+  const active = CUSTOMERS.filter(c => c.status === 'active').length;
+  $('analyticsView').innerHTML = `<div class="grid">
+    <div class="card-item"><h3>Total Revenue</h3><p style="font-size:18px;color:var(--gold)">${fmtCurrency(revenue)}</p></div>
+    <div class="card-item"><h3>Active Rate</h3><p style="font-size:18px;color:var(--green)">${((active/customers)*100).toFixed(0)}%</p></div>
+    <div class="card-item"><h3>Avg Value</h3><p style="font-size:18px;color:var(--blue)">${fmtCurrency(revenue/customers)}</p></div>
+  </div>`;
+}
+
+function renderSettings() {
+  if (!$('settingsView')) return;
+  $('settingsView').innerHTML = `<div class="grid">
+    <div class="card-item"><h3>Role: ${MYSTAFF.role}</h3><p>Your account role and permissions</p></div>
+    <div class="card-item"><h3>Team</h3><p>${STAFF.length} staff member${STAFF.length !== 1 ? 's' : ''}</p></div>
+    <div class="card-item"><h3>Help</h3><p>Need support? Contact your admin</p></div>
+  </div>`;
+}
+
+// Init
+$('go').onclick = signIn;
+$('pw').onkeydown = e => { if (e.key === 'Enter') signIn(); };
+$('em').onkeydown = e => { if (e.key === 'Enter') $('pw').focus(); };
+supa.auth.getSession().then(({ data: { session } }) => { if (session) enter(); });
+</script>
+</body>
+</html>
