@@ -1780,6 +1780,7 @@ const setCustomers=v=>{save('layi_dash_customers',v);};
 
 /* ===== LIVE SYNC: customers (first connected table) ===== */
 let liveMode=false, myBusinessId=null;
+const APP_VERSION='2026.08.19';   // bump on release; shown to platform staff, never to the studio
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -1848,6 +1849,30 @@ async function reconcileDeletes(table,keepIds){
     if(keepIds&&keepIds.length)q=q.not('id','in','('+keepIds.join(',')+')');
     const {error}=await q;if(error)console.warn('reconcile '+table+':',error.message);
   }catch(e){console.warn('reconcile '+table+':',e);}
+}
+/* ===== TENANT PRESENCE =====
+   Writes this studio's row in the platform's businesses table: who they are and
+   that they were here. Column grants mean a studio can only touch its own name,
+   contact and last-seen; plan and status are ours alone and cannot be edited
+   from the browser.
+   Deliberately silent on failure: if the platform tables are not deployed yet,
+   or the studio is offline, the app must not care. This is our bookkeeping,
+   not theirs. */
+async function reportTenantPresence(){
+  if(!supa||!liveMode)return false;
+  try{
+    const co=(SETTINGS&&SETTINGS.company)||{};
+    const row={
+      id: myBusinessId||LAYI_BIZ,
+      name: (typeof tenantName==='function'?tenantName():'')||null,
+      contact_email: co.email||null,
+      last_seen_at: new Date().toISOString(),
+      app_version: (typeof APP_VERSION!=='undefined')?APP_VERSION:null
+    };
+    const {error}=await supa.from('businesses').upsert(row,{onConflict:'id'});
+    if(error){console.debug('presence:',error.message);return false;}
+    return true;
+  }catch(e){return false;}
 }
 async function hydrateFromCloud(){
   if(!supa||!liveMode)return false;
@@ -2207,6 +2232,7 @@ async function doLogin(){
       liveMode=true; myBusinessId=prof.business_id||LAYI_BIZ;
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
+      try{reportTenantPresence();}catch(e){}
       startRealtime();
       errEl.textContent='';document.getElementById('loginPass').value='';
       activeBranchView='all'; // start on the all-studios view (renderBranchSwitch pins branch-locked roles to their studio)
