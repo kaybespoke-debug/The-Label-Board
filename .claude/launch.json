@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "layi-dashboard",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/kaybe/Downloads/Claude Code/preview_server.js"],
+      "port": 8000
+    },
+    {
+      "name": "layi-site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "http-server", "C:/Users/kaybe/Downloads/Website", "-p", "5599", "-c-1", "--silent"],
+      "port": 5599
+    }
+  ],
+  "autoVerify": false
+}
