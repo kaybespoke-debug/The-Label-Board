@@ -376,6 +376,8 @@ select.cal-jump{padding-right:26px;background-image:url('data:image/svg+xml;utf8
 .cal-cell.jumped{box-shadow:inset 0 0 0 2px var(--gold)}
 
 .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sortsel{flex:0 0 auto;width:auto;min-width:132px;max-width:180px}
+@media(max-width:680px){.sortsel{min-width:0;flex:1 1 130px;max-width:none}}
 .pt-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .pipe-table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:620px}
 .pipe-table th{position:sticky;top:0;background:var(--panel-2);color:var(--text-dim);font-weight:600;text-align:center;padding:8px 5px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:11px;letter-spacing:.2px}
@@ -1051,7 +1053,7 @@ body.modal-open{overflow:hidden}
       <section class="view" id="view-customers">
         <div class="stat-grid" id="custStats"></div>
         <div class="toolbar">
-          <input type="text" class="fld search" id="custSearch" placeholder="Search customers…" oninput="renderCustomers()">
+          <input type="text" class="fld search" id="custSearch" placeholder="Search customers…" oninput="renderCustomers()"><select class="fld sortsel" id="sort_customers" onchange="setSort('customers',this.value)" aria-label="Sort"></select>
           <span style="flex:1"></span>
           
           <button class="btn sm ghost" onclick="go('marketing')"><svg viewBox="0 0 24 24" fill="none" stroke="#c2568a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>Marketing</button>
@@ -1081,7 +1083,7 @@ body.modal-open{overflow:hidden}
       <section class="view" id="view-orders">
         <div class="stat-grid" id="ordersStats"></div>
         <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
-          <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px">
+          <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px"><select class="fld sortsel" id="sort_orders" onchange="setSort('orders',this.value)" aria-label="Sort"></select>
           <select class="fld" id="ordersStatusSel" onchange="setOrdersFilter(this.value)" style="width:auto;min-width:150px"></select>
           <button class="btn sm" id="newOrderBtn2" onclick="openOrder()">+ New order</button>
         </div>
@@ -1106,7 +1108,7 @@ body.modal-open{overflow:hidden}
       </section>
       <section class="view" id="view-products">
         <div class="stat-grid" id="prodStats"></div>
-        <div class="toolbar"><input type="text" class="fld search" id="rtwSearch" placeholder="Search products…" oninput="renderProducts()"><span style="flex:1"></span><button class="btn sm ghost" onclick="openSale()">＋ Record a sale</button><button class="btn sm" onclick="openProduct()">+ Add product</button></div>
+        <div class="toolbar"><input type="text" class="fld search" id="rtwSearch" placeholder="Search products…" oninput="renderProducts()"><select class="fld sortsel" id="sort_products" onchange="setSort('products',this.value)" aria-label="Sort"></select><span style="flex:1"></span><button class="btn sm ghost" onclick="openSale()">＋ Record a sale</button><button class="btn sm" onclick="openProduct()">+ Add product</button></div>
         <div class="panel"><div class="panel-head"><h3>In stock</h3><span class="page-sub" id="rtwSub"></span></div><div id="rtwList"></div></div>
       </section>
       <section class="view" id="view-sales">
@@ -1124,7 +1126,7 @@ body.modal-open{overflow:hidden}
           <button class="chip" onclick="setInvTab('forecast',this)">Reorder forecast</button>
         </div>
         <div class="toolbar">
-          <input type="text" class="fld search" id="supSearch" placeholder="Search inventory…" oninput="renderSupplies()">
+          <input type="text" class="fld search" id="supSearch" placeholder="Search inventory…" oninput="renderSupplies()"><select class="fld sortsel" id="sort_supplies" onchange="setSort('supplies',this.value)" aria-label="Sort"></select>
           <select class="fld" id="supStatusSel" style="max-width:150px" onchange="setSupStatus(this.value)">
             <option value="all">All status</option><option value="low">Running low</option><option value="out">Out of stock</option>
           </select>
@@ -1138,7 +1140,7 @@ body.modal-open{overflow:hidden}
       <section class="view" id="view-suppliers">
         <div class="stat-grid" id="suprStats"></div>
         <div class="toolbar">
-          <input type="text" class="fld search" id="suprSearch" placeholder="Search vendors…" oninput="renderSuppliers()">
+          <input type="text" class="fld search" id="suprSearch" placeholder="Search vendors…" oninput="renderSuppliers()"><select class="fld sortsel" id="sort_suppliers" onchange="setSort('suppliers',this.value)" aria-label="Sort"></select>
           <select class="fld" id="suprTypeSel" style="max-width:260px" onchange="setSuprFilter(this.value)">
             <option value="all">All vendors & partners</option>
             <option value="preferred">★ Preferred only</option>
@@ -1222,7 +1224,7 @@ body.modal-open{overflow:hidden}
       <section class="view" id="view-team">
         <div class="stat-grid" id="teamStats"></div>
         <div class="toolbar">
-          <input type="text" class="fld search" id="teamSearch" placeholder="Search team…" oninput="renderTeam()">
+          <input type="text" class="fld search" id="teamSearch" placeholder="Search team…" oninput="renderTeam()"><select class="fld sortsel" id="sort_team" onchange="setSort('team',this.value)" aria-label="Sort"></select>
           <span style="flex:1"></span>
           <button class="btn sm ghost" id="newAnnBtn" onclick="openAnnouncement()">+ Team announcement</button>
           <button class="btn sm" id="newStaffBtn2" onclick="openStaff()">+ Add staff</button>
@@ -3313,7 +3315,7 @@ function saveOrder(){
   // save/update the customer profile (keep existing measurements/note)
   const cust=getCustomers();const key=nameKey(draft.client);
   const ex=cust[key]||{};
-  cust[key]={name:draft.client.trim(),email:draft.email||ex.email||'',whatsapp:draft.whatsapp||ex.whatsapp||'',address:draft.address||ex.address||'',note:ex.note||'',meas:ex.meas||{},measHistory:ex.measHistory||[],measurements:ex.measurements||'',photos:ex.photos||[]};
+  cust[key]={createdAt:ex.createdAt||new Date().toISOString(),name:draft.client.trim(),email:draft.email||ex.email||'',whatsapp:draft.whatsapp||ex.whatsapp||'',address:draft.address||ex.address||'',note:ex.note||'',meas:ex.meas||{},measHistory:ex.measHistory||[],measurements:ex.measurements||'',photos:ex.photos||[]};
   // if measurements were captured on this order, save them as a dated record on the client
   const _mvals=draft.meas&&Object.keys(draft.meas).length;
   if(_mvals||draft.measFit||draft.measPosture||draft.measNote){
@@ -3856,7 +3858,7 @@ function saveLogPayment(){
   const t=getTxns();
   t.push({id:uid('t'),dir:'in',label,amount,at,branch,channel,method,who,note,cat:'manual'});
   setTxns(t);
-  if(who){const cust=getCustomers();const key=nameKey(who);if(!cust[key]){cust[key]={name:who,email:'',whatsapp:'',address:'',note:'',meas:{},measHistory:[],measurements:'',photos:[]};setCustomers(cust);}}
+  if(who){const cust=getCustomers();const key=nameKey(who);if(!cust[key]){cust[key]={createdAt:new Date().toISOString(),name:who,email:'',whatsapp:'',address:'',note:'',meas:{},measHistory:[],measurements:'',photos:[]};setCustomers(cust);}}
   logAudit('Payment logged',cur(amount)+' · '+channel+(method?' · '+method:'')+(who?' · '+who:''));
   pushActivity('payment','Payment received: '+cur(amount)+(who?' from '+who:''));
   closeModal();if(typeof renderAll==='function')renderAll();if(typeof toast==='function')toast('Payment recorded in Money In.');
@@ -4855,7 +4857,8 @@ function renderSuppliers(){
       <div class="vt-meta">${s.location?esc(s.location):''}${items?(s.location?' · ':'')+items+' item'+(items>1?'s':''):''}</div>
       <div class="vt-contact">${[s.contact,s.phone].filter(Boolean).map(esc).join(' · ')||'Tap for details'}</div>
     </div>`;};
-  const sorted=list.slice().sort((a,b)=>(b.preferred?1:0)-(a.preferred?1:0)||(a.type||'Other').localeCompare(b.type||'Other')||a.business.localeCompare(b.business));
+  renderSortControl('suppliers');
+  const sorted=applySort('suppliers',list);
   document.getElementById('suprList').innerHTML=sorted.length?(vendorView==='list'?vendorTableHTML(sorted):`<div class="vendor-grid">${sorted.map(tileHtml).join('')}</div>`)
     :`<div class="ad" style="color:var(--text-faint);padding:24px 4px">No vendors match this filter.</div>`;
 }
@@ -5113,6 +5116,8 @@ function renderProducts(){
   const q=(document.getElementById('rtwSearch')?.value||'').toLowerCase();
   let list=all.filter(p=>!q||((p.name||'')+' '+(p.category||'')+' '+(p.variants||[]).map(v=>v.size+' '+v.color).join(' ')).toLowerCase().includes(q));
   list.sort((a,b)=>{const r={out:0,low:1,ok:2};return r[productLow(a)]-r[productLow(b)]||(a.name||'').localeCompare(b.name||'');});
+  renderSortControl('products');
+  sortInPlace('products',list);
   const sub=document.getElementById('rtwSub');if(sub)sub.textContent=all.length+(all.length===1?' style':' styles');
   const el=document.getElementById('rtwList');if(!el)return;
   if(!all.length){el.innerHTML=emptyBlock('🏷','No products in your shop yet',can('products')?'Add a style with its sizes, colours and stock. You can record sales from these later.':'Products will appear here.',can('products')?'+ Add product':null,'openProduct()');return;}
@@ -5280,7 +5285,7 @@ function recordSale(){
   pushActivity('sale','Sale recorded · '+label+' · '+cur(lineTotal));
   // customer profile + loyalty (skip walk-ins)
   if(client!=='Walk-in'){const cust=getCustomers();const key=nameKey(client);const ex=cust[key]||{};
-    cust[key]={name:client,email:d.email||ex.email||'',whatsapp:d.whatsapp||ex.whatsapp||'',address:ex.address||'',note:ex.note||'',meas:ex.meas||{},measHistory:ex.measHistory||[],measurements:ex.measurements||'',photos:ex.photos||[]};
+    cust[key]={createdAt:ex.createdAt||new Date().toISOString(),name:client,email:d.email||ex.email||'',whatsapp:d.whatsapp||ex.whatsapp||'',address:ex.address||'',note:ex.note||'',meas:ex.meas||{},measHistory:ex.measHistory||[],measurements:ex.measurements||'',photos:ex.photos||[]};
     setCustomers(cust);}
   // funds & reserves — same rule as orders: each pot's % of this sale's profit
   {const setA=orderPotSetAsides(order);const ps=getPots();let touched=false;
@@ -5595,7 +5600,6 @@ function renderSupplies(){
     if(!can('products')){box.innerHTML='<div class="ad" style="color:var(--text-faint);padding:18px 2px">You do not have access to products.</div>';return;}
     let list=prods.filter(p=>!q||((p.name||'')+' '+(p.category||'')).toLowerCase().includes(q));
     if(supFilter!=='all')list=list.filter(p=>productLow(p)===supFilter);
-    list.sort((a,b)=>(a.category||'').localeCompare(b.category||'')||(a.name||'').localeCompare(b.name||''));
     if(!list.length){box.innerHTML=prods.length?'<div class="ad" style="color:var(--text-faint);padding:18px 2px">No products match this filter.</div>':emptyBlock('\uD83C\uDFF7','No products yet',can('products')?'Add the finished styles you sell, with sizes, colours and stock.':null,'openProduct()');return;}
     const head=`<tr><th>Product</th><th class="hide-sm">Category</th>${money?'<th class="num">Price</th>':''}<th class="num">In stock</th><th>Status</th>${money?'<th class="num hide-sm">Value</th>':''}</tr>`;
     const body=list.map(p=>{const u=productUnits(p);const st=productLow(p);const lbl=st==='out'?'Out of stock':st==='low'?'Running low':'In stock';
@@ -5607,6 +5611,8 @@ function renderSupplies(){
   if(supTab==='overview'){box.innerHTML=invCatView?invCatItemsHTML(all,money,q):invOverviewHTML(all,money,q);return;}
   let list=(supTab==='fabric'||supTab==='haberdashery')?all.filter(s=>invCatMatch(s.cat,supTab)):all.filter(s=>s.cat===supTab);
   list=list.filter(s=>!q||((s.name||'')+' '+(s.cat||'')+' '+(s.subcat||'')).toLowerCase().includes(q));
+  renderSortControl('supplies');
+  sortInPlace('supplies',list);
   if(supFilter!=='all')list=list.filter(s=>supStatus(s)===supFilter);
   list.sort((a,b)=>(a.cat||'').localeCompare(b.cat||'')||(a.name||'').localeCompare(b.name||''));
   if(!list.length){box.innerHTML='<div class="ad" style="color:var(--text-faint);padding:20px 2px">Nothing under '+esc(supTab==='fabric'?'Fabric':supTab==='haberdashery'?'Haberdashery':supTab)+' yet. Add an item in this category and it will show here.</div>';return;}
@@ -6786,7 +6792,9 @@ function renderOrders(){
     if(ordersFilter==='disptoday'&&!((o.updates||[]).some(u=>u.stage==='Dispatched'&&isToday(u.at))))return false;
     if(q){const txt=(o.client+' '+(o.garment||'')+' '+orderRef(o)+' '+(o.outfits||[]).map(x=>x.name).join(' ')).toLowerCase();if(!txt.includes(q))return false;}
     return true;
-  }).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
+  });
+  renderSortControl('orders');
+  rows=applySort('orders',rows);
   const sub=document.getElementById('ordersLedgerSub');if(sub)sub.innerHTML=periodInlineHTML(ordersPeriod,ordersCustom,'setOrdersPeriod','setOrdersCustom')+(rows.length?' <span style="color:var(--text-faint)">· '+rows.length+(rows.length===1?' order':' orders')+'</span>':'');
   if(!orders.length){wrap.innerHTML=emptyBlock('🧾','No orders yet',can('orders')?'Create your first order to start tracking it here.':'Orders added by the team will show here.',can('orders')?'+ New order':null,'openOrder()');return;}
   if(!rows.length){wrap.innerHTML='<div class="ad" style="color:var(--text-faint);padding:18px 4px">No orders match this filter.</div>';return;}
@@ -7653,17 +7661,83 @@ function openNewCustomer(){
 function saveNewCustomer(){
   const name=fv('nc_name').trim();if(!name){alert('Name is required.');return;}
   const c=getCustomers();const key=nameKey(name);const ex=c[key]||{};
-  c[key]={name,email:fv('nc_email')||ex.email||'',whatsapp:fv('nc_whatsapp')||ex.whatsapp||'',address:fv('nc_address')||ex.address||'',note:fv('nc_note')||ex.note||'',meas:readMeas('nc_m')};
+  c[key]={createdAt:ex.createdAt||new Date().toISOString(),name,email:fv('nc_email')||ex.email||'',whatsapp:fv('nc_whatsapp')||ex.whatsapp||'',address:fv('nc_address')||ex.address||'',note:fv('nc_note')||ex.note||'',meas:readMeas('nc_m')};
   setCustomers(c);closeModal();renderCustomers();
 }
 /* ===== CUSTOMERS ===== */
+
+/* ===== LIST SORTING =====
+   Every long list gets the same three-way control, so the order is the user's
+   choice instead of a guess baked into each renderer. The choice is remembered
+   per list and per DEVICE (a view preference, not business data, so it is
+   deliberately not synced to the cloud).
+   Production is excluded on purpose: that queue is ordered by urgency, and the
+   ordering is the information. Letting it be re-sorted would bury what is late. */
+const _az=(x,y)=>String(x||'').localeCompare(String(y||''),undefined,{sensitivity:'base',numeric:true});
+const _t=v=>{const n=v?Date.parse(v):NaN;return isNaN(n)?0:n;};
+/* a customer predates the createdAt stamp? fall back to their first order */
+function custAdded(c){
+  if(c&&c.createdAt)return _t(c.createdAt);
+  try{const os=getOrders().filter(o=>nameKey(o.client)===nameKey(c&&c.name));
+    if(os.length)return Math.min.apply(null,os.map(o=>_t(o.createdAt)||Infinity));}catch(e){}
+  return 0;
+}
+const SORTS={
+  customers:[{v:'default',label:'Top spenders',cmp:(a,b)=>b.spend-a.spend},
+             {v:'az',     label:'Name A\u2013Z', cmp:(a,b)=>_az(a.name,b.name)},
+             {v:'new',    label:'Newest first',cmp:(a,b)=>custAdded(b)-custAdded(a)}],
+  orders:   [{v:'default',label:'Newest first',cmp:(a,b)=>_t(b.createdAt)-_t(a.createdAt)},
+             {v:'az',     label:'Client A\u2013Z',cmp:(a,b)=>_az(a.client,b.client)},
+             {v:'due',    label:'Due soonest',cmp:(a,b)=>_t(a.due||'9999')-_t(b.due||'9999')}],
+  team:     [{v:'default',label:'Name A\u2013Z', cmp:(a,b)=>_az(a.name,b.name)},
+             {v:'new',    label:'Newest first',cmp:(a,b)=>_t(b.createdAt||b.startDate)-_t(a.createdAt||a.startDate)},
+             {v:'role',   label:'Role A\u2013Z', cmp:(a,b)=>_az(a.role,b.role)||_az(a.name,b.name)}],
+  supplies: [{v:'default',label:'Category',    cmp:(a,b)=>_az(a.category,b.category)||_az(a.name,b.name)},
+             {v:'az',     label:'Name A\u2013Z', cmp:(a,b)=>_az(a.name,b.name)},
+             {v:'new',    label:'Recently updated',cmp:(a,b)=>_t(b.updatedAt||b.createdAt)-_t(a.updatedAt||a.createdAt)}],
+  suppliers:[{v:'default',label:'Preferred first',cmp:(a,b)=>(b.preferred?1:0)-(a.preferred?1:0)||_az(a.type||'Other',b.type||'Other')||_az(a.business,b.business)},
+             {v:'az',     label:'Name A\u2013Z', cmp:(a,b)=>_az(a.business,b.business)},
+             {v:'new',    label:'Newest first',cmp:(a,b)=>_t(b.createdAt)-_t(a.createdAt)}],
+  products: [{v:'default',label:'Stock status',cmp:null},
+             {v:'az',     label:'Name A\u2013Z', cmp:(a,b)=>_az(a.name,b.name)},
+             {v:'new',    label:'Newest first',cmp:(a,b)=>_t(b.createdAt)-_t(a.createdAt)}]
+};
+const SORT_RENDER={customers:'renderCustomers',orders:'renderOrders',team:'renderTeam',
+                   supplies:'renderSupplies',suppliers:'renderSuppliers',products:'renderProducts'};
+function sortPref(k){try{return (JSON.parse(localStorage.getItem('layi_sort')||'{}'))[k]||'default';}catch(e){return 'default';}}
+function setSort(k,v){
+  try{const o=JSON.parse(localStorage.getItem('layi_sort')||'{}');o[k]=v;localStorage.setItem('layi_sort',JSON.stringify(o));}catch(e){}
+  const fn=SORT_RENDER[k];try{if(fn&&typeof window[fn]==='function')window[fn]();}catch(e){}
+}
+/* returns a NEW array; a null comparator means "leave the renderer's own order" */
+function applySort(k,arr){
+  try{const cfg=SORTS[k];if(!cfg||!Array.isArray(arr))return arr;
+    const opt=cfg.filter(o=>o.v===sortPref(k))[0]||cfg[0];
+    return opt&&opt.cmp?arr.slice().sort(opt.cmp):arr;
+  }catch(e){return arr;}
+}
+function sortInPlace(k,arr){
+  try{const cfg=SORTS[k];if(!cfg||!Array.isArray(arr))return arr;
+    const opt=cfg.filter(o=>o.v===sortPref(k))[0]||cfg[0];
+    if(opt&&opt.cmp)arr.sort(opt.cmp);
+    return arr;
+  }catch(e){return arr;}
+}
+function renderSortControl(k){
+  try{const el=document.getElementById('sort_'+k);if(!el||!SORTS[k])return;
+    const cur=sortPref(k);
+    const html=SORTS[k].map(function(o){return '<option value="'+o.v+'"'+(o.v===cur?' selected':'')+'>'+o.label+'</option>';}).join('');
+    if(el.innerHTML!==html)el.innerHTML=html;
+    el.value=cur;
+  }catch(e){}
+}
 function buildCustomerData(){
   const orders=getOrders().filter(inBranch);const profiles=getCustomers();const map={};  // scoped to the studio in view (spend/orders reflect that branch)
   orders.forEach(o=>{const k=nameKey(o.client);if(!map[k])map[k]={name:o.client,key:k,orders:[],spend:0,paid:0,outstanding:0,discount:0,email:'',whatsapp:''};
     const m=map[k];m.orders.push(o);m.spend+=orderNetBase(o);m.paid+=(+o.paid||0)*ofx(o);m.outstanding+=orderOutstandingBase(o);m.discount+=(+o.discount||0)*ofx(o);});
   // profile-only customers (no orders) belong to no single studio — list them only in the all-studios view
   if(activeBranchView==='all')Object.keys(profiles).forEach(k=>{if(!map[k])map[k]={name:profiles[k].name,key:k,orders:[],spend:0,paid:0,outstanding:0,discount:0};const p=profiles[k];map[k].email=p.email||'';map[k].whatsapp=p.whatsapp||'';map[k].note=p.note||'';map[k].address=p.address||'';map[k].meas=p.meas||{};map[k].measurements=p.measurements||'';});
-  Object.values(map).forEach(m=>{const p=profiles[m.key];if(p){m.email=p.email||'';m.whatsapp=p.whatsapp||'';m.note=p.note||'';m.address=p.address||'';m.meas=p.meas||{};m.measurements=p.measurements||'';}});
+  Object.values(map).forEach(m=>{const p=profiles[m.key];if(p){m.createdAt=p.createdAt||'';m.email=p.email||'';m.whatsapp=p.whatsapp||'';m.note=p.note||'';m.address=p.address||'';m.meas=p.meas||{};m.measurements=p.measurements||'';}});
   return Object.values(map).sort((a,b)=>b.spend-a.spend);
 }
 function custPieces(c){return c.orders.reduce((n,o)=>n+(((o.outfits&&o.outfits.length)||0)+((o.saleItems||[]).reduce((s,it)=>s+(+it.qty||0),0))||(o.kind==='sale'?1:1)),0);}
@@ -7685,7 +7759,8 @@ function renderCustomers(){
   document.getElementById('custSub').textContent=data.length+(data.length===1?' customer':' customers')+(followCount?' · '+followCount+' to follow up':'');
   if(!data.length){document.getElementById('custList').innerHTML=emptyBlock('♚','No customers yet','Add a customer, or they are created automatically when you add an order.',can('customers')?'+ Add customer':null,'openNewCustomer()');return;}
   const money=can('money');
-  const sorted=list.slice().sort((a,b)=>b.spend-a.spend);
+  renderSortControl('customers');
+  const sorted=applySort('customers',list);
   const fmtLast=d=>{if(!d)return '<span style="color:var(--text-faint)">never</span>';const days=Math.floor((Date.now()-d)/86400000);const ds=days<=0?'today':days===1?'yesterday':days<30?days+'d ago':days<365?Math.floor(days/30)+'mo ago':Math.floor(days/365)+'y ago';return `${d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}<div style="color:var(--text-faint);font-size:10.5px">${ds}</div>`;};
   const flagHtml=c=>{const fu=custFollowUp(c);if(!fu)return '<span class="cflag ok">✓ up to date</span>';return `<span class="cflag ${fu.cls}"${fu.title?` title="${fu.title}"`:''}>${fu.label}</span>`;};
   const tierBadge=c=>loyaltyOn()?` <span class="tier-badge">${esc(loyaltyTier(c.spend).tier)}</span>`:'';
@@ -8095,7 +8170,8 @@ function renderTeam(){
   if(teamDept!=='all'&&!orderedDepts.includes(teamDept))teamDept='all';
   const tabsEl=document.getElementById('teamDeptTabs');
   if(tabsEl)tabsEl.innerHTML=`<button class="chip ${teamDept==='all'?'active':''}" onclick="setTeamDept('all',this)">All \u00b7 ${staff.length}</button>`+orderedDepts.map(d=>`<button class="chip ${teamDept===d?'active':''}" onclick="setTeamDept('${esc(d).replace(/'/g,"&#39;")}',this)">${esc(d)} <span style="opacity:.6">${staff.filter(s=>deptOf(s)===d).length}</span></button>`).join('');
-  const shown=(teamDept==='all')?list:list.filter(s=>deptOf(s)===teamDept);
+  renderSortControl('team');
+  const shown=applySort('team',(teamDept==='all')?list:list.filter(s=>deptOf(s)===teamDept));
   document.getElementById('teamList').innerHTML=staff.length?(shown.length?`<div class="panel">${teamTableHTML(shown)}</div>`:'<div class="panel"><div class="kv" style="color:var(--text-faint);padding:16px">No one in this department.</div></div>')
     :emptyBlock('\u2637','No team yet','Add your tailors, CRE, shoemaker and other staff, with full profiles for contact, pay, documents and history.','+ Add staff','openStaff()');
 }
