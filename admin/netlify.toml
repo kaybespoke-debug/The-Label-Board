@@ -1,11 +1,34 @@
-# Label Board Ops — the operator console. Its own Netlify site, separate from
-# the studio app, so tenants are never served staff code.
-[build]
-  publish = "admin"
+# Label Board Admin Dashboard — separate Netlify deployment
+# Serves the SaaS business admin dashboard (PWA-enabled)
 
+[build]
+  publish = "."
+  base = "admin"
+  command = ""
+
+# Serve dashboard.html for all routes (SPA fallback)
+[[redirects]]
+  from = "/*"
+  to = "/dashboard.html"
+  status = 200
+
+# Security headers
 [[headers]]
   for = "/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
     X-Frame-Options = "DENY"
     Referrer-Policy = "no-referrer"
+    Cache-Control = "public, max-age=3600"
+
+# PWA manifest & service worker
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
