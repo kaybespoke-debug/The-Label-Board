@@ -1,0 +1,9 @@
+# Netlify redirects file for The Label Board Admin Dashboard
+# This file is processed BEFORE netlify.toml and takes precedence
+
+# SPA routing: serve dashboard.html for all routes
+/*    /dashboard.html   200
+
+# Prevent caching of service worker and manifest
+/sw.js          /sw.js          200
+/manifest.json  /manifest.json  200

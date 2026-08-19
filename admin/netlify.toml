@@ -1,18 +1,10 @@
 # Label Board Admin Dashboard — separate Netlify deployment
-# Serves the SaaS business admin dashboard (PWA-enabled)
+# PWA-enabled SaaS business admin dashboard
 
 [build]
   publish = "."
-  base = "admin"
-  command = ""
 
-# Serve dashboard.html for all routes (SPA fallback)
-[[redirects]]
-  from = "/*"
-  to = "/dashboard.html"
-  status = 200
-
-# Security headers
+# Security headers - prevent indexing and embedding
 [[headers]]
   for = "/*"
   [headers.values]
@@ -21,14 +13,23 @@
     Referrer-Policy = "no-referrer"
     Cache-Control = "public, max-age=3600"
 
-# PWA manifest & service worker
+# PWA manifest - allow caching
 [[headers]]
   for = "/manifest.json"
   [headers.values]
     Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=86400"
 
+# Service worker - no caching (always fresh)
 [[headers]]
   for = "/sw.js"
   [headers.values]
     Content-Type = "application/javascript"
     Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
+
+# Dashboard HTML - standard caching
+[[headers]]
+  for = "/dashboard.html"
+  [headers.values]
+    Content-Type = "text/html; charset=utf-8"
+    Cache-Control = "public, max-age=3600"
