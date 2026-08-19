@@ -5,7 +5,7 @@
      - same-origin static (icons, manifest) -> cache-first
      - cross-origin (Supabase, Google Fonts) -> untouched, straight to network
    Bump CACHE on any change to force a clean swap. */
-const CACHE = 'layi-v20';
+const CACHE = 'layi-v21';
 const SHELL = [
   '/',
   '/layi_dashboard.html',

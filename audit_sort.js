@@ -74,6 +74,29 @@ check(/m\.createdAt=p\.createdAt/.test(src),
 check(/function custAdded[\s\S]{0,320}getOrders\(\)/.test(src),
       'customers: falls back to first order date for records predating the stamp');
 
+/* ---------- 5b. direction toggle ---------- */
+for (const fn of ['sortNatDir', 'sortRev', 'sortDir', 'toggleSortDir']) {
+  check(new RegExp('function\\s+' + fn + '\\s*\\(').test(src), 'direction: ' + fn + '() defined');
+}
+for (const key of Object.keys(LISTS)) {
+  check(src.includes('id="sortdir_' + key + '"'), key + ': has a direction button');
+  check(src.includes("toggleSortDir('" + key + "')"), key + ': button calls toggleSortDir');
+}
+check(/localStorage\.setItem\('layi_sort_rev'/.test(src), 'direction: choice is stored');
+check(/delete r\[k\]/.test(src), 'direction: resets to natural when the field changes');
+check(/rev\?\(a,b\)=>-f\(a,b\):f/.test(src), 'direction: comparator is actually negated');
+if (cfg) {
+  for (const key of Object.keys(LISTS)) {
+    const block = cfg[0].match(new RegExp(key + ':\\s*\\[[\\s\\S]*?\\]'));
+    if (block) {
+      const dirs = (block[0].match(/dir:'(asc|desc)'/g) || []).length;
+      const opts = (block[0].match(/\{v:/g) || []).length;
+      check(dirs === opts, key + ': every option declares its natural direction (' + dirs + '/' + opts + ')');
+    }
+  }
+}
+check(/btn\.textContent=d==='asc'/.test(src), 'direction: the arrow reflects the direction in force');
+
 /* ---------- 6. Production stays out of it, deliberately ---------- */
 check(!src.includes('id="sort_production"'), 'production: has NO sort control');
 check(!/(applySort|sortInPlace)\('production'/.test(src), 'production: renderer does not apply a sort');
