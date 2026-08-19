@@ -1,0 +1,11 @@
+# Label Board Ops — the operator console. Its own Netlify site, separate from
+# the studio app, so tenants are never served staff code.
+[build]
+  publish = "admin"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "no-referrer"

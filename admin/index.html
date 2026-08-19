@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Label Board Ops</title>
+<style>
+  :root{
+    --navy:#010817; --navy-2:#020b1d; --panel:#0d1526; --panel-2:#111b30;
+    --line:#1e2c47; --line-soft:#16233a;
+    --text:#eef1f6; --text-dim:#a8b3c6; --text-faint:#697894;
+    --gold:#e2ad4f; --green:#3ec98a; --amber:#e0a838; --red:#e06a6a; --blue:#5b9bd8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--navy);color:var(--text);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px}
+  a{color:var(--gold)}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 60px}
+
+  /* ---- sign in ---- */
+  #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);
+    border-radius:18px;padding:30px 26px;text-align:center}
+  .mark{font-size:11px;letter-spacing:5px;color:var(--text-faint);margin-bottom:6px}
+  .name{font-family:Georgia,serif;font-size:22px;letter-spacing:4px;margin-bottom:4px}
+  .sub{color:var(--text-faint);font-size:12px;margin-bottom:24px}
+  input,select,textarea{width:100%;height:46px;border-radius:11px;border:1px solid var(--line);
+    background:#0a1120;color:var(--text);padding:0 13px;outline:none;font-family:inherit;font-size:15px}
+  textarea{height:auto;min-height:92px;padding:11px 13px;resize:vertical}
+  input:focus,select:focus,textarea:focus{border-color:#3c5a8c}
+  label{display:block;text-align:left;font-size:12px;color:var(--text-dim);margin:14px 0 6px}
+  .btn{height:46px;border:0;border-radius:11px;background:var(--gold);color:#101728;
+    font-weight:700;cursor:pointer;font-family:inherit;font-size:15px;padding:0 18px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.sm{height:34px;font-size:13px;padding:0 12px;border-radius:9px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
+
+  /* ---- shell ---- */
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+  header h1{font-family:Georgia,serif;font-size:23px;margin:0;font-weight:500}
+  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim)}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:11px;
+    text-transform:uppercase;letter-spacing:1px;color:var(--gold)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .kpi b{display:block;font-size:26px;font-family:Georgia,serif;font-weight:500;margin-bottom:3px}
+  .kpi span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .panel-head h2{margin:0;font-family:Georgia,serif;font-size:17px;font-weight:500}
+  .panel-head .grow{flex:1}
+  .panel-head input,.panel-head select{height:38px;width:auto;min-width:150px;font-size:14px}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--text-faint);
+    font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel-2)}
+  tr:last-child td{border-bottom:none}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .studio{font-weight:600}
+  .muted{color:var(--text-faint);font-size:12px;margin-top:2px}
+  .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+  .t-trial{background:rgba(224,168,56,.16);color:var(--amber)}
+  .t-paid{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-active{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-past_due{background:rgba(224,106,106,.16);color:var(--red)}
+  .t-paused,.t-cancelled{background:rgba(105,120,148,.18);color:var(--text-faint)}
+  .t-cold{background:rgba(224,106,106,.14);color:var(--red)}
+  .t-warm{background:rgba(224,168,56,.14);color:var(--amber)}
+  .t-hot{background:rgba(62,201,138,.14);color:var(--green)}
+
+  /* ---- detail ---- */
+  .overlay{position:fixed;inset:0;background:rgba(1,6,16,.72);display:none;align-items:flex-start;
+    justify-content:center;padding:28px 16px;overflow:auto;z-index:50}
+  .overlay.show{display:flex}
+  .sheet{width:100%;max-width:620px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px}
+  .kv{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:14px}
+  .kv span{color:var(--text-faint);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .row > *{flex:1;min-width:130px}
+  .note{margin-top:18px}
+  .privacy{margin-top:18px;padding:13px 15px;border:1px solid var(--line);border-radius:12px;
+    background:var(--panel-2);font-size:13px;color:var(--text-dim);line-height:1.6}
+  .empty{padding:40px 20px;text-align:center;color:var(--text-faint)}
+  @media(max-width:680px){
+    .hide-sm{display:none}
+    .wrap{padding:16px 12px 50px}
+    th,td{padding:11px 9px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SIGN IN ============ -->
+<section id="login">
+  <div class="card">
+    <div class="mark">THE LABEL BOARD</div>
+    <div class="name">OPS</div>
+    <div class="sub">Staff only</div>
+    <label for="em">Email</label>
+    <input id="em" type="email" autocomplete="username" placeholder="you@thelabelboard.app">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div style="margin-top:20px"><button class="btn" style="width:100%" id="go">Sign in</button></div>
+    <div class="err" id="err"></div>
+  </div>
+</section>
+
+<!-- ============ CONSOLE ============ -->
+<section id="app" style="display:none"><div class="wrap">
+  <header>
+    <h1>Studios</h1>
+    <span class="pill" id="myRole"></span>
+    <div class="who"><span id="myName"></span><button class="btn ghost sm" id="out">Sign out</button></div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Every studio</h2>
+      <span class="grow"></span>
+      <input id="q" placeholder="Search studios…">
+      <select id="fPlan"><option value="">All plans</option><option>trial</option><option>studio</option><option>growth</option><option>atelier</option></select>
+      <select id="fStatus"><option value="">All statuses</option><option>active</option><option>past_due</option><option>paused</option><option>cancelled</option></select>
+    </div>
+    <div id="list"></div>
+  </div>
+</div></section>
+
+<div class="overlay" id="sheet"><div class="sheet" id="sheetBody"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================================
+   Label Board Ops — the operator console.
+
+   This app holds NO service key and queries NO table. Everything goes through
+   the admin-api Edge Function, which checks the caller is staff and logs what
+   they did. That is what lets tenant row-level security stay untouched.
+
+   It shows COUNTS, not contents. Nobody here sees a studio's client names,
+   measurements or figures. Reaching real data is a separate, logged support
+   session, which is the next thing to build.
+   ============================================================================ */
+const SUPA_URL = 'https://gcdrkoitjqwbidcfgyzl.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZHJrb2l0anF3YmlkY2ZneXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMxODcsImV4cCI6MjEwMjcxOTE4N30.XYiBkZCGgyhtRgQfmCPVErLRQY0SvmVEgHMddEpFcy8';
+
+const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+let ME = null, TENANTS = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* the one door to the database */
+async function api(action, extra = {}) {
+  const { data: { session } } = await supa.auth.getSession();
+  if (!session) throw new Error('Signed out');
+  const res = await fetch(SUPA_URL + '/functions/v1/admin-api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify({ action, ...extra })
+  });
+  const out = await res.json().catch(() => ({ error: 'Bad response from the server' }));
+  if (!res.ok || out.error) throw new Error(out.error || ('Request failed (' + res.status + ')'));
+  return out;
+}
+
+/* ---- sign in ---- */
+async function signIn() {
+  const btn = $('go'); btn.disabled = true; $('err').textContent = 'Signing in…';
+  try {
+    const { error } = await supa.auth.signInWithPassword({ email: $('em').value.trim().toLowerCase(), password: $('pw').value });
+    if (error) throw error;
+    await enter();
+  } catch (e) {
+    $('err').textContent = e.message || 'Sign-in failed';
+    try { await supa.auth.signOut(); } catch (_) {}
+  } finally { btn.disabled = false; }
+}
+
+async function enter() {
+  try {
+    const me = await api('me');
+    ME = me.me;
+    $('login').style.display = 'none';
+    $('app').style.display = '';
+    $('myName').textContent = ME.name || ME.email;
+    $('myRole').textContent = ME.role;
+    await loadTenants();
+  } catch (e) {
+    /* a tenant CAN sign in here, since it is the same auth. They simply get
+       nothing, because this app cannot read a table without the gateway. */
+    $('err').textContent = e.message;
+    try { await supa.auth.signOut(); } catch (_) {}
+  }
+}
+
+/* ---- studios ---- */
+const fmtDate = v => v ? new Date(v).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' }) : '—';
+const daysAgo = v => { if (!v) return null; return Math.floor((Date.now() - new Date(v)) / 86400000); };
+function seenTag(v) {
+  const d = daysAgo(v);
+  if (d === null) return '<span class="tag t-cold">never</span>';
+  const t = d <= 2 ? 'hot' : d <= 14 ? 'warm' : 'cold';
+  const txt = d === 0 ? 'today' : d === 1 ? 'yesterday' : d + 'd ago';
+  return '<span class="tag t-' + t + '">' + txt + '</span>';
+}
+
+async function loadTenants() {
+  $('list').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const r = await api('tenants');
+    TENANTS = r.tenants || [];
+    renderKpis(); renderList();
+  } catch (e) {
+    $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+  }
+}
+
+function renderKpis() {
+  const total = TENANTS.length;
+  const active7 = TENANTS.filter(t => daysAgo(t.last_seen_at) !== null && daysAgo(t.last_seen_at) <= 7).length;
+  const trials = TENANTS.filter(t => t.plan === 'trial').length;
+  const paying = TENANTS.filter(t => t.plan !== 'trial' && t.status === 'active').length;
+  const expiring = TENANTS.filter(t => t.plan === 'trial' && t.trial_ends_at &&
+    (new Date(t.trial_ends_at) - Date.now()) / 86400000 <= 7).length;
+  const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+  $('kpis').innerHTML = K(total, 'studios') + K(active7, 'active this week') + K(trials, 'on trial') +
+                        K(paying, 'paying') + K(expiring, 'trials ending');
+}
+
+function renderList() {
+  const q = $('q').value.trim().toLowerCase();
+  const fp = $('fPlan').value, fs = $('fStatus').value;
+  const rows = TENANTS.filter(t =>
+    (!q || ((t.name || '') + ' ' + (t.contact_email || '') + ' ' + t.id).toLowerCase().includes(q)) &&
+    (!fp || t.plan === fp) && (!fs || t.status === fs));
+
+  if (!rows.length) {
+    $('list').innerHTML = '<div class="empty">' +
+      (TENANTS.length ? 'No studio matches that.' : 'No studios yet. The first one appears the moment someone signs in to the app.') +
+      '</div>';
+    return;
+  }
+  $('list').innerHTML =
+    '<table><thead><tr><th>Studio</th><th>Plan</th><th>Status</th>' +
+    '<th class="hide-sm">Signed up</th><th>Last seen</th>' +
+    '<th class="num hide-sm">Orders</th><th class="num hide-sm">Clients</th><th class="num hide-sm">Team</th>' +
+    '</tr></thead><tbody>' +
+    rows.map(t => '<tr onclick="openTenant(\'' + t.id + '\')">' +
+      '<td><div class="studio">' + esc(t.name || 'Unnamed studio') + '</div>' +
+        '<div class="muted">' + esc(t.contact_email || t.id.slice(0, 8)) + '</div></td>' +
+      '<td><span class="tag ' + (t.plan === 'trial' ? 't-trial' : 't-paid') + '">' + esc(t.plan) + '</span></td>' +
+      '<td><span class="tag t-' + esc(t.status) + '">' + esc(t.status.replace('_', ' ')) + '</span></td>' +
+      '<td class="hide-sm">' + fmtDate(t.created_at) + '</td>' +
+      '<td>' + seenTag(t.last_seen_at) + '</td>' +
+      '<td class="num hide-sm">' + t.orders + '</td>' +
+      '<td class="num hide-sm">' + t.customers + '</td>' +
+      '<td class="num hide-sm">' + t.staff + '</td>' +
+    '</tr>').join('') + '</tbody></table>';
+}
+
+/* ---- one studio ---- */
+async function openTenant(id) {
+  $('sheet').classList.add('show');
+  $('sheetBody').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const { tenant: t } = await api('tenant', { id });
+    const canBill = ME.role === 'owner' || ME.role === 'finance';
+    const canNote = ME.role === 'owner' || ME.role === 'support';
+    const kv = (k, v) => '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>';
+    $('sheetBody').innerHTML =
+      '<h2 style="font-family:Georgia,serif;font-weight:500;margin:0 0 4px">' + esc(t.name || 'Unnamed studio') + '</h2>' +
+      '<div class="muted" style="margin-bottom:16px">' + esc(t.contact_email || '') + ' · ' + esc(t.id) + '</div>' +
+      kv('Plan', esc(t.plan)) + kv('Status', esc(t.status.replace('_', ' '))) +
+      kv('Signed up', fmtDate(t.created_at)) +
+      kv('Trial ends', fmtDate(t.trial_ends_at)) +
+      kv('Last seen', (t.last_seen_at ? fmtDate(t.last_seen_at) : 'never') + ' ' + seenTag(t.last_seen_at)) +
+      kv('App version', esc(t.app_version || 'unknown')) +
+      kv('Logins', t.users) + kv('Orders', t.orders) + kv('Clients', t.customers) +
+      kv('Team', t.staff) + kv('Vendors', t.suppliers) + kv('Transactions', t.txns) +
+      (canBill ? '<div class="row">' +
+        '<select id="pl">' + ['trial','studio','growth','atelier'].map(p => '<option' + (p === t.plan ? ' selected' : '') + '>' + p + '</option>').join('') + '</select>' +
+        '<select id="st">' + ['active','past_due','paused','cancelled'].map(p => '<option' + (p === t.status ? ' selected' : '') + '>' + p + '</option>').join('') + '</select>' +
+        '<button class="btn" onclick="saveBilling(\'' + t.id + '\')">Save</button></div>' : '') +
+      (canNote ? '<div class="note"><label>Internal note</label>' +
+        '<textarea id="nt" placeholder="Context for whoever picks this up next…">' + esc(t.notes || '') + '</textarea>' +
+        '<div class="row"><button class="btn ghost" onclick="saveNote(\'' + t.id + '\')">Save note</button></div></div>' : '') +
+      '<div class="privacy"><b>You are seeing counts, not contents.</b> Their client names, ' +
+        'measurements and figures are not on this screen and are not sent to it. Opening a studio ' +
+        'is recorded, and reaching their real records will need a support session they can see in ' +
+        'their own audit trail.</div>' +
+      '<div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>';
+  } catch (e) {
+    $('sheetBody').innerHTML = '<div class="empty">' + esc(e.message) +
+      '</div><div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>';
+  }
+}
+function closeSheet() { $('sheet').classList.remove('show'); }
+
+async function saveBilling(id) {
+  try {
+    await api('setPlan', { id, value: $('pl').value });
+    await api('setStatus', { id, value: $('st').value });
+    closeSheet(); await loadTenants();
+  } catch (e) { alert(e.message); }
+}
+async function saveNote(id) {
+  try { await api('setNote', { id, notes: $('nt').value }); closeSheet(); }
+  catch (e) { alert(e.message); }
+}
+
+/* ---- wiring ---- */
+$('go').onclick = signIn;
+$('pw').onkeydown = e => { if (e.key === 'Enter') signIn(); };
+$('em').onkeydown = e => { if (e.key === 'Enter') $('pw').focus(); };
+$('out').onclick = async () => { await supa.auth.signOut(); location.reload(); };
+$('q').oninput = renderList;
+$('fPlan').onchange = renderList;
+$('fStatus').onchange = renderList;
+$('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
+
+/* resume an existing session */
+supa.auth.getSession().then(({ data: { session } }) => { if (session) enter(); });
+</script>
+</body>
+</html>
