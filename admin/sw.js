@@ -1,5 +1,5 @@
 // The Label Board Admin Dashboard - Service Worker
-const CACHE_NAME = 'tlb-admin-v1';
+const CACHE_NAME = 'tlb-admin-v2';
 const ASSETS = [
   'dashboard.html',
   'manifest.json',
