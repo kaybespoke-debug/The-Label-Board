@@ -1,10 +1,5 @@
-# Netlify publishes the site/ folder: the app plus its PWA files, nothing else.
-# Connected to github.com/kaybespoke-debug/The-Label-Board, so a push deploys.
+# ADMIN DEPLOYMENT BRANCH
+# Netlify publishes the admin/ folder for the admin dashboard
+# Connected to github.com/kaybespoke-debug/The-Label-Board admin-deploy branch
 [build]
-  publish = "site"
-
-# Serve the single-file app at the site root.
-[[redirects]]
-  from = "/"
-  to = "/layi_dashboard.html"
-  status = 200
+  publish = "admin"
