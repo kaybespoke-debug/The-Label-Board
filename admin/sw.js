@@ -1,6 +1,6 @@
 /* The Label Board — Admin Control Centre service worker
    Bump CACHE on every release so clients pick up new files. */
-const CACHE = 'tlb-admin-v10';
+const CACHE = 'tlb-admin-v11';
 const ASSETS = [
   './',
   'index.html',
@@ -12,6 +12,7 @@ const ASSETS = [
   'js/pages.js',
   'js/pages2.js',
   'js/detail.js',
+  'js/metrics.js',
   'js/actions.js'
 ];
 

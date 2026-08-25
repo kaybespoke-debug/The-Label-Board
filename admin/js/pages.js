@@ -6,34 +6,32 @@ const PAGES = {};
 
 /* =================== OVERVIEW =================== */
 PAGES.overview = function () {
-  const subs = Q.subsAsOf(), act = Q.active(), nw = Q.newSubs(), nwPrev = Q.newSubsPrev();
+  const subs = Q.subsAsOf(), act = Q.active(), nw = Q.newSubs();
   const mrr = Q.mrr(), rev = Q.revenue(), split = Q.planSplit();
   const openT = Q.openTickets(), urg = Q.urgentTickets();
 
+  /* Four cards. Revenue and open support are not cards because both numbers
+     already read on the panels below them. */
   const stats = [
-    statCard({ label: 'Total subscribers', value: subs.length, tone: 'money', onclick: "go('subscribers')",
+    statCard({ label: 'Total subscribers', value: subs.length, tone: 'money', onclick: "drill('subs.total')",
       sub: (nw.length ? '<span class="up">↑ ' + nw.length + '</span> joined ' + PERIOD.label.toLowerCase()
-        : '<span class="note">none joined ' + PERIOD.label.toLowerCase() + '</span>') +
-        ' · ' + Q.active().length + ' paying' }),
-    statCard({ label: 'Active subscribers', value: act.length, tone: 'good', onclick: "UI.filters.subscribers='active';go('subscribers')",
+        : '<span class="note">none joined ' + PERIOD.label.toLowerCase() + '</span>') }),
+    statCard({ label: 'Active subscribers', value: act.length, tone: 'good', onclick: "drill('subs.active')",
       sub: pct(act.length, subs.length) + '% of all · ' + Q.trial().length + ' on trial' }),
-    statCard({ label: 'Revenue (' + PERIOD.label.toLowerCase() + ')', value: moneyShort(rev), tone: 'money', onclick: "go('revenue')",
-      sub: trend(rev, Q.revenuePrev()) }),
-    statCard({ label: 'MRR', value: moneyShort(mrr), tone: 'money', onclick: "go('revenue')",
+    statCard({ label: 'MRR', value: moneyShort(mrr), tone: 'money', onclick: "drill('mrr')",
       sub: 'ARR ' + moneyShort(Q.arr()) + ' · ARPU ' + moneyShort(Q.arpu()) }),
-    statCard({ label: 'Open support', value: openT.length, tone: urg.length ? 'bad' : 'good', onclick: "go('support')",
-      sub: '<span class="down">' + urg.length + ' urgent</span> · ' + (openT.length - urg.length) + ' normal' }),
-    statCard({ label: 'Renewals due (7d)', value: Q.renewing().length, tone: 'warn', onclick: "UI.filters.subscribers='renewing';go('subscribers')",
-      sub: '<span class="down">' + Q.pastDue().length + ' past due</span> · ' + moneyShort(Q.renewing().reduce((t, s) => t + s.mrr, 0)) + ' at stake' })
+    statCard({ label: 'Renewals due (7d)', value: Q.renewing().length, tone: Q.pastDue().length ? 'bad' : 'warn',
+      onclick: "drill('subs.renewals')",
+      sub: (Q.pastDue().length ? '<span class="down">' + Q.pastDue().length + ' past due</span> · ' : '') +
+        moneyShort(Q.renewing().reduce((t, s) => t + s.mrr, 0)) + ' at stake' })
   ].join('');
 
   const revSeries = Q.revenueSeries();
-  const growth = Q.growthSeries(6);
 
   const donutSegs = split.filter(s => s.count).map(s => ({
     label: s.name, value: s.count,
     color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)', trial: 'var(--blue)' }[s.id],
-    onclick: "UI.filters.subscribers='" + s.id + "';go('subscribers')"
+    onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
   }));
 
   const recent = DB.subscribers.slice().sort((a, b) => b.joined.localeCompare(a.joined)).slice(0, 6);
@@ -53,15 +51,10 @@ PAGES.overview = function () {
     '<div class="cols"><div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Revenue overview</h3>' +
-    '<div class="ph-sub">' + money(rev) + ' collected · ' + PERIOD.label + '</div></div>' +
-    '<button class="lnk" onclick="go(\'revenue\')">Full revenue &rsaquo;</button></div>' +
+    '<div class="ph-sub"><b style="color:var(--gold)">' + money(rev) + '</b> collected · ' + PERIOD.label +
+    ' · ' + trend(rev, Q.revenuePrev()) + '</div></div>' +
+    '<button class="lnk" onclick="drill(\'revenue\')">See the payments &rsaquo;</button></div>' +
     areaChart(revSeries, { money: true, color: 'var(--gold)', height: 210 }) + '</div>' +
-
-    '<div class="pnl"><div class="ph"><div><h3>Growth overview</h3>' +
-    '<div class="ph-sub">Total subscribers · last 6 months</div></div>' +
-    '<span class="note">' + subs.length + ' &nbsp;<span class="up">↑ ' +
-    pct(growth[5].value - growth[0].value, growth[0].value) + '%</span></span></div>' +
-    areaChart(growth, { color: 'var(--green)', height: 190 }) + '</div>' +
 
     '<div class="pnl"><div class="ph"><h3>Recent subscribers</h3>' +
     '<button class="lnk" onclick="go(\'subscribers\')">View all</button></div>' +
@@ -81,21 +74,16 @@ PAGES.overview = function () {
     donut(donutSegs, subs.length, 'Total') +
     '<button class="btn" style="width:100%;margin-top:14px" onclick="go(\'subscribers\')">View all subscribers &rarr;</button></div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Revenue by plan</h3><span class="note">MRR</span></div>' +
-    hBars(split.filter(s => s.mrr).map(s => ({
-      label: s.name, value: s.mrr,
-      color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)', trial: 'var(--blue)' }[s.id],
-      onclick: "UI.filters.subscribers='" + s.id + "';go('subscribers')"
-    })), { money: true }) + '</div>' +
-
-    '<div class="pnl"><div class="ph"><h3>Alerts</h3><button class="lnk" onclick="go(\'activity\')">View all</button></div>' +
+    '<div class="pnl"><div class="ph"><h3>Alerts</h3><button class="lnk" onclick="openAlerts()">View all</button></div>' +
     (alerts.length ? alerts.map(a => '<div class="row klik" onclick="' + a.go + '">' +
       '<div><b>' + a.t + '</b><small>' + esc(a.d) + '</small></div>' +
       '<span class="note">' + a.when + '</span></div>').join('') : '<div class="empty">Nothing needs you right now.</div>') +
     '</div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Support &amp; reviews</h3><button class="lnk" onclick="go(\'support\')">View all</button></div>' +
-    DB.tickets.slice(0, 5).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+    '<div class="pnl"><div class="ph"><div><h3>Support</h3>' +
+    '<div class="ph-sub">' + openT.length + ' open' + (urg.length ? ' · <span style="color:var(--red)">' + urg.length + ' urgent</span>' : '') + '</div></div>' +
+    '<button class="lnk" onclick="drill(\'tickets.open\')">Breakdown &rsaquo;</button></div>' +
+    Q.openTickets().slice(0, 4).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
       '<div><b>' + esc(t.title) + '</b><small>' + esc(t.subscriber) + '</small></div>' +
       statusPill(t.state) + '</div>').join('') +
     '<button class="btn" style="width:100%;margin-top:12px" onclick="go(\'support\')">Go to support centre &rarr;</button></div>' +
@@ -125,6 +113,9 @@ PAGES.subscribers = function () {
   };
   let list = (buckets[f] || all).slice();
 
+  /* plan is a dropdown, not three more tabs */
+  if (UI.planFilter && UI.planFilter !== 'any') list = list.filter(s => s.plan === UI.planFilter);
+
   if (UI.search) {
     const q = UI.search.toLowerCase();
     list = list.filter(s => s.name.toLowerCase().includes(q) || s.owner.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
@@ -149,14 +140,14 @@ PAGES.subscribers = function () {
   };
   list.sort(sorters[sort] || sorters.name);
 
+  const planSel = UI.planFilter || 'any';
+
   return periodBar() +
     '<div class="stats">' +
-    statCard({ label: 'All subscribers', value: all.length, tone: 'money', onclick: "setFilter('subscribers','all')", sub: Q.newSubs().length + ' joined ' + PERIOD.label.toLowerCase() }) +
-    statCard({ label: 'Active', value: buckets.active.length, tone: 'good', onclick: "setFilter('subscribers','active')", sub: moneyShort(Q.mrr()) + ' MRR' }) +
-    statCard({ label: 'On trial', value: buckets.trial.length, tone: 'info', onclick: "setFilter('subscribers','trial')", sub: buckets.trial.filter(s => s.renewIn <= 3).length + ' ending within 3 days' }) +
-    statCard({ label: 'Renewing in 7d', value: buckets.renewing.length, tone: 'warn', onclick: "setFilter('subscribers','renewing')", sub: moneyShort(buckets.renewing.reduce((t, s) => t + s.mrr, 0)) + ' up for renewal' }) +
-    statCard({ label: 'Past due', value: buckets.pastdue.length, tone: 'bad', onclick: "setFilter('subscribers','pastdue')", sub: moneyShort(buckets.pastdue.reduce((t, s) => t + s.mrr, 0)) + ' unpaid' }) +
-    statCard({ label: 'Expired', value: buckets.expired.length, tone: 'bad', onclick: "setFilter('subscribers','expired')", sub: 'Churn ' + pct(buckets.expired.length, all.length) + '%' }) +
+    statCard({ label: 'All subscribers', value: all.length, tone: 'money', onclick: "drill('subs.total')", sub: Q.newSubs().length + ' joined ' + PERIOD.label.toLowerCase() }) +
+    statCard({ label: 'Active', value: buckets.active.length, tone: 'good', onclick: "drill('subs.active')", sub: moneyShort(Q.mrr()) + ' MRR' }) +
+    statCard({ label: 'On trial', value: buckets.trial.length, tone: 'info', onclick: "drill('subs.trial')", sub: buckets.trial.filter(s => s.renewIn <= 3).length + ' ending within 3 days' }) +
+    statCard({ label: 'Needs attention', value: buckets.pastdue.length + buckets.renewing.length, tone: buckets.pastdue.length ? 'bad' : 'warn', onclick: "drill('subs.pastdue')", sub: buckets.pastdue.length + ' past due · ' + buckets.renewing.length + ' renewing' }) +
     '</div>' +
 
     '<div class="bar">' +
@@ -166,12 +157,14 @@ PAGES.subscribers = function () {
       { k: 'trial', t: 'Trial', n: buckets.trial.length },
       { k: 'renewing', t: 'Renewing soon', n: buckets.renewing.length },
       { k: 'pastdue', t: 'Past due', n: buckets.pastdue.length },
-      { k: 'expired', t: 'Expired', n: buckets.expired.length },
-      { k: 'premium', t: 'Premium', n: buckets.premium.length },
-      { k: 'pro', t: 'Pro', n: buckets.pro.length },
-      { k: 'starter', t: 'Starter', n: buckets.starter.length }
+      { k: 'expired', t: 'Expired', n: buckets.expired.length }
     ]) +
     '<span class="spacer"></span>' +
+    '<select class="sel" onchange="UI.planFilter=this.value;render()">' +
+    [['any', 'Any plan'], ['premium', 'Premium'], ['pro', 'Pro'], ['starter', 'Starter'], ['trial', 'Trial']]
+      .map(o => '<option value="' + o[0] + '"' + (planSel === o[0] ? ' selected' : '') + '>' +
+        (o[0] === 'any' ? 'Plan: any' : 'Plan: ' + o[1]) + '</option>').join('') +
+    '</select>' +
     '<select class="sel" onchange="UI.sort.subscribers=this.value;render()">' +
     [['name', 'Name A–Z'], ['name-desc', 'Name Z–A'], ['tier', 'Tier (Premium first)'], ['tier-asc', 'Tier (Starter first)'],
      ['mrr-desc', 'MRR high → low'], ['mrr-asc', 'MRR low → high'], ['newest', 'Newest first'], ['oldest', 'Longest standing'],
@@ -184,20 +177,18 @@ PAGES.subscribers = function () {
     '</div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Subscriber directory</h3>' +
-    '<div class="ph-sub">' + list.length + ' of ' + all.length + ' shown</div></div></div>' +
+    '<div class="ph-sub">' + list.length + ' of ' + all.length + ' shown' +
+    (planSel !== 'any' ? ' · ' + planById(planSel).name + ' only' : '') +
+    ' · health, seats and referrals are on each profile</div></div></div>' +
     (list.length ? '<div class="tw"><table><thead><tr>' +
-      '<th>Business</th><th>Plan</th><th>Status</th><th>Health</th><th class="num">Users</th>' +
-      '<th>Joined</th><th>Renews</th><th class="num">Referrals</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
+      '<th>Business</th><th>Plan</th><th>Status</th><th>Joined</th><th>Renews</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
       list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + ' · ' + esc(s.city) + '</div></td>' +
-        '<td><span class="tier">' + s.planName + '</span><div class="t-sub">' + s.cycle + '</div></td>' +
+        '<td><span class="tier">' + s.planName + '</span></td>' +
         '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') + '</td>' +
-        '<td>' + statusPill(s.health) + '</td>' +
-        '<td class="num">' + s.users + '<span class="t-sub">/' + s.seats + '</span></td>' +
         '<td>' + fmtD(s.joined) + '</td>' +
         '<td>' + (s.status === 'expired' ? '<span class="note">—</span>' :
           (s.renewIn <= 7 ? '<span class="pill amber">' + (s.renewIn <= 0 ? 'due' : s.renewIn + 'd') + '</span>' : fmtDShort(s.renewsOn))) + '</td>' +
-        '<td class="num">' + (s.referralConverted || 0) + (s.referralEarned ? '<div class="t-sub">' + moneyShort(s.referralEarned) + '</div>' : '') + '</td>' +
         '<td class="num">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
       '</tbody></table></div>'
@@ -221,9 +212,9 @@ PAGES.onboarding = function () {
   return periodBar() +
     '<div class="stats">' +
     statCard({ label: 'In pipeline', value: all.length, tone: 'info', onclick: "setFilter('onboarding','all')", sub: 'Trials not yet converted' }) +
-    statCard({ label: 'Not started', value: buckets.new.length, tone: 'warn', onclick: "setFilter('onboarding','new')", sub: 'Account created, nothing set up' }) +
-    statCard({ label: 'Setting up', value: buckets.setup.length, tone: 'info', onclick: "setFilter('onboarding','setup')", sub: 'Partway through the checklist' }) +
-    statCard({ label: 'Ready to convert', value: buckets.ready.length, tone: 'good', onclick: "setFilter('onboarding','ready')", sub: 'Checklist complete' }) +
+    statCard({ label: 'Not started', value: buckets.new.length, tone: 'warn', onclick: "drill('onb.stage:new')", sub: 'Account created, nothing set up' }) +
+    statCard({ label: 'Setting up', value: buckets.setup.length, tone: 'info', onclick: "drill('onb.stage:setup')", sub: 'Partway through the checklist' }) +
+    statCard({ label: 'Ready to convert', value: buckets.ready.length, tone: 'good', onclick: "drill('onb.stage:ready')", sub: 'Checklist complete' }) +
     statCard({ label: 'Activated', value: activatedThisPeriod, tone: 'good', sub: PERIOD.label + ' · trial → paid' }) +
     statCard({ label: 'Avg time to live', value: avgDays + 'd', tone: 'money', sub: '<span class="up">↓ 0.7d</span> vs previous period' }) +
     '</div>' +
@@ -256,11 +247,10 @@ PAGES.billing = function () {
     '<div class="stats">' +
     split.map(p => statCard({
       label: p.name, value: p.count, tone: p.id === 'trial' ? 'info' : 'money',
-      onclick: "UI.filters.subscribers='" + p.id + "';go('subscribers')",
+      onclick: "UI.planFilter='" + p.id + "';UI.filters.subscribers='all';go('subscribers')",
       sub: p.share + '% of base · ' + (p.mrr ? moneyShort(p.mrr) + ' MRR' : 'no MRR')
     })).join('') +
-    statCard({ label: 'Annual billing', value: annual, tone: 'good', sub: pct(annual, subs.length) + '% of subscribers' }) +
-    statCard({ label: 'Blended ARPU', value: moneyShort(Q.arpu()), tone: 'money', sub: 'Across ' + Q.active().length + ' paying accounts' }) +
+    statCard({ label: 'Blended ARPU', value: moneyShort(Q.arpu()), tone: 'money', onclick: "drill('arpu')", sub: pct(annual, subs.length) + '% on annual billing' }) +
     '</div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Plans &amp; pricing</h3>' +
@@ -285,7 +275,7 @@ PAGES.billing = function () {
     hBars(split.filter(s => s.mrr).map(s => ({
       label: s.name, value: s.mrr,
       color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)' }[s.id] || 'var(--blue)',
-      onclick: "UI.filters.subscribers='" + s.id + "';go('subscribers')"
+      onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
     })), { money: true }) + '</div>' +
     '<div class="pnl"><div class="ph"><h3>Referral programme</h3></div>' +
     '<div class="kv"><span class="k">Commission rate</span><span class="v">' + DB.settings.referralPct + '% of first month</span></div>' +
@@ -302,28 +292,38 @@ PAGES.billing = function () {
 PAGES.payments = function () {
   const f = UI.filters.payments;
   const inP = DB.payments.filter(p => inPeriod(p.date));
-  const count = s => inP.filter(p => p.status === s).length;
-  let list = f === 'all' ? inP : inP.filter(p => p.status === f);
+
+  /* Five groups instead of seven statuses. Failed and overdue are the same job
+     (retry the card); pending and upcoming are the same job (nothing, yet).
+     The exact status still shows as a pill on every row. */
+  const GROUPS = {
+    all: () => inP,
+    collected: () => inP.filter(p => p.status === 'successful'),
+    problems: () => inP.filter(p => p.status === 'failed' || p.status === 'overdue'),
+    scheduled: () => inP.filter(p => p.status === 'pending' || p.status === 'upcoming'),
+    refunded: () => inP.filter(p => p.status === 'refunded')
+  };
+  const g = k => GROUPS[k] ? GROUPS[k]() : inP;
+  const sum = k => g(k).reduce((t, p) => t + p.amount, 0);
+
+  let list = g(f);
   if (UI.search) { const q = UI.search.toLowerCase(); list = list.filter(p => p.subscriber.toLowerCase().includes(q) || p.ref.toLowerCase().includes(q)); }
   list = list.slice().sort((a, b) => b.date.localeCompare(a.date));
 
-  const sum = s => inP.filter(p => p.status === s).reduce((t, p) => t + p.amount, 0);
-
   return periodBar() +
     '<div class="stats">' +
-    statCard({ label: 'Collected', value: moneyShort(sum('successful')), tone: 'good', onclick: "setFilter('payments','successful')", sub: count('successful') + ' payments · ' + trend(sum('successful'), Q.revenuePrev()) }) +
-    statCard({ label: 'Failed', value: moneyShort(sum('failed')), tone: 'bad', onclick: "setFilter('payments','failed')", sub: count('failed') + ' need a retry' }) +
-    statCard({ label: 'Overdue', value: moneyShort(sum('overdue')), tone: 'bad', onclick: "setFilter('payments','overdue')", sub: count('overdue') + ' accounts past due' }) +
-    statCard({ label: 'Pending', value: moneyShort(sum('pending')), tone: 'warn', onclick: "setFilter('payments','pending')", sub: count('pending') + ' clearing today' }) +
-    statCard({ label: 'Upcoming', value: moneyShort(sum('upcoming')), tone: 'info', onclick: "setFilter('payments','upcoming')", sub: count('upcoming') + ' scheduled renewals' }) +
-    statCard({ label: 'Refunded', value: moneyShort(sum('refunded')), tone: 'money', onclick: "setFilter('payments','refunded')", sub: count('refunded') + ' refunds issued' }) +
+    statCard({ label: 'Collected', value: moneyShort(sum('collected')), tone: 'good', onclick: "drill('revenue')", sub: g('collected').length + ' payments · ' + trend(sum('collected'), Q.revenuePrev()) }) +
+    statCard({ label: 'Problems', value: moneyShort(sum('problems')), tone: sum('problems') ? 'bad' : 'good', onclick: "drill('pay.problems')", sub: g('problems').length + ' to retry — declines and past due' }) +
+    statCard({ label: 'Scheduled', value: moneyShort(sum('scheduled')), tone: 'info', onclick: "drill('pay.scheduled')", sub: g('scheduled').length + ' queued against a card on file' }) +
+    statCard({ label: 'Refunded', value: moneyShort(sum('refunded')), tone: 'money', onclick: "drill('pay.refunded')", sub: g('refunded').length + ' sent back' }) +
     '</div>' +
 
     '<div class="bar">' + tabBar('payments', [
-      { k: 'all', t: 'All', n: inP.length }, { k: 'successful', t: 'Successful', n: count('successful') },
-      { k: 'failed', t: 'Failed', n: count('failed') }, { k: 'pending', t: 'Pending', n: count('pending') },
-      { k: 'overdue', t: 'Overdue', n: count('overdue') }, { k: 'upcoming', t: 'Upcoming', n: count('upcoming') },
-      { k: 'refunded', t: 'Refunded', n: count('refunded') }
+      { k: 'all', t: 'All', n: inP.length },
+      { k: 'collected', t: 'Collected', n: g('collected').length },
+      { k: 'problems', t: 'Problems', n: g('problems').length },
+      { k: 'scheduled', t: 'Scheduled', n: g('scheduled').length },
+      { k: 'refunded', t: 'Refunded', n: g('refunded').length }
     ]) + '<span class="spacer"></span><button class="btn" onclick="exportPayments()">Export CSV</button></div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Transactions</h3>' +
@@ -367,12 +367,11 @@ function payrollBody(key) {
   slips.forEach(s => { byDept[s.dept] = (byDept[s.dept] || 0) + s.net; });
 
   return '<div class="stats">' +
-    statCard({ label: 'Gross payroll', value: moneyShort(run.gross), tone: 'money', sub: run.headcount + ' staff · ' + run.month }) +
-    statCard({ label: 'Total deductions', value: moneyShort(run.deductions), tone: 'warn', sub: pct(run.deductions, run.gross) + '% of gross · PAYE, pension, NHF' }) +
-    statCard({ label: 'Net to pay', value: moneyShort(run.net), tone: 'good', sub: 'Value date ' + fmtD(run.payDate) }) +
-    statCard({ label: 'Paid', value: paid.length + '/' + slips.length, tone: 'good', sub: moneyShort(paid.reduce((t, s) => t + s.net, 0)) + ' released' }) +
-    statCard({ label: 'Pending', value: pending.length, tone: pending.length ? 'bad' : 'good', sub: pending.length ? moneyShort(pending.reduce((t, s) => t + s.net, 0)) + ' still to run' : 'All staff paid' }) +
-    statCard({ label: 'Payslips published', value: published + '/' + slips.length, tone: published === slips.length ? 'good' : 'warn', sub: published === slips.length ? 'Visible to all staff' : 'Publish so staff can see them' }) +
+    statCard({ label: 'Gross payroll', value: moneyShort(run.gross), tone: 'money', onclick: "drill('pay.gross')", sub: run.headcount + ' staff · ' + run.month }) +
+    statCard({ label: 'Total deductions', value: moneyShort(run.deductions), tone: 'warn', onclick: "drill('pay.deductions')", sub: pct(run.deductions, run.gross) + '% of gross · PAYE, pension, NHF' }) +
+    statCard({ label: 'Net to pay', value: moneyShort(run.net), tone: 'good', onclick: "drill('pay.net')", sub: 'Value date ' + fmtD(run.payDate) }) +
+    statCard({ label: 'Pending', value: pending.length, tone: pending.length ? 'bad' : 'good', onclick: "drill('pay.pending')", sub: pending.length ? moneyShort(pending.reduce((t, s) => t + s.net, 0)) + ' still to run' : 'All ' + slips.length + ' staff paid' }) +
+    statCard({ label: 'Payslips published', value: published + '/' + slips.length, tone: published === slips.length ? 'good' : 'warn', onclick: "drill('pay.slips')", sub: published === slips.length ? 'Visible to all staff' : 'Publish so staff can see them' }) +
     '</div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>' + run.month + ' payroll</h3>' +
@@ -416,14 +415,16 @@ PAGES.revenue = function () {
   const rev = Q.revenue(), churn = Q.churnedMrr();
   const netNew = Q.newSubs().filter(s => s.status === 'active').reduce((t, s) => t + s.mrr, 0);
 
+  const growth = Q.growthSeries(6);
+
   return periodBar() +
     '<div class="stats">' +
-    statCard({ label: 'MRR', value: moneyShort(mrr), tone: 'money', sub: trend(mrr, Q.mrrPrev()) }) +
-    statCard({ label: 'ARR run rate', value: moneyShort(Q.arr()), tone: 'money', sub: 'MRR × 12' }) +
-    statCard({ label: 'Collected', value: moneyShort(rev), tone: 'good', onclick: "go('payments')", sub: Q.payments('successful').length + ' payments · ' + PERIOD.label }) +
-    statCard({ label: 'ARPU', value: moneyShort(Q.arpu()), tone: 'money', sub: 'Per active account' }) +
-    statCard({ label: 'New MRR', value: moneyShort(netNew), tone: 'good', sub: Q.newSubs().length + ' new accounts ' + PERIOD.label.toLowerCase() }) +
-    statCard({ label: 'Churned MRR', value: moneyShort(churn), tone: 'bad', onclick: "UI.filters.subscribers='expired';go('subscribers')", sub: pct(churn, mrr) + '% of MRR · ' + Q.expired().length + ' accounts' }) +
+    statCard({ label: 'MRR', value: moneyShort(mrr), tone: 'money', onclick: "drill('mrr')", sub: trend(mrr, Q.mrrPrev()) }) +
+    statCard({ label: 'Collected', value: moneyShort(rev), tone: 'good', onclick: "drill('revenue')", sub: Q.payments('successful').length + ' payments · ' + PERIOD.label }) +
+    statCard({ label: 'ARR run rate', value: moneyShort(Q.arr()), tone: 'money', onclick: "drill('arr')", sub: 'MRR × 12' }) +
+    statCard({ label: 'ARPU', value: moneyShort(Q.arpu()), tone: 'money', onclick: "drill('arpu')", sub: 'Per active account' }) +
+    statCard({ label: 'New MRR', value: moneyShort(netNew), tone: 'good', onclick: "drill('newmrr')", sub: Q.newSubs().length + ' new accounts ' + PERIOD.label.toLowerCase() }) +
+    statCard({ label: 'Churned MRR', value: moneyShort(churn), tone: 'bad', onclick: "drill('churn')", sub: pct(churn, mrr) + '% of MRR · ' + Q.expired().length + ' accounts' }) +
     '</div>' +
 
     '<div class="cols"><div>' +
@@ -431,6 +432,12 @@ PAGES.revenue = function () {
     '<div class="ph-sub">Successful payments · ' + PERIOD.label + '</div></div>' +
     '<span class="note">' + money(rev) + '</span></div>' +
     areaChart(Q.revenueSeries(), { money: true, color: 'var(--gold)', height: 220 }) + '</div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Growth overview</h3>' +
+    '<div class="ph-sub">Total subscribers · last 6 months</div></div>' +
+    '<span class="note">' + growth[5].value + ' &nbsp;<span class="up">↑ ' +
+    pct(growth[5].value - growth[0].value, growth[0].value) + '%</span></span></div>' +
+    areaChart(growth, { color: 'var(--green)', height: 190 }) + '</div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Revenue progression</h3>' +
     '<div class="ph-sub">Monthly collected, last 12 months</div></div></div>' +
@@ -463,13 +470,13 @@ PAGES.revenue = function () {
     donut(split.filter(s => s.count).map(s => ({
       label: s.name, value: s.count,
       color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)', trial: 'var(--blue)' }[s.id],
-      onclick: "UI.filters.subscribers='" + s.id + "';go('subscribers')"
+      onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
     })), Q.subsAsOf().length, 'Total') + '</div>' +
     '<div class="pnl"><div class="ph"><h3>Revenue by plan</h3><span class="note">MRR</span></div>' +
     hBars(split.filter(s => s.mrr).map(s => ({
       label: s.name, value: s.mrr,
       color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)' }[s.id] || 'var(--blue)',
-      onclick: "UI.filters.subscribers='" + s.id + "';go('subscribers')"
+      onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
     })), { money: true }) + '</div>' +
     '<div class="pnl"><div class="ph"><h3>Billing cycle mix</h3></div>' +
     donut([

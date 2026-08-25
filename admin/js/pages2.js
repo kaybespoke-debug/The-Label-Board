@@ -24,7 +24,7 @@ PAGES.support = function () {
       statCard({ label: 'Monthly active users', value: last.mau.toLocaleString(), tone: 'good', sub: trend(last.mau, u[0].mau, { unit: '30 days' }) }) +
       statCard({ label: 'Orders created', value: u.reduce((t, d) => t + d.orders, 0).toLocaleString(), tone: 'money', sub: 'Last 30 days across all subscribers' }) +
       statCard({ label: 'Avg orders / business', value: Math.round(u.reduce((t, d) => t + d.orders, 0) / Math.max(1, Q.active().length)), tone: 'info', sub: 'Per active account, 30 days' }) +
-      statCard({ label: 'At-risk accounts', value: Q.atRisk().length, tone: 'bad', onclick: "setFilter('support','risk')", sub: 'Low activity or failed payment' }) +
+      statCard({ label: 'At-risk accounts', value: Q.atRisk().length, tone: 'bad', onclick: "drill('subs.atrisk')", sub: 'Low activity or failed payment' }) +
       statCard({ label: 'Seat utilisation', value: pct(Q.active().reduce((t, s) => t + s.users, 0), Q.active().reduce((t, s) => t + s.seats, 0)) + '%', tone: 'info', sub: Q.active().reduce((t, s) => t + s.users, 0) + ' of ' + Q.active().reduce((t, s) => t + s.seats, 0) + ' seats used' }) +
       '</div>' +
       '<div class="pnl"><div class="ph"><div><h3>Daily active businesses</h3><div class="ph-sub">Last 30 days</div></div></div>' +
@@ -67,7 +67,7 @@ PAGES.support = function () {
 
   return head +
     '<div class="stats">' +
-    statCard({ label: 'Open tickets', value: open.length, tone: 'bad', onclick: "UI.ticketFilter='open';render()", sub: '<span class="down">' + urg.length + ' urgent</span> · SLA ' + DB.settings.slaHours + 'h' }) +
+    statCard({ label: 'Open tickets', value: open.length, tone: 'bad', onclick: "drill('tickets.open')", sub: '<span class="down">' + urg.length + ' urgent</span> · SLA ' + DB.settings.slaHours + 'h' }) +
     statCard({ label: 'In progress', value: prog.length, tone: 'info', onclick: "UI.ticketFilter='progress';render()", sub: 'Assigned to an agent' }) +
     statCard({ label: 'Unassigned', value: DB.tickets.filter(t => !t.assignedTo).length, tone: 'warn', onclick: "UI.ticketFilter='unassigned';render()", sub: 'Waiting to be picked up' }) +
     statCard({ label: 'Avg first reply', value: Q.avgFirstReply() + 'm', tone: 'good', sub: 'Target under ' + (DB.settings.slaHours * 60) + 'm' }) +
@@ -222,7 +222,7 @@ PAGES.tasks = function () {
     statCard({ label: 'My tasks', value: mine.filter(t => !t.done).length, tone: 'money', onclick: "setFilter('tasks','mine')", sub: 'Assigned to you' }) +
     statCard({ label: 'All open', value: all.filter(t => !t.done).length, tone: 'info', onclick: "setFilter('tasks','all')", sub: 'Across every team' }) +
     statCard({ label: 'Due today', value: todayT.length, tone: 'warn', onclick: "setFilter('tasks','today')", sub: 'Needs closing out today' }) +
-    statCard({ label: 'Overdue', value: overdue.length, tone: overdue.length ? 'bad' : 'good', onclick: "setFilter('tasks','overdue')", sub: overdue.length ? 'Oldest ' + Math.abs(Math.min.apply(null, overdue.map(t => t.dueIn))) + ' days late' : 'Nothing late' }) +
+    statCard({ label: 'Overdue', value: overdue.length, tone: overdue.length ? 'bad' : 'good', onclick: "drill('tasks.overdue')", sub: overdue.length ? 'Oldest ' + Math.abs(Math.min.apply(null, overdue.map(t => t.dueIn))) + ' days late' : 'Nothing late' }) +
     statCard({ label: 'Completed', value: done.length, tone: 'good', onclick: "setFilter('tasks','done')", sub: 'Closed out' }) +
     '</div>' +
     '<div class="bar">' + tabBar('tasks', [
@@ -253,12 +253,11 @@ PAGES.staff = function () {
   const totalPay = all.reduce((t, s) => t + s.basic + s.housing + s.transport, 0);
 
   return '<div class="stats">' +
-    statCard({ label: 'Total staff', value: all.length, tone: 'money', onclick: "setFilter('staff','all')", sub: all.filter(s => s.empType === 'Full time').length + ' full time' }) +
-    statCard({ label: 'On the floor now', value: Q.onFloorNow(), tone: 'good', sub: 'Clocked in and not out yet' }) +
-    statCard({ label: 'Late today', value: Q.lateToday(), tone: Q.lateToday() ? 'warn' : 'good', sub: 'Clocked in after 09:00' }) +
-    statCard({ label: 'On leave today', value: Q.onLeaveToday(), tone: 'info', sub: DB.leave.filter(l => l.status === 'pending').length + ' requests pending' }) +
-    statCard({ label: 'Monthly payroll', value: moneyShort(totalPay), tone: 'money', onclick: "go('payroll')", sub: 'Gross before bonuses' }) +
-    statCard({ label: 'Roles defined', value: DB.roles.length, tone: 'info', onclick: "go('settings')", sub: 'Edit in Settings → Team' }) +
+    statCard({ label: 'Total staff', value: all.length, tone: 'money', onclick: "drill('staff.total')", sub: all.filter(s => s.empType === 'Full time').length + ' full time · ' + DB.roles.length + ' roles' }) +
+    statCard({ label: 'On the floor now', value: Q.onFloorNow(), tone: 'good', onclick: "drill('staff.onfloor')", sub: 'Clocked in and not out yet' }) +
+    statCard({ label: 'Late today', value: Q.lateToday(), tone: Q.lateToday() ? 'warn' : 'good', onclick: "drill('staff.late')", sub: 'Clocked in after 09:00' }) +
+    statCard({ label: 'On leave today', value: Q.onLeaveToday(), tone: 'info', onclick: "drill('staff.leave')", sub: DB.leave.filter(l => l.status === 'pending').length + ' requests pending' }) +
+    statCard({ label: 'Monthly payroll', value: moneyShort(totalPay), tone: 'money', onclick: "drill('pay.gross')", sub: 'Gross before bonuses' }) +
     '</div>' +
     '<div class="bar">' + tabBar('staff', [
       { k: 'all', t: 'All staff', n: all.length },
@@ -468,24 +467,42 @@ function kvEdit(k, v, onclick) {
     '<span class="k">' + k + '</span><span class="v">' + esc(v) + ' <span class="chev">&rsaquo;</span></span></div>';
 }
 
+/* One role open at a time. All six expanded put 157 chips on screen at once,
+   which reads as noise rather than as a control. */
 function roleCard(r) {
   const pages = DB.pages, caps = DB.caps;
+  const assigned = DB.staff.filter(s => s.roleId === r.id).length;
+  const open = UI.openRole === r.id;
+
+  const summary = r.locked
+    ? 'Full access, always on'
+    : r.pages.length + ' of ' + pages.length + ' pages · ' + r.caps.length + ' of ' + caps.length + ' permissions';
+
   return '<div class="rolecard">' +
-    '<div class="rolehead"><div class="roleav">' + r.name[0] + '</div>' +
-    '<div><div class="rolename">' + r.name + ' <span class="roletag">' + (r.builtin ? 'built-in' : 'custom') + '</span></div>' +
-    '<div class="roledesc">' + r.desc + '</div></div>' +
-    '<div class="roleacts">' +
-    (r.locked ? '' : '<button class="btn sm" onclick="renameRole(\'' + r.id + '\')">Rename</button>') +
-    (r.builtin ? '' : '<button class="btn sm danger" onclick="deleteRole(\'' + r.id + '\')">Delete</button>') +
-    '</div></div>' +
-    (r.locked
-      ? '<p class="note" style="margin-top:8px">Full access, always on and cannot be limited.</p>'
-      : '<div class="band">Pages this role can open</div><div class="chips">' +
-      pages.map(p => '<button class="chip' + (r.pages.includes(p[0]) ? ' on' : '') + '" onclick="togglePage(\'' + r.id + '\',\'' + p[0] + '\')">' + p[1] + '</button>').join('') +
-      '</div><div class="band">What this role can do</div><div class="chips">' +
-      caps.map(c => '<button class="chip' + (r.caps.includes(c[0]) ? ' on' : '') + '" onclick="toggleCap(\'' + r.id + '\',\'' + c[0] + '\')">' + c[1] + '</button>').join('') +
-      '</div>') +
-    '<div class="band">Assigned to ' + DB.staff.filter(s => s.roleId === r.id).length + ' account' +
-    (DB.staff.filter(s => s.roleId === r.id).length === 1 ? '' : 's') + '</div>' +
+    '<div class="rolehead" style="cursor:pointer" onclick="toggleRoleOpen(\'' + r.id + '\')">' +
+    '<div class="roleav">' + r.name[0] + '</div>' +
+    '<div style="flex:1"><div class="rolename">' + r.name +
+    ' <span class="roletag">' + (r.builtin ? 'built-in' : 'custom') + '</span></div>' +
+    '<div class="roledesc">' + summary + ' · ' + assigned + ' account' + (assigned === 1 ? '' : 's') + '</div></div>' +
+    '<span class="sgrp-cv" style="transform:rotate(' + (open ? 90 : 0) + 'deg)">&rsaquo;</span></div>' +
+
+    (!open ? '' :
+      '<div style="margin-top:6px">' +
+      (r.locked
+        ? '<p class="note">Full access, always on and cannot be limited. Every page and every permission is granted, and that cannot be changed — there has to be one account that can always get back in.</p>'
+        : '<div class="band">Pages this role can open</div><div class="chips">' +
+        pages.map(p => '<button class="chip' + (r.pages.includes(p[0]) ? ' on' : '') + '" onclick="togglePage(\'' + r.id + '\',\'' + p[0] + '\')">' + p[1] + '</button>').join('') +
+        '</div><div class="band">What this role can do</div><div class="chips">' +
+        caps.map(c => '<button class="chip' + (r.caps.includes(c[0]) ? ' on' : '') + '" onclick="toggleCap(\'' + r.id + '\',\'' + c[0] + '\')">' + c[1] + '</button>').join('') +
+        '</div>') +
+      (assigned ? '<div class="band">Held by</div><div class="chips">' +
+        DB.staff.filter(s => s.roleId === r.id).map(s =>
+          '<button class="chip" onclick="openDetail(\'staff\',' + s.id + ')">' + esc(s.name) + ' &rsaquo;</button>').join('') +
+        '</div>' : '') +
+      '<div style="display:flex;gap:8px;margin-top:14px">' +
+      (r.locked ? '' : '<button class="btn sm" onclick="renameRole(\'' + r.id + '\')">Rename</button>') +
+      (r.builtin ? '' : '<button class="btn sm danger" onclick="deleteRole(\'' + r.id + '\')">Delete</button>') +
+      '</div></div>') +
     '</div>';
 }
+function toggleRoleOpen(id) { UI.openRole = (UI.openRole === id ? null : id); render(); }
