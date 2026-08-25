@@ -1,255 +1,430 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#010817">
-<meta name="description" content="The Label Board Business Admin Dashboard">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#100d0a">
+<meta name="color-scheme" content="light dark">
+<title>The Label Board Business</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
-<title>Label Board Business Dashboard</title>
 <style>
-:root {
-  --navy: #010817;
-  --navy-2: #020b1d;
-  --panel: #0d1526;
-  --line: #1e2c47;
-  --text: #eef1f6;
-  --text-dim: #a8b3c6;
-  --text-faint: #697894;
-  --gold: #e2ad4f;
-  --green: #3ec98a;
-  --amber: #e0a838;
-  --red: #e06a6a;
+:root{
+  --bg:#100d0a;--bg-2:#171310;--panel:#1c1714;--panel-2:#221c18;
+  --line:rgba(201,168,106,.16);--line-soft:rgba(255,255,255,.06);
+  --text:#efe7d9;--text-dim:#a99f8d;--text-faint:#6f675a;
+  --gold:#c9a86a;--gold-bright:#e4c587;--on-accent:#1a140c;--green:#7fae7a;--red:#cf7b6b;--amber:#d6a85c;--blue:#7fa3b3;
+  --shadow:0 24px 60px -28px rgba(0,0,0,.8);--radius:14px;
 }
-
-[data-theme="light"] {
-  --navy: #ffffff;
-  --navy-2: #f9f9fb;
-  --panel: #f3f4f8;
-  --line: #dfe5f0;
-  --text: #010817;
-  --text-dim: #334155;
-  --text-faint: #64748b;
-  --gold: #d9933c;
-  --green: #2d9d78;
-  --amber: #b8860b;
-  --red: #c73e3e;
+body.light-mode{
+  --bg:#f1e9db;--bg-2:#e6dac6;--panel:#fffdf8;--panel-2:#f3e9d7;
+  --line:rgba(110,78,38,.34);--line-soft:rgba(60,42,20,.13);
+  --text:#241d12;--text-dim:#5a4a33;--text-faint:#7f6f57;
+  --gold:#7c5a32;--gold-bright:#5e4423;--on-accent:#faf4e8;--green:#3f7344;--red:#b1452f;--amber:#9c6c1c;--blue:#3f6a86;
+  --shadow:0 18px 40px -26px rgba(70,50,25,.45);
 }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Source Serif 4',Georgia,'Times New Roman',serif;
+  background:radial-gradient(1200px 600px at 85% -10%, rgba(201,168,106,.10), transparent 60%),radial-gradient(900px 500px at -10% 110%, rgba(201,168,106,.06), transparent 55%),var(--bg);
+  color:var(--text);font-weight:400;letter-spacing:.2px;-webkit-font-smoothing:antialiased;transition:background .4s ease,color .3s ease}
+h1,h2,h3,h4{font-family:'Playfair Display',Georgia,serif;font-weight:500;letter-spacing:.3px}
 
-* { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; background: var(--navy); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; }
-a { color: var(--gold); text-decoration: none; }
-#app { display: flex; height: 100dvh; }
+.shell{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:248px;flex:none;border-right:1px solid var(--line-soft);padding:26px 18px;display:flex;flex-direction:column;gap:6px;background:linear-gradient(180deg,var(--bg-2),transparent);height:100%;overflow-y:auto;overscroll-behavior:contain}
+.sidebar::-webkit-scrollbar{width:7px}.sidebar::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.side-brand{font-family:'Playfair Display',serif;font-size:26px;letter-spacing:6px;font-weight:600;padding:0 8px 4px;margin-bottom:8px}
+.side-brand .dot{color:var(--gold)}
+.side-tag{padding:0 8px;color:var(--text-faint);font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:22px;margin-top:20px}
+.side-tag:first-of-type{margin-top:0}
+.nav-group{padding:14px 14px 5px;color:var(--text-faint);font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;cursor:pointer;color:var(--text-dim);transition:.2s;font-size:14.5px;letter-spacing:.5px;position:relative;border:none;background:none;font-family:inherit;text-align:left;width:100%}
+.nav-item:hover{background:var(--panel);color:var(--text)}
+.nav-item.active{background:var(--panel);color:var(--text)}
+.nav-item.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--gold)}
+.nav-item .ni{width:20px;text-align:center;opacity:.9;line-height:0;font-size:18px}
+.nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--gold);color:var(--on-accent);font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center}
+.nav-badge.on{display:inline-flex}
+.side-foot{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:16px}
+.who{display:flex;align-items:center;gap:11px;padding:6px 8px}
+.who .av{width:34px;height:34px;border-radius:50%;background:rgba(201,168,106,.14);color:var(--gold);display:grid;place-items:center;font-size:14px;font-weight:500;flex:none}
+.who .wn{font-size:13.5px;color:var(--text)}.who .wr{font-size:11px;color:var(--text-faint);letter-spacing:.5px}
 
-aside { width: 280px; background: var(--navy-2); border-right: 1px solid var(--line); padding: 24px 16px; overflow-y: auto; position: relative; }
-aside.collapsed { width: 80px; }
-.logo { font-family: Georgia, serif; font-size: 20px; font-weight: 600; margin-bottom: 40px; letter-spacing: 2px; text-transform: uppercase; color: var(--text); }
-aside.collapsed .logo { font-size: 14px; text-align: center; }
-.nav-section { margin-bottom: 28px; }
-.nav-label { font-size: 10px; letter-spacing: 1.5px; color: var(--text-faint); text-transform: uppercase; margin-bottom: 10px; padding-left: 8px; }
-aside.collapsed .nav-label { display: none; }
-.nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 6px; border-radius: 10px; background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; transition: 0.2s; text-align: left; width: 100%; }
-.nav-item:hover { background: var(--panel); color: var(--text); }
-.nav-item.active { background: var(--panel); color: var(--gold); border-left: 3px solid var(--gold); }
-aside.collapsed .nav-item { justify-content: center; padding: 8px; }
-aside.collapsed .nav-item.active { border-left: none; border-bottom: 3px solid var(--gold); }
-.nav-icon { font-size: 18px; min-width: 18px; text-align: center; }
-.nav-text { flex: 1; font-size: 14px; }
-aside.collapsed .nav-text { display: none; }
-.nav-badge { background: var(--gold); color: #010817; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; min-width: 22px; text-align: center; }
-aside.collapsed .nav-badge { display: none; }
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:max(30px,env(safe-area-inset-top)) max(30px,env(safe-area-inset-right)) 60px max(30px,env(safe-area-inset-left));max-width:none}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:30px;gap:16px;flex-wrap:wrap}
+.page-title{font-size:30px;letter-spacing:.5px}.page-sub{color:var(--text-faint);font-size:13px;margin-top:3px;letter-spacing:.6px}
+.top-actions{display:flex;align-items:center;gap:10px}
+.icon-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--text-dim);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.2s;font-family:inherit;padding:0}
+.icon-btn:hover{border-color:var(--gold);color:var(--gold)}
+.view{display:none;animation:rise .45s ease both}.view.active{display:block}
 
-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.tabs{display:flex;gap:20px;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:0}
+.tab{background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:14.5px;letter-spacing:.5px;padding:12px 0;border-bottom:3px solid transparent;transition:.2s;font-weight:500}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 
-header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 20px 32px; display: flex; align-items: center; gap: 24px; }
-.greeting-section { flex: 1; }
-.greeting { font-family: Georgia, serif; font-size: 28px; font-weight: 500; margin: 0 0 2px 0; }
-.greeting-sub { color: var(--text-faint); font-size: 13px; }
-.header-right { display: flex; align-items: center; gap: 16px; margin-left: auto; }
-.theme-toggle { background: transparent; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 0; transition: 0.2s; }
-.theme-toggle:hover { color: var(--gold); }
-.user-info { display: flex; align-items: center; gap: 12px; }
-.avatar { width: 40px; height: 40px; background: var(--gold); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #010817; font-weight: 700; font-size: 18px; }
-.user-details { display: flex; flex-direction: column; gap: 2px; }
-.user-role { font-size: 10px; letter-spacing: 0.5px; color: var(--text-faint); text-transform: uppercase; }
-.user-name { font-size: 14px; font-weight: 500; color: var(--text); }
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:30px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;position:relative;overflow:hidden;transition:.25s;box-shadow:0 1px 2px rgba(17,24,39,.05),0 6px 16px -8px rgba(17,24,39,.12)}
+.stat:hover{border-color:var(--line);transform:translateY(-2px)}
+.stat .sl{color:var(--text-faint);font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
+.stat .sv{font-family:'Playfair Display',serif;font-size:34px;margin-top:10px;line-height:1}
+.stat .sd{font-size:12px;margin-top:8px;letter-spacing:.4px}
+.stat.good{background:rgba(22,101,52,.16);background:color-mix(in srgb,var(--green) 30%,var(--panel));border-color:color-mix(in srgb,var(--green) 46%,var(--panel))}.stat.good .sv{color:var(--green)}
+.stat.money{background:rgba(23,56,92,.14);background:color-mix(in srgb,var(--gold) 26%,var(--panel));border-color:color-mix(in srgb,var(--gold) 42%,var(--panel))}.stat.money .sv{color:var(--gold)}
+.stat.alert{background:rgba(179,38,30,.16);background:color-mix(in srgb,var(--red) 30%,var(--panel));border-color:color-mix(in srgb,var(--red) 46%,var(--panel))}.stat.alert .sv{color:var(--red)}
+.stat.warn{background:rgba(138,90,18,.16);background:color-mix(in srgb,var(--amber) 30%,var(--panel));border-color:color-mix(in srgb,var(--amber) 46%,var(--panel))}.stat.warn .sv{color:var(--amber)}
+.stat.info{background:rgba(21,94,117,.14);background:color-mix(in srgb,var(--blue) 26%,var(--panel));border-color:color-mix(in srgb,var(--blue) 42%,var(--panel))}.stat.info .sv{color:var(--blue)}
 
-.content { flex: 1; overflow-y: auto; padding: 32px; }
-.content-header { margin-bottom: 28px; }
-.section-title { font-family: Georgia, serif; font-size: 24px; font-weight: 500; margin: 0 0 20px 0; }
-.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); padding-bottom: 0; }
-.tab { padding: 12px 20px; background: transparent; border: none; color: var(--text-faint); cursor: pointer; font-size: 14px; border-bottom: 3px solid transparent; transition: 0.2s; white-space: nowrap; }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.table-wrap{overflow-x:auto;margin-bottom:20px}
+.table{width:100%;border-collapse:collapse;font-size:13.5px}
+.table th{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);font-weight:600;padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+.table th:first-child{text-align:left}
+.table td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:right;vertical-align:middle}
+.table td:first-child{text-align:left}
+.table tbody tr{cursor:pointer;transition:background .12s}
+.table tbody tr:hover{background:rgba(201,168,106,.06)}
 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.card { background: linear-gradient(135deg, rgba(226, 173, 79, 0.1) 0%, rgba(226, 173, 79, 0.02) 100%); border: 1px solid var(--line); border-left: 5px solid var(--gold); border-radius: 12px; padding: 20px; transition: 0.2s; }
-.card:hover { background: linear-gradient(135deg, rgba(226, 173, 79, 0.15) 0%, rgba(226, 173, 79, 0.05) 100%); }
-.card.alert { border-left-color: var(--red); background: linear-gradient(135deg, rgba(224, 106, 106, 0.1) 0%, rgba(224, 106, 106, 0.02) 100%); }
-.card.alert:hover { background: linear-gradient(135deg, rgba(224, 106, 106, 0.15) 0%, rgba(224, 106, 106, 0.05) 100%); }
-.card.warning { border-left-color: var(--amber); background: linear-gradient(135deg, rgba(224, 168, 56, 0.1) 0%, rgba(224, 168, 56, 0.02) 100%); }
-.card.warning:hover { background: linear-gradient(135deg, rgba(224, 168, 56, 0.15) 0%, rgba(224, 168, 56, 0.05) 100%); }
-.card.success { border-left-color: var(--green); background: linear-gradient(135deg, rgba(62, 201, 138, 0.1) 0%, rgba(62, 201, 138, 0.02) 100%); }
-.card.success:hover { background: linear-gradient(135deg, rgba(62, 201, 138, 0.15) 0%, rgba(62, 201, 138, 0.05) 100%); }
-.card-label { font-size: 11px; letter-spacing: 0.5px; color: var(--text-faint); text-transform: uppercase; margin-bottom: 8px; }
-.card-value { font-family: Georgia, serif; font-size: 28px; font-weight: 500; color: var(--text); margin-bottom: 8px; }
-.card-desc { font-size: 13px; color: var(--text-dim); }
+.badge{display:inline-block;padding:5px 12px;border-radius:30px;font-size:11px;letter-spacing:.6px;border:1px solid var(--line)}
+.badge.b-gold{color:var(--gold);background:rgba(201,168,106,.1)}.badge.b-green{color:var(--green);background:rgba(127,174,122,.1)}
+.badge.b-red{color:var(--red);background:rgba(207,123,107,.1)}.badge.b-amber{color:var(--amber);background:rgba(214,168,92,.1)}
 
-.table-wrapper { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { padding: 14px 16px; background: var(--navy-2); text-align: left; font-weight: 500; color: var(--text-faint); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--line); }
-td { padding: 12px 16px; border-bottom: 1px solid var(--line); }
-tr:last-child td { border-bottom: none; }
-.status { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
-.status.pending { background: var(--amber); color: #010817; }
-.status.active { background: var(--green); color: #010817; }
-.status.overdue { background: var(--red); color: white; }
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:20px;box-shadow:0 1px 2px rgba(17,24,39,.05),0 6px 16px -8px rgba(17,24,39,.10)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}.panel-head h3{font-size:19px;margin:0}
 
-.empty { text-align: center; padding: 60px 24px; color: var(--text-faint); }
-.empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
-.empty-text { font-size: 14px; }
+.empty{text-align:center;padding:46px 20px;color:var(--text-faint)}.empty .ei{width:66px;height:66px;border-radius:50%;display:inline-grid;place-items:center;font-size:30px;line-height:1;margin:0 auto 16px;background:color-mix(in srgb,var(--eic,var(--gold)) 15%,transparent);color:var(--eic,var(--gold))}
+.empty .et{font-size:15px;color:var(--text-dim);margin-bottom:6px}.empty .es{font-size:12.5px;margin-bottom:18px}
 
-section { display: none; }
-section.active { display: block; }
-
-@media (max-width: 680px) {
-  aside { width: 80px; }
-  header { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .header-right { margin-left: 0; width: 100%; }
-  .content { padding: 20px; }
-  .cards { grid-template-columns: 1fr; }
-  .section-title { font-size: 20px; }
-  table { font-size: 13px; }
-  th, td { padding: 10px; }
-  .tab { padding: 10px 14px; font-size: 13px; }
-}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media(max-width:820px){.sidebar{width:70px;padding-left:11px;padding-right:11px}.side-brand{font-size:0;letter-spacing:0;text-align:center;margin-bottom:12px}.side-tag,.nav-group{display:none}.nav-item{justify-content:center;padding:12px 0;gap:0;font-size:0;letter-spacing:0}.nav-item .ni{font-size:17px;width:auto;opacity:1}.who{justify-content:center;padding:8px 0}.who .wn,.who .wr{display:none}.side-foot{border-top:none;padding-top:12px}}
 </style>
 </head>
 <body>
 
-<div id="app">
-  <aside id="sidebar">
-    <div class="logo">LABEL</div>
-    <div class="nav-section">
-      <div class="nav-label">OVERVIEW</div>
-      <button class="nav-item active" data-route="dashboard"><span class="nav-icon">📊</span><span class="nav-text">Dashboard</span></button>
-    </div>
-    <div class="nav-section">
-      <div class="nav-label">CUSTOMERS</div>
-      <button class="nav-item" data-route="customers"><span class="nav-icon">👥</span><span class="nav-text">All Customers</span><span class="nav-badge">5</span></button>
-      <button class="nav-item" data-route="pipeline"><span class="nav-icon">🎯</span><span class="nav-text">Pipeline</span></button>
-      <button class="nav-item" data-route="renewals"><span class="nav-icon">🔔</span><span class="nav-text">Renewals</span><span class="nav-badge">2</span></button>
-    </div>
-    <div class="nav-section">
-      <div class="nav-label">FINANCE</div>
-      <button class="nav-item" data-route="payments"><span class="nav-icon">💳</span><span class="nav-text">Payments</span><span class="nav-badge">5</span></button>
-    </div>
-    <div class="nav-section">
-      <div class="nav-label">OPERATIONS</div>
-      <button class="nav-item" data-route="tasks"><span class="nav-icon">✓</span><span class="nav-text">Tasks</span><span class="nav-badge">0</span></button>
-    </div>
-    <div class="nav-section">
-      <div class="nav-label">TEAM</div>
-      <button class="nav-item" data-route="staff"><span class="nav-icon">👔</span><span class="nav-text">Staff</span><span class="nav-badge">1</span></button>
-      <button class="nav-item" data-route="settings"><span class="nav-icon">⚙</span><span class="nav-text">Settings</span></button>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="side-brand">THE LABEL<span class="dot">.</span></div>
+    <div class="side-tag">Business</div>
+
+    <div class="nav-group">Overview</div>
+    <button class="nav-item active" data-view="dashboard"><span class="ni">📊</span> Dashboard</button>
+
+    <div class="nav-group">Customers</div>
+    <button class="nav-item" data-view="customers"><span class="ni">👥</span> All Customers <span class="nav-badge on">5</span></button>
+    <button class="nav-item" data-view="pipeline"><span class="ni">🎯</span> Pipeline</button>
+    <button class="nav-item" data-view="renewals"><span class="ni">🔔</span> Renewals <span class="nav-badge on">2</span></button>
+
+    <div class="nav-group">Finance</div>
+    <button class="nav-item" data-view="payments"><span class="ni">💳</span> Payments <span class="nav-badge on">5</span></button>
+
+    <div class="nav-group">Operations</div>
+    <button class="nav-item" data-view="tasks"><span class="ni">✓</span> Tasks <span class="nav-badge on">0</span></button>
+
+    <div class="nav-group">Team & Settings</div>
+    <button class="nav-item" data-view="staff"><span class="ni">👔</span> Staff <span class="nav-badge on">1</span></button>
+    <button class="nav-item" data-view="settings"><span class="ni">⚙</span> Settings</button>
+
+    <div class="side-foot">
+      <div class="who">
+        <div class="av">K</div>
+        <div>
+          <div class="wn">Kayode Ojomo</div>
+          <div class="wr">Owner</div>
+        </div>
+      </div>
     </div>
   </aside>
 
-  <main>
-    <header>
-      <div class="greeting-section">
-        <h1 class="greeting" id="greeting">Good morning</h1>
-        <p class="greeting-sub">Label Board</p>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 class="page-title" id="page-title">Dashboard</h1>
+        <p class="page-sub" id="page-subtitle">Overview</p>
       </div>
-      <div class="header-right">
-        <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode">🌙</button>
-        <div class="user-info">
-          <div class="avatar" id="userAvatar">K</div>
-          <div class="user-details">
-            <div class="user-role">Owner</div>
-            <div class="user-name">Kayode Ojomo</div>
-          </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div id="dashboard" class="view active">
+      <div class="stat-grid">
+        <div class="stat money">
+          <div class="sl">Total Customers</div>
+          <div class="sv">5</div>
+          <div class="sd">Active businesses</div>
+        </div>
+        <div class="stat money">
+          <div class="sl">Active Subscriptions</div>
+          <div class="sv">2</div>
+          <div class="sd">Paying subscriptions</div>
+        </div>
+        <div class="stat good">
+          <div class="sl">Revenue</div>
+          <div class="sv">₦72K</div>
+          <div class="sd">Completed payments</div>
+        </div>
+        <div class="stat alert">
+          <div class="sl">Pending</div>
+          <div class="sv">₦1.5K</div>
+          <div class="sd">Awaiting payment</div>
         </div>
       </div>
-    </header>
 
-    <div class="content">
-      <section id="dashboard-section" class="active">
-        <div class="content-header"><h2 class="section-title">Dashboard</h2></div>
-        <div class="cards">
-          <div class="card"><div class="card-label">Total Customers</div><div class="card-value">5</div><div class="card-desc">Active businesses</div></div>
-          <div class="card"><div class="card-label">Active Subscriptions</div><div class="card-value">2</div><div class="card-desc">Paying subscriptions</div></div>
-          <div class="card success"><div class="card-label">Revenue</div><div class="card-value">₦72K</div><div class="card-desc">Completed payments</div></div>
-          <div class="card alert"><div class="card-label">Pending</div><div class="card-value">₦1.5K</div><div class="card-desc">Awaiting payment</div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Payment Health</h3>
         </div>
-        <div style="margin-top: 28px;"><h3 style="margin: 0 0 16px 0; font-family: Georgia, serif; font-size: 18px; font-weight: 500;">Payment Health</h3><div class="card warning"><div class="card-label">Health Status</div><div class="card-value">40%</div><div class="card-desc">Active payment processing</div></div></div>
-      </section>
+        <div class="stat warn" style="margin:0">
+          <div class="sl">Health Status</div>
+          <div class="sv">40%</div>
+          <div class="sd">Active payment processing</div>
+        </div>
+      </div>
+    </div>
 
-      <section id="customers-section">
-        <div class="content-header"><h2 class="section-title">Customers</h2><div class="tabs"><button class="tab active" data-tab="all-customers">All Customers</button><button class="tab" data-tab="recent">Recent</button></div></div>
-        <div id="all-customers-tab"><div class="table-wrapper"><table><thead><tr><th>Business Name</th><th>Status</th><th>Joined</th><th>Plan</th></tr></thead><tbody><tr><td>Lux Couture</td><td><span class="status active">Active</span></td><td>19 Aug</td><td>Premium</td></tr><tr><td>The Weaver Studio</td><td><span class="status active">Active</span></td><td>15 Aug</td><td>Pro</td></tr><tr><td>Desert Rose Designs</td><td><span class="status pending">Pending</span></td><td>1 Aug</td><td>Basic</td></tr><tr><td>Stella Fashion Atelier</td><td><span class="status active">Active</span></td><td>1 Jun</td><td>Premium</td></tr><tr><td>Artisan Threads</td><td><span class="status active">Active</span></td><td>1 May</td><td>Pro</td></tr></tbody></table></div></div>
-        <div id="recent-tab" style="display: none;"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No recent activity</div></div></div>
-      </section>
+    <!-- CUSTOMERS VIEW -->
+    <div id="customers" class="view">
+      <div class="tabs">
+        <button class="tab active" data-tab="customers-all">All Customers</button>
+        <button class="tab" data-tab="customers-recent">Recent</button>
+      </div>
 
-      <section id="pipeline-section">
-        <div class="content-header"><h2 class="section-title">Sales Pipeline</h2><div class="tabs"><button class="tab active" data-tab="prospects">Prospects</button><button class="tab" data-tab="qualified">Qualified</button><button class="tab" data-tab="negotiating">Negotiating</button></div></div>
-        <div id="prospects-tab"><div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">No prospects in pipeline yet</div></div></div>
-        <div id="qualified-tab" style="display: none;"><div class="empty"><div class="empty-icon">✓</div><div class="empty-text">No qualified leads</div></div></div>
-        <div id="negotiating-tab" style="display: none;"><div class="empty"><div class="empty-icon">💬</div><div class="empty-text">No active negotiations</div></div></div>
-      </section>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Business Name</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th>Plan</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Lux Couture</td>
+              <td><span class="badge b-green">Active</span></td>
+              <td>19 Aug</td>
+              <td>Premium</td>
+            </tr>
+            <tr>
+              <td>The Weaver Studio</td>
+              <td><span class="badge b-green">Active</span></td>
+              <td>15 Aug</td>
+              <td>Pro</td>
+            </tr>
+            <tr>
+              <td>Desert Rose Designs</td>
+              <td><span class="badge b-amber">Pending</span></td>
+              <td>1 Aug</td>
+              <td>Basic</td>
+            </tr>
+            <tr>
+              <td>Stella Fashion Atelier</td>
+              <td><span class="badge b-green">Active</span></td>
+              <td>1 Jun</td>
+              <td>Premium</td>
+            </tr>
+            <tr>
+              <td>Artisan Threads</td>
+              <td><span class="badge b-green">Active</span></td>
+              <td>1 May</td>
+              <td>Pro</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-      <section id="renewals-section">
-        <div class="content-header"><h2 class="section-title">Renewals</h2><div class="tabs"><button class="tab active" data-tab="upcoming">Upcoming</button><button class="tab" data-tab="overdue">Overdue</button></div></div>
-        <div id="upcoming-tab"><div class="table-wrapper"><table><thead><tr><th>Business</th><th>Renewal Date</th><th>Status</th><th>Amount</th></tr></thead><tbody><tr><td>Lux Couture</td><td>15 Sep</td><td><span class="status active">Due Soon</span></td><td>₦36,000</td></tr></tbody></table></div></div>
-        <div id="overdue-tab" style="display: none;"><div class="table-wrapper"><table><thead><tr><th>Business</th><th>Renewal Date</th><th>Status</th><th>Amount</th></tr></thead><tbody><tr><td>Stella Fashion Atelier</td><td>1 Aug</td><td><span class="status overdue">Overdue</span></td><td>₦48,000</td></tr></tbody></table></div></div>
-      </section>
+    <!-- PIPELINE VIEW -->
+    <div id="pipeline" class="view">
+      <div class="tabs">
+        <button class="tab active" data-tab="pipeline-prospects">Prospects</button>
+        <button class="tab" data-tab="pipeline-qualified">Qualified</button>
+        <button class="tab" data-tab="pipeline-negotiating">Negotiating</button>
+      </div>
+      <div class="empty">
+        <div class="ei">🔍</div>
+        <div class="et">No prospects in pipeline</div>
+        <div class="es">Start adding prospects to build your sales pipeline</div>
+      </div>
+    </div>
 
-      <section id="payments-section">
-        <div class="content-header"><h2 class="section-title">Payments</h2><div class="tabs"><button class="tab active" data-tab="all-payments">All</button><button class="tab" data-tab="completed">Completed</button><button class="tab" data-tab="pending-payments">Pending</button></div></div>
-        <div id="all-payments-tab"><div class="table-wrapper"><table><thead><tr><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody><tr><td>Lux Couture</td><td>₦1,500</td><td><span class="status pending">Pending</span></td><td>19 Aug</td></tr><tr><td>The Weaver Studio</td><td>₦1,500</td><td><span class="status active">Completed</span></td><td>15 Aug</td></tr><tr><td>Desert Rose Designs</td><td>₦5,000</td><td><span class="status active">Completed</span></td><td>1 Aug</td></tr></tbody></table></div></div>
-        <div id="completed-tab" style="display: none;"><div class="table-wrapper"><table><thead><tr><th>Customer</th><th>Amount</th><th>Date</th></tr></thead><tbody><tr><td>The Weaver Studio</td><td>₦1,500</td><td>15 Aug</td></tr><tr><td>Desert Rose Designs</td><td>₦5,000</td><td>1 Aug</td></tr></tbody></table></div></div>
-        <div id="pending-payments-tab" style="display: none;"><div class="table-wrapper"><table><thead><tr><th>Customer</th><th>Amount</th><th>Date</th></tr></thead><tbody><tr><td>Lux Couture</td><td>₦1,500</td><td>19 Aug</td></tr></tbody></table></div></div>
-      </section>
+    <!-- RENEWALS VIEW -->
+    <div id="renewals" class="view">
+      <div class="tabs">
+        <button class="tab active" data-tab="renewals-upcoming">Upcoming</button>
+        <button class="tab" data-tab="renewals-overdue">Overdue</button>
+      </div>
 
-      <section id="tasks-section"><div class="content-header"><h2 class="section-title">Tasks</h2></div><div class="empty"><div class="empty-icon">✓</div><div class="empty-text">No tasks assigned</div></div></section>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Business</th>
+              <th>Renewal Date</th>
+              <th>Status</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Lux Couture</td>
+              <td>15 Sep</td>
+              <td><span class="badge b-amber">Due Soon</span></td>
+              <td>₦36,000</td>
+            </tr>
+            <tr>
+              <td>Stella Fashion Atelier</td>
+              <td>1 Aug</td>
+              <td><span class="badge b-red">Overdue</span></td>
+              <td>₦48,000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-      <section id="staff-section">
-        <div class="content-header"><h2 class="section-title">Staff</h2><div class="tabs"><button class="tab active" data-tab="team-members">Team Members</button><button class="tab" data-tab="roles">Roles</button></div></div>
-        <div id="team-members-tab"><div class="table-wrapper"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody><tr><td>Kayode Ojomo</td><td>layojomo@gmail.com</td><td><span class="status active">Owner</span></td></tr></tbody></table></div></div>
-        <div id="roles-tab" style="display: none;"><div class="empty"><div class="empty-icon">👔</div><div class="empty-text">No additional roles configured</div></div></div>
-      </section>
+    <!-- PAYMENTS VIEW -->
+    <div id="payments" class="view">
+      <div class="tabs">
+        <button class="tab active" data-tab="payments-all">All</button>
+        <button class="tab" data-tab="payments-completed">Completed</button>
+        <button class="tab" data-tab="payments-pending">Pending</button>
+      </div>
 
-      <section id="settings-section"><div class="content-header"><h2 class="section-title">Settings</h2></div><div class="cards"><div class="card"><div style="font-weight: 600; margin-bottom: 12px; font-size: 14px;">Account</div><div style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">layojomo@gmail.com</div><div style="font-size: 13px; color: var(--text-dim);">Role: Owner</div></div><div class="card"><div style="font-weight: 600; margin-bottom: 12px; font-size: 14px;">Preferences</div><div style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Theme: Auto</div><div style="font-size: 13px; color: var(--text-dim);">Notifications: Enabled</div></div></div></section>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Lux Couture</td>
+              <td>₦1,500</td>
+              <td><span class="badge b-amber">Pending</span></td>
+              <td>19 Aug</td>
+            </tr>
+            <tr>
+              <td>The Weaver Studio</td>
+              <td>₦1,500</td>
+              <td><span class="badge b-green">Completed</span></td>
+              <td>15 Aug</td>
+            </tr>
+            <tr>
+              <td>Desert Rose Designs</td>
+              <td>₦5,000</td>
+              <td><span class="badge b-green">Completed</span></td>
+              <td>1 Aug</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TASKS VIEW -->
+    <div id="tasks" class="view">
+      <div class="empty">
+        <div class="ei">✓</div>
+        <div class="et">No tasks assigned</div>
+        <div class="es">Tasks will appear here when assigned</div>
+      </div>
+    </div>
+
+    <!-- STAFF VIEW -->
+    <div id="staff" class="view">
+      <div class="tabs">
+        <button class="tab active" data-tab="staff-members">Team Members</button>
+        <button class="tab" data-tab="staff-roles">Roles</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Kayode Ojomo</td>
+              <td>layojomo@gmail.com</td>
+              <td><span class="badge b-gold">Owner</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS VIEW -->
+    <div id="settings" class="view">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Account</h3>
+        </div>
+        <div style="font-size:13.5px;line-height:1.8">
+          <div><strong>Email:</strong> layojomo@gmail.com</div>
+          <div><strong>Role:</strong> Owner</div>
+          <div><strong>Status:</strong> Active</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Preferences</h3>
+        </div>
+        <div style="font-size:13.5px;line-height:1.8">
+          <div><strong>Theme:</strong> Auto</div>
+          <div><strong>Notifications:</strong> Enabled</div>
+        </div>
+      </div>
     </div>
   </main>
 </div>
 
 <script>
-function getTheme() { return localStorage.getItem('theme') || 'dark'; }
-function applyTheme(theme) { if (theme === 'light') { document.documentElement.setAttribute('data-theme', 'light'); document.getElementById('themeToggle').textContent = '☀️'; } else { document.documentElement.removeAttribute('data-theme'); document.getElementById('themeToggle').textContent = '🌙'; } localStorage.setItem('theme', theme); }
-document.getElementById('themeToggle').addEventListener('click', () => { const current = getTheme(); applyTheme(current === 'dark' ? 'light' : 'dark'); });
+// Theme
+function getTheme() { return localStorage.getItem('theme') || 'default'; }
+function applyTheme(t) { document.body.className = t === 'light' ? 'light-mode' : ''; document.getElementById('themeToggle').textContent = t === 'light' ? '☀️' : '🌙'; localStorage.setItem('theme', t); }
+document.getElementById('themeToggle').addEventListener('click', () => { const t = getTheme(); applyTheme(t === 'light' ? 'default' : 'light'); });
 applyTheme(getTheme());
 
-function getGreeting() { const hour = new Date().getHours(); if (hour < 12) return 'Good morning'; if (hour < 18) return 'Good afternoon'; return 'Good evening'; }
-document.getElementById('greeting').textContent = getGreeting();
-
-const navItems = document.querySelectorAll('[data-route]');
-const sections = document.querySelectorAll('section');
+// Navigation
+const navItems = document.querySelectorAll('[data-view]');
+const views = document.querySelectorAll('.view');
 const tabs = document.querySelectorAll('[data-tab]');
+const pageTitles = { dashboard: 'Dashboard', customers: 'Customers', pipeline: 'Sales Pipeline', renewals: 'Renewals', payments: 'Payments', tasks: 'Tasks', staff: 'Staff', settings: 'Settings', }
 
-function showSection(route) { sections.forEach(s => s.classList.remove('active')); const section = document.getElementById(`${route}-section`); if (section) section.classList.add('active'); navItems.forEach(item => { item.classList.toggle('active', item.dataset.route === route); }); window.location.hash = route; }
+function showView(id) {
+  views.forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  navItems.forEach(n => n.classList.toggle('active', n.dataset.view === id));
+  document.getElementById('page-title').textContent = pageTitles[id] || 'Dashboard';
+  document.getElementById('page-subtitle').textContent = id.charAt(0).toUpperCase() + id.slice(1);
+  window.location.hash = id;
+}
 
-navItems.forEach(item => { item.addEventListener('click', () => { showSection(item.dataset.route); }); });
+navItems.forEach(n => n.addEventListener('click', () => showView(n.dataset.view)));
 
-tabs.forEach(tab => { tab.addEventListener('click', () => { const tabGroup = tab.parentElement; tabGroup.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); const tabId = tab.dataset.tab; const section = tab.closest('section'); section.querySelectorAll('[id$="-tab"]').forEach(el => { el.style.display = el.id === `${tabId}-tab` ? 'block' : 'none'; }); }); });
+// Tabs
+tabs.forEach(t => {
+  t.addEventListener('click', () => {
+    const group = t.getAttribute('data-tab').split('-')[0];
+    document.querySelectorAll(`[data-tab^="${group}"]`).forEach(tab => tab.classList.remove('active'));
+    t.classList.add('active');
+  });
+});
 
-const route = window.location.hash.slice(1) || 'dashboard';
-showSection(route);
-
-window.addEventListener('hashchange', () => { const route = window.location.hash.slice(1); if (route) showSection(route); });
-
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+const hash = window.location.hash.slice(1) || 'dashboard';
+showView(hash);
 </script>
 
 </body>
