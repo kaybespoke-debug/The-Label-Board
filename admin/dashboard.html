@@ -4,22 +4,196 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Label Board — Admin Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#07101c;--side:#0a121f;--card:#0f1a2a;--card2:#0c1624;--line:#223047;--text:#f4f1e8;--muted:#8793a8;--gold:#d9ad45;--green:#3cbc87;--red:#df6e73;--purple:#9071d8;--blue:#5a9fd4}
-
-@media(prefers-color-scheme: light) {
-  :root {
-    --bg:#ffffff;--side:#f5f5f5;--card:#ffffff;--card2:#f9f9f9;--line:#e5e5e5;--text:#111827;--muted:#6b7280;--gold:#17385c;
-  }
+:root{
+  --bg:#0a0b0e;--bg-2:#101218;--panel:#15171f;--panel-2:#1d2029;
+  --line:rgba(255,255,255,.11);--line-soft:rgba(255,255,255,.055);
+  --text:#f3f4f7;--text-dim:#aab1c0;--text-faint:#78808f;
+  --gold:#c9a24b;--gold-bright:#ddb968;--on-accent:#1a1305;
+  --green:#3f9d78;--red:#d6706f;--amber:#d3a34a;--blue:#5a9fd4;
+  --shadow:0 24px 60px -28px rgba(0,0,0,.9);
 }
 
 body.light-mode {
-  --bg:#ffffff;--side:#f5f5f5;--card:#ffffff;--card2:#f9f9f9;--line:#e5e5e5;--text:#111827;--muted:#6b7280;--gold:#17385c;
+  --bg:#ffffff;--bg-2:#eef0f5;--panel:#ffffff;--panel-2:#f5f6f9;
+  --line:rgba(30,41,59,.14);--line-soft:rgba(30,41,59,.07);
+  --text:#111827;--text-dim:#3f4a5a;--text-faint:#6b7280;
+  --gold:#17385c;--gold-bright:#0f2743;--on-accent:#ffffff;
+  --green:#166534;--red:#b3261e;--amber:#8a5a12;--blue:#155e75;
+  --shadow:0 18px 42px -24px rgba(15,23,42,.20);
 }
 
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;transition:background 0.3s, color 0.3s}button,input,select,textarea{font:inherit}.app{display:grid;grid-template-columns:245px minmax(0,1fr);min-height:100vh}aside{background:var(--side);border-right:1px solid var(--line);padding:22px 14px;position:sticky;top:0;height:100vh;overflow:auto}.brand{display:flex;gap:12px;align-items:center;padding:0 10px 24px}.logo{font-size:30px;font-weight:700}.logo span{color:var(--gold)}.brand strong{font-size:13px;letter-spacing:.08em}.brand small{display:block;color:var(--muted);margin-top:4px}.group{margin:16px 0}.group-title{font-size:10px;color:#607088;letter-spacing:.15em;text-transform:uppercase;padding:0 10px 7px}.nav{width:100%;background:transparent;border:0;color:#bec6d1;text-align:left;padding:11px 12px;border-radius:9px;display:flex;gap:10px;align-items:center;cursor:pointer;transition:0.2s}.nav:hover,.nav.active{background:#162031;color:white}.nav.active{box-shadow:inset 3px 0 var(--gold)}.count{margin-left:auto;background:#49391c;color:#efc45b;padding:2px 7px;border-radius:999px;font-size:10px}.profile{margin-top:24px;border-top:1px solid var(--line);padding:18px 10px;color:#cbd2dc}.profile small{display:block;color:var(--muted)}main{padding:24px;min-width:0;overflow-y:auto}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:22px}h1{font-family:Georgia,serif;font-size:30px;margin:0 0 5px}h2{font-size:24px;margin:0 0 5px}h3{font-size:16px;margin:0}h4{font-size:13px;margin:0}.sub{color:var(--muted);font-size:13px}.search{min-width:300px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:#b8c0ce}.page{display:none}.page.active{display:block}.detail-view{display:none}.detail-view.active{display:block}.back-btn{background:var(--card);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:8px;cursor:pointer;font-size:12px;margin-bottom:16px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.stat,.panel{background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:14px}.stat{padding:18px;cursor:pointer;transition:0.2s}.stat:hover{border-color:var(--gold);transform:translateY(-2px)}.stat .label{color:#8e9aae;font-size:11px}.value{font-size:28px;font-weight:700;margin:9px 0}.trend{font-size:11px;color:var(--muted)}.up{color:var(--green)}.warn{color:var(--gold)}.bad{color:var(--red)}.grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.55fr);gap:14px}.panel{padding:18px;margin-bottom:14px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.link{color:var(--gold);font-size:11px;cursor:pointer}.chart{height:220px;position:relative;background:repeating-linear-gradient(to bottom,transparent 0,transparent 53px,#1f2b3d 54px)}.chart svg{width:100%;height:100%}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:760px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid #1f2a39;font-size:12px}th{font-size:10px;color:#6f7d92;text-transform:uppercase;font-weight:600}tbody tr{cursor:pointer;transition:background 0.1s}tbody tr:hover{background:var(--card2)}.pill{padding:4px 8px;border-radius:999px;font-size:10px;display:inline-block;font-weight:600}.green{background:#102922;color:#4bc895}.yellow{background:#2e2619;color:#e2b34b}.red{background:#301c20;color:#ea7a7e}.purple{background:#251f39;color:#aa91e6}.blue{background:#1f2d42;color:#5a9fd4}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}.time-filter{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);cursor:pointer;font-size:12px;display:flex;gap:8px}.time-filter.active{border-color:var(--gold);background:rgba(217,173,69,0.1)}.btn{background:#101a29;color:#cbd2dc;border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;transition:0.2s;font-size:12px}.btn:hover{border-color:var(--gold)}.primary{background:var(--gold);border-color:var(--gold);color:#17130b;font-weight:700;margin-left:auto}.ticket-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.ticket{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;transition:0.2s}.ticket:hover{border-color:var(--gold)}.ticket h4{margin:8px 0;font-size:13px}.ticket p{color:var(--muted);font-size:11px;line-height:1.5}.meta{font-size:10px;color:#6f7b90}.kv{display:flex;justify-content:space-between;border-bottom:1px solid #223047;padding:11px 0;font-size:12px}.kv span{color:#7f8da1}.side-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #1f2a39;align-items:center}.side-row:last-child{border-bottom:0}.side-row b{display:block;font-size:11px}.side-row span{font-size:10px;color:var(--muted)}.theme-toggle{background:var(--card2);border:1px solid var(--line);color:var(--text);width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:0.2s;flex-shrink:0}.theme-toggle:hover{border-color:var(--gold)}.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto}.modal-overlay.show{display:flex}.modal-content{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:24px;margin:auto;width:90%;max-width:800px;my:20px}.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.close-modal{background:none;border:none;color:var(--text);font-size:24px;cursor:pointer}.form-group{margin-bottom:16px}.form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px;font-size:12px}.form-group textarea{resize:vertical;min-height:100px}.profile-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;display:flex;gap:16px}.profile-avatar{width:60px;height:60px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#17130b;font-weight:700;font-size:20px;flex-shrink:0}.profile-info h3{margin:0 0 4px}.profile-info p{margin:0;font-size:12px;color:var(--muted)}.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px}.info-row{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}.info-row-label{font-size:10px;color:var(--muted);text-transform:uppercase}.info-row-value{font-size:14px;font-weight:600;margin-top:4px}.tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap}.tab-btn{background:none;border:none;color:var(--muted);padding:12px 0;border-bottom:2px solid transparent;cursor:pointer;font-size:13px;transition:0.2s}.tab-btn.active{color:var(--text);border-bottom-color:var(--gold)}.tab-content{display:none}.tab-content.active{display:block}
-@media(max-width:980px){.app{grid-template-columns:82px 1fr}.brand>div:last-child,.group-title,.nav .txt,.profile,.count{display:none}.nav{justify-content:center}.stats{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.ticket-grid{grid-template-columns:1fr 1fr}.search{min-width:180px}.modal-content{width:95%;max-width:90vw}}
-@media(max-width:620px){.app{display:block}aside{position:static;height:auto}.brand{justify-content:center}.group{display:flex;gap:6px;overflow:auto}.nav{min-width:48px}.top{align-items:flex-start;flex-direction:column}.search{width:100%;min-width:0}.stats{grid-template-columns:1fr}.ticket-grid{grid-template-columns:1fr}main{padding:15px}.info-grid{grid-template-columns:1fr}.modal-content{width:95%}.profile-card{flex-direction:column;text-align:center}.profile-avatar{margin:0 auto}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Source Serif 4',Georgia,serif;transition:background 0.4s ease,color 0.3s ease}
+body{min-height:100vh}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,h4{font-family:'Playfair Display',Georgia,serif;font-weight:500;letter-spacing:.3px}
+
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+aside{background:linear-gradient(180deg,var(--bg-2),transparent);border-right:1px solid var(--line-soft);padding:26px 18px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+aside::-webkit-scrollbar{width:7px}
+aside::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+.brand{display:flex;gap:12px;align-items:center;padding:0 8px 24px;font-family:'Playfair Display',serif}
+.logo{font-size:26px;letter-spacing:6px;font-weight:600}
+.logo span{color:var(--gold)}
+.brand strong{font-size:13px;letter-spacing:.08em}
+.brand small{display:block;color:var(--text-faint);margin-top:4px;font-size:9px}
+
+.group{margin:16px 0}
+.group-title{font-size:10px;color:#607088;letter-spacing:.15em;text-transform:uppercase;padding:0 10px 7px;font-weight:600}
+
+.nav{width:100%;background:transparent;border:0;color:#bec6d1;text-align:left;padding:12px 14px;border-radius:10px;display:flex;gap:10px;align-items:center;cursor:pointer;transition:.2s;font-size:14.5px;letter-spacing:.5px;position:relative}
+.nav:hover,.nav.active{background:var(--panel);color:var(--text)}
+.nav.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--gold)}
+
+.count{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--gold);color:var(--on-accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+.profile{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:16px}
+.who{display:flex;align-items:center;gap:11px;padding:6px 8px}
+.who .av{width:34px;height:34px;border-radius:50%;background:rgba(201,162,75,.14);color:var(--gold);display:grid;place-items:center;font-size:14px;font-weight:500;flex:none}
+.who .wn{font-size:13.5px;color:var(--text)}
+.who .wr{font-size:11px;color:var(--text-faint);letter-spacing:.5px}
+
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:30px;max-width:none}
+.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:30px;flex-wrap:wrap}
+h1{font-size:30px;letter-spacing:.5px;margin:0}
+.page-sub{color:var(--text-faint);font-size:13px;margin-top:3px;letter-spacing:.6px}
+.search{min-width:300px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:#b8c0ce;font-size:13.5px}
+.search::placeholder{color:var(--text-faint)}
+
+.page{display:none;animation:rise .45s ease both}
+.page.active{display:block}
+.detail-view{display:none}
+.detail-view.active{display:block}
+
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.back-btn{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-size:13.5px;margin-bottom:20px;transition:.2s}
+.back-btn:hover{border-color:var(--gold)}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:30px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;cursor:pointer;transition:.25s;box-shadow:0 1px 2px rgba(17,24,39,.05),0 6px 16px -8px rgba(17,24,39,.12)}
+.stat:hover{border-color:var(--gold);transform:translateY(-2px)}
+.stat .sl{color:var(--text-faint);font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
+.stat .sv{font-family:'Playfair Display',serif;font-size:34px;margin-top:10px;line-height:1;font-weight:600}
+.stat .sd{font-size:12px;margin-top:8px;letter-spacing:.4px}
+.sd.up{color:var(--green)}.sd.down{color:var(--red)}.sd.warn{color:var(--amber)}
+
+.stat.good{background:color-mix(in srgb,var(--green) 30%,var(--panel));border-color:color-mix(in srgb,var(--green) 46%,var(--panel))}.stat.good .sv{color:var(--green)}
+.stat.money{background:color-mix(in srgb,var(--gold) 26%,var(--panel));border-color:color-mix(in srgb,var(--gold) 42%,var(--panel))}.stat.money .sv{color:var(--gold)}
+.stat.alert{background:color-mix(in srgb,var(--red) 30%,var(--panel));border-color:color-mix(in srgb,var(--red) 46%,var(--panel))}.stat.alert .sv{color:var(--red)}
+.stat.warn{background:color-mix(in srgb,var(--amber) 30%,var(--panel));border-color:color-mix(in srgb,var(--amber) 46%,var(--panel))}.stat.warn .sv{color:var(--amber)}
+.stat.info{background:color-mix(in srgb,var(--blue) 26%,var(--panel));border-color:color-mix(in srgb,var(--blue) 42%,var(--panel))}.stat.info .sv{color:var(--blue)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.55fr);gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(17,24,39,.05)}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.panel h3{margin:0;font-size:15px;font-weight:600}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.time-filter{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--text);cursor:pointer;font-size:12px;transition:.2s}
+.time-filter:hover,.time-filter.active{border-color:var(--gold)}
+.time-filter.active{background:color-mix(in srgb,var(--gold) 20%,var(--panel))}
+
+.btn{background:#101a29;color:#cbd2dc;border:1px solid var(--line);border-radius:10px;padding:10px 13px;cursor:pointer;transition:.2s;font-size:13.5px;font-family:inherit;letter-spacing:.5px}
+.btn:hover{border-color:var(--gold)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--on-accent);font-weight:600;margin-left:auto}
+.btn.primary:hover{background:var(--gold-bright);transform:translateY(-1px)}
+
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);font-size:12px}
+th{font-size:10px;color:var(--gold);text-transform:uppercase;font-weight:600;letter-spacing:.9px}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover{background:var(--panel-2)}
+
+.pill{padding:4px 8px;border-radius:10px;font-size:10px;display:inline-block;font-weight:600;letter-spacing:.5px}
+.pill.green{background:color-mix(in srgb,var(--green) 20%,var(--panel));color:var(--green)}
+.pill.yellow{background:color-mix(in srgb,var(--amber) 20%,var(--panel));color:var(--amber)}
+.pill.red{background:color-mix(in srgb,var(--red) 20%,var(--panel));color:var(--red)}
+.pill.blue{background:color-mix(in srgb,var(--blue) 20%,var(--panel));color:var(--blue)}
+.pill.purple{background:rgba(144,113,216,.2);color:#aa91e6}
+
+.link{color:var(--gold);font-size:11px;cursor:pointer;letter-spacing:.5px}
+.link:hover{text-decoration:underline}
+
+.chart{height:220px;position:relative;background:repeating-linear-gradient(to bottom,transparent 0,transparent 53px,color-mix(in srgb,var(--gold) 10%,var(--panel)) 54px)}
+.chart svg{width:100%;height:100%}
+
+.ticket-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ticket{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;transition:.2s;box-shadow:0 1px 2px rgba(17,24,39,.05)}
+.ticket:hover{border-color:var(--gold);transform:translateY(-2px)}
+.ticket h4{margin:8px 0 6px;font-size:14px;font-weight:600}
+.ticket p{color:var(--text-faint);font-size:12px;line-height:1.5;margin:6px 0 8px}
+.meta{font-size:11px;color:#6f7b90;letter-spacing:.4px}
+
+.side-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center}
+.side-row:last-child{border-bottom:0}
+.side-row b{display:block;font-size:12px;font-weight:600}
+.side-row span{font-size:11px;color:var(--text-faint)}
+
+.kv{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:11px 0;font-size:13px}
+.kv span{color:var(--text-faint)}
+
+.theme-toggle{background:var(--panel-2);border:1px solid var(--line);color:var(--text);width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:.2s;flex-shrink:0}
+.theme-toggle:hover{border-color:var(--gold)}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;overflow-y:auto;padding:20px}
+.modal-overlay.show{display:flex;align-items:flex-start;justify-content:center;padding-top:40px}
+.modal-content{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:24px;width:90%;max-width:800px;box-shadow:var(--shadow);animation:rise .35s ease}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.close-modal{background:none;border:none;color:var(--text);font-size:28px;cursor:pointer;width:32px;height:32px;display:grid;place-items:center;transition:.2s}
+.close-modal:hover{color:var(--gold)}
+
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;color:var(--text-faint);margin-bottom:6px;font-weight:600;letter-spacing:.5px}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 13px;font-size:13.5px}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--gold)}
+.form-group textarea{resize:vertical;min-height:100px}
+
+.profile-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;display:flex;gap:16px}
+.profile-avatar{width:60px;height:60px;border-radius:50%;background:color-mix(in srgb,var(--gold) 20%,var(--panel));display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:700;font-size:20px;flex-shrink:0}
+.profile-info h3{margin:0 0 4px}
+.profile-info p{margin:0;font-size:12px;color:var(--text-faint)}
+
+.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px}
+.info-row{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.info-row-label{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.info-row-value{font-size:15px;font-weight:600;margin-top:6px}
+
+.tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tab-btn{background:none;border:none;color:var(--text-faint);padding:12px 0;border-bottom:2px solid transparent;cursor:pointer;font-size:13.5px;transition:.2s;letter-spacing:.5px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--gold)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+@media(max-width:980px){
+  .app{grid-template-columns:70px 1fr}
+  .brand>strong,.brand>small,.group-title,.nav .txt,.profile,.count{display:none}
+  .nav{justify-content:center;padding:12px 0;gap:0}
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr}
+  .ticket-grid{grid-template-columns:1fr 1fr}
+  .search{min-width:100px}
+  .info-grid{grid-template-columns:1fr}
+}
+@media(max-width:620px){
+  .app{display:block}
+  aside{position:static;height:auto;padding:16px 12px}
+  .group{display:flex;gap:4px;overflow:auto}
+  .nav{min-width:44px;gap:0;padding:10px 0;justify-content:center;font-size:0}
+  .top{flex-direction:column;align-items:stretch}
+  .search{width:100%;min-width:0}
+  .stat-grid{grid-template-columns:1fr}
+  .ticket-grid{grid-template-columns:1fr}
+  main{padding:15px}
+  .info-grid{grid-template-columns:1fr}
+  .modal-content{width:95%}
+  .profile-card{flex-direction:column;text-align:center;align-items:center}
+}
 </style>
 </head><body>
 <div class="app">
@@ -30,25 +204,36 @@ body.light-mode {
 <div class="group"><div class="group-title">Billing</div><button class="nav" data-page="billing">▣ <span class="txt">Plans & Billing</span></button><button class="nav" data-page="payments">▭ <span class="txt">Payments</span></button><button class="nav" data-page="payroll">💳 <span class="txt">Payroll</span></button><button class="nav" data-page="revenue">▥ <span class="txt">Revenue</span></button></div>
 <div class="group"><div class="group-title">Engagement</div><button class="nav" data-page="support">◉ <span class="txt">Support</span><span class="count">7</span></button><button class="nav" data-page="feedback">◇ <span class="txt">Feedback & Reviews</span><span class="count">12</span></button><button class="nav" data-page="usage">◫ <span class="txt">Product Usage</span></button><button class="nav" data-page="announcements">⌁ <span class="txt">Announcements</span></button></div>
 <div class="group"><div class="group-title">Operations</div><button class="nav" data-page="health">♡ <span class="txt">Platform Health</span></button><button class="nav" data-page="tasks">✓ <span class="txt">Tasks</span></button><button class="nav" data-page="staff">♧ <span class="txt">Staff & Roles</span></button><button class="nav" data-page="activity">≡ <span class="txt">Activity Log</span></button><button class="nav" data-page="settings">⚙ <span class="txt">Settings</span></button></div>
-<div class="profile"><b>Kayode Ojomo</b><small>Super Admin</small></div>
+<div class="profile">
+  <div class="who">
+    <div class="av">KO</div>
+    <div><div class="wn">Kayode Ojomo</div><div class="wr">Super Admin</div></div>
+  </div>
+</div>
 </aside>
 <main>
-<div class="top"><div><h1 id="title">Overview</h1><div class="sub" id="subtitle">Monitor your platform at a glance</div></div><div style="display:flex; gap:10px; align-items:center"><input class="search" id="globalSearch" placeholder="Search subscribers, tickets, payments..." /><button class="theme-toggle" onclick="toggleTheme()">🌙</button></div></div>
+<div class="top"><div><h1 id="title">Overview</h1><div class="page-sub" id="subtitle">Monitor your platform at a glance</div></div><div style="display:flex;gap:10px;align-items:center"><input class="search" id="globalSearch" placeholder="Search subscribers, tickets, payments..." /><button class="theme-toggle" onclick="toggleTheme()">🌙</button></div></div>
 
 <section class="page active" id="overview">
-<div style="display:flex; gap:10px; margin-bottom:16px">
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
   <button class="time-filter active" onclick="setTimePeriod('today')">Today</button>
   <button class="time-filter" onclick="setTimePeriod('week')">This Week</button>
   <button class="time-filter" onclick="setTimePeriod('month')">This Month</button>
   <button class="time-filter" onclick="setTimePeriod('year')">This Year</button>
 </div>
-<div class="stats" onclick="handleStatClick(event)">
-  <div class="stat"><div class="label">TOTAL SUBSCRIBERS</div><div class="value">128</div><div class="trend"><span class="warn">↑ 12</span> this month</div></div>
-  <div class="stat"><div class="label">ACTIVE SUBSCRIBERS</div><div class="value">105</div><div class="trend"><span class="up">82%</span> of total</div></div>
-  <div class="stat"><div class="label">MRR</div><div class="value">₦3.89M</div><div class="trend"><span class="up">↑ 14.6%</span> vs last month</div></div>
-  <div class="stat"><div class="label">OPEN SUPPORT</div><div class="value">7</div><div class="trend"><span class="bad">2 urgent</span> · 5 normal</div></div>
+<div class="stat-grid">
+  <div class="stat good"><div class="sl">TOTAL SUBSCRIBERS</div><div class="sv">128</div><div class="sd up">↑ 12 this month</div></div>
+  <div class="stat money"><div class="sl">ACTIVE SUBSCRIBERS</div><div class="sv">105</div><div class="sd">82% of total</div></div>
+  <div class="stat money"><div class="sl">MRR</div><div class="sv">₦3.89M</div><div class="sd up">↑ 14.6% vs last</div></div>
+  <div class="stat alert"><div class="sl">OPEN SUPPORT</div><div class="sv">7</div><div class="sd">2 urgent · 5 normal</div></div>
 </div>
-<div class="grid"><div><div class="panel"><div class="panel-head"><h3>Revenue Overview</h3><span class="link">This month</span></div><div class="chart"><svg viewBox="0 0 800 220" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9ad45" stop-opacity=".28"/><stop offset="1" stop-color="#d9ad45" stop-opacity="0"/></linearGradient></defs><path d="M0 200 L40 170 L85 180 L130 138 L175 145 L220 122 L265 101 L310 118 L355 92 L400 78 L445 48 L490 68 L535 86 L580 63 L625 44 L670 53 L715 19 L760 34 L800 12 L800 220 L0 220Z" fill="url(#g)"/><path d="M0 200 L40 170 L85 180 L130 138 L175 145 L220 122 L265 101 L310 118 L355 92 L400 78 L445 48 L490 68 L535 86 L580 63 L625 44 L670 53 L715 19 L760 34 L800 12" fill="none" stroke="#d9ad45" stroke-width="3"/></svg></div></div><div class="panel"><div class="panel-head"><h3>Recent Subscribers</h3><span class="link">View all</span></div><div class="table-wrap"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Joined</th><th>MRR</th></tr></thead><tbody><tr><td>Artisan Threads</td><td>Pro</td><td><span class="pill green">Active</span></td><td>19 Aug</td><td>₦49,000</td></tr><tr><td>The Weaver Studio</td><td>Premium</td><td><span class="pill green">Active</span></td><td>15 Aug</td><td>₦79,000</td></tr><tr><td>Desert Rose Designs</td><td>Trial</td><td><span class="pill yellow">Trial</span></td><td>1 Aug</td><td>—</td></tr></tbody></table></div></div></div><div><div class="panel"><div class="panel-head"><h3>Alerts</h3><span class="link">View all</span></div><div class="side-row"><div><b>Payment failed</b><span>Desert Rose Designs · 2h ago</span></div></div><div class="side-row"><div><b>Trial ending soon</b><span>Stella Fashion Atelier · 5h ago</span></div></div><div class="side-row"><div><b>New subscriber</b><span>Artisan Threads · 1d ago</span></div></div></div><div class="panel"><div class="panel-head"><h3>Support & Feedback</h3><span class="link">View all</span></div><div class="side-row"><div><b>Checkout not loading</b><span>Bug · Lux Couture</span></div><span class="pill red">Urgent</span></div><div class="side-row"><div><b>Fabric calculator request</b><span>Feature request</span></div><span class="pill yellow">New</span></div><div class="side-row"><div><b>Invoice question</b><span>Billing · Weaver Studio</span></div><span class="pill purple">Working</span></div></div></div></div>
+<div class="grid"><div>
+<div class="panel"><div class="panel-head"><h3>Revenue Overview</h3><span class="link">This month</span></div><div class="chart"><svg viewBox="0 0 800 220" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9a24b" stop-opacity=".28"/><stop offset="1" stop-color="#c9a24b" stop-opacity="0"/></linearGradient></defs><path d="M0 200 L40 170 L85 180 L130 138 L175 145 L220 122 L265 101 L310 118 L355 92 L400 78 L445 48 L490 68 L535 86 L580 63 L625 44 L670 53 L715 19 L760 34 L800 12 L800 220 L0 220Z" fill="url(#g)"/><path d="M0 200 L40 170 L85 180 L130 138 L175 145 L220 122 L265 101 L310 118 L355 92 L400 78 L445 48 L490 68 L535 86 L580 63 L625 44 L670 53 L715 19 L760 34 L800 12" fill="none" stroke="#c9a24b" stroke-width="2.5"/></svg></div></div>
+<div class="panel"><div class="panel-head"><h3>Recent Subscribers</h3><span class="link">View all</span></div><div class="table-wrap"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Joined</th><th>MRR</th></tr></thead><tbody><tr><td>Artisan Threads</td><td>Pro</td><td><span class="pill green">Active</span></td><td>19 Aug</td><td>₦49,000</td></tr><tr><td>The Weaver Studio</td><td>Premium</td><td><span class="pill green">Active</span></td><td>15 Aug</td><td>₦79,000</td></tr><tr><td>Desert Rose Designs</td><td>Trial</td><td><span class="pill yellow">Trial</span></td><td>1 Aug</td><td>—</td></tr></tbody></table></div></div>
+</div><div>
+<div class="panel"><div class="panel-head"><h3>Alerts</h3><span class="link">View all</span></div><div class="side-row"><div><b>Payment failed</b><span>Desert Rose Designs · 2h ago</span></div></div><div class="side-row"><div><b>Trial ending soon</b><span>Stella Fashion Atelier · 5h ago</span></div></div><div class="side-row"><div><b>New subscriber</b><span>Artisan Threads · 1d ago</span></div></div></div>
+<div class="panel"><div class="panel-head"><h3>Support & Feedback</h3><span class="link">View all</span></div><div class="side-row"><div><b>Checkout not loading</b><span>Bug · Lux Couture</span></div><span class="pill red">Urgent</span></div><div class="side-row"><div><b>Fabric calculator request</b><span>Feature request</span></div><span class="pill yellow">New</span></div><div class="side-row"><div><b>Invoice question</b><span>Billing · Weaver Studio</span></div><span class="pill purple">Working</span></div></div>
+</div></div>
 </section>
 
 <section class="page" id="subscribers">
@@ -61,48 +246,35 @@ body.light-mode {
   <button class="primary btn" onclick="openAddSubscriber()">+ Add Subscriber</button>
 </div>
 <div class="panel">
-  <div class="panel-head">
-    <h3>Subscriber Directory</h3>
-    <span class="link" onclick="sortSubscribers()">Sort by tier</span>
-  </div>
+  <div class="panel-head"><h3>Subscriber Directory</h3><span class="link" onclick="sortSubscribers()">Sort by tier</span></div>
   <div class="table-wrap">
-    <table id="subscribersTable">
-      <thead>
-        <tr><th>Business</th><th>Owner</th><th>Plan</th><th>Status</th><th>Users</th><th>Last Active</th><th>MRR</th></tr>
-      </thead>
-      <tbody id="subscribersBody"></tbody>
-    </table>
+    <table id="subscribersTable"><thead><tr><th>Business</th><th>Owner</th><th>Plan</th><th>Status</th><th>Users</th><th>Last Active</th><th>MRR</th></tr></thead><tbody id="subscribersBody"></tbody></table>
   </div>
 </div>
 </section>
 
-<section class="page" id="subscribers-detail" class="detail-view">
-  <button class="back-btn" onclick="goBack()">← Back to Subscribers</button>
-  <div id="subscriberDetailContent"></div>
-</section>
+<section class="page" id="subscribers-detail" class="detail-view"><button class="back-btn" onclick="goBack()">← Back to Subscribers</button><div id="subscriberDetailContent"></div></section>
 
 <section class="page" id="onboarding">
-<div class="stats" onclick="handleStatClick(event)">
-  <div class="stat"><div class="label">NEW SIGNUPS</div><div class="value">6</div><div class="trend">Awaiting activation</div></div>
-  <div class="stat"><div class="label">SETUP STARTED</div><div class="value">4</div><div class="trend">Onboarding</div></div>
-  <div class="stat"><div class="label">ACTIVATED</div><div class="value">18</div><div class="trend up">This month</div></div>
-  <div class="stat"><div class="label">AVG TIME TO LIVE</div><div class="value">2.4d</div><div class="trend up">↓ 0.7d</div></div>
+<div class="stat-grid">
+  <div class="stat good"><div class="sl">NEW SIGNUPS</div><div class="sv">6</div><div class="sd">Awaiting activation</div></div>
+  <div class="stat info"><div class="sl">SETUP STARTED</div><div class="sv">4</div><div class="sd">Onboarding</div></div>
+  <div class="stat good"><div class="sl">ACTIVATED</div><div class="sv">18</div><div class="sd up">This month</div></div>
+  <div class="stat warn"><div class="sl">AVG TIME TO LIVE</div><div class="sv">2.4d</div><div class="sd up">↓ 0.7d</div></div>
 </div>
 <div class="ticket-grid" id="onboardingGrid"></div>
 </section>
 
 <section class="page" id="billing">
-<div class="stats" onclick="handleStatClick(event)">
-  <div class="stat"><div class="label">PREMIUM</div><div class="value">68</div><div class="trend">53%</div></div>
-  <div class="stat"><div class="label">PRO</div><div class="value">38</div><div class="trend">30%</div></div>
-  <div class="stat"><div class="label">STARTER</div><div class="value">18</div><div class="trend">14%</div></div>
-  <div class="stat"><div class="label">TRIAL</div><div class="value">4</div><div class="trend">3%</div></div>
+<div class="stat-grid">
+  <div class="stat money"><div class="sl">PREMIUM</div><div class="sv">68</div><div class="sd">53%</div></div>
+  <div class="stat money"><div class="sl">PRO</div><div class="sv">38</div><div class="sd">30%</div></div>
+  <div class="stat money"><div class="sl">STARTER</div><div class="sv">18</div><div class="sd">14%</div></div>
+  <div class="stat info"><div class="sl">TRIAL</div><div class="sv">4</div><div class="sd">3%</div></div>
 </div>
 <div class="panel">
   <div class="panel-head"><h3>Plans & Pricing</h3><button class="primary btn" onclick="openAddPlan()">+ Create Plan</button></div>
-  <div class="table-wrap" id="plansContainer">
-    <table><thead><tr><th>Plan</th><th>Monthly</th><th>Annual</th><th>Subscribers</th><th>Status</th></tr></thead><tbody id="plansBody"></tbody></table>
-  </div>
+  <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Monthly</th><th>Annual</th><th>Subscribers</th><th>Status</th></tr></thead><tbody id="plansBody"></tbody></table></div>
 </div>
 </section>
 
@@ -117,78 +289,74 @@ body.light-mode {
   <button class="btn" onclick="filterPayments('upcoming')">Upcoming</button>
 </div>
 <div class="panel">
-  <div class="table-wrap" id="paymentsContainer">
-    <table><thead><tr><th>Subscriber</th><th>Reference</th><th>Amount</th><th>Provider</th><th>Status</th><th>Date</th></tr></thead><tbody id="paymentsBody"></tbody></table>
-  </div>
+  <div class="table-wrap"><table><thead><tr><th>Subscriber</th><th>Reference</th><th>Amount</th><th>Provider</th><th>Status</th><th>Date</th></tr></thead><tbody id="paymentsBody"></tbody></table></div>
 </div>
 </section>
 
 <section class="page" id="payroll">
-<div style="display:flex; gap:10px; margin-bottom:16px">
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
   <button class="time-filter active" onclick="setPayrollPeriod('month')">This Month</button>
   <button class="time-filter" onclick="setPayrollPeriod('quarter')">This Quarter</button>
   <button class="time-filter" onclick="setPayrollPeriod('year')">This Year</button>
 </div>
-<div class="stats">
-  <div class="stat"><div class="label">TOTAL PAYROLL</div><div class="value">₦890K</div><div class="trend">16 staff</div></div>
-  <div class="stat"><div class="label">PROCESSED</div><div class="value">14</div><div class="trend up">87.5%</div></div>
-  <div class="stat"><div class="label">PENDING</div><div class="value">2</div><div class="trend">Due by 28th</div></div>
-  <div class="stat"><div class="label">DEDUCTIONS</div><div class="value">₦45K</div><div class="trend">5.1% of total</div></div>
+<div class="stat-grid">
+  <div class="stat money"><div class="sl">TOTAL PAYROLL</div><div class="sv">₦890K</div><div class="sd">16 staff</div></div>
+  <div class="stat good"><div class="sl">PROCESSED</div><div class="sv">14</div><div class="sd up">87.5%</div></div>
+  <div class="stat warn"><div class="sl">PENDING</div><div class="sv">2</div><div class="sd">Due by 28th</div></div>
+  <div class="stat alert"><div class="sl">DEDUCTIONS</div><div class="sv">₦45K</div><div class="sd">5.1% of total</div></div>
 </div>
 <div class="panel">
   <div class="panel-head"><h3>Payroll Records</h3><button class="primary btn" onclick="openAddPayroll()">+ Process Payroll</button></div>
-  <div class="table-wrap" id="payrollContainer">
-    <table><thead><tr><th>Staff Name</th><th>Department</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th></tr></thead><tbody id="payrollBody"></tbody></table>
-  </div>
+  <div class="table-wrap"><table><thead><tr><th>Staff Name</th><th>Department</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th></tr></thead><tbody id="payrollBody"></tbody></table></div>
 </div>
 </section>
 
 <section class="page" id="revenue">
-<div style="display:flex; gap:10px; margin-bottom:16px">
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
   <button class="time-filter active" onclick="setTimePeriod('month')">This Month</button>
   <button class="time-filter" onclick="setTimePeriod('quarter')">This Quarter</button>
   <button class="time-filter" onclick="setTimePeriod('year')">This Year</button>
 </div>
-<div class="stats">
-  <div class="stat"><div class="label">MRR</div><div class="value">₦3.89M</div><div class="trend up">↑ 14.6%</div></div>
-  <div class="stat"><div class="label">ARR RUN RATE</div><div class="value">₦46.7M</div><div class="trend">MRR × 12</div></div>
-  <div class="stat"><div class="label">ARPU</div><div class="value">₦37K</div><div class="trend up">↑ ₦2.1K</div></div>
-  <div class="stat"><div class="label">CHURNED MRR</div><div class="value">₦98K</div><div class="trend bad">2.5%</div></div>
+<div class="stat-grid">
+  <div class="stat money"><div class="sl">MRR</div><div class="sv">₦3.89M</div><div class="sd up">↑ 14.6%</div></div>
+  <div class="stat money"><div class="sl">ARR RUN RATE</div><div class="sv">₦46.7M</div><div class="sd">MRR × 12</div></div>
+  <div class="stat money"><div class="sl">ARPU</div><div class="sv">₦37K</div><div class="sd up">↑ ₦2.1K</div></div>
+  <div class="stat alert"><div class="sl">CHURNED MRR</div><div class="sv">₦98K</div><div class="sd">2.5%</div></div>
 </div>
 <div class="grid">
-  <div><div class="panel"><div class="panel-head"><h3>Revenue Overview</h3><span class="link">Last 6 months</span></div><div class="chart"><svg viewBox="0 0 800 220" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9ad45" stop-opacity=".28"/><stop offset="1" stop-color="#d9ad45" stop-opacity="0"/></linearGradient></defs><path d="M0 200 L100 170 L200 140 L300 100 L400 70 L500 50 L600 60 L700 40 L800 10 L800 220 L0 220Z" fill="url(#g2)"/><path d="M0 200 L100 170 L200 140 L300 100 L400 70 L500 50 L600 60 L700 40 L800 10" fill="none" stroke="#d9ad45" stroke-width="3"/></svg></div></div>
-  <div><div class="panel"><div class="panel-head"><h3>Revenue by Plan</h3></div><div style="padding:10px 0"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Premium</span><span>₦1.58M</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Pro</span><span>₦640K</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>Starter</span><span>₦180K</span></div></div></div>
-  <div class="panel"><div class="panel-head"><h3>Subscribers by Plan</h3></div><div style="padding:10px 0"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Premium</span><span style="color:var(--gold)">68 (53%)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Pro</span><span style="color:var(--green)">38 (30%)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>Starter</span><span style="color:var(--blue)">18 (14%)</span></div></div></div>
+  <div><div class="panel"><div class="panel-head"><h3>Revenue Overview</h3><span class="link">Last 6 months</span></div><div class="chart"><svg viewBox="0 0 800 220" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9a24b" stop-opacity=".28"/><stop offset="1" stop-color="#c9a24b" stop-opacity="0"/></linearGradient></defs><path d="M0 200 L100 170 L200 140 L300 100 L400 70 L500 50 L600 60 L700 40 L800 10 L800 220 L0 220Z" fill="url(#g2)"/><path d="M0 200 L100 170 L200 140 L300 100 L400 70 L500 50 L600 60 L700 40 L800 10" fill="none" stroke="#c9a24b" stroke-width="2.5"/></svg></div></div>
+  <div><div class="panel"><div class="panel-head"><h3>Revenue by Plan</h3></div><div style="padding:10px 0"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Premium</span><span style="color:var(--gold);font-weight:600">₦1.58M</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Pro</span><span style="color:var(--green);font-weight:600">₦640K</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>Starter</span><span style="color:var(--blue);font-weight:600">₦180K</span></div></div></div>
+  <div class="panel"><div class="panel-head"><h3>Subscribers by Plan</h3></div><div style="padding:10px 0"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Premium</span><span style="color:var(--gold);font-weight:600">68 (53%)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span>Pro</span><span style="color:var(--green);font-weight:600">38 (30%)</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>Starter</span><span style="color:var(--blue);font-weight:600">18 (14%)</span></div></div></div>
   </div>
 </div>
 </section>
 
 <section class="page" id="support">
-<div class="stats" onclick="handleStatClick(event)">
-  <div class="stat"><div class="label">OPEN TICKETS</div><div class="value">7</div><div class="trend bad">2 urgent</div></div>
-  <div class="stat"><div class="label">IN PROGRESS</div><div class="value">4</div><div class="trend">Assigned</div></div>
-  <div class="stat"><div class="label">AVG RESPONSE</div><div class="value">18m</div><div class="trend up">Within target</div></div>
-  <div class="stat"><div class="label">RESOLVED TODAY</div><div class="value">11</div><div class="trend up">92% satisfaction</div></div>
+<div class="stat-grid">
+  <div class="stat alert"><div class="sl">OPEN TICKETS</div><div class="sv">7</div><div class="sd">2 urgent</div></div>
+  <div class="stat info"><div class="sl">IN PROGRESS</div><div class="sv">4</div><div class="sd">Assigned</div></div>
+  <div class="stat good"><div class="sl">AVG RESPONSE</div><div class="sv">18m</div><div class="sd up">Within target</div></div>
+  <div class="stat good"><div class="sl">RESOLVED TODAY</div><div class="sv">11</div><div class="sd up">92% satisfaction</div></div>
 </div>
 <div class="ticket-grid" id="supportGrid"></div>
 </section>
 
 <section class="page" id="feedback">
-<div class="stats" onclick="handleStatClick(event)">
-  <div class="stat"><div class="label">FEATURE REQUESTS</div><div class="value">12</div><div class="trend">7 under review</div></div>
-  <div class="stat"><div class="label">SUGGESTIONS</div><div class="value">18</div><div class="trend">This quarter</div></div>
-  <div class="stat"><div class="label">AVG RATING</div><div class="value">4.6</div><div class="trend up">★★★★★</div></div>
-  <div class="stat"><div class="label">NPS</div><div class="value">+61</div><div class="trend up">Excellent</div></div>
+<div class="stat-grid">
+  <div class="stat info"><div class="sl">FEATURE REQUESTS</div><div class="sv">12</div><div class="sd">7 under review</div></div>
+  <div class="stat info"><div class="sl">SUGGESTIONS</div><div class="sv">18</div><div class="sd">This quarter</div></div>
+  <div class="stat good"><div class="sl">AVG RATING</div><div class="sv">4.6</div><div class="sd">★★★★★</div></div>
+  <div class="stat good"><div class="sl">NPS</div><div class="sv">+61</div><div class="sd up">Excellent</div></div>
 </div>
 <div class="ticket-grid" id="feedbackGrid"></div>
 </section>
 
 <section class="page" id="usage">
-<div class="stats">
-  <div class="stat"><div class="label">DAILY ACTIVE BUSINESSES</div><div class="value">79</div><div class="trend up">↑ 8%</div></div>
-  <div class="stat"><div class="label">MONTHLY ACTIVE USERS</div><div class="value">846</div><div class="trend up">↑ 12%</div></div>
-  <div class="stat"><div class="label">ORDERS CREATED</div><div class="value">4,281</div><div class="trend">30 days</div></div>
-  <div class="stat"><div class="label">AT-RISK ACCOUNTS</div><div class="value">9</div><div class="trend bad">Low activity</div></div>
+<div class="stat-grid">
+  <div class="stat good"><div class="sl">DAILY ACTIVE BUSINESSES</div><div class="sv">79</div><div class="sd up">↑ 8%</div></div>
+  <div class="stat good"><div class="sl">MONTHLY ACTIVE USERS</div><div class="sv">846</div><div class="sd up">↑ 12%</div></div>
+  <div class="stat money"><div class="sl">ORDERS CREATED</div><div class="sv">4,281</div><div class="sd">30 days</div></div>
+  <div class="stat alert"><div class="sl">AT-RISK ACCOUNTS</div><div class="sv">9</div><div class="sd">Low activity</div></div>
 </div>
 </section>
 
@@ -200,18 +368,16 @@ body.light-mode {
   <button class="primary btn" onclick="openAddAnnouncement()">+ New Announcement</button>
 </div>
 <div class="panel">
-  <div class="table-wrap" id="announcementsContainer">
-    <table><thead><tr><th>Announcement</th><th>Audience</th><th>Channel</th><th>Status</th><th>Date</th></tr></thead><tbody id="announcementsBody"></tbody></table>
-  </div>
+  <div class="table-wrap"><table><thead><tr><th>Announcement</th><th>Audience</th><th>Channel</th><th>Status</th><th>Date</th></tr></thead><tbody id="announcementsBody"></tbody></table></div>
 </div>
 </section>
 
 <section class="page" id="health">
-<div class="stats">
-  <div class="stat"><div class="label">PLATFORM</div><div class="value up">Operational</div><div class="trend">99.98%</div></div>
-  <div class="stat"><div class="label">DATABASE</div><div class="value up">Healthy</div><div class="trend">Supabase connected</div></div>
-  <div class="stat"><div class="label">PAYMENTS</div><div class="value warn">Degraded</div><div class="trend">3 webhook retries</div></div>
-  <div class="stat"><div class="label">ERRORS 24H</div><div class="value">14</div><div class="trend bad">2 require review</div></div>
+<div class="stat-grid">
+  <div class="stat good"><div class="sl">PLATFORM</div><div class="sv">Operational</div><div class="sd">99.98%</div></div>
+  <div class="stat good"><div class="sl">DATABASE</div><div class="sv">Healthy</div><div class="sd">Supabase connected</div></div>
+  <div class="stat warn"><div class="sl">PAYMENTS</div><div class="sv">Degraded</div><div class="sd">3 webhook retries</div></div>
+  <div class="stat alert"><div class="sl">ERRORS 24H</div><div class="sv">14</div><div class="sd">2 require review</div></div>
 </div>
 <div class="panel"><h3>Service Status</h3><div class="side-row"><div><b>API Server</b><span>Operational</span></div><span class="pill green">Online</span></div><div class="side-row"><div><b>Database</b><span>Supabase</span></div><span class="pill green">Online</span></div><div class="side-row"><div><b>Payment Gateway</b><span>Flutterwave</span></div><span class="pill yellow">Degraded</span></div><div class="side-row"><div><b>Email Service</b><span>SendGrid</span></div><span class="pill green">Online</span></div></div>
 </section>
@@ -236,16 +402,11 @@ body.light-mode {
   <button class="primary btn" onclick="openInviteStaff()">+ Invite Staff</button>
 </div>
 <div class="panel">
-  <div class="table-wrap" id="staffContainer">
-    <table><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Status</th><th>Last active</th></tr></thead><tbody id="staffBody"></tbody></table>
-  </div>
+  <div class="table-wrap"><table><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Status</th><th>Last active</th></tr></thead><tbody id="staffBody"></tbody></table></div>
 </div>
 </section>
 
-<section class="page" id="staff-detail" class="detail-view">
-  <button class="back-btn" onclick="goBack()">← Back to Staff</button>
-  <div id="staffDetailContent"></div>
-</section>
+<section class="page" id="staff-detail" class="detail-view"><button class="back-btn" onclick="goBack()">← Back to Staff</button><div id="staffDetailContent"></div></section>
 
 <section class="page" id="activity">
 <div class="panel">
@@ -258,10 +419,10 @@ body.light-mode {
 <div class="grid">
   <div>
     <div class="panel"><h3>Platform Settings</h3><div class="kv"><span>Platform name</span><b>The Label Board</b></div><div class="kv"><span>Default currency</span><b>NGN ₦</b></div><div class="kv"><span>Trial length</span><b>14 days</b></div><div class="kv"><span>Support SLA</span><b>4 hours</b></div></div>
-    <div class="panel"><h3>Integrations</h3><div class="kv"><span>Supabase</span><b class="up">Connected</b></div><div class="kv"><span>Flutterwave</span><b class="up">Connected</b></div><div class="kv"><span>Email provider</span><b class="up">Connected</b></div><div class="kv"><span>WhatsApp</span><b class="warn">Configure</b></div></div>
+    <div class="panel"><h3>Integrations</h3><div class="kv"><span>Supabase</span><b style="color:var(--green)">Connected</b></div><div class="kv"><span>Flutterwave</span><b style="color:var(--green)">Connected</b></div><div class="kv"><span>Email provider</span><b style="color:var(--green)">Connected</b></div><div class="kv"><span>WhatsApp</span><b style="color:var(--amber)">Configure</b></div></div>
   </div>
   <div>
-    <div class="panel"><h3>Role Permissions</h3><div style="padding:12px 0"><div style="font-size:11px;margin-bottom:12px"><b>Super Admin</b><div style="color:var(--muted);font-size:10px;margin-top:4px">Full access to all features</div></div><div style="font-size:11px;margin-bottom:12px"><b>Support Manager</b><div style="color:var(--muted);font-size:10px;margin-top:4px">Support, Feedback, Activity log</div></div><div style="font-size:11px;margin-bottom:12px"><b>Finance</b><div style="color:var(--muted);font-size:10px;margin-top:4px">Billing, Payments, Revenue, Payroll</div></div><div style="font-size:11px"><b>Product</b><div style="color:var(--muted);font-size:10px;margin-top:4px">Usage, Feedback, Announcements</div></div></div>
+    <div class="panel"><h3>Role Permissions</h3><div style="padding:12px 0"><div style="font-size:12px;margin-bottom:12px"><b>Super Admin</b><div style="color:var(--text-faint);font-size:11px;margin-top:4px">Full access to all features</div></div><div style="font-size:12px;margin-bottom:12px"><b>Support Manager</b><div style="color:var(--text-faint);font-size:11px;margin-top:4px">Support, Feedback, Activity log</div></div><div style="font-size:12px;margin-bottom:12px"><b>Finance</b><div style="color:var(--text-faint);font-size:11px;margin-top:4px">Billing, Payments, Revenue, Payroll</div></div><div style="font-size:12px"><b>Product</b><div style="color:var(--text-faint);font-size:11px;margin-top:4px">Usage, Feedback, Announcements</div></div></div>
     </div>
   </div>
 </div>
@@ -269,7 +430,6 @@ body.light-mode {
 
 </main></div>
 
-<!-- Modal for details and forms -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-content">
     <div class="modal-header">
@@ -357,6 +517,7 @@ function initApp() {
   renderAnnouncements();
   renderPayroll();
   renderActivityLog();
+  renderTasks();
   setupNavigation();
 }
 
@@ -401,7 +562,6 @@ function renderSubscribers() {
                    currentFilter === 'expired' ? appData.subscribers.filter(s => s.status === 'expired') :
                    currentFilter === 'renewing' ? appData.subscribers.filter(s => s.status === 'renewing') :
                    appData.subscribers;
-
   const body = document.getElementById('subscribersBody');
   body.innerHTML = filtered.map(s => `
     <tr onclick="viewSubscriber(${s.id})">
@@ -419,9 +579,6 @@ function renderSubscribers() {
 function filterSubscribers(filter) {
   currentFilter = filter;
   renderSubscribers();
-  document.querySelectorAll('#subscribers .btn').forEach((btn, i) => {
-    btn.classList.toggle('active', ['all','active','trial','expired','renewing'][i] === filter);
-  });
 }
 
 function sortSubscribers() {
@@ -435,7 +592,7 @@ function sortSubscribers() {
 function viewSubscriber(id) {
   const sub = appData.subscribers.find(s => s.id === id);
   document.getElementById('subscribers').style.display = 'none';
-  document.getElementById('subscribers-detail').classList.add('active');
+  document.getElementById('subscribers-detail').style.display = 'block';
   document.getElementById('subscriberDetailContent').innerHTML = `
     <div class="profile-card">
       <div class="profile-avatar">${sub.name.split(' ').map(w => w[0]).join('')}</div>
@@ -454,14 +611,14 @@ function viewSubscriber(id) {
       <div class="info-row"><div class="info-row-label">Bonuses Earned</div><div class="info-row-value">₦${sub.bonuses.toLocaleString()}</div></div>
     </div>
     <div class="panel"><h3>Businesses Added</h3>${sub.businesses.map((b,i) => `<div class="side-row"><div><b>${b}</b></div></div>`).join('')}</div>
-    <div style="display:flex;gap:10px"><button class="btn" onclick="editSubscriber(${id})">Edit Subscriber</button><button class="btn" onclick="viewPayments(${id})">View Payments</button></div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn" onclick="editSubscriber(${id})">Edit Subscriber</button><button class="btn" onclick="viewPayments(${id})">View Payments</button></div>
   `;
 }
 
 function goBack() {
-  const detailView = document.querySelector('.detail-view.active');
+  const detailView = document.querySelector('.detail-view[style*="display: block"]');
   if(detailView) {
-    detailView.classList.remove('active');
+    detailView.style.display = 'none';
     document.getElementById(currentView).style.display = 'block';
   }
 }
@@ -488,8 +645,7 @@ function filterStaff(filter) {
 function viewStaff(id) {
   const staff = appData.staff.find(s => s.id === id);
   document.getElementById('staff').style.display = 'none';
-  document.getElementById('staff-detail').classList.add('active');
-
+  document.getElementById('staff-detail').style.display = 'block';
   document.getElementById('staffDetailContent').innerHTML = `
     <div class="profile-card">
       <div class="profile-avatar">${staff.name.split(' ').map(w => w[0]).join('')}</div>
@@ -646,19 +802,23 @@ function renderPayroll() {
 function renderActivityLog() {
   const content = document.getElementById('activityLogContent');
   content.innerHTML = appData.activities.map(a => `
-    <div class="side-row" onclick="viewActivity(${a.id})">
+    <div class="side-row" onclick="viewActivity(${a.id})" style="cursor:pointer">
       <div><b>${a.action}</b><span>${a.detail}</span></div>
       <span style="font-size:10px">${a.time}</span>
     </div>
   `).join('');
 }
 
-function handleStatClick(e) {
-  if(e.target.closest('.stat')) {
-    const stat = e.target.closest('.stat');
-    const label = stat.querySelector('.label').textContent;
-    console.log('Stat clicked:', label);
-  }
+function renderTasks() {
+  const grid = document.getElementById('tasksGrid');
+  grid.innerHTML = appData.tasks.map(t => `
+    <div class="ticket" onclick="viewTask(${t.id})">
+      <span class="pill ${t.priority === 'high' ? 'red' : 'yellow'}">${t.priority.toUpperCase()}</span>
+      <h4>${t.title}</h4>
+      <p>${t.desc}</p>
+      <div class="meta">Assigned to ${t.assignee} · ${t.date}</div>
+    </div>
+  `).join('');
 }
 
 // Modal functions
@@ -679,7 +839,7 @@ function openAddSubscriber() {
       <div class="form-group"><label>Owner Name</label><input type="text" required></div>
       <div class="form-group"><label>Email</label><input type="email" required></div>
       <div class="form-group"><label>Plan</label><select required><option>Select Plan</option><option>Starter</option><option>Pro</option><option>Premium</option></select></div>
-      <button type="submit" class="primary btn">Add Subscriber</button>
+      <button type="submit" class="btn primary">Add Subscriber</button>
     </form>
   `);
 }
@@ -691,7 +851,7 @@ function editSubscriber(id) {
       <div class="form-group"><label>Business Name</label><input type="text" value="${sub.name}" required></div>
       <div class="form-group"><label>Plan</label><select required><option>${sub.plan}</option><option>Starter</option><option>Pro</option><option>Premium</option></select></div>
       <div class="form-group"><label>MRR</label><input type="number" value="${sub.mrr}" required></div>
-      <button type="submit" class="primary btn">Update Subscriber</button>
+      <button type="submit" class="btn primary">Update Subscriber</button>
     </form>
   `);
 }
@@ -702,7 +862,7 @@ function openAddPlan() {
       <div class="form-group"><label>Plan Name</label><input type="text" required></div>
       <div class="form-group"><label>Monthly Price (₦)</label><input type="number" required></div>
       <div class="form-group"><label>Annual Price (₦)</label><input type="number" required></div>
-      <button type="submit" class="primary btn">Create Plan</button>
+      <button type="submit" class="btn primary">Create Plan</button>
     </form>
   `);
 }
@@ -714,7 +874,7 @@ function editPlan(id) {
       <div class="form-group"><label>Plan Name</label><input type="text" value="${plan.name}" required></div>
       <div class="form-group"><label>Monthly Price (₦)</label><input type="number" value="${plan.monthly}" required></div>
       <div class="form-group"><label>Annual Price (₦)</label><input type="number" value="${plan.annual}" required></div>
-      <button type="submit" class="primary btn">Update Plan</button>
+      <button type="submit" class="btn primary">Update Plan</button>
     </form>
   `);
 }
@@ -725,7 +885,7 @@ function openAddTask() {
       <div class="form-group"><label>Task Title</label><input type="text" required></div>
       <div class="form-group"><label>Description</label><textarea required></textarea></div>
       <div class="form-group"><label>Assign To</label><select required><option>Select Staff</option><option>Kayode Ojomo</option><option>Sarah Bello</option><option>Femi Adebayo</option></select></div>
-      <button type="submit" class="primary btn">Create Task</button>
+      <button type="submit" class="btn primary">Create Task</button>
     </form>
   `);
 }
@@ -736,7 +896,7 @@ function openInviteStaff() {
       <div class="form-group"><label>Email</label><input type="email" required></div>
       <div class="form-group"><label>Department</label><select required><option>Support</option><option>Finance</option><option>Product</option><option>Management</option></select></div>
       <div class="form-group"><label>Role</label><input type="text" required></div>
-      <button type="submit" class="primary btn">Send Invite</button>
+      <button type="submit" class="btn primary">Send Invite</button>
     </form>
   `);
 }
@@ -747,7 +907,7 @@ function openAddPayroll() {
       <div class="form-group"><label>Staff Member</label><select required><option>Select Staff</option>${appData.staff.map(s => `<option>${s.name}</option>`).join('')}</select></div>
       <div class="form-group"><label>Gross Amount (₦)</label><input type="number" required></div>
       <div class="form-group"><label>Deductions (₦)</label><input type="number"></div>
-      <button type="submit" class="primary btn">Process</button>
+      <button type="submit" class="btn primary">Process</button>
     </form>
   `);
 }
@@ -758,38 +918,12 @@ function openAddAnnouncement() {
       <div class="form-group"><label>Title</label><input type="text" required></div>
       <div class="form-group"><label>Message</label><textarea required></textarea></div>
       <div class="form-group"><label>Audience</label><select required><option>All subscribers</option><option>Premium only</option><option>Trial users</option></select></div>
-      <button type="submit" class="primary btn">Publish</button>
+      <button type="submit" class="btn primary">Publish</button>
     </form>
   `);
 }
 
 // View detail functions
-function viewSubscriber(id) {
-  const sub = appData.subscribers.find(s => s.id === id);
-  document.getElementById('subscribers').style.display = 'none';
-  document.getElementById('subscribers-detail').classList.add('active');
-  document.getElementById('subscriberDetailContent').innerHTML = `
-    <div class="profile-card">
-      <div class="profile-avatar">${sub.name.split(' ').map(w => w[0]).join('')}</div>
-      <div class="profile-info">
-        <h3>${sub.name}</h3>
-        <p>${sub.owner} · ${sub.email}</p>
-        <p style="margin-top:8px"><span class="pill ${sub.status === 'active' ? 'green' : 'yellow'}">${sub.plan}</span></p>
-      </div>
-    </div>
-    <div class="info-grid">
-      <div class="info-row"><div class="info-row-label">Status</div><div class="info-row-value">${sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}</div></div>
-      <div class="info-row"><div class="info-row-label">Monthly Revenue</div><div class="info-row-value">₦${sub.mrr.toLocaleString()}</div></div>
-      <div class="info-row"><div class="info-row-label">Users</div><div class="info-row-value">${sub.users}</div></div>
-      <div class="info-row"><div class="info-row-label">Join Date</div><div class="info-row-value">${sub.joined}</div></div>
-      <div class="info-row"><div class="info-row-label">Referrals</div><div class="info-row-value">${sub.referrals}</div></div>
-      <div class="info-row"><div class="info-row-label">Bonuses Earned</div><div class="info-row-value">₦${sub.bonuses.toLocaleString()}</div></div>
-    </div>
-    <div class="panel"><h3>Businesses Added</h3>${sub.businesses.map((b,i) => `<div class="side-row"><div><b>${b}</b></div></div>`).join('')}</div>
-    <div style="display:flex;gap:10px"><button class="btn" onclick="editSubscriber(${id})">Edit Subscriber</button><button class="btn" onclick="viewPayments(${id})">View Payments</button></div>
-  `;
-}
-
 function viewOnboarding(id) {
   const item = appData.onboarding.find(o => o.id === id);
   openModal(item.name, `<div style="line-height:1.8"><p><b>Status:</b> ${item.status}</p><p><b>Progress:</b> ${item.progress}%</p><p><b>Details:</b> ${item.note}</p><p><b>Last Update:</b> ${item.date}</p></div><div style="margin-top:16px"><button class="btn" onclick="closeModal()">Close</button></div>`);
@@ -828,6 +962,11 @@ function viewPayrollDetail(id) {
 function viewActivity(id) {
   const item = appData.activities.find(a => a.id === id);
   openModal('Activity Detail', `<div style="line-height:1.8"><p><b>Action:</b> ${item.action}</p><p><b>Details:</b> ${item.detail}</p><p><b>Time:</b> ${item.time}</p></div><div style="margin-top:16px"><button class="btn" onclick="closeModal()">Close</button></div>`);
+}
+
+function viewTask(id) {
+  const task = appData.tasks.find(t => t.id === id);
+  openModal(task.title, `<div style="line-height:1.8"><p><b>Description:</b> ${task.desc}</p><p><b>Priority:</b> ${task.priority}</p><p><b>Assigned to:</b> ${task.assignee}</p><p><b>Due:</b> ${task.date}</p></div><div style="margin-top:16px"><button class="btn" onclick="closeModal()">Close</button><button class="btn" onclick="closeModal()">Mark Done</button></div>`);
 }
 
 function exportActivityLog() {
@@ -892,21 +1031,7 @@ function saveAnnouncement(e) {
 
 function filterTasks(filter) {
   currentFilter = filter;
-  const grid = document.getElementById('tasksGrid');
-  const filtered = filter === 'all' ? appData.tasks : appData.tasks.filter(t => t.priority.includes(filter));
-  grid.innerHTML = appData.tasks.map(t => `
-    <div class="ticket" onclick="viewTask(${t.id})">
-      <span class="pill ${t.priority === 'high' ? 'red' : 'yellow'}">${t.priority.toUpperCase()}</span>
-      <h4>${t.title}</h4>
-      <p>${t.desc}</p>
-      <div class="meta">Assigned to ${t.assignee} · ${t.date}</div>
-    </div>
-  `).join('');
-}
-
-function viewTask(id) {
-  const task = appData.tasks.find(t => t.id === id);
-  openModal(task.title, `<div style="line-height:1.8"><p><b>Description:</b> ${task.desc}</p><p><b>Priority:</b> ${task.priority}</p><p><b>Assigned to:</b> ${task.assignee}</p><p><b>Due:</b> ${task.date}</p></div><div style="margin-top:16px"><button class="btn" onclick="closeModal()">Close</button><button class="btn" onclick="closeModal()">Mark Done</button></div>`);
+  renderTasks();
 }
 
 function setTimePeriod(period) {
@@ -935,20 +1060,6 @@ function loadTheme() {
   }
 }
 
-// Init
 document.addEventListener('DOMContentLoaded', initApp);
-
-// Render tasks grid on load
-document.addEventListener('DOMContentLoaded', () => {
-  const grid = document.getElementById('tasksGrid');
-  grid.innerHTML = appData.tasks.map(t => `
-    <div class="ticket" onclick="viewTask(${t.id})">
-      <span class="pill ${t.priority === 'high' ? 'red' : 'yellow'}">${t.priority.toUpperCase()}</span>
-      <h4>${t.title}</h4>
-      <p>${t.desc}</p>
-      <div class="meta">Assigned to ${t.assignee} · ${t.date}</div>
-    </div>
-  `).join('');
-});
 </script>
 </body></html>
