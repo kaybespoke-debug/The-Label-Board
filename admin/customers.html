@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Label Board Customers</title>
+<style>
+  :root{
+    --navy:#010817; --navy-2:#020b1d; --panel:#0d1526; --panel-2:#111b30;
+    --line:#1e2c47; --line-soft:#16233a;
+    --text:#eef1f6; --text-dim:#a8b3c6; --text-faint:#697894;
+    --gold:#e2ad4f; --green:#3ec98a; --amber:#e0a838; --red:#e06a6a; --blue:#5b9bd8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--navy);color:var(--text);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px}
+  a{color:var(--gold)}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 18px 60px}
+
+  /* ---- sign in ---- */
+  #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);
+    border-radius:18px;padding:30px 26px;text-align:center}
+  .mark{font-size:11px;letter-spacing:5px;color:var(--text-faint);margin-bottom:6px}
+  .name{font-family:Georgia,serif;font-size:22px;letter-spacing:4px;margin-bottom:4px}
+  .sub{color:var(--text-faint);font-size:12px;margin-bottom:24px}
+  input,select,textarea{width:100%;height:46px;border-radius:11px;border:1px solid var(--line);
+    background:#0a1120;color:var(--text);padding:0 13px;outline:none;font-family:inherit;font-size:15px}
+  textarea{height:auto;min-height:100px;padding:11px 13px;resize:vertical}
+  input:focus,select:focus,textarea:focus{border-color:#3c5a8c}
+  label{display:block;text-align:left;font-size:12px;color:var(--text-dim);margin:14px 0 6px}
+  .btn{height:46px;border:0;border-radius:11px;background:var(--gold);color:#101728;
+    font-weight:700;cursor:pointer;font-family:inherit;font-size:15px;padding:0 18px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.sm{height:34px;font-size:13px;padding:0 12px;border-radius:9px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
+
+  /* ---- shell ---- */
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:16px}
+  header h1{font-family:Georgia,serif;font-size:23px;margin:0;font-weight:500}
+  .tabs{display:flex;gap:16px;margin-left:auto;margin-right:auto}
+  .tab{padding:8px 0;border-bottom:2px solid transparent;cursor:pointer;font-size:14px;color:var(--text-dim);transition:.2s}
+  .tab.active{border-bottom-color:var(--gold);color:var(--text)}
+  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim)}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:11px;
+    text-transform:uppercase;letter-spacing:1px;color:var(--gold)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .kpi b{display:block;font-size:26px;font-family:Georgia,serif;font-weight:500;margin-bottom:3px}
+  .kpi span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:22px}
+  .panel-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .panel-head h2{margin:0;font-family:Georgia,serif;font-size:17px;font-weight:500}
+  .panel-head .grow{flex:1}
+  .panel-head input,.panel-head select{height:38px;width:auto;min-width:150px;font-size:14px}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--text-faint);
+    font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel-2)}
+  tr:last-child td{border-bottom:none}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .name-col{font-weight:600}
+  .muted{color:var(--text-faint);font-size:12px;margin-top:2px}
+  .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+  .t-trial{background:rgba(224,168,56,.16);color:var(--amber)}
+  .t-active{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-prospect{background:rgba(91,155,216,.15);color:var(--blue)}
+  .t-churned{background:rgba(224,106,106,.16);color:var(--red)}
+  .t-discovery{background:rgba(91,155,216,.14);color:var(--blue)}
+  .t-interested{background:rgba(224,168,56,.14);color:var(--amber)}
+  .t-negotiation{background:rgba(62,201,138,.14);color:var(--green)}
+  .t-lost{background:rgba(105,120,148,.18);color:var(--text-faint)}
+
+  /* ---- detail ---- */
+  .overlay{position:fixed;inset:0;background:rgba(1,6,16,.72);display:none;align-items:flex-start;
+    justify-content:center;padding:28px 16px;overflow:auto;z-index:50}
+  .overlay.show{display:flex}
+  .sheet{width:100%;max-width:700px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px}
+  .sheet h2{font-family:Georgia,serif;font-weight:500;margin:0 0 4px}
+  .sheet .muted{margin-bottom:16px}
+  .kv{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:14px}
+  .kv span{color:var(--text-faint);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .row > *{flex:1;min-width:130px}
+  .section{margin-top:20px}
+  .section h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text-faint);margin:0 0 10px}
+  .empty{padding:40px 20px;text-align:center;color:var(--text-faint)}
+  @media(max-width:680px){
+    .hide-sm{display:none}
+    .wrap{padding:16px 12px 50px}
+    .tabs{flex-basis:100%;order:3}
+    th,td{padding:11px 9px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SIGN IN ============ -->
+<section id="login">
+  <div class="card">
+    <div class="mark">THE LABEL BOARD</div>
+    <div class="name">BUSINESS</div>
+    <div class="sub">Manage customers & subscriptions</div>
+    <label for="em">Email</label>
+    <input id="em" type="email" autocomplete="username" placeholder="you@thelabelboard.app">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div style="margin-top:20px"><button class="btn" style="width:100%" id="go">Sign in</button></div>
+    <div class="err" id="err"></div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="app" style="display:none"><div class="wrap">
+  <header>
+    <h1>Label Board</h1>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('customers')">Customers</div>
+      <div class="tab" onclick="switchTab('pipeline')">Pipeline</div>
+      <div class="tab" onclick="switchTab('renewals')">Renewals</div>
+      <div class="tab" onclick="switchTab('payments')">Payments</div>
+    </div>
+    <div class="who"><span id="myName"></span><button class="btn ghost sm" id="out">Sign out</button></div>
+  </header>
+
+  <!-- CUSTOMERS TAB -->
+  <div id="tab-customers" class="tab-content">
+    <div class="kpis" id="kpis"></div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Customers</h2>
+        <span class="grow"></span>
+        <input id="qCustomers" placeholder="Search by name or email…" style="width:200px">
+        <select id="fStatus" style="width:160px"><option value="">All statuses</option><option>prospect</option><option>trial</option><option>active</option><option>churned</option></select>
+        <button class="btn sm" onclick="openAddCustomer()">+ New</button>
+      </div>
+      <div id="customersList"></div>
+    </div>
+  </div>
+
+  <!-- PIPELINE TAB -->
+  <div id="tab-pipeline" class="tab-content" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Sales Pipeline</h2>
+      </div>
+      <div id="pipelineView" style="padding:18px"></div>
+    </div>
+  </div>
+
+  <!-- RENEWALS TAB -->
+  <div id="tab-renewals" class="tab-content" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Upcoming Renewals (Next 30 days)</h2>
+      </div>
+      <div id="renewalsList"></div>
+    </div>
+  </div>
+
+  <!-- PAYMENTS TAB -->
+  <div id="tab-payments" class="tab-content" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Recent Payments</h2>
+        <span class="grow"></span>
+        <select id="fPaymentStatus" style="width:160px"><option value="">All statuses</option><option>pending</option><option>completed</option><option>failed</option></select>
+      </div>
+      <div id="paymentsList"></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ MODALS ============ -->
+<div class="overlay" id="sheet"><div class="sheet" id="sheetBody"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPA_URL = 'https://gcdrkoitjqwbidcfgyzl.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZHJrb2l0anF3YmlkY2ZneXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMxODcsImV4cCI6MjEwMjcxOTE4N30.XYiBkZCGgyhtRgQfmCPVErLRQY0SvmVEgHMddEpFcy8';
+
+const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+let ME = null, CUSTOMERS = [], SUBSCRIPTIONS = [], PAYMENTS = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = v => v ? new Date(v).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' }) : '—';
+const fmtCurrency = v => new Intl.NumberFormat('en-NG', { style:'currency', currency:'NGN' }).format(v);
+
+/* ---- auth ---- */
+async function signIn() {
+  const btn = $('go'); btn.disabled = true; $('err').textContent = 'Signing in…';
+  try {
+    const { error } = await supa.auth.signInWithPassword({
+      email: $('em').value.trim().toLowerCase(),
+      password: $('pw').value
+    });
+    if (error) throw error;
+    await enter();
+  } catch (e) {
+    $('err').textContent = e.message || 'Sign-in failed';
+    try { await supa.auth.signOut(); } catch (_) {}
+  } finally { btn.disabled = false; }
+}
+
+async function enter() {
+  try {
+    const { data: { user } } = await supa.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    ME = user;
+    $('login').style.display = 'none';
+    $('app').style.display = '';
+    $('myName').textContent = user.email;
+    await loadData();
+  } catch (e) {
+    $('err').textContent = e.message;
+    try { await supa.auth.signOut(); } catch (_) {}
+  }
+}
+
+async function loadData() {
+  try {
+    const [custsRes, subsRes, paysRes] = await Promise.all([
+      supa.from('tlb_customers').select('*').order('created_at', { ascending: false }),
+      supa.from('tlb_subscriptions').select('*'),
+      supa.from('tlb_payments').select('*').order('payment_date', { ascending: false }).limit(50)
+    ]);
+
+    if (custsRes.error) throw custsRes.error;
+    if (subsRes.error) throw subsRes.error;
+    if (paysRes.error) throw paysRes.error;
+
+    CUSTOMERS = custsRes.data || [];
+    SUBSCRIPTIONS = subsRes.data || [];
+    PAYMENTS = paysRes.data || [];
+
+    renderAll();
+  } catch (e) {
+    alert('Error loading data: ' + e.message);
+  }
+}
+
+function renderAll() {
+  renderKpis();
+  renderCustomers();
+  renderPipeline();
+  renderRenewals();
+  renderPayments();
+}
+
+function renderKpis() {
+  const total = CUSTOMERS.length;
+  const active = CUSTOMERS.filter(c => c.status === 'active').length;
+  const trials = CUSTOMERS.filter(c => c.status === 'trial').length;
+  const prospects = CUSTOMERS.filter(c => c.status === 'prospect').length;
+  const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+  $('kpis').innerHTML = K(total, 'Total') + K(prospects, 'Prospects') + K(trials, 'Trials') + K(active, 'Active');
+}
+
+function renderCustomers() {
+  const q = $('qCustomers').value.trim().toLowerCase();
+  const fs = $('fStatus').value;
+  const rows = CUSTOMERS.filter(c =>
+    (!q || (c.business_name + ' ' + c.owner_email).toLowerCase().includes(q)) &&
+    (!fs || c.status === fs)
+  );
+
+  if (!rows.length) {
+    $('customersList').innerHTML = '<div class="empty">No customers yet.</div>';
+    return;
+  }
+
+  $('customersList').innerHTML =
+    '<table><thead><tr><th>Business</th><th>Contact</th><th>Type</th><th>Status</th><th>Location</th><th class="num hide-sm">Added</th></tr></thead><tbody>' +
+    rows.map(c => '<tr onclick="openCustomer(\'' + c.id + '\')">' +
+      '<td><div class="name-col">' + esc(c.business_name) + '</div><div class="muted">' + esc(c.owner_name) + '</div></td>' +
+      '<td>' + esc(c.owner_email) + '</td>' +
+      '<td>' + esc(c.business_type || '—') + '</td>' +
+      '<td><span class="tag t-' + esc(c.status) + '">' + esc(c.status) + '</span></td>' +
+      '<td>' + esc(c.location || '—') + '</td>' +
+      '<td class="num hide-sm">' + fmtDate(c.created_at) + '</td>' +
+    '</tr>').join('') + '</tbody></table>';
+}
+
+function renderPipeline() {
+  const stages = ['discovery', 'interested', 'trial', 'negotiation', 'active', 'lost'];
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">';
+
+  stages.forEach(stage => {
+    const count = CUSTOMERS.filter(c => {
+      const pipe = SUBSCRIPTIONS.find(s => s.customer_id === c.id);
+      return c.status === 'prospect' && stage === 'discovery' ||
+             c.status === 'trial' && ['trial','negotiation'].includes(stage) ||
+             c.status === 'active' && stage === 'active' ||
+             c.status === 'churned' && stage === 'lost';
+    }).length;
+
+    html += '<div style="background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:16px">' +
+      '<div style="font-size:12px;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px">' + esc(stage) + '</div>' +
+      '<div style="font-size:28px;font-family:Georgia,serif;font-weight:500">' + count + '</div></div>';
+  });
+
+  html += '</div>';
+  $('pipelineView').innerHTML = html;
+}
+
+function renderRenewals() {
+  const now = new Date();
+  const in30 = new Date(now.getTime() + 30 * 86400000);
+
+  const renewals = SUBSCRIPTIONS
+    .filter(s => s.renewal_date && new Date(s.renewal_date) > now && new Date(s.renewal_date) <= in30)
+    .map(s => {
+      const cust = CUSTOMERS.find(c => c.id === s.customer_id);
+      return { ...s, customer: cust };
+    })
+    .sort((a, b) => new Date(a.renewal_date) - new Date(b.renewal_date));
+
+  if (!renewals.length) {
+    $('renewalsList').innerHTML = '<div class="empty">No renewals in the next 30 days.</div>';
+    return;
+  }
+
+  $('renewalsList').innerHTML =
+    '<table><thead><tr><th>Business</th><th>Plan</th><th>Renewal Date</th><th class="num">MRR</th></tr></thead><tbody>' +
+    renewals.map(r => '<tr>' +
+      '<td><div class="name-col">' + esc(r.customer?.business_name || 'Unknown') + '</div></td>' +
+      '<td>' + esc(r.plan_tier) + ' (' + esc(r.billing_cycle) + ')</td>' +
+      '<td>' + fmtDate(r.renewal_date) + '</td>' +
+      '<td class="num">' + fmtCurrency(r.monthly_equivalent_price) + '</td>' +
+    '</tr>').join('') + '</tbody></table>';
+}
+
+function renderPayments() {
+  const fs = $('fPaymentStatus').value;
+  const rows = PAYMENTS.filter(p => !fs || p.status === fs).slice(0, 50);
+
+  if (!rows.length) {
+    $('paymentsList').innerHTML = '<div class="empty">No payments yet.</div>';
+    return;
+  }
+
+  $('paymentsList').innerHTML =
+    '<table><thead><tr><th>Business</th><th>Amount</th><th>Status</th><th>Date</th><th>Method</th></tr></thead><tbody>' +
+    rows.map(p => {
+      const cust = CUSTOMERS.find(c => c.id === p.customer_id);
+      return '<tr>' +
+        '<td>' + esc(cust?.business_name || 'Unknown') + '</td>' +
+        '<td class="num">' + fmtCurrency(p.amount) + '</td>' +
+        '<td><span class="tag t-' + esc(p.status) + '">' + esc(p.status) + '</span></td>' +
+        '<td>' + fmtDate(p.payment_date) + '</td>' +
+        '<td>' + esc(p.payment_method || '—') + '</td>' +
+      '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  $('tab-' + tab).style.display = '';
+  event.target.classList.add('active');
+}
+
+async function openAddCustomer() {
+  $('sheet').classList.add('show');
+  $('sheetBody').innerHTML = `
+    <h2>Add New Customer</h2>
+    <div class="muted">Invite a new business to The Label Board</div>
+    <div class="section">
+      <label>Business Name</label>
+      <input id="newBizName" placeholder="Fashion Label LLC">
+      <label>Business Type</label>
+      <select id="newBizType">
+        <option>fashion_label</option>
+        <option>boutique</option>
+        <option>wholesaler</option>
+        <option>manufacturer</option>
+        <option>distributor</option>
+        <option>other</option>
+      </select>
+      <label>Owner Name</label>
+      <input id="newOwnerName" placeholder="John Doe">
+      <label>Owner Email</label>
+      <input id="newOwnerEmail" type="email" placeholder="owner@business.com">
+      <label>Phone</label>
+      <input id="newOwnerPhone" placeholder="+234 XXX XXXX" type="tel">
+      <label>Location</label>
+      <input id="newLocation" placeholder="Lagos, Nigeria">
+      <label>Website</label>
+      <input id="newWebsite" placeholder="https://business.com" type="url">
+    </div>
+    <div class="row">
+      <button class="btn" onclick="saveNewCustomer()">Add Customer</button>
+      <button class="btn ghost" onclick="closeSheet()">Cancel</button>
+    </div>
+  `;
+}
+
+async function saveNewCustomer() {
+  const data = {
+    business_name: $('newBizName').value.trim(),
+    business_type: $('newBizType').value,
+    owner_name: $('newOwnerName').value.trim(),
+    owner_email: $('newOwnerEmail').value.trim().toLowerCase(),
+    owner_phone: $('newOwnerPhone').value.trim(),
+    location: $('newLocation').value.trim(),
+    website: $('newWebsite').value.trim(),
+    status: 'prospect'
+  };
+
+  if (!data.business_name || !data.owner_name || !data.owner_email) {
+    alert('Please fill in Business Name, Owner Name, and Email');
+    return;
+  }
+
+  try {
+    const res = await supa.from('tlb_customers').insert([data]);
+    if (res.error) throw res.error;
+    closeSheet();
+    await loadData();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function openCustomer(id) {
+  const c = CUSTOMERS.find(x => x.id === id);
+  if (!c) return;
+
+  const subs = SUBSCRIPTIONS.filter(s => s.customer_id === id);
+  const pays = PAYMENTS.filter(p => p.customer_id === id);
+
+  $('sheet').classList.add('show');
+  $('sheetBody').innerHTML = `
+    <h2>${esc(c.business_name)}</h2>
+    <div class="muted">${esc(c.owner_email)}</div>
+
+    <div class="kv">
+      <span>Owner</span>
+      <b>${esc(c.owner_name)} ${c.owner_phone ? '• ' + esc(c.owner_phone) : ''}</b>
+    </div>
+    <div class="kv">
+      <span>Business Type</span>
+      <b>${esc(c.business_type || '—')}</b>
+    </div>
+    <div class="kv">
+      <span>Location</span>
+      <b>${esc(c.location || '—')}</b>
+    </div>
+    <div class="kv">
+      <span>Status</span>
+      <b><span class="tag t-${esc(c.status)}">${esc(c.status)}</span></b>
+    </div>
+    ${c.website ? '<div class="kv"><span>Website</span><b><a href="' + esc(c.website) + '" target="_blank">' + esc(c.website) + '</a></b></div>' : ''}
+
+    ${subs.length ? '<div class="section"><h3>Subscriptions</h3>' +
+      subs.map(s => `
+        <div style="background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;padding:12px 14px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <b>${esc(s.plan_tier)}</b>
+            <span style="color:var(--text-faint);font-size:13px">${s.billing_cycle}</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-dim)">
+            ${fmtDate(s.start_date)} to ${s.end_date ? fmtDate(s.end_date) : 'ongoing'}
+            ${s.is_trial ? ' <span class="tag t-trial" style="margin-left:8px">trial</span>' : ''}
+            ${s.is_active ? ' <span class="tag t-active">active</span>' : ''}
+          </div>
+        </div>
+      `).join('') + '</div>' : ''}
+
+    ${pays.length ? '<div class="section"><h3>Recent Payments</h3>' +
+      pays.slice(0, 5).map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px">
+          <span>${fmtDate(p.payment_date)}</span>
+          <b>${fmtCurrency(p.amount)}</b>
+          <span class="tag t-${esc(p.status)}">${esc(p.status)}</span>
+        </div>
+      `).join('') + '</div>' : ''}
+
+    <div class="section">
+      <label>Notes</label>
+      <textarea id="custNotes" placeholder="Internal notes about this customer…">${esc(c.notes || '')}</textarea>
+    </div>
+
+    <div class="row">
+      <button class="btn ghost" onclick="updateCustomerStatus('${id}')">Update Status</button>
+      <button class="btn ghost" onclick="closeSheet()">Close</button>
+    </div>
+  `;
+}
+
+async function updateCustomerStatus(id) {
+  const newStatus = prompt('New status (prospect, trial, active, churned):', '');
+  if (!newStatus) return;
+
+  try {
+    const res = await supa.from('tlb_customers')
+      .update({ status: newStatus, updated_at: new Date() })
+      .eq('id', id);
+    if (res.error) throw res.error;
+    closeSheet();
+    await loadData();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function closeSheet() {
+  $('sheet').classList.remove('show');
+}
+
+/* ---- wiring ---- */
+$('go').onclick = signIn;
+$('pw').onkeydown = e => { if (e.key === 'Enter') signIn(); };
+$('em').onkeydown = e => { if (e.key === 'Enter') $('pw').focus(); };
+$('out').onclick = async () => { await supa.auth.signOut(); location.reload(); };
+$('qCustomers').oninput = () => renderCustomers();
+$('fStatus').onchange = () => renderCustomers();
+$('fPaymentStatus').onchange = () => renderPayments();
+$('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
+
+/* resume session */
+supa.auth.getSession().then(({ data: { session } }) => { if (session) enter(); });
+</script>
+</body>
+</html>

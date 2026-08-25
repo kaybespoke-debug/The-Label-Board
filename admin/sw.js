@@ -1,85 +1,51 @@
-// The Label Board Admin Dashboard - Service Worker
-const CACHE_NAME = 'tlb-admin-v2';
+/* The Label Board — Admin Control Centre service worker
+   Bump CACHE on every release so clients pick up new files. */
+const CACHE = 'tlb-admin-v10';
 const ASSETS = [
-  'dashboard.html',
+  './',
+  'index.html',
   'manifest.json',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  'icon.svg',
+  'css/app.css',
+  'js/data.js',
+  'js/core.js',
+  'js/pages.js',
+  'js/pages2.js',
+  'js/detail.js',
+  'js/actions.js'
 ];
 
-// Install event - cache assets
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS).catch(err => {
-        // Non-critical assets may fail in offline
-        console.log('Cache install partial:', err);
-      });
-    }).then(() => self.skipWaiting())
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => Promise.all(ASSETS.map(a => c.add(a).catch(() => {}))))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Activate event - clean up old caches
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch event - serve from cache, fallback to network
-self.addEventListener('fetch', event => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
+/* Network first, fall back to cache when offline. Keeps the console usable
+   on a bad connection without ever serving a stale build while online. */
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;   // let fonts hit the network
 
-  // Skip Supabase API calls - always use network
-  if (event.request.url.includes('supabase.co')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({error: 'Offline - API unavailable'}), {
-          status: 503,
-          statusText: 'Service Unavailable',
-          headers: new Headers({'Content-Type': 'application/json'})
-        });
+  e.respondWith(
+    fetch(req)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        return res;
       })
-    );
-    return;
-  }
-
-  // For other requests: try network first, fallback to cache
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Cache successful responses
-        if (response && response.status === 200) {
-          const clonedResponse = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, clonedResponse);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Return cached version if network fails
-        return caches.match(event.request).then(cachedResponse => {
-          return cachedResponse || new Response('Offline - Page not cached', {
-            status: 503,
-            statusText: 'Service Unavailable'
-          });
-        });
-      })
+      .catch(() => caches.match(req).then(hit => hit || caches.match('index.html')))
   );
-});
-
-// Handle messages from clients
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
 });

@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Label Board Business Suite</title>
+<style>
+  :root{
+    --navy:#010817; --navy-2:#020b1d; --panel:#0d1526; --panel-2:#111b30;
+    --line:#1e2c47; --line-soft:#16233a;
+    --text:#eef1f6; --text-dim:#a8b3c6; --text-faint:#697894;
+    --gold:#e2ad4f; --green:#3ec98a; --amber:#e0a838; --red:#e06a6a; --blue:#5b9bd8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--navy);color:var(--text);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px}
+  a{color:var(--gold);text-decoration:none}
+
+  #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);
+    border-radius:18px;padding:30px 26px;text-align:center}
+  .mark{font-size:11px;letter-spacing:5px;color:var(--text-faint);margin-bottom:6px}
+  .name{font-family:Georgia,serif;font-size:22px;letter-spacing:4px;margin-bottom:4px}
+  .sub{color:var(--text-faint);font-size:12px;margin-bottom:24px}
+
+  #app{display:flex;height:100dvh}
+  aside{width:80px;background:var(--navy-2);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:8px}
+  .logo{width:48px;height:48px;background:var(--gold);border-radius:12px;
+    display:flex;align-items:center;justify-content:center;color:#101728;font-weight:700;margin-bottom:16px;cursor:pointer;font-size:24px}
+  .nav-btn{width:56px;height:56px;border:none;background:transparent;color:var(--text-dim);
+    border-radius:12px;cursor:pointer;font-size:24px;display:flex;align-items:center;justify-content:center;
+    transition:.2s;border:2px solid transparent}
+  .nav-btn.active{background:var(--panel);color:var(--gold);border-color:var(--gold)}
+  .nav-btn:hover{color:var(--text)}
+  .logout-btn{margin-top:auto;color:var(--red);font-size:20px}
+
+  main{flex:1;overflow:auto;display:flex;flex-direction:column}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:20px 28px;
+    display:flex;align-items:center;gap:16px}
+  header h1{margin:0;font-family:Georgia,serif;font-size:24px;font-weight:500}
+  .user-info{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-dim)}
+  .user-info b{color:var(--text)}
+
+  .content{flex:1;padding:24px 28px;overflow:auto}
+  .section{display:none}
+  .section.active{display:block}
+
+  input,select,textarea{width:100%;height:46px;border-radius:11px;border:1px solid var(--line);
+    background:#0a1120;color:var(--text);padding:0 13px;outline:none;font-family:inherit;font-size:15px}
+  textarea{height:auto;min-height:100px;padding:11px 13px;resize:vertical}
+  input:focus,select:focus,textarea:focus{border-color:#3c5a8c}
+  label{display:block;text-align:left;font-size:12px;color:var(--text-dim);margin:14px 0 6px}
+  .btn{height:46px;border:0;border-radius:11px;background:var(--gold);color:#101728;
+    font-weight:700;cursor:pointer;font-family:inherit;font-size:15px;padding:0 18px;display:inline-flex;align-items:center;gap:8px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.sm{height:34px;font-size:13px;padding:0 12px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .kpi b{display:block;font-size:26px;font-family:Georgia,serif;font-weight:500;margin-bottom:3px}
+  .kpi span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:22px}
+  .panel-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .panel-head h2{margin:0;font-family:Georgia,serif;font-size:17px;font-weight:500}
+  .panel-head .grow{flex:1}
+  .panel-head input,.panel-head select{height:38px;width:auto;min-width:150px;font-size:14px;margin:0}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--text-faint);
+    font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel-2)}
+  tr:last-child td{border-bottom:none}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .name-col{font-weight:600}
+  .muted{color:var(--text-faint);font-size:12px;margin-top:2px}
+  .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+  .t-prospect{background:rgba(91,155,216,.15);color:var(--blue)}
+  .t-interested{background:rgba(224,168,56,.14);color:var(--amber)}
+  .t-active{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-churned{background:rgba(224,106,106,.16);color:var(--red)}
+  .t-owner{background:rgba(224,168,56,.15);color:var(--amber)}
+  .t-sales{background:rgba(62,201,138,.15);color:var(--green)}
+  .t-operations{background:rgba(91,155,216,.15);color:var(--blue)}
+  .t-support{background:rgba(224,106,106,.16);color:var(--red)}
+  .t-pending{background:rgba(224,168,56,.14);color:var(--amber)}
+  .t-completed{background:rgba(62,201,138,.14);color:var(--green)}
+  .t-in_progress{background:rgba(91,155,216,.14);color:var(--blue)}
+
+  .overlay{position:fixed;inset:0;background:rgba(1,6,16,.72);display:none;align-items:flex-start;
+    justify-content:center;padding:28px 16px;overflow:auto;z-index:50}
+  .overlay.show{display:flex}
+  .sheet{width:100%;max-width:700px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;max-height:90vh;overflow-y:auto}
+  .sheet h2{font-family:Georgia,serif;font-weight:500;margin:0 0 4px;font-size:20px}
+  .sheet h3{font-size:14px;margin:16px 0 8px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .row > *{flex:1;min-width:130px}
+  .empty{padding:40px 20px;text-align:center;color:var(--text-faint)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:22px}
+  .card-item{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card-item h3{margin:0 0 8px;font-size:14px;color:var(--text)}
+  .card-item p{margin:0;font-size:13px;color:var(--text-faint)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login">
+  <div class="card">
+    <div class="mark">THE LABEL BOARD</div>
+    <div class="name">BUSINESS</div>
+    <div class="sub">Staff Portal</div>
+    <label for="em">Email</label>
+    <input id="em" type="email" autocomplete="username" placeholder="staff@thelabelboard.app">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div style="margin-top:20px"><button class="btn" style="width:100%" id="go">Sign in</button></div>
+    <div class="err" id="err"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="app" style="display:none">
+  <aside>
+    <div class="logo" onclick="location.reload()">📊</div>
+    <button class="nav-btn active" data-section="dashboard" title="Dashboard">📈</button>
+    <button class="nav-btn" data-section="customers" title="Customers">👥</button>
+    <button class="nav-btn" data-section="pipeline" title="Pipeline">🎯</button>
+    <button class="nav-btn" data-section="renewals" title="Renewals">🔔</button>
+    <button class="nav-btn" data-section="payments" title="Payments">💳</button>
+    <button class="nav-btn" data-section="tasks" title="Tasks">✓</button>
+    <button class="nav-btn" data-section="commissions" title="Commissions" id="commissionBtn" style="display:none">💰</button>
+    <button class="nav-btn" data-section="staff" title="Staff">👔</button>
+    <button class="nav-btn" data-section="newsletters" title="Newsletters" id="newsBtn" style="display:none">📧</button>
+    <button class="nav-btn" data-section="analytics" title="Analytics" id="analyticsBtn" style="display:none">📊</button>
+    <button class="nav-btn logout-btn" id="out" title="Sign out">🚪</button>
+  </aside>
+
+  <main>
+    <header>
+      <h1 id="pageTitle">Dashboard</h1>
+      <div class="user-info">
+        <span id="myRole" class="tag"></span>
+        <b id="myName"></b>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div class="section active" id="dashboard">
+        <div class="kpis" id="kpis"></div>
+        <div class="panel">
+          <div class="panel-head"><h2>Overview</h2></div>
+          <div id="dashboardContent"></div>
+        </div>
+      </div>
+
+      <!-- CUSTOMERS -->
+      <div class="section" id="customers">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Customers</h2>
+            <span class="grow"></span>
+            <input id="qCustomers" placeholder="Search…" style="width:200px;margin:0">
+            <select id="fStatus" style="width:160px;margin:0"><option value="">All statuses</option><option>prospect</option><option>interested</option><option>active</option><option>churned</option></select>
+            <button class="btn sm" id="addCustomerBtn">+ New</button>
+          </div>
+          <div id="customersList"></div>
+        </div>
+      </div>
+
+      <!-- PIPELINE -->
+      <div class="section" id="pipeline">
+        <div class="panel">
+          <div class="panel-head"><h2>Sales Pipeline</h2></div>
+          <div id="pipelineView" style="padding:18px"></div>
+        </div>
+      </div>
+
+      <!-- RENEWALS -->
+      <div class="section" id="renewals">
+        <div class="panel">
+          <div class="panel-head"><h2>Upcoming Renewals (30 days)</h2></div>
+          <div id="renewalsList"></div>
+        </div>
+      </div>
+
+      <!-- PAYMENTS -->
+      <div class="section" id="payments">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Payments</h2>
+            <span class="grow"></span>
+            <select id="fPaymentStatus" style="width:160px;margin:0"><option value="">All statuses</option><option>pending</option><option>completed</option><option>failed</option></select>
+          </div>
+          <div id="paymentsList"></div>
+        </div>
+      </div>
+
+      <!-- TASKS -->
+      <div class="section" id="tasks">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Tasks</h2>
+            <span class="grow"></span>
+            <button class="btn sm" id="addTaskBtn">+ New Task</button>
+          </div>
+          <div id="tasksList"></div>
+        </div>
+      </div>
+
+      <!-- COMMISSIONS (Sales only) -->
+      <div class="section" id="commissions">
+        <div class="panel">
+          <div class="panel-head"><h2>My Commissions</h2></div>
+          <div id="commissionsList"></div>
+        </div>
+      </div>
+
+      <!-- STAFF (Owner only) -->
+      <div class="section" id="staff">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Staff Management</h2>
+            <span class="grow"></span>
+            <button class="btn sm" id="addStaffBtn">+ Add Staff</button>
+          </div>
+          <div id="staffList"></div>
+        </div>
+      </div>
+
+      <!-- NEWSLETTERS (Owner only) -->
+      <div class="section" id="newsletters">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Newsletters & Messaging</h2>
+            <span class="grow"></span>
+            <button class="btn sm" id="addNewsletterBtn">+ Send Newsletter</button>
+          </div>
+          <div id="newsletterList"></div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS (Owner only) -->
+      <div class="section" id="analytics">
+        <div class="panel">
+          <div class="panel-head"><h2>Business Analytics</h2></div>
+          <div id="analyticsView"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- MODAL -->
+<div class="overlay" id="sheet"><div class="sheet" id="sheetBody"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPA_URL = 'https://gcdrkoitjqwbidcfgyzl.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZHJrb2l0anF3YmlkY2ZneXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMxODcsImV4cCI6MjEwMjcxOTE4N30.XYiBkZCGgyhtRgQfmCPVErLRQY0SvmVEgHMddEpFcy8';
+
+const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+let ME = null, MYSTAFF = null, CUSTOMERS = [], SUBSCRIPTIONS = [], PAYMENTS = [], STAFF = [], TASKS = [], COMMISSIONS = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = v => v ? new Date(v).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' }) : '—';
+const fmtCurrency = v => new Intl.NumberFormat('en-NG', { style:'currency', currency:'NGN' }).format(v);
+
+// AUTH
+async function signIn() {
+  const btn = $('go'); btn.disabled = true; $('err').textContent = 'Signing in…';
+  try {
+    const { error } = await supa.auth.signInWithPassword({
+      email: $('em').value.trim().toLowerCase(),
+      password: $('pw').value
+    });
+    if (error) throw error;
+    await enter();
+  } catch (e) {
+    $('err').textContent = e.message || 'Sign-in failed';
+    try { await supa.auth.signOut(); } catch (_) {}
+  } finally { btn.disabled = false; }
+}
+
+async function enter() {
+  try {
+    const { data: { user } } = await supa.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    ME = user;
+
+    const { data: staff, error: staffErr } = await supa.from('tlb_staff')
+      .select('*').eq('auth_user_id', user.id).single();
+    if (staffErr || !staff) throw new Error('Staff profile not found');
+
+    MYSTAFF = staff;
+    $('login').style.display = 'none';
+    $('app').style.display = 'flex';
+    $('myName').textContent = staff.name;
+    $('myRole').textContent = staff.role;
+    $('myRole').className = 'tag t-' + staff.role;
+
+    // Show role-specific buttons
+    if (staff.role === 'owner') {
+      $('addCustomerBtn').style.display = '';
+      $('addStaffBtn').style.display = '';
+      $('newsBtn').style.display = '';
+      $('analyticsBtn').style.display = '';
+    } else if (staff.role === 'sales') {
+      $('commissionBtn').style.display = '';
+    }
+
+    await loadData();
+  } catch (e) {
+    $('err').textContent = e.message;
+    try { await supa.auth.signOut(); } catch (_) {}
+  }
+}
+
+async function loadData() {
+  try {
+    const [custsRes, subsRes, paysRes, staffRes, tasksRes, commRes] = await Promise.all([
+      supa.from('tlb_customers').select('*').order('created_at', { ascending: false }),
+      supa.from('tlb_subscriptions').select('*'),
+      supa.from('tlb_payments').select('*').order('payment_date', { ascending: false }),
+      supa.from('tlb_staff').select('*').eq('is_active', true),
+      MYSTAFF.role === 'owner'
+        ? supa.from('tlb_tasks').select('*')
+        : supa.from('tlb_tasks').select('*').eq('assigned_to', MYSTAFF.id),
+      MYSTAFF.role === 'sales'
+        ? supa.from('tlb_commissions').select('*').eq('staff_id', MYSTAFF.id)
+        : supa.from('tlb_commissions').select('*')
+    ]);
+
+    CUSTOMERS = custsRes.data || [];
+    SUBSCRIPTIONS = subsRes.data || [];
+    PAYMENTS = paysRes.data || [];
+    STAFF = staffRes.data || [];
+    TASKS = tasksRes.data || [];
+    COMMISSIONS = commRes.data || [];
+
+    renderAll();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function renderAll() {
+  renderDashboard();
+  renderCustomers();
+  renderPipeline();
+  renderRenewals();
+  renderPayments();
+  renderTasks();
+  renderStaff();
+  if (MYSTAFF.role === 'sales') renderCommissions();
+  if (MYSTAFF.role === 'owner') renderAnalytics();
+}
+
+function renderDashboard() {
+  let kpis = '', dash = '';
+
+  if (MYSTAFF.role === 'owner') {
+    const total = CUSTOMERS.length;
+    const active = CUSTOMERS.filter(c => c.status === 'active').length;
+    const revenue = PAYMENTS.filter(p => p.status === 'completed').reduce((s, p) => s + p.amount, 0);
+    const pending = PAYMENTS.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
+    const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+    kpis = K(total, 'Customers') + K(active, 'Active') + K(fmtCurrency(revenue), 'Revenue') + K(fmtCurrency(pending), 'Pending');
+
+    const renewalSoon = SUBSCRIPTIONS.filter(s => s.renewal_date && new Date(s.renewal_date) <= new Date(Date.now() + 30*86400000)).length;
+    dash = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">' +
+      '<div class="card-item"><h3>Renewals This Month</h3><p>' + renewalSoon + ' customers need attention</p></div>' +
+      '<div class="card-item"><h3>Payment Health</h3><p>' + fmtCurrency(pending) + ' awaiting payment</p></div></div>';
+  } else if (MYSTAFF.role === 'sales') {
+    const myCusts = CUSTOMERS.length;
+    const leads = CUSTOMERS.filter(c => c.status === 'interested').length;
+    const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+    kpis = K(myCusts, 'Customers') + K(leads, 'Leads');
+    const earned = COMMISSIONS.filter(c => c.status === 'pending').reduce((s, c) => s + c.commission_amount, 0);
+    dash = '<div class="card-item"><h3>Commissions Earned (Pending)</h3><p>' + fmtCurrency(earned) + '</p></div>';
+  } else if (MYSTAFF.role === 'operations') {
+    const active = CUSTOMERS.filter(c => c.status === 'active').length;
+    const renewals = SUBSCRIPTIONS.filter(s => s.renewal_date && new Date(s.renewal_date) <= new Date(Date.now() + 7*86400000)).length;
+    const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+    kpis = K(active, 'Active Customers') + K(renewals, 'Urgent Renewals');
+    dash = '<div class="card-item"><h3>Week Ahead</h3><p>Focus on ' + renewals + ' customers renewing</p></div>';
+  } else if (MYSTAFF.role === 'support') {
+    const myTasks = TASKS.filter(t => t.assigned_to === MYSTAFF.id && t.status !== 'completed').length;
+    const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
+    kpis = K(myTasks, 'Open Tasks');
+    dash = '<div class="card-item"><h3>Priority</h3><p>You have ' + myTasks + ' active tasks</p></div>';
+  }
+
+  if ($('kpis')) $('kpis').innerHTML = kpis;
+  if ($('dashboardContent')) $('dashboardContent').innerHTML = dash || '<div class="empty">No data yet.</div>';
+}
+
+function renderCustomers() {
+  if (!$('customersList')) return;
+  let rows = CUSTOMERS;
+  const q = $('qCustomers')?.value?.trim().toLowerCase() || '';
+  const fs = $('fStatus')?.value || '';
+  rows = rows.filter(c => (!q || (c.business_name + ' ' + c.owner_email).toLowerCase().includes(q)) && (!fs || c.status === fs));
+
+  if (!rows.length) {
+    $('customersList').innerHTML = '<div class="empty">No customers.</div>';
+    return;
+  }
+
+  $('customersList').innerHTML =
+    '<table><thead><tr><th>Business</th><th>Contact</th><th>Status</th><th class="hide-sm">Added</th></tr></thead><tbody>' +
+    rows.map(c => '<tr onclick="openCustomer(\'' + c.id + '\')">' +
+      '<td><div class="name-col">' + esc(c.business_name) + '</div></td>' +
+      '<td>' + esc(c.owner_email) + '</td>' +
+      '<td><span class="tag t-' + esc(c.status) + '">' + esc(c.status) + '</span></td>' +
+      '<td class="hide-sm">' + fmtDate(c.created_at) + '</td></tr>').join('') + '</tbody></table>';
+}
+
+function renderPipeline() {
+  if (!$('pipelineView')) return;
+  const stages = ['prospect', 'interested', 'active', 'churned'];
+  let html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">';
+  stages.forEach(stage => {
+    const count = CUSTOMERS.filter(c => c.status === stage).length;
+    html += '<div style="background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">' +
+      '<div style="font-size:12px;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px">' + esc(stage) + '</div>' +
+      '<div style="font-size:28px;font-family:Georgia,serif;font-weight:500">' + count + '</div></div>';
+  });
+  html += '</div>';
+  $('pipelineView').innerHTML = html;
+}
+
+function renderRenewals() {
+  if (!$('renewalsList')) return;
+  const now = new Date();
+  const in30 = new Date(now.getTime() + 30 * 86400000);
+  const renewals = SUBSCRIPTIONS
+    .filter(s => s.renewal_date && new Date(s.renewal_date) > now && new Date(s.renewal_date) <= in30)
+    .map(s => ({ ...s, customer: CUSTOMERS.find(c => c.id === s.customer_id) }))
+    .sort((a, b) => new Date(a.renewal_date) - new Date(b.renewal_date));
+
+  if (!renewals.length) {
+    $('renewalsList').innerHTML = '<div class="empty">No renewals in next 30 days.</div>';
+    return;
+  }
+
+  $('renewalsList').innerHTML =
+    '<table><thead><tr><th>Business</th><th>Plan</th><th>Renewal Date</th><th class="num">MRR</th></tr></thead><tbody>' +
+    renewals.map(r => '<tr><td>' + esc(r.customer?.business_name || 'Unknown') + '</td>' +
+      '<td>' + esc(r.plan_tier) + '</td><td>' + fmtDate(r.renewal_date) + '</td>' +
+      '<td class="num">' + fmtCurrency(r.monthly_equivalent_price) + '</td></tr>').join('') + '</tbody></table>';
+}
+
+function renderPayments() {
+  if (!$('paymentsList')) return;
+  const fs = $('fPaymentStatus')?.value || '';
+  let rows = PAYMENTS.filter(p => !fs || p.status === fs);
+
+  if (!rows.length) {
+    $('paymentsList').innerHTML = '<div class="empty">No payments.</div>';
+    return;
+  }
+
+  $('paymentsList').innerHTML =
+    '<table><thead><tr><th>Customer</th><th class="num">Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>' +
+    rows.map(p => {
+      const cust = CUSTOMERS.find(c => c.id === p.customer_id);
+      return '<tr><td>' + esc(cust?.business_name || 'Unknown') + '</td>' +
+        '<td class="num">' + fmtCurrency(p.amount) + '</td>' +
+        '<td><span class="tag t-' + esc(p.status) + '">' + esc(p.status) + '</span></td>' +
+        '<td>' + fmtDate(p.payment_date) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderTasks() {
+  if (!$('tasksList')) return;
+  const fs = $('fTaskStatus')?.value || '';
+  let rows = TASKS.filter(t => !fs || t.status === fs);
+
+  if (!rows.length) {
+    $('tasksList').innerHTML = '<div class="empty">No tasks.</div>';
+    return;
+  }
+
+  $('tasksList').innerHTML =
+    '<table><thead><tr><th>Title</th><th>Status</th><th>Due</th><th>Priority</th><th>Assigned To</th></tr></thead><tbody>' +
+    rows.map(t => {
+      const assignee = STAFF.find(s => s.id === t.assigned_to);
+      return '<tr onclick="openTask(\'' + t.id + '\')">' +
+        '<td>' + esc(t.title) + '</td>' +
+        '<td><span class="tag t-' + esc(t.status) + '">' + esc(t.status) + '</span></td>' +
+        '<td>' + fmtDate(t.due_date) + '</td>' +
+        '<td>' + esc(t.priority) + '</td>' +
+        '<td>' + esc(assignee?.name || 'Unassigned') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderCommissions() {
+  if (!$('commissionsList')) return;
+  if (!COMMISSIONS.length) {
+    $('commissionsList').innerHTML = '<div class="empty">No commissions yet.</div>';
+    return;
+  }
+
+  const pending = COMMISSIONS.filter(c => c.status === 'pending').reduce((s, c) => s + c.commission_amount, 0);
+  const paid = COMMISSIONS.filter(c => c.status === 'paid').reduce((s, c) => s + c.commission_amount, 0);
+
+  $('commissionsList').innerHTML = '<div class="kpis">' +
+    '<div class="kpi"><b>' + fmtCurrency(pending) + '</b><span>Pending</span></div>' +
+    '<div class="kpi"><b>' + fmtCurrency(paid) + '</b><span>Paid</span></div></div>' +
+    '<table><thead><tr><th>Customer</th><th class="num">Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>' +
+    COMMISSIONS.map(c => {
+      const cust = CUSTOMERS.find(x => x.id === c.customer_id);
+      return '<tr><td>' + esc(cust?.business_name || 'Unknown') + '</td>' +
+        '<td class="num">' + fmtCurrency(c.commission_amount) + '</td>' +
+        '<td><span class="tag t-' + esc(c.status) + '">' + esc(c.status) + '</span></td>' +
+        '<td>' + fmtDate(c.payment_date) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderStaff() {
+  if (!$('staffList')) return;
+  if (MYSTAFF.role !== 'owner') {
+    $('staffList').innerHTML = '<div class="empty">Owner only.</div>';
+    return;
+  }
+
+  if (!STAFF.length) {
+    $('staffList').innerHTML = '<div class="empty">No staff yet.</div>';
+    return;
+  }
+
+  $('staffList').innerHTML =
+    '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Commission %</th></tr></thead><tbody>' +
+    STAFF.map(s => '<tr onclick="openStaff(\'' + s.id + '\')">' +
+      '<td><div class="name-col">' + esc(s.name) + '</div></td>' +
+      '<td>' + esc(s.email) + '</td>' +
+      '<td><span class="tag t-' + esc(s.role) + '">' + esc(s.role) + '</span></td>' +
+      '<td>' + (s.commission_rate ? (s.commission_rate * 100) + '%' : '—') + '</td></tr>').join('') + '</tbody></table>';
+}
+
+function renderAnalytics() {
+  if (!$('analyticsView')) return;
+  const revenue = PAYMENTS.filter(p => p.status === 'completed').reduce((s, p) => s + p.amount, 0);
+  const customers = CUSTOMERS.length;
+  const activeCustomers = CUSTOMERS.filter(c => c.status === 'active').length;
+  const churnRate = (CUSTOMERS.filter(c => c.status === 'churned').length / customers * 100).toFixed(1);
+  const avgValue = revenue / customers;
+
+  $('analyticsView').innerHTML =
+    '<div class="grid">' +
+    '<div class="card-item"><h3>Total Revenue</h3><p style="font-size:18px;color:var(--gold)">' + fmtCurrency(revenue) + '</p></div>' +
+    '<div class="card-item"><h3>Avg Customer Value</h3><p style="font-size:18px;color:var(--green)">' + fmtCurrency(avgValue) + '</p></div>' +
+    '<div class="card-item"><h3>Active Rate</h3><p style="font-size:18px;color:var(--blue)">' + ((activeCustomers / customers * 100).toFixed(1)) + '%</p></div>' +
+    '<div class="card-item"><h3>Churn Rate</h3><p style="font-size:18px;color:var(--red)">' + churnRate + '%</p></div>' +
+    '</div>';
+}
+
+function openCustomer(id) {
+  const c = CUSTOMERS.find(x => x.id === id);
+  if (!c) return;
+  const subs = SUBSCRIPTIONS.filter(s => s.customer_id === id);
+  const pays = PAYMENTS.filter(p => p.customer_id === id);
+
+  $('sheet').classList.add('show');
+  $('sheetBody').innerHTML = `<h2>${esc(c.business_name)}</h2><div class="muted">${esc(c.owner_email)}</div>
+    <h3>Details</h3>
+    <p><b>Status:</b> <span class="tag t-${esc(c.status)}">${esc(c.status)}</span></p>
+    <p><b>Type:</b> ${esc(c.business_type || '—')}</p>
+    <p><b>Location:</b> ${esc(c.location || '—')}</p>
+    ${subs.length ? '<h3>Subscriptions</h3><div>' + subs.map(s => `<div style="background:var(--panel-2);padding:10px;border-radius:8px;margin:8px 0">
+      ${esc(s.plan_tier)} (${esc(s.billing_cycle)}) • ${fmtDate(s.start_date)} to ${s.end_date ? fmtDate(s.end_date) : 'ongoing'}
+    </div>`).join('') + '</div>' : ''}
+    ${pays.length ? '<h3>Payments</h3>' + pays.slice(0, 3).map(p => `<p>${fmtDate(p.payment_date)} • ${fmtCurrency(p.amount)} <span class="tag t-${esc(p.status)}">${esc(p.status)}</span></p>`).join('') : ''}
+    <div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>`;
+}
+
+function openTask(id) {
+  const t = TASKS.find(x => x.id === id);
+  if (!t) return;
+  const cust = CUSTOMERS.find(c => c.id === t.customer_id);
+
+  $('sheet').classList.add('show');
+  $('sheetBody').innerHTML = `<h2>${esc(t.title)}</h2>
+    <h3>Details</h3>
+    <p><b>Status:</b> <span class="tag t-${esc(t.status)}">${esc(t.status)}</span></p>
+    <p><b>Priority:</b> ${esc(t.priority)}</p>
+    <p><b>Due:</b> ${fmtDate(t.due_date)}</p>
+    ${cust ? '<p><b>Customer:</b> ' + esc(cust.business_name) + '</p>' : ''}
+    ${t.description ? '<p><b>Notes:</b> ' + esc(t.description) + '</p>' : ''}
+    <div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>`;
+}
+
+function openStaff(id) {
+  const s = STAFF.find(x => x.id === id);
+  if (!s) return;
+
+  $('sheet').classList.add('show');
+  $('sheetBody').innerHTML = `<h2>${esc(s.name)}</h2>
+    <h3>Profile</h3>
+    <p><b>Email:</b> ${esc(s.email)}</p>
+    <p><b>Role:</b> <span class="tag t-${esc(s.role)}">${esc(s.role)}</span></p>
+    <p><b>Phone:</b> ${esc(s.phone || '—')}</p>
+    ${s.commission_rate ? '<p><b>Commission:</b> ' + (s.commission_rate * 100) + '%</p>' : ''}
+    <p><b>Active:</b> ${s.is_active ? '✓' : '✗'}</p>
+    <div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>`;
+}
+
+function closeSheet() {
+  $('sheet').classList.remove('show');
+}
+
+// NAV
+document.querySelectorAll('.nav-btn[data-section]').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.nav-btn[data-section]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const section = btn.dataset.section;
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    $(section)?.classList.add('active');
+    const titles = { dashboard: 'Dashboard', customers: 'Customers', pipeline: 'Pipeline', renewals: 'Renewals', payments: 'Payments', tasks: 'Tasks', commissions: 'Commissions', staff: 'Staff', newsletters: 'Newsletters', analytics: 'Analytics' };
+    $('pageTitle').textContent = titles[section] || 'Dashboard';
+  };
+});
+
+// WIRING
+$('go').onclick = signIn;
+$('pw').onkeydown = e => { if (e.key === 'Enter') signIn(); };
+$('em').onkeydown = e => { if (e.key === 'Enter') $('pw').focus(); };
+$('out').onclick = async () => { await supa.auth.signOut(); location.reload(); };
+$('qCustomers').oninput = () => renderCustomers();
+$('fStatus').onchange = () => renderCustomers();
+$('fPaymentStatus').onchange = () => renderPayments();
+
+supa.auth.getSession().then(({ data: { session } }) => { if (session) enter(); });
+</script>
+</body>
+</html>

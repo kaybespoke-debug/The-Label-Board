@@ -1,9 +1,8 @@
-# Netlify redirects file for The Label Board Admin Dashboard
-# This file is processed BEFORE netlify.toml and takes precedence
+# The Label Board — Admin Control Centre
+# Processed before netlify.toml and takes precedence.
+# Static files (css/, js/, icon.svg, manifest.json, sw.js) are served
+# directly by Netlify before these rules run, so the catch-all below
+# only affects paths that do not map to a real file.
 
-# SPA routing: serve dashboard.html for all routes
-/*    /dashboard.html   200
-
-# Prevent caching of service worker and manifest
-/sw.js          /sw.js          200
-/manifest.json  /manifest.json  200
+# Single-page app: every unmatched route renders the console shell.
+/*    /index.html   200

@@ -1,35 +1,44 @@
-# Label Board Admin Dashboard — separate Netlify deployment
-# PWA-enabled SaaS business admin dashboard
+# The Label Board — Admin Control Centre
+# Separate Netlify deployment from the customer-facing site.
 
 [build]
   publish = "."
 
-# Security headers - prevent indexing and embedding
+# Not a public page: keep it out of search engines and out of iframes.
 [[headers]]
   for = "/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
     X-Frame-Options = "DENY"
     Referrer-Policy = "no-referrer"
-    Cache-Control = "public, max-age=3600"
+    X-Content-Type-Options = "nosniff"
 
-# PWA manifest - allow caching
+# The shell must never be served stale, or a release looks like it did not ship.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Content-Type = "text/html; charset=utf-8"
+    Cache-Control = "max-age=0, must-revalidate"
+
+# Code is revalidated too — the service worker handles offline, not the CDN.
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "max-age=0, must-revalidate"
+
 [[headers]]
   for = "/manifest.json"
   [headers.values]
     Content-Type = "application/manifest+json"
     Cache-Control = "public, max-age=86400"
 
-# Service worker - no caching (always fresh)
 [[headers]]
   for = "/sw.js"
   [headers.values]
     Content-Type = "application/javascript"
     Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
-
-# Dashboard HTML - standard caching
-[[headers]]
-  for = "/dashboard.html"
-  [headers.values]
-    Content-Type = "text/html; charset=utf-8"
-    Cache-Control = "public, max-age=3600"
