@@ -69,7 +69,11 @@
   <main class="main">
     <div class="top">
       <div>
-        <h1 id="ttl">Dashboard</h1>
+        <!-- the badge is a sibling, not a child: render() sets textContent on #ttl -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
+          <h1 id="ttl">Dashboard</h1>
+          <span class="demo" id="demoTag" title="Every figure here is invented">Demo data</span>
+        </div>
         <div class="top-sub" id="sub">Monitor your platform at a glance</div>
       </div>
       <div class="top-act">
@@ -192,6 +196,10 @@ function render() {
     console.error(err);
   }
   document.getElementById('view').innerHTML = html;
+
+  // demo-data marker — hidden the moment real data is wired in
+  const dt = document.getElementById('demoTag');
+  if (dt) dt.style.display = DB.demoData ? 'inline-block' : 'none';
 
   // theme icon
   const dark = !document.body.classList.contains('light');

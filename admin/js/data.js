@@ -832,6 +832,9 @@ const DB = (function () {
     roles: defaultRoles(),
     pages: ADMIN_PAGES,
     caps: ADMIN_CAPS,
+    /* Everything in here is invented. Flip this to false the moment the console
+       is reading real subscribers, and the demo marker disappears. */
+    demoData: true,
     settings: {
       platformName: 'The Label Board',
       currency: 'NGN',
