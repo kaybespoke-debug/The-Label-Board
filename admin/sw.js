@@ -1,6 +1,6 @@
 /* The Label Board — Admin Control Centre service worker
    Bump CACHE on every release so clients pick up new files. */
-const CACHE = 'tlb-admin-v14';
+const CACHE = 'tlb-admin-v15';
 const ASSETS = [
   './',
   'index.html',

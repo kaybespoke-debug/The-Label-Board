@@ -103,7 +103,20 @@ function doAddStaff() {
     transport: al.enabled ? Math.round(basic * al.transportPct / 100) : 0,
     pension: { optedIn: pensionOn, rate: DB.settings.pensionDefaultRate, agreedOn: pensionOn ? iso(DB.today) : null },
     nhfOptIn: nhfOn,
-    lastActive: iso(DB.today), lastActiveLabel: 'Invited', leaveEntitlement: 20, rating: 0
+    lastActive: iso(DB.today), lastActiveLabel: 'Invited', leaveEntitlement: 20, rating: 0,
+    /* A new account has no password yet — the invite link is how they set one.
+       Without this block their profile and Login & passwords have nothing to read. */
+    auth: {
+      passwordSetOn: iso(DB.today),
+      mustReset: true,            // they must choose a password on first sign-in
+      neverSignedIn: true,
+      twoFactor: DB.settings.security.twoFactorRequired,
+      failedAttempts: 0,
+      locked: false,
+      lockedAt: null,
+      resetSentOn: iso(DB.today), // the invite doubles as the first reset link
+      sessions: []
+    }
   };
   DB.staff.push(st);
   addStaffToOpenRun(st);

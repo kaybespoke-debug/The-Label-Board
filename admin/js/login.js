@@ -8,6 +8,21 @@
       the person chooses their own, so no one ever knows another's password.
    ============================================================ */
 
+/* Guarantees the sign-in block exists. Any path that creates a staff record
+   without one degrades to "never signed in" rather than throwing. */
+function authOf(s) {
+  if (!s) return null;
+  if (!s.auth) {
+    s.auth = {
+      passwordSetOn: iso(DB.today), mustReset: true, neverSignedIn: true,
+      twoFactor: false, failedAttempts: 0, locked: false, lockedAt: null,
+      resetSentOn: null, sessions: []
+    };
+  }
+  if (!Array.isArray(s.auth.sessions)) s.auth.sessions = [];
+  return s.auth;
+}
+
 /* ---------------- password strength ---------------- */
 const COMMON_PASSWORDS = [
   'password', 'password1', 'passw0rd', '12345678', '123456789', 'qwerty', 'qwerty123',
@@ -77,7 +92,8 @@ function onPwType() {
 /* ---------------- change your own password ---------------- */
 function formChangePassword() {
   const me = Q.staffM(ME.staffId);
-  const age = Math.round((DB.today - parseD(me.auth.passwordSetOn)) / DAY);
+  const a0 = authOf(me);
+  const age = Math.round((DB.today - parseD(a0.passwordSetOn)) / DAY);
   modal('Change your password', me.name + ' · ' + me.username,
     '<p class="note">You need your current password to change it. Everyone else stays signed out of your account: ' +
     'changing it ends every other session, so anyone using your login elsewhere is dropped.</p>' +
@@ -95,8 +111,8 @@ function formChangePassword() {
     '<div class="hint" id="pwMatch"></div></div>' +
 
     '<div class="row" style="margin-top:6px"><div><b>Sign out my other devices</b>' +
-    '<small>Recommended. Ends the ' + Math.max(0, me.auth.sessions.length - 1) + ' other session' +
-    (me.auth.sessions.length - 1 === 1 ? '' : 's') + ' on this account.</small></div>' +
+    '<small>Recommended. Ends the ' + Math.max(0, authOf(me).sessions.length - 1) + ' other session' +
+    (authOf(me).sessions.length - 1 === 1 ? '' : 's') + ' on this account.</small></div>' +
     '<div class="tog on" id="pwRevoke" onclick="this.classList.toggle(\'on\')"><i></i></div></div>' +
 
     '<p class="hint">Your password was last changed ' + (age === 0 ? 'today' : age + ' days ago') +
@@ -127,12 +143,12 @@ function doChangePassword() {
 
   /* Nothing about the password is kept. Only the date it changed. */
   const revoke = document.getElementById('pwRevoke').classList.contains('on');
-  const dropped = revoke ? me.auth.sessions.filter(s => !s.current).length : 0;
-  if (revoke) me.auth.sessions = me.auth.sessions.filter(s => s.current);
-  me.auth.passwordSetOn = iso(DB.today);
-  me.auth.mustReset = false;
-  me.auth.failedAttempts = 0;
-  me.auth.locked = false;
+  const dropped = revoke ? authOf(me).sessions.filter(s => !s.current).length : 0;
+  if (revoke) authOf(me).sessions = authOf(me).sessions.filter(s => s.current);
+  authOf(me).passwordSetOn = iso(DB.today);
+  authOf(me).mustReset = false;
+  authOf(me).failedAttempts = 0;
+  authOf(me).locked = false;
 
   logAction('login', 'Password changed',
     me.name + ' changed their own password' + (dropped ? ' and signed out ' + dropped + ' other session' + (dropped === 1 ? '' : 's') : ''));
@@ -145,7 +161,7 @@ function doChangePassword() {
 /* ---------------- two-step verification ---------------- */
 function formTwoFactor() {
   const me = Q.staffM(ME.staffId);
-  const on = me.auth.twoFactor;
+  const on = authOf(me).twoFactor;
   modal('Two-step verification', on ? 'Currently on' : 'Currently off',
     '<p class="note">With two-step on, signing in needs your password and a six-digit code from an authenticator ' +
     'app on your phone. It is the single best protection on an account that can move money, because a stolen ' +
@@ -170,14 +186,14 @@ function formTwoFactor() {
 }
 function doTwoFactor() {
   const me = Q.staffM(ME.staffId);
-  const was = me.auth.twoFactor;
-  me.auth.twoFactor = document.getElementById('tfOn').classList.contains('on');
-  if (was !== me.auth.twoFactor) {
+  const was = authOf(me).twoFactor;
+  authOf(me).twoFactor = document.getElementById('tfOn').classList.contains('on');
+  if (was !== authOf(me).twoFactor) {
     logAction('login', 'Two-step verification changed',
-      me.name + ' turned two-step verification ' + (me.auth.twoFactor ? 'on' : 'off') + ' on their own account');
+      me.name + ' turned two-step verification ' + (authOf(me).twoFactor ? 'on' : 'off') + ' on their own account');
   }
   closeModal();
-  toast('Two-step verification ' + (me.auth.twoFactor ? 'on' : 'off'));
+  toast('Two-step verification ' + (authOf(me).twoFactor ? 'on' : 'off'));
   render();
 }
 
@@ -190,10 +206,10 @@ function sessionAge(mins) {
 }
 function revokeSession(staffId, sessionId) {
   const s = Q.staffM(staffId);
-  const sess = s.auth.sessions.find(x => x.id === sessionId);
+  const sess = authOf(s).sessions.find(x => x.id === sessionId);
   if (!sess) return;
   if (sess.current) { toast('That is the session you are using right now'); return; }
-  s.auth.sessions = s.auth.sessions.filter(x => x.id !== sessionId);
+  authOf(s).sessions = authOf(s).sessions.filter(x => x.id !== sessionId);
   logAction('login', 'Session ended',
     (staffId === ME.staffId ? s.name + ' signed out their ' : 'Kayode Ojomo signed out ' + s.name + '\'s ') +
     sess.device + ' in ' + sess.place);
@@ -202,7 +218,7 @@ function revokeSession(staffId, sessionId) {
 }
 function revokeAllSessions(staffId) {
   const s = Q.staffM(staffId);
-  const others = s.auth.sessions.filter(x => !x.current);
+  const others = authOf(s).sessions.filter(x => !x.current);
   if (!others.length) { toast('No other sessions to end'); return; }
   const mine = staffId === ME.staffId;
   modal('Sign out everywhere', s.name,
@@ -218,8 +234,8 @@ function revokeAllSessions(staffId) {
 }
 function doRevokeAll(staffId) {
   const s = Q.staffM(staffId);
-  const n = s.auth.sessions.filter(x => !x.current).length;
-  s.auth.sessions = s.auth.sessions.filter(x => x.current);
+  const n = authOf(s).sessions.filter(x => !x.current).length;
+  authOf(s).sessions = authOf(s).sessions.filter(x => x.current);
   logAction('login', 'Sessions ended',
     (staffId === ME.staffId ? s.name + ' signed out ' + n + ' of their own sessions'
       : 'Kayode Ojomo signed out all ' + n + ' of ' + s.name + '\'s sessions'));
@@ -245,7 +261,7 @@ function formSendReset(staffId) {
     '<div class="row"><div><b>Make them set a new one at next sign-in</b>' +
     '<small>They can still sign in with the old password once, then must change it</small></div>' +
     '<div class="tog" id="rsForce" onclick="this.classList.toggle(\'on\')"><i></i></div></div>' +
-    (s.auth.resetSentOn ? '<p class="hint">A reset was last sent ' + ago(s.auth.resetSentOn) + '.</p>' : ''),
+    (authOf(s).resetSentOn ? '<p class="hint">A reset was last sent ' + ago(authOf(s).resetSentOn) + '.</p>' : ''),
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doSendReset(' + staffId + ')">Send the link</button>');
 }
@@ -253,11 +269,11 @@ function doSendReset(staffId) {
   const s = Q.staffM(staffId);
   const revoke = document.getElementById('rsRevoke').classList.contains('on');
   const force = document.getElementById('rsForce').classList.contains('on');
-  s.auth.resetSentOn = iso(DB.today);
-  if (force) s.auth.mustReset = true;
+  authOf(s).resetSentOn = iso(DB.today);
+  if (force) authOf(s).mustReset = true;
   let dropped = 0;
-  if (revoke) { dropped = s.auth.sessions.length; s.auth.sessions = []; }
-  s.auth.locked = false; s.auth.failedAttempts = 0;
+  if (revoke) { dropped = authOf(s).sessions.length; authOf(s).sessions = []; }
+  authOf(s).locked = false; authOf(s).failedAttempts = 0;
   logAction('login', 'Password reset sent',
     'Kayode Ojomo sent a password reset link to ' + s.name + ' (' + s.email + ')' +
     (dropped ? ', ending ' + dropped + ' session' + (dropped === 1 ? '' : 's') : '') +
@@ -269,7 +285,7 @@ function doSendReset(staffId) {
 function unlockAccount(staffId) {
   if (needs('manage_staff', 'Unlocking an account')) return;
   const s = Q.staffM(staffId);
-  s.auth.locked = false; s.auth.lockedAt = null; s.auth.failedAttempts = 0;
+  authOf(s).locked = false; authOf(s).lockedAt = null; authOf(s).failedAttempts = 0;
   logAction('login', 'Account unlocked', 'Kayode Ojomo unlocked ' + s.name + '\'s account');
   toast(s.name.split(' ')[0] + '\'s account unlocked');
   render();
@@ -277,11 +293,11 @@ function unlockAccount(staffId) {
 function toggleForceReset(staffId) {
   if (needs('manage_staff', 'Requiring a password change')) return;
   const s = Q.staffM(staffId);
-  s.auth.mustReset = !s.auth.mustReset;
+  authOf(s).mustReset = !authOf(s).mustReset;
   logAction('login', 'Sign-in requirement changed',
-    'Kayode Ojomo ' + (s.auth.mustReset ? 'required' : 'cleared the requirement for') +
+    'Kayode Ojomo ' + (authOf(s).mustReset ? 'required' : 'cleared the requirement for') +
     ' ' + s.name + ' to change their password at next sign-in');
-  toast(s.auth.mustReset ? s.name.split(' ')[0] + ' must change their password at next sign-in'
+  toast(authOf(s).mustReset ? s.name.split(' ')[0] + ' must change their password at next sign-in'
     : 'Requirement cleared');
   render();
 }
@@ -341,10 +357,13 @@ function doPasswordPolicy() {
   closeModal(); toast('Password policy saved'); render();
 }
 
-/* ---------------- the Settings section ---------------- */
+/* ---------------- the Settings section ----------------
+   No KPI cards here. Settings is a place you come to change a thing, not a
+   dashboard, so the counts read as a sentence and the detail lives in a
+   searchable, sortable table. */
 function loginSection() {
   const me = Q.staffM(ME.staffId);
-  const a = me.auth;
+  const a = authOf(me);
   const sec = DB.settings.security;
   const age = Math.round((DB.today - parseD(a.passwordSetOn)) / DAY);
   const canManage = can('manage_staff');
@@ -358,7 +377,8 @@ function loginSection() {
     (a.twoFactor ? '<span class="pill green">Two-step on</span>' : '<span class="pill amber">Two-step off</span>') +
     '</div>' +
     kv('Password', '•••••••••••• <span class="note">changed ' + (age === 0 ? 'today' : age + ' days ago') + '</span>') +
-    kv('Two-step verification', a.twoFactor ? '<span style="color:var(--green)">On</span>' : '<span style="color:var(--amber)">Off</span>') +
+    kv('Two-step verification', a.twoFactor
+      ? '<span style="color:var(--green)">On</span>' : '<span style="color:var(--amber)">Off</span>') +
     kv('Signed in on', a.sessions.length + ' device' + (a.sessions.length === 1 ? '' : 's')) +
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -376,52 +396,105 @@ function loginSection() {
       (x.current ? ' <span class="pill green">This device</span>' : '') + '</b>' +
       '<small>' + x.place + ' · ' + x.ip + ' · ' + sessionAge(x.lastSeenMins) + '</small></div>' +
       (x.current ? '<span class="note">in use</span>'
-        : '<button class="btn sm" onclick="revokeSession(' + me.id + ',\'' + x.id + '\')">Sign out</button>') +
+        : '<button class="btn sm" onclick="revokeSession(' + me.id + ',&#39;' + x.id + '&#39;)">Sign out</button>') +
       '</div>').join('') + '</div>' +
     (a.sessions.filter(x => !x.current).length
       ? '<button class="btn danger" style="margin-top:12px" onclick="revokeAllSessions(' + me.id + ')">' +
         'Sign out my other devices</button>' : '');
 
-  /* --- everyone else --- */
+  /* --- everyone else, searchable and sortable --- */
   if (canManage) {
-    const locked = DB.staff.filter(s => s.auth.locked).length;
-    const mustReset = DB.staff.filter(s => s.auth.mustReset).length;
-    const noTf = DB.staff.filter(s => !s.auth.twoFactor).length;
-    const stale = DB.staff.filter(s => (DB.today - parseD(s.auth.passwordSetOn)) / DAY > 365).length;
+    const locked = DB.staff.filter(s => authOf(s).locked).length;
+    const mustReset = DB.staff.filter(s => authOf(s).mustReset).length;
+    const noTf = DB.staff.filter(s => !authOf(s).twoFactor).length;
+    const stale = DB.staff.filter(s => (DB.today - parseD(authOf(s).passwordSetOn)) / DAY > 365).length;
+    const never = DB.staff.filter(s => authOf(s).neverSignedIn).length;
+
+    /* the counts as a readable line, not four cards */
+    const bits = [];
+    if (locked) bits.push('<b style="color:var(--red)">' + locked + ' locked out</b>');
+    if (never) bits.push('<b style="color:var(--blue)">' + never + ' yet to sign in</b>');
+    if (mustReset) bits.push('<b style="color:var(--amber)">' + mustReset + ' must change their password</b>');
+    if (noTf) bits.push(noTf + ' without two-step');
+    if (stale) bits.push(stale + ' with a password over a year old');
+
+    const filter = UI.loginFilter || 'all';
+    const buckets = {
+      all: DB.staff,
+      locked: DB.staff.filter(s => authOf(s).locked),
+      never: DB.staff.filter(s => authOf(s).neverSignedIn),
+      mustreset: DB.staff.filter(s => authOf(s).mustReset),
+      notf: DB.staff.filter(s => !authOf(s).twoFactor),
+      stale: DB.staff.filter(s => (DB.today - parseD(authOf(s).passwordSetOn)) / DAY > 365)
+    };
+    let list = (buckets[filter] || DB.staff).slice();
+
+    const q = UI.q.login || '';
+    if (q) list = list.filter(s => matches(q, [s.name, s.username, s.email, s.dept, s.title, s.staffId]));
+
+    const pwAge = s => Math.round((DB.today - parseD(authOf(s).passwordSetOn)) / DAY);
+    const risk = s => (authOf(s).locked ? 0 : authOf(s).neverSignedIn ? 1 : authOf(s).mustReset ? 2
+      : authOf(s).failedAttempts ? 3 : !authOf(s).twoFactor ? 4 : 5);
+    const sorters = {
+      risk: (x, y) => risk(x) - risk(y) || pwAge(y) - pwAge(x),
+      name: (x, y) => x.name.localeCompare(y.name),
+      dept: (x, y) => x.dept.localeCompare(y.dept) || x.name.localeCompare(y.name),
+      'age-desc': (x, y) => pwAge(y) - pwAge(x),
+      'age-asc': (x, y) => pwAge(x) - pwAge(y),
+      sessions: (x, y) => authOf(y).sessions.length - authOf(x).sessions.length,
+      twofactor: (x, y) => (authOf(x).twoFactor ? 1 : 0) - (authOf(y).twoFactor ? 1 : 0) || x.name.localeCompare(y.name)
+    };
+    list.sort(sorters[UI.sort.login || 'risk'] || sorters.risk);
 
     html += '<div class="sec-t" style="margin-top:26px">Everyone else</div>' +
-      '<p class="note">You can send a reset link, require a change, unlock an account or end its sessions. ' +
-      'You cannot set anyone\'s password — they choose their own from the link.</p>' +
-      '<div class="stats" style="margin:14px 0">' +
-      statCard({ label: 'Locked out', value: locked, tone: locked ? 'bad' : 'good',
-        sub: locked ? 'Too many failed attempts' : 'Nobody locked out' }) +
-      statCard({ label: 'Must change', value: mustReset, tone: mustReset ? 'warn' : 'good',
-        sub: 'Required at next sign-in' }) +
-      statCard({ label: 'Without two-step', value: noTf, tone: noTf ? 'warn' : 'good',
-        sub: sec.twoFactorRequired ? 'Policy requires it' : 'Not required by policy' }) +
-      statCard({ label: 'Password over a year old', value: stale, tone: stale ? 'warn' : 'good',
-        sub: 'Worth a nudge' }) +
+      '<p class="note">Send a reset link, require a change, unlock an account or end its sessions. ' +
+      'You cannot set anyone&rsquo;s password — they choose their own from the link.' +
+      (bits.length ? '<br><span style="color:var(--text)">Right now: ' + bits.join(' · ') + '.</span>'
+        : '<br><span style="color:var(--green)">Right now: nothing needs attention.</span>') + '</p>' +
+
+      '<div class="bar" style="margin-top:12px">' +
+      [['all', 'All', DB.staff.length], ['locked', 'Locked', locked], ['never', 'Yet to sign in', never],
+       ['mustreset', 'Must change', mustReset], ['notf', 'No two-step', noTf], ['stale', 'Old password', stale]]
+        .filter(t => t[0] === 'all' || t[2] > 0)
+        .map(t => '<button class="tab' + (filter === t[0] ? ' on' : '') +
+          '" onclick="UI.loginFilter=&#39;' + t[0] + '&#39;;render()">' + t[1] +
+          '<span class="n">' + t[2] + '</span></button>').join('') +
       '</div>' +
-      '<div class="tw"><table><thead><tr><th>Person</th><th>Password age</th><th>Two-step</th>' +
-      '<th class="num">Sessions</th><th>State</th><th></th></tr></thead><tbody>' +
-      DB.staff.map(s => {
-        const d = Math.round((DB.today - parseD(s.auth.passwordSetOn)) / DAY);
-        const state = s.auth.locked ? '<span class="pill red">Locked</span>'
-          : s.auth.mustReset ? '<span class="pill amber">Must change</span>'
-            : s.auth.failedAttempts ? '<span class="pill amber">' + s.auth.failedAttempts + ' failed</span>'
-              : '<span class="pill green">Normal</span>';
-        return '<tr><td class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
-          '<div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.username + '</div></td>' +
-          '<td' + (d > 365 ? ' style="color:var(--amber)"' : '') + '>' + d + ' days</td>' +
-          '<td>' + (s.auth.twoFactor ? '<span class="pill green">On</span>' : '<span class="pill grey">Off</span>') + '</td>' +
-          '<td class="num">' + s.auth.sessions.length + '</td>' +
-          '<td>' + state + '</td>' +
-          '<td><div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">' +
-          '<button class="btn sm" onclick="formSendReset(' + s.id + ')">Reset link</button>' +
-          (s.auth.locked ? '<button class="btn sm gold" onclick="unlockAccount(' + s.id + ')">Unlock</button>' : '') +
-          (s.auth.sessions.length ? '<button class="btn sm" onclick="revokeAllSessions(' + s.id + ')">End sessions</button>' : '') +
-          '</div></td></tr>';
-      }).join('') + '</tbody></table></div>';
+      '<div class="bar">' +
+      searchBox('login', 'Search name, username, email, department…') +
+      sortSelect('login', [['risk', 'Needs attention first'], ['name', 'Name A–Z'], ['dept', 'Department'],
+        ['age-desc', 'Oldest password first'], ['age-asc', 'Newest password first'],
+        ['sessions', 'Most sessions'], ['twofactor', 'Without two-step first']]) +
+      '<span class="note" style="margin-left:auto">' + list.length + ' of ' + DB.staff.length + '</span>' +
+      '</div>' +
+
+      (list.length
+        ? '<div class="tw"><table><thead><tr><th>Person</th><th>Department</th><th class="num">Password age</th>' +
+        '<th>Two-step</th><th class="num">Sessions</th><th>State</th><th></th></tr></thead><tbody>' +
+        list.map(s => {
+          const au = authOf(s);
+          const d = pwAge(s);
+          const state = au.locked ? '<span class="pill red">Locked</span>'
+            : au.neverSignedIn ? '<span class="pill blue">Yet to sign in</span>'
+              : au.mustReset ? '<span class="pill amber">Must change</span>'
+                : au.failedAttempts ? '<span class="pill amber">' + au.failedAttempts + ' failed</span>'
+                  : '<span class="pill green">Normal</span>';
+          return '<tr><td class="klik" onclick="openDetail(&#39;staff&#39;,' + s.id + ')">' +
+            '<div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.username + '</div></td>' +
+            '<td>' + s.dept + '</td>' +
+            '<td class="num"' + (d > 365 ? ' style="color:var(--amber)"' : '') + '>' +
+            (au.neverSignedIn ? '<span class="note">—</span>' : d + ' days') + '</td>' +
+            '<td>' + (au.twoFactor ? '<span class="pill green">On</span>' : '<span class="pill grey">Off</span>') + '</td>' +
+            '<td class="num">' + au.sessions.length + '</td>' +
+            '<td>' + state + '</td>' +
+            '<td><div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">' +
+            '<button class="btn sm" onclick="formSendReset(' + s.id + ')">Reset link</button>' +
+            (au.locked ? '<button class="btn sm gold" onclick="unlockAccount(' + s.id + ')">Unlock</button>' : '') +
+            (au.sessions.length ? '<button class="btn sm" onclick="revokeAllSessions(' + s.id + ')">End sessions</button>' : '') +
+            '</div></td></tr>';
+        }).join('') + '</tbody></table></div>'
+        : '<div class="empty">Nobody matches that.</div>') +
+      '<button class="btn gold" style="margin-top:14px" onclick="formAddStaff()">+ Add staff</button>';
   }
 
   /* --- policy --- */
@@ -431,7 +504,8 @@ function loginSection() {
     kv('Must include a symbol', sec.requireSymbol ? 'Yes' : 'No') +
     kv('Cannot reuse the last', sec.blockReuse ? sec.blockReuse + ' passwords' : 'No restriction') +
     kv('Account locks after', sec.lockoutAfter + ' failed attempts') +
-    kv('Signed out after idle', (sec.sessionIdleMins >= 60 ? Math.round(sec.sessionIdleMins / 60) + ' hours' : sec.sessionIdleMins + ' minutes')) +
+    kv('Signed out after idle', (sec.sessionIdleMins >= 60
+      ? Math.round(sec.sessionIdleMins / 60) + ' hours' : sec.sessionIdleMins + ' minutes')) +
     kv('Reset link valid for', sec.resetLinkHours + ' hours') +
     kv('Passwords expire', sec.expiryDays ? 'Every ' + sec.expiryDays + ' days' : 'Never, by choice') +
     kv('Two-step required', sec.twoFactorRequired ? 'Yes, for everyone' : 'Optional') +

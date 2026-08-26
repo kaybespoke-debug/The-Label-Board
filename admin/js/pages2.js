@@ -513,7 +513,7 @@ PAGES.settings = function () {
         '<small>' + st.username + ' · ' + st.email + '</small></div>' +
         '<button class="btn sm" onclick="event.stopPropagation();formStaffRole(' + st.id + ')">Change role</button></div>';
     }).join('') + '</div>' +
-    '<button class="btn gold" style="margin-top:14px" onclick="formAddStaff()">+ Add account</button>';
+    '<button class="btn gold" style="margin-top:14px" onclick="formAddStaff()">+ Add staff account</button>';
 
   /* --- roles & permissions (editable) --- */
   const roles =

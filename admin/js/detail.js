@@ -211,13 +211,13 @@ DETAIL.staff = function (id) {
       '<div class="sec-t">Sign-in</div>' +
       kv('Username', s.username) +
       kv('Password', '•••••••••••• <span class="note">changed ' +
-        (Math.round((DB.today - parseD(s.auth.passwordSetOn)) / DAY) || 'today') +
-        (Math.round((DB.today - parseD(s.auth.passwordSetOn)) / DAY) ? ' days ago' : '') + '</span>') +
-      kv('Two-step verification', s.auth.twoFactor
+        (Math.round((DB.today - parseD(authOf(s).passwordSetOn)) / DAY) || 'today') +
+        (Math.round((DB.today - parseD(authOf(s).passwordSetOn)) / DAY) ? ' days ago' : '') + '</span>') +
+      kv('Two-step verification', authOf(s).twoFactor
         ? '<span style="color:var(--green)">On</span>' : '<span style="color:var(--amber)">Off</span>') +
-      kv('Signed in on', s.auth.sessions.length + ' device' + (s.auth.sessions.length === 1 ? '' : 's')) +
-      kv('Account state', s.auth.locked ? '<span class="pill red">Locked</span>'
-        : s.auth.mustReset ? '<span class="pill amber">Must change password</span>'
+      kv('Signed in on', authOf(s).sessions.length + ' device' + (authOf(s).sessions.length === 1 ? '' : 's')) +
+      kv('Account state', authOf(s).locked ? '<span class="pill red">Locked</span>'
+        : authOf(s).mustReset ? '<span class="pill amber">Must change password</span>'
           : '<span class="pill green">Normal</span>') +
       (s.id === ME.staffId
         ? '<p class="hint">This is your own account. Change your password under ' +
@@ -229,7 +229,7 @@ DETAIL.staff = function (id) {
       (s.id === ME.staffId
         ? '<button class="btn gold" onclick="formChangePassword()">Change my password</button>'
         : '<button class="btn" onclick="formSendReset(' + s.id + ')">Send a reset link</button>') +
-      (s.auth.locked ? '<button class="btn gold" onclick="unlockAccount(' + s.id + ')">Unlock account</button>' : '') +
+      (authOf(s).locked ? '<button class="btn gold" onclick="unlockAccount(' + s.id + ')">Unlock account</button>' : '') +
       '<button class="btn" onclick="go(\'settings\')">Edit permissions</button></div>';
   }
 
