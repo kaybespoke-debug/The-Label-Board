@@ -469,8 +469,10 @@ function loginSection() {
       '</div>' +
 
       (list.length
-        ? '<div class="tw"><table><thead><tr><th>Person</th><th>Department</th><th class="num">Password age</th>' +
-        '<th>Two-step</th><th class="num">Sessions</th><th>State</th><th></th></tr></thead><tbody>' +
+        ? '<div class="tw"><table><thead><tr><th>Person</th><th class="hide-sm">Department</th>' +
+        '<th class="num hide-sm">Password age</th>' +
+        '<th class="hide-sm">Two-step</th><th class="num hide-sm">Sessions</th>' +
+        '<th>State</th><th></th></tr></thead><tbody>' +
         list.map(s => {
           const au = authOf(s);
           const d = pwAge(s);
@@ -481,11 +483,11 @@ function loginSection() {
                   : '<span class="pill green">Normal</span>';
           return '<tr><td class="klik" onclick="openDetail(&#39;staff&#39;,' + s.id + ')">' +
             '<div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.username + '</div></td>' +
-            '<td>' + s.dept + '</td>' +
-            '<td class="num"' + (d > 365 ? ' style="color:var(--amber)"' : '') + '>' +
+            '<td class="hide-sm">' + s.dept + '</td>' +
+            '<td class="num hide-sm"' + (d > 365 ? ' style="color:var(--amber)"' : '') + '>' +
             (au.neverSignedIn ? '<span class="note">—</span>' : d + ' days') + '</td>' +
-            '<td>' + (au.twoFactor ? '<span class="pill green">On</span>' : '<span class="pill grey">Off</span>') + '</td>' +
-            '<td class="num">' + au.sessions.length + '</td>' +
+            '<td class="hide-sm">' + (au.twoFactor ? '<span class="pill green">On</span>' : '<span class="pill grey">Off</span>') + '</td>' +
+            '<td class="num hide-sm">' + au.sessions.length + '</td>' +
             '<td>' + state + '</td>' +
             '<td><div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">' +
             '<button class="btn sm" onclick="formSendReset(' + s.id + ')">Reset link</button>' +

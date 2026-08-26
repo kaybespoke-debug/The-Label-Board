@@ -753,3 +753,62 @@ function exportRisk() {
   exportCsv('at-risk-accounts', ['Business', 'Owner', 'Plan', 'Status', 'Past due', 'Orders 30d', 'Last seen', 'MRR'],
     Q.atRisk().map(s => [s.name, s.owner, s.planName, s.status, s.pastDue ? 'yes' : 'no', s.ordersLast30, s.lastSeen, s.mrr]));
 }
+
+/* ---------------- example data ----------------
+   The console ships empty. This is the only way the invented set appears, and
+   it is reversible, which is why nothing needs a banner apologising for it. */
+function formLoadExample() {
+  const already = DB.demoData;
+  modal('Load example data', already ? 'Replaces what is loaded now' : 'Fills every page with an invented dataset',
+    '<p class="note">This loads a complete made-up business so every page has something to show: ' +
+    '<b>128 subscribers</b> across four plans, roughly three years of payments, a team of <b>sixteen</b> with ' +
+    'payroll, payslips and attendance, plus support tickets, feature requests and an audit trail.</p>' +
+    '<p class="note" style="margin-top:10px">None of it is real. Nothing bills, emails or pays anyone. ' +
+    'While it is loaded, a small <span class="demo" style="margin:0">Demo data</span> tag sits next to the page ' +
+    'title so nobody mistakes it for the real thing.</p>' +
+    (already ? '<p class="hint">Reloading rebuilds the set from scratch, discarding any edits you made to it.</p>'
+      : '<p class="hint">Your own account, the plan catalogue, the roles and your settings are kept either way.</p>'),
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn gold" onclick="doLoadExample()">' + (already ? 'Reload it' : 'Load it') + '</button>');
+}
+function doLoadExample() {
+  loadExampleData();
+  UI.detail = null; UI.page = 'dashboard';
+  UI.filters.subscribers = 'all'; UI.planFilter = 'any';
+  UI.payMonth = null;
+  Object.keys(UI.q).forEach(k => { UI.q[k] = ''; });
+  logAction('export', 'Example data loaded',
+    'Kayode Ojomo loaded the example dataset — ' + DB.subscribers.length + ' subscribers and ' +
+    DB.staff.length + ' staff');
+  closeModal();
+  toast('Example data loaded · ' + DB.subscribers.length + ' subscribers');
+  render();
+}
+function formClearData() {
+  modal('Clear all data', 'Back to an empty console',
+    '<p class="note">Removes the ' + DB.subscribers.length + ' subscribers, ' + DB.staff.length +
+    ' staff records, ' + DB.payments.length.toLocaleString() + ' payments and everything else that came with the ' +
+    'example set.</p>' +
+    '<div class="pnl" style="background:var(--panel-2);margin-top:12px">' +
+    '<div class="ph"><h3 style="font-size:13px">What is kept</h3></div>' +
+    '<div class="kv"><span class="k">Your owner account</span><span class="v">Kept</span></div>' +
+    '<div class="kv"><span class="k">Plan catalogue</span><span class="v">Kept</span></div>' +
+    '<div class="kv"><span class="k">Roles &amp; permissions</span><span class="v">Kept</span></div>' +
+    '<div class="kv"><span class="k">Platform settings</span><span class="v">Kept</span></div>' +
+    '<div class="kv"><span class="k">Everything else</span><span class="v" style="color:var(--red)">Removed</span></div>' +
+    '</div>' +
+    '<p class="hint">You can load the example set again whenever you like — it is generated, not stored.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn danger" onclick="doClearData()">Clear the data</button>');
+}
+function doClearData() {
+  const n = DB.subscribers.length;
+  clearAllData();
+  UI.detail = null; UI.page = 'dashboard';
+  UI.filters.subscribers = 'all'; UI.planFilter = 'any';
+  UI.payMonth = null; UI.staffTab = 'team'; UI.billingTab = 'plans';
+  Object.keys(UI.q).forEach(k => { UI.q[k] = ''; });
+  closeModal();
+  toast('Cleared · ' + n + ' subscribers removed');
+  render();
+}

@@ -805,36 +805,109 @@ function buildUsage(subs) {
   return { series, atRisk };
 }
 
-/* ---------------- assemble ---------------- */
-const DB = (function () {
+/* ---------------- assemble ----------------
+   A fresh console is EMPTY. It holds your own owner account, the plan
+   catalogue, the roles and the settings — the things a new install genuinely
+   has — and nothing else. The 128 invented subscribers only appear if you ask
+   for them under Settings → Data & storage, the same way the customer app
+   works. That choice is remembered, so a reload does not resurrect the demo.  */
+
+/* the owner account, the one record that must always exist */
+function ownerAccount() {
+  const s = STAFF_SEED[0];
+  const first = s[0].split(' ')[0].toLowerCase();
+  return {
+    id: 1, staffId: 'TLB-001', name: s[0], dept: s[1], title: s[2], roleId: s[3],
+    username: '@' + first, email: first + '@thelabelboard.com',
+    phone: '+234 800 000 0000', gender: s[5] === 'M' ? 'Male' : 'Female', dob: s[6],
+    address: '—', nationality: 'Nigerian', emergency: '—',
+    empType: 'Full time', startDate: iso(TODAY), status: 'active',
+    reportsTo: null, workLocation: 'Lagos office',
+    bankName: '—', bankAccount: '—', bankAccountName: s[0],
+    salaryType: 'Monthly salary', basic: 0, housing: 0, transport: 0,
+    pension: { optedIn: false, rate: 8, agreedOn: null },
+    nhfOptIn: false,
+    lastActive: iso(TODAY), lastActiveLabel: 'Now', leaveEntitlement: 20, rating: 0,
+    auth: {
+      passwordSetOn: iso(TODAY), mustReset: false, neverSignedIn: false,
+      twoFactor: false, failedAttempts: 0, locked: false, lockedAt: null,
+      resetSentOn: null,
+      sessions: [{ id: 'S1-1', device: 'This device', place: '—', ip: '—', lastSeenMins: 0, current: true }]
+    }
+  };
+}
+
+/* thirty days of zeroes, so the usage charts have a shape to draw */
+function flatUsage() {
+  const series = [];
+  for (let d = 29; d >= 0; d--) series.push({ date: iso(dAgo(d)), dab: 0, mau: 0, orders: 0 });
+  return { series, atRisk: [] };
+}
+
+/* the current month with nobody on it yet */
+function emptyRun() {
+  const d = new Date(TODAY.getFullYear(), TODAY.getMonth(), 25);
+  return [{
+    monthKey: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'),
+    month: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    payDate: iso(d), headcount: 1, gross: 0, deductions: 0, net: 0,
+    paid: 0, pending: 1, status: 'open'
+  }];
+}
+
+function emptyData() {
+  const owner = ownerAccount();
+  return {
+    demoData: false,
+    subscribers: [], payments: [], payslips: [],
+    payrollRuns: emptyRun(),
+    attendance: [], leave: [],
+    docs: [
+      { id: 1, staffId: 1, kind: 'Employment contract', status: 'missing', pages: 0,
+        addedOn: iso(TODAY), body: [['Status', 'Not uploaded']], note: 'Nothing on file yet.' }
+    ],
+    tickets: [], feedback: [], tasks: [], announcements: [], onboarding: [],
+    activity: [{
+      id: 1, kind: 'login', action: 'Console opened', detail: 'Kayode Ojomo opened the Admin Control Centre',
+      actorId: 1, actor: 'Kayode Ojomo', actorRole: 'Super Admin',
+      at: new Date(TODAY.getTime() - 60000).toISOString(), target: null,
+      ip: '—', device: 'This device', reason: 'First run'
+    }],
+    usage: flatUsage(),
+    staff: [owner]
+  };
+}
+
+/* the invented set, built only when asked for */
+function demoData() {
   const subscribers = buildSubscribers();
   const staff = buildStaff();
   const payments = buildPayments(subscribers);
   const { runs, slips } = buildPayroll(staff);
-  const attendance = buildAttendance(staff);
-  const leave = buildLeave(staff);
-  const docs = buildDocs(staff);
-  const tickets = buildTickets(subscribers, staff);
-  const feedback = buildFeedback(subscribers);
-  const tasks = buildTasks(staff);
-  const announcements = buildAnnouncements();
-  const onboarding = buildOnboarding(subscribers);
-  const activity = buildActivity(subscribers, staff, tickets);
-  const usage = buildUsage(subscribers);
-
   return {
-    today: TODAY,
-    plans: PLANS,
+    demoData: true,
     subscribers, staff, payments,
     payrollRuns: runs, payslips: slips,
-    attendance, leave, docs,
-    tickets, feedback, tasks, announcements, onboarding, activity, usage,
+    attendance: buildAttendance(staff),
+    leave: buildLeave(staff),
+    docs: buildDocs(staff),
+    tickets: buildTickets(subscribers, staff),
+    feedback: buildFeedback(subscribers),
+    tasks: buildTasks(staff),
+    announcements: buildAnnouncements(),
+    onboarding: buildOnboarding(subscribers),
+    activity: buildActivity(subscribers, staff, buildTickets(subscribers, staff)),
+    usage: buildUsage(subscribers)
+  };
+}
+
+const DB = (function () {
+  const base = {
+    today: TODAY,
+    plans: PLANS,
     roles: defaultRoles(),
     pages: ADMIN_PAGES,
     caps: ADMIN_CAPS,
-    /* Everything in here is invented. Flip this to false the moment the console
-       is reading real subscribers, and the demo marker disappears. */
-    demoData: true,
     settings: {
       platformName: 'The Label Board',
       currency: 'NGN',
@@ -843,8 +916,6 @@ const DB = (function () {
       referralPct: 15,
       taxPct: 7.5,
       invoicePrefix: 'INV',
-      /* Where subscription money lands. Structured, because "GTBank · 0011223344 · The
-         Label Board Ltd" in one box is impossible to validate or reconcile against. */
       settlement: {
         accountName: 'The Label Board Ltd',
         bankName: 'Guaranty Trust Bank',
@@ -859,42 +930,56 @@ const DB = (function () {
         verified: true,
         verifiedOn: '2026-02-14'
       },
-      /* Allowances are off while we are a startup. Kept as a switch, not deleted,
-         so turning them on later needs no rework. */
       allowances: { enabled: false, housingPct: 15, transportPct: 10 },
       pensionDefaultRate: 8,
-      /* Sign-in rules, applied to everyone. */
       security: {
-        minLength: 10,
-        requireMix: true,          // upper, lower and a number
-        requireSymbol: false,
-        expiryDays: 0,             // 0 = passwords do not expire
-        blockReuse: 3,             // cannot reuse the last N
-        lockoutAfter: 5,           // failed attempts before the account locks
-        sessionIdleMins: 720,      // signed out after 12 hours idle
-        twoFactorRequired: false,
-        resetLinkHours: 24
+        minLength: 10, requireMix: true, requireSymbol: false, expiryDays: 0,
+        blockReuse: 3, lockoutAfter: 5, sessionIdleMins: 720,
+        twoFactorRequired: false, resetLinkHours: 24
       },
-      notify: { sound: 'chime', volume: 70, popups: false,
-        alerts: { payment: true, signup: true, failed: true, ticket: true, churn: true, payroll: false } },
+      notify: {
+        sound: 'chime', volume: 70, popups: false,
+        alerts: { payment: true, signup: true, failed: true, ticket: true, churn: true, payroll: false }
+      },
       integrations: [
-        { name: 'Supabase', detail: 'Database & auth', state: 'connected' },
-        { name: 'Flutterwave', detail: 'Card & transfer payments', state: 'connected' },
-        { name: 'Email (SMTP)', detail: 'Receipts & announcements', state: 'connected' },
+        { name: 'Supabase', detail: 'Database & auth', state: 'setup' },
+        { name: 'Flutterwave', detail: 'Card & transfer payments', state: 'setup' },
+        { name: 'Email (SMTP)', detail: 'Receipts & announcements', state: 'setup' },
         { name: 'WhatsApp Business', detail: 'Concierge hand-off', state: 'setup' }
       ]
     }
   };
+  return Object.assign(base, emptyData());
 })();
 
-/* restore any saved role edits / settings */
+/* swap the whole dataset in or out, keeping settings and roles */
+function applyDataset(next) {
+  ['demoData', 'subscribers', 'staff', 'payments', 'payrollRuns', 'payslips', 'attendance',
+   'leave', 'docs', 'tickets', 'feedback', 'tasks', 'announcements', 'onboarding',
+   'activity', 'usage'].forEach(k => { DB[k] = next[k]; });
+}
+function loadExampleData() {
+  applyDataset(demoData());
+  /* the demo assumes allowances are off and integrations are live */
+  DB.settings.integrations.forEach(i => { if (i.name !== 'WhatsApp Business') i.state = 'connected'; });
+  try { localStorage.setItem('tlb_admin_dataset', 'example'); } catch (e) {}
+}
+function clearAllData() {
+  applyDataset(emptyData());
+  DB.settings.integrations.forEach(i => { i.state = 'setup'; });
+  try { localStorage.setItem('tlb_admin_dataset', 'empty'); } catch (e) {}
+}
+
+/* restore settings, role edits, and which dataset was last chosen */
 (function restore() {
   try {
     const r = JSON.parse(localStorage.getItem('tlb_admin_roles') || 'null');
     if (Array.isArray(r) && r.length) DB.roles = r;
     const s = JSON.parse(localStorage.getItem('tlb_admin_settings') || 'null');
     if (s) Object.assign(DB.settings, s);
-  } catch (e) { /* ignore */ }
+    if (localStorage.getItem('tlb_admin_dataset') === 'example') loadExampleData();
+  } catch (e) { /* a blank console is the safe fallback */ }
 })();
+
 function saveRoles() { try { localStorage.setItem('tlb_admin_roles', JSON.stringify(DB.roles)); } catch (e) {} }
 function saveSettings() { try { localStorage.setItem('tlb_admin_settings', JSON.stringify(DB.settings)); } catch (e) {} }

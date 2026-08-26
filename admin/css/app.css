@@ -45,8 +45,11 @@ a{color:var(--gold);text-decoration:none}
 .nav .ic{width:18px;height:18px;flex:none;display:grid;place-items:center}
 .nav .ic svg{width:17px;height:17px}
 .nav .tx{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.badge{min-width:19px;height:19px;padding:0 6px;border-radius:10px;background:var(--gold);color:var(--on-gold);
-  font-size:10px;font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
+/* circular count bubble, matching the customer app rather than a gold pill */
+.badge{min-width:21px;height:21px;padding:0 5px;border-radius:50%;background:#1e3a5f;color:#fff;
+  font-size:10.5px;font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif;
+  box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+body.light .badge{background:#17385c;color:#fff}
 
 .side-foot{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:12px}
 .me{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:9px;cursor:pointer}
@@ -144,8 +147,9 @@ a{color:var(--gold);text-decoration:none}
 .note{font-size:12px;color:var(--faint);line-height:1.65}
 
 /* ---------- tables ----------
-   .tw is the scroll boundary. max-width keeps it from being widened by the
-   table's own min-width, so wide tables scroll rather than push the page. */
+   On a phone the table keeps being a table and sheds columns instead of
+   scrolling sideways — matching the customer app, where secondary columns carry
+   .hide-sm. Side-scrolling hides information behind a gesture nobody makes. */
 .tw{overflow-x:auto;max-width:100%;min-width:0}
 table{width:100%;border-collapse:collapse;min-width:640px}
 th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line-soft);font-size:12.5px;white-space:nowrap}
@@ -370,19 +374,6 @@ tbody tr:last-child td{border-bottom:0}
 
 /* ---- phone ---- */
 @media(max-width:680px){
-  /* sidebar becomes a scrollable bottom bar: thumbs reach the bottom, not the top-left */
-  .shell{grid-template-columns:1fr;padding-bottom:64px}
-  .side{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;width:100%;
-    flex-direction:row;align-items:center;gap:2px;padding:6px 8px;border-right:0;
-    border-top:1px solid var(--line);background:var(--bg-2);z-index:400;
-    overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
-    box-shadow:0 -8px 24px -12px rgba(0,0,0,.5)}
-  .side::-webkit-scrollbar{display:none}
-  .brand,.grp-t,.side-foot{display:none}
-  #nav{display:flex;gap:2px}
-  .grp{display:flex;gap:2px;margin:0}
-  .nav{width:auto;min-width:52px;min-height:48px;padding:6px 10px;border-radius:10px;justify-content:center}
-  .nav.on::before{left:8px;right:8px;top:auto;bottom:2px;width:auto;height:3px}
 
   .main{height:auto;min-height:100vh;padding:16px 14px 30px;overflow:visible}
   html,body{height:auto}
@@ -404,10 +395,11 @@ tbody tr:last-child td{border-bottom:0}
   .pnl h3{font-size:13.5px}
   .ph-sub{font-size:11px}
 
-  /* tables keep their columns and scroll sideways inside the panel */
-  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;
-    margin:0 -14px;padding:0 14px;scrollbar-width:thin;max-width:calc(100% + 28px)}
-  table{min-width:480px}
+  /* tables shed their secondary columns and fit — no sideways scroll */
+  .tw{overflow-x:visible;max-width:100%;margin:0;padding:0}
+  table{min-width:0;width:100%}
+  th,td{white-space:normal}
+  td.num,th.num{white-space:nowrap}
   .chartbox{min-width:0;max-width:100%}
   .chartbox svg{max-width:100%}
   .cols3,.cols4{grid-template-columns:minmax(0,1fr)}
@@ -458,4 +450,81 @@ tbody tr:last-child td{border-bottom:0}
   color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 42%,var(--panel))}
 @media(max-width:680px){
   .demo{font-size:8.5px;padding:3px 7px;margin-left:6px;letter-spacing:.8px}
+}
+
+/* ============================================================
+   Mobile navigation, matching the customer app: a hamburger at the
+   top that slides the full nav in from the left, plus a bottom bar
+   carrying the five pages you actually live in.
+   ============================================================ */
+#menuBtn{display:none}
+#drawerMask{display:none}
+.mobbar{display:none}
+
+/* secondary table columns disappear on a phone rather than scrolling away */
+@media(max-width:760px){
+  .hide-sm{display:none!important}
+  th,td{padding:11px 8px}
+}
+@media(max-width:440px){
+  .hide-xs{display:none!important}
+}
+
+@media(max-width:680px){
+  /* the sidebar becomes a drawer */
+  .shell{grid-template-columns:1fr;padding-bottom:0}
+  .side{position:fixed;top:0;left:0;bottom:0;width:84%;max-width:310px;z-index:60;
+    transform:translateX(-100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);
+    background:var(--bg-2);border-right:1px solid var(--line);box-shadow:var(--shadow);
+    flex-direction:column;height:100%;overflow-y:auto;
+    padding:calc(18px + env(safe-area-inset-top)) 15px calc(20px + env(safe-area-inset-bottom))}
+  .side.open{transform:translateX(0)}
+  .brand,.grp-t,.side-foot{display:revert}
+  .brand{justify-content:flex-start;padding:2px 4px 16px}
+  #nav{display:block}
+  .grp{display:block;margin:12px 0 4px}
+  .nav{width:100%;min-height:46px;justify-content:flex-start;gap:12px;
+    padding:11px 12px;font-size:14.5px}
+  .nav .tx{display:block}
+  .badge{display:grid}
+  .nav.on::before{left:0;right:auto;top:8px;bottom:8px;width:3px;height:auto}
+
+  #drawerMask{display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:55;
+    opacity:0;pointer-events:none;transition:opacity .24s}
+  #drawerMask.on{opacity:1;pointer-events:auto}
+
+  /* hamburger sits with the title */
+  #menuBtn{display:grid;place-items:center;width:40px;height:40px;flex:none;
+    border:1px solid var(--line);background:var(--panel);color:var(--dim);
+    border-radius:11px;cursor:pointer}
+  #menuBtn svg{width:19px;height:19px}
+  .top{align-items:center;gap:11px}
+  .top-head{display:flex;align-items:center;gap:11px;min-width:0;flex:1}
+
+  /* bottom bar */
+  .mobbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:var(--bg-2);border-top:1px solid var(--line);
+    padding:5px 2px calc(5px + env(safe-area-inset-bottom));
+    box-shadow:0 -8px 22px -14px rgba(0,0,0,.55)}
+  .mobbar .mb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:none;border:0;font-family:inherit;font-size:9.5px;letter-spacing:.2px;
+    color:var(--faint);cursor:pointer;padding:6px 2px;min-height:52px;position:relative}
+  .mobbar .mb .mbi{line-height:0;display:block}
+  .mobbar .mb .mbi svg{width:22px;height:22px;display:block}
+  .mobbar .mb .mbt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .mobbar .mb:not(.on){opacity:.55}
+  .mobbar .mb.on{color:var(--text);font-weight:600}
+  .mobbar .mb .mbd{position:absolute;top:3px;right:calc(50% - 20px);min-width:15px;height:15px;
+    padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;
+    font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
+
+  .main{height:auto;min-height:100vh;overflow:visible;
+    padding:max(16px,env(safe-area-inset-top)) 14px calc(74px + env(safe-area-inset-bottom))}
+  html,body{height:auto}
+
+  /* iOS zooms the page when a field under 16px gets focus */
+  .fg input,.fg select,.fg textarea,.srch,.pfield input{font-size:16px}
+  .toast{bottom:calc(78px + env(safe-area-inset-bottom))}
+  .ppop{position:fixed;left:14px;right:14px;top:auto;bottom:calc(80px + env(safe-area-inset-bottom));
+    min-width:0;max-height:70vh;overflow-y:auto}
 }

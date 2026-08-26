@@ -82,17 +82,18 @@ DETAIL.sub = function (id) {
       statCard({ label: 'Outstanding', value: money(s.referralPending), tone: s.referralPending ? 'warn' : 'good', sub: s.referralPending ? 'Clears 31 days after signup' : 'Nothing owing' }) +
       '</div>' +
       (s.referralLedger.length
-        ? '<div class="tw"><table><thead><tr><th>Business referred</th><th>Plan</th><th>Status</th><th>Joined</th>' +
+        ? '<div class="tw"><table><thead><tr><th>Business referred</th><th class="hide-sm">Plan</th>' +
+        '<th class="hide-sm">Status</th><th class="hide-sm">Joined</th>' +
         '<th class="num">Commission</th><th>Paid</th><th></th></tr></thead><tbody>' +
         s.referralLedger.map(r => '<tr class="klik" onclick="openDetail(\'sub\',' + r.subId + ')">' +
           '<td class="t-main">' + esc(r.name) + '</td>' +
-          '<td><span class="tier">' + r.plan + '</span></td>' +
-          '<td>' + statusPill(r.status) + '</td>' +
-          '<td>' + fmtD(r.joined) + '</td>' +
+          '<td class="hide-sm"><span class="tier">' + r.plan + '</span></td>' +
+          '<td class="hide-sm">' + statusPill(r.status) + '</td>' +
+          '<td class="hide-sm">' + fmtD(r.joined) + '</td>' +
           '<td class="num">' + (r.commission ? money(r.commission) : '—') + '</td>' +
           '<td>' + (r.paid ? '<span class="pill green">Paid ' + fmtDShort(r.creditedOn) + '</span>' : r.converted ? '<span class="pill amber">Pending</span>' : '<span class="pill grey">Not converted</span>') + '</td>' +
           '<td class="chev">&rsaquo;</td></tr>').join('') +
-        '<tr><td colspan="4" style="text-align:right;font-weight:600">Total</td>' +
+        '<tr class="hide-sm"><td colspan="4" style="text-align:right;font-weight:600">Total</td>' +
         '<td class="num"><b>' + money(s.referralEarned) + '</b></td><td colspan="2"></td></tr>' +
         '</tbody></table></div>'
         : '<div class="empty">This subscriber has not referred anyone yet.<br>' +
@@ -102,10 +103,11 @@ DETAIL.sub = function (id) {
   else if (tab === 'businesses') {
     body = '<div class="sec-t">Outlets on this account</div>' +
       '<p class="note">Each outlet is a separate workroom or shop inside the subscriber\'s own app, with its own staff and stock.</p>' +
-      '<div class="tw" style="margin-top:12px"><table><thead><tr><th>Outlet</th><th>City</th><th class="num">Staff</th><th>Opened</th></tr></thead><tbody>' +
+      '<div class="tw" style="margin-top:12px"><table><thead><tr><th>Outlet</th><th>City</th>' +
+      '<th class="num hide-sm">Staff</th><th class="hide-sm">Opened</th></tr></thead><tbody>' +
       s.businesses.map(b => '<tr><td class="t-main">' + esc(b.name) + '</td><td>' + esc(b.city) + '</td>' +
-        '<td class="num">' + b.staff + '</td><td>' + fmtD(b.openedOn) + '</td></tr>').join('') +
-      '<tr><td style="font-weight:600">' + s.businesses.length + ' outlets</td><td></td>' +
+        '<td class="num hide-sm">' + b.staff + '</td><td class="hide-sm">' + fmtD(b.openedOn) + '</td></tr>').join('') +
+      '<tr class="hide-sm"><td style="font-weight:600">' + s.businesses.length + ' outlets</td><td></td>' +
       '<td class="num"><b>' + s.businesses.reduce((t, b) => t + b.staff, 0) + '</b></td><td></td></tr>' +
       '</tbody></table></div>';
   }
@@ -117,11 +119,11 @@ DETAIL.sub = function (id) {
       statCard({ label: 'Failed', value: pays.filter(p => p.status === 'failed').length, tone: pays.filter(p => p.status === 'failed').length ? 'bad' : 'good', sub: money(pays.filter(p => p.status === 'failed').reduce((t, p) => t + p.amount, 0)) + ' not collected' }) +
       statCard({ label: 'Next charge', value: s.status === 'expired' ? '—' : fmtDShort(s.renewsOn), tone: 'info', sub: s.mrr ? money(s.cycle === 'annual' ? planById(s.plan).annual : planById(s.plan).monthly) : 'No charge scheduled' }) +
       '</div>' +
-      (pays.length ? '<div class="tw"><table><thead><tr><th>Date</th><th>Reference</th><th>Invoice</th>' +
-        '<th class="num">Amount</th><th>Method</th><th>Status</th><th></th></tr></thead><tbody>' +
+      (pays.length ? '<div class="tw"><table><thead><tr><th>Date</th><th class="hide-sm">Reference</th><th class="hide-sm">Invoice</th>' +
+        '<th class="num">Amount</th><th class="hide-sm">Method</th><th>Status</th><th></th></tr></thead><tbody>' +
         pays.map(p => '<tr class="klik" onclick="openDetail(\'pay\',' + p.id + ')">' +
-          '<td>' + fmtD(p.date) + '</td><td>' + p.ref + '</td><td>' + p.invoice + '</td>' +
-          '<td class="num">' + money(p.amount) + '</td><td>' + p.method + '</td>' +
+          '<td>' + fmtD(p.date) + '</td><td class="hide-sm">' + p.ref + '</td><td class="hide-sm">' + p.invoice + '</td>' +
+          '<td class="num">' + money(p.amount) + '</td><td class="hide-sm">' + p.method + '</td>' +
           '<td>' + statusPill(p.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty">No payments on this account — it is still on trial.</div>');
   }
@@ -304,15 +306,16 @@ DETAIL.staff = function (id) {
     body = '<div class="sec-t">Monthly pay history</div>' +
       '<p class="note">Tap a month to open the payslip: a full breakdown of how that pay was worked out. ' +
       'Published payslips are visible to ' + s.name.split(' ')[0] + ' in their own profile.</p>' +
-      '<div class="tw" style="margin-top:12px"><table><thead><tr><th>Month</th><th class="num">Gross</th>' +
-      '<th class="num">Deductions</th><th class="num">Net</th><th>Paid</th><th>Visible to staff</th><th></th></tr></thead><tbody>' +
+      '<div class="tw" style="margin-top:12px"><table><thead><tr><th>Month</th><th class="num hide-sm">Gross</th>' +
+      '<th class="num hide-sm">Deductions</th><th class="num">Net</th><th>Paid</th>' +
+      '<th class="hide-sm">Visible to staff</th><th></th></tr></thead><tbody>' +
       slips.map(sl => '<tr class="klik" onclick="openDetail(\'slip\',' + sl.id + ')">' +
         '<td class="t-main">' + sl.month + '</td>' +
-        '<td class="num">' + money(sl.gross) + '</td>' +
-        '<td class="num" style="color:var(--red)">−' + money(sl.deductions) + '</td>' +
+        '<td class="num hide-sm">' + money(sl.gross) + '</td>' +
+        '<td class="num hide-sm" style="color:var(--red)">−' + money(sl.deductions) + '</td>' +
         '<td class="num"><b>' + money(sl.net) + '</b></td>' +
         '<td>' + statusPill(sl.status) + '</td>' +
-        '<td>' + (sl.uploaded ? '<span class="pill green">Published</span>' : '<span class="pill grey">Not yet</span>') + '</td>' +
+        '<td class="hide-sm">' + (sl.uploaded ? '<span class="pill green">Published</span>' : '<span class="pill grey">Not yet</span>') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>' +
       '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
       '<button class="btn" onclick="downloadAllSlips(' + s.id + ')">Download all as CSV</button>' +
@@ -340,12 +343,13 @@ DETAIL.staff = function (id) {
       statCard({ label: 'Hours worked', value: Math.round(hours) + 'h', tone: 'money', sub: 'Avg ' + (Math.round(hours / Math.max(1, present + late) * 10) / 10) + 'h a day' }) +
       '</div>' +
       '<div class="sec-t">Daily log, last 30 days</div>' +
-      '<div class="tw"><table><thead><tr><th>Date</th><th>Clock in</th><th>Clock out</th><th class="num">Hours</th><th>State</th></tr></thead><tbody>' +
+      '<div class="tw"><table><thead><tr><th>Date</th><th>Clock in</th><th>Clock out</th>' +
+      '<th class="num hide-sm">Hours</th><th class="hide-sm">State</th></tr></thead><tbody>' +
       att.map(a => '<tr><td>' + fmtD(a.date) + '</td>' +
         '<td>' + (a.in || '<span class="note">—</span>') + '</td>' +
         '<td>' + (a.out || (a.in ? '<span class="pill green">still in</span>' : '<span class="note">—</span>')) + '</td>' +
-        '<td class="num">' + (a.hours || '—') + '</td>' +
-        '<td>' + statusPill(a.state) + '</td></tr>').join('') + '</tbody></table></div>';
+        '<td class="num hide-sm">' + (a.hours || '—') + '</td>' +
+        '<td class="hide-sm">' + statusPill(a.state) + '</td></tr>').join('') + '</tbody></table></div>';
   }
 
   else if (tab === 'leave') {
@@ -357,10 +361,12 @@ DETAIL.staff = function (id) {
       statCard({ label: 'Pending requests', value: lv.filter(l => l.status === 'pending').length, tone: lv.filter(l => l.status === 'pending').length ? 'warn' : 'good', sub: 'Awaiting approval' }) +
       '</div>' +
       '<div class="sec-t">Leave history</div>' +
-      (lv.length ? '<div class="tw"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th class="num">Days</th><th>Status</th><th>Note</th></tr></thead><tbody>' +
-        lv.map(l => '<tr><td class="t-main">' + l.type + '</td><td>' + fmtD(l.from) + '</td><td>' + fmtD(l.to) + '</td>' +
+      (lv.length ? '<div class="tw"><table><thead><tr><th>Type</th><th>From</th><th class="hide-sm">To</th>' +
+        '<th class="num">Days</th><th>Status</th><th class="hide-sm">Note</th></tr></thead><tbody>' +
+        lv.map(l => '<tr><td class="t-main">' + l.type + '</td><td>' + fmtDShort(l.from) + '</td>' +
+          '<td class="hide-sm">' + fmtD(l.to) + '</td>' +
           '<td class="num">' + l.days + '</td><td>' + statusPill(l.status === 'pending' ? 'open' : 'approved') + '</td>' +
-          '<td class="note">' + l.note + '</td></tr>').join('') + '</tbody></table></div>'
+          '<td class="note hide-sm">' + l.note + '</td></tr>').join('') + '</tbody></table></div>'
         : '<div class="empty">No leave taken or booked.</div>') +
       '<button class="btn gold" style="margin-top:16px" onclick="formLeave(' + s.id + ')">Record leave</button>';
   }
@@ -466,11 +472,11 @@ DETAIL.slip = function (id) {
     '<div class="pnl"><div class="ph"><div><h3>Other months</h3>' +
     '<div class="ph-sub">' + others.length + ' more on record · tap to open</div></div></div>' +
     (others.length
-      ? '<div class="tw"><table><thead><tr><th>Month</th><th class="num">Net</th><th>Status</th><th></th></tr></thead><tbody>' +
+      ? '<div class="tw"><table><thead><tr><th>Month</th><th class="num">Net</th><th class="hide-sm">Status</th><th></th></tr></thead><tbody>' +
       others.map(x => '<tr class="klik" onclick="openDetail(\'slip\',' + x.id + ')">' +
         '<td class="t-main">' + x.month + '</td>' +
         '<td class="num">' + money(x.net) + '</td>' +
-        '<td>' + statusPill(x.status) + '</td>' +
+        '<td class="hide-sm">' + statusPill(x.status) + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>'
       : '<div class="note">This is the only payslip on record.</div>') +
     '</div></div>' +

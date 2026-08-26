@@ -11,31 +11,31 @@
 const ROWS = {
   subs(list) {
     if (!list.length) return '<div class="empty">No accounts in this figure.</div>';
-    return '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th>' +
-      '<th>Joined</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
+    return '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th>Status</th>' +
+      '<th class="hide-sm">Joined</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
       list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
-        '<td><span class="tier">' + s.planName + '</span></td>' +
+        '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
         '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') + '</td>' +
-        '<td>' + fmtD(s.joined) + '</td>' +
+        '<td class="hide-sm">' + fmtD(s.joined) + '</td>' +
         '<td class="num">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
-      '<tr><td colspan="4" style="text-align:right;font-weight:600">' + list.length + ' account' + (list.length === 1 ? '' : 's') + '</td>' +
+      '<tr class="hide-sm"><td colspan="4" style="text-align:right;font-weight:600">' + list.length + ' account' + (list.length === 1 ? '' : 's') + '</td>' +
       '<td class="num"><b>' + money(list.reduce((t, s) => t + s.mrr, 0)) + '</b></td><td></td></tr>' +
       '</tbody></table></div>';
   },
   pays(list) {
     if (!list.length) return '<div class="empty">No payments in this figure.</div>';
-    return '<div class="tw"><table><thead><tr><th>Date</th><th>Subscriber</th><th>Reference</th>' +
-      '<th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>' +
+    return '<div class="tw"><table><thead><tr><th class="hide-sm">Date</th><th>Subscriber</th>' +
+      '<th class="hide-sm">Reference</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>' +
       list.slice(0, 150).map(p => '<tr class="klik" onclick="openDetail(\'pay\',' + p.id + ')">' +
-        '<td>' + fmtD(p.date) + '</td>' +
+        '<td class="hide-sm">' + fmtD(p.date) + '</td>' +
         '<td><div class="t-main">' + esc(p.subscriber) + '</div><div class="t-sub">' + p.plan + ' · ' + p.cycle + '</div></td>' +
-        '<td>' + p.ref + '</td>' +
+        '<td class="hide-sm">' + p.ref + '</td>' +
         '<td class="num">' + money(p.amount) + '</td>' +
         '<td>' + statusPill(p.status) + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
-      '<tr><td colspan="3" style="text-align:right;font-weight:600">' + list.length + ' payment' + (list.length === 1 ? '' : 's') + '</td>' +
+      '<tr class="hide-sm"><td colspan="3" style="text-align:right;font-weight:600">' + list.length + ' payment' + (list.length === 1 ? '' : 's') + '</td>' +
       '<td class="num"><b>' + money(list.reduce((t, p) => t + p.amount, 0)) + '</b></td><td colspan="2"></td></tr>' +
       '</tbody></table></div>' +
       (list.length > 150 ? '<div class="pager"><span>Showing the first 150</span></div>' : '');
@@ -49,29 +49,29 @@ const ROWS = {
   },
   staff(list) {
     if (!list.length) return '<div class="empty">Nobody in this figure.</div>';
-    return '<div class="tw"><table><thead><tr><th>Name</th><th>Department</th><th>Today</th>' +
-      '<th class="num">Monthly gross</th><th></th></tr></thead><tbody>' +
+    return '<div class="tw"><table><thead><tr><th>Name</th><th class="hide-sm">Department</th><th>Today</th>' +
+      '<th class="num hide-sm">Monthly gross</th><th></th></tr></thead><tbody>' +
       list.map(s => {
         const a = Q.attToday(s.id);
         return '<tr class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.title + '</div></td>' +
-          '<td>' + s.dept + '</td>' +
+          '<td class="hide-sm">' + s.dept + '</td>' +
           '<td>' + (a && a.in ? (a.out ? a.in + '–' + a.out : '<span class="pill green">In since ' + a.in + '</span>') : (a ? statusPill(a.state) : '<span class="note">—</span>')) + '</td>' +
-          '<td class="num">' + money(s.basic + s.housing + s.transport) + '</td>' +
+          '<td class="num hide-sm">' + money(s.basic + s.housing + s.transport) + '</td>' +
           '<td class="chev">&rsaquo;</td></tr>';
       }).join('') + '</tbody></table></div>';
   },
   slips(list) {
     if (!list.length) return '<div class="empty">No payslips in this figure.</div>';
-    return '<div class="tw"><table><thead><tr><th>Staff</th><th>Department</th><th class="num">Gross</th>' +
-      '<th class="num">Deductions</th><th class="num">Net</th><th>Status</th><th></th></tr></thead><tbody>' +
+    return '<div class="tw"><table><thead><tr><th>Staff</th><th class="hide-sm">Department</th><th class="num hide-sm">Gross</th>' +
+      '<th class="num hide-sm">Deductions</th><th class="num">Net</th><th>Status</th><th></th></tr></thead><tbody>' +
       list.map(s => '<tr class="klik" onclick="openDetail(\'slip\',' + s.id + ')">' +
-        '<td class="t-main">' + esc(s.staffName) + '</td><td>' + s.dept + '</td>' +
-        '<td class="num">' + money(s.gross) + '</td>' +
-        '<td class="num" style="color:var(--red)">−' + money(s.deductions) + '</td>' +
+        '<td class="t-main">' + esc(s.staffName) + '</td><td class="hide-sm">' + s.dept + '</td>' +
+        '<td class="num hide-sm">' + money(s.gross) + '</td>' +
+        '<td class="num hide-sm" style="color:var(--red)">−' + money(s.deductions) + '</td>' +
         '<td class="num"><b>' + money(s.net) + '</b></td>' +
         '<td>' + statusPill(s.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
-      '<tr><td colspan="2" style="text-align:right;font-weight:600">' + list.length + ' staff</td>' +
+      '<tr class="hide-sm"><td colspan="2" style="text-align:right;font-weight:600">' + list.length + ' staff</td>' +
       '<td class="num"><b>' + money(list.reduce((t, s) => t + s.gross, 0)) + '</b></td>' +
       '<td class="num" style="color:var(--red)"><b>−' + money(list.reduce((t, s) => t + s.deductions, 0)) + '</b></td>' +
       '<td class="num"><b>' + money(list.reduce((t, s) => t + s.net, 0)) + '</b></td><td colspan="2"></td></tr>' +
@@ -86,20 +86,21 @@ const ROWS = {
   },
   referrers(list) {
     if (!list.length) return '<div class="empty">Nobody has referred anyone yet.</div>';
-    return '<div class="tw"><table><thead><tr><th>Subscriber</th><th>Plan</th><th class="num">Referred</th>' +
-      '<th class="num">Converted</th><th class="num">Earned</th><th class="num">Paid</th>' +
-      '<th class="num">Outstanding</th><th></th></tr></thead><tbody>' +
+    return '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Plan</th>' +
+      '<th class="num hide-sm">Referred</th>' +
+      '<th class="num hide-sm">Converted</th><th class="num">Earned</th><th class="num hide-sm">Paid</th>' +
+      '<th class="num hide-sm">Outstanding</th><th></th></tr></thead><tbody>' +
       list.map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
-        '<td><span class="tier">' + s.planName + '</span></td>' +
-        '<td class="num">' + s.referrals.length + '</td>' +
-        '<td class="num">' + s.referralConverted + '</td>' +
+        '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
+        '<td class="num hide-sm">' + s.referrals.length + '</td>' +
+        '<td class="num hide-sm">' + s.referralConverted + '</td>' +
         '<td class="num">' + money(s.referralEarned) + '</td>' +
-        '<td class="num">' + money(s.referralPaid) + '</td>' +
-        '<td class="num"' + (s.referralPending ? ' style="color:var(--amber)"' : '') + '>' +
+        '<td class="num hide-sm">' + money(s.referralPaid) + '</td>' +
+        '<td class="num hide-sm"' + (s.referralPending ? ' style="color:var(--amber)"' : '') + '>' +
         (s.referralPending ? money(s.referralPending) : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
-      '<tr><td colspan="2" style="text-align:right;font-weight:600">' + list.length + ' referrers</td>' +
+      '<tr class="hide-sm"><td colspan="2" style="text-align:right;font-weight:600">' + list.length + ' referrers</td>' +
       '<td class="num"><b>' + list.reduce((t, s) => t + s.referrals.length, 0) + '</b></td>' +
       '<td class="num"><b>' + list.reduce((t, s) => t + s.referralConverted, 0) + '</b></td>' +
       '<td class="num"><b>' + money(list.reduce((t, s) => t + s.referralEarned, 0)) + '</b></td>' +

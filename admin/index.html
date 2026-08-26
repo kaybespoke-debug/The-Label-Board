@@ -36,10 +36,12 @@
     <g id="i-bell"><path d="M18 15V10a6 6 0 1 0-12 0v5l-1.5 2.5h15z"/><path d="M9.5 20.5a2.6 2.6 0 0 0 5 0"/></g>
     <g id="i-search"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></g>
     <g id="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></g>
+    <g id="i-menu"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></g>
     <g id="i-moon"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></g>
   </defs>
 </svg>
 
+<div id="drawerMask" onclick="closeDrawer()"></div>
 <div class="shell">
   <!-- ================= sidebar ================= -->
   <aside class="side">
@@ -68,13 +70,16 @@
   <!-- ================= main ================= -->
   <main class="main">
     <div class="top">
-      <div>
+      <div class="top-head">
+        <button id="menuBtn" onclick="toggleDrawer()" aria-label="Open the menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><use href="#i-menu"/></svg></button>
+      <div style="min-width:0">
         <!-- the badge is a sibling, not a child: render() sets textContent on #ttl -->
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
           <h1 id="ttl">Dashboard</h1>
           <span class="demo" id="demoTag" title="Every figure here is invented">Demo data</span>
         </div>
         <div class="top-sub" id="sub">Monitor your platform at a glance</div>
+      </div>
       </div>
       <div class="top-act">
         <input class="srch" id="srch" placeholder="Search subscribers, tickets, payments…" oninput="onSearch(this.value)">
@@ -89,6 +94,7 @@
     </div>
     <div id="view"></div>
   </main>
+  <nav class="mobbar" id="mobbar"></nav>
 </div>
 
 <div class="mask" id="mask" onclick="if(event.target===this)closeModal()"></div>
@@ -133,6 +139,20 @@ const NAV = [
   ]]
 ];
 
+
+/* One hue per nav item, like the customer app. Flat single-colour icons read as
+   a wall; a colour per destination makes the sidebar scannable. */
+const NAV_HUE = {
+  dashboard:'var(--gold)', subscribers:'#c04668', onboarding:'#0f8a80',
+  billing:'#2563a8', payments:'#1f9d57', payroll:'#6d5dd3', revenue:'#c47d12',
+  support:'#0f8a80', announcements:'#c2568a',
+  tasks:'#2563a8', staff:'#6d5dd3', activity:'#5b6b82', settings:'#5b6b82'
+};
+/* the five pages you actually live in, for the bottom bar */
+const MOB_BAR = ['dashboard','subscribers','payments','support','staff'];
+const MOB_LABEL = { dashboard:'Home', subscribers:'Subs', payments:'Payments',
+  support:'Support', staff:'Team' };
+
 const TITLES = {
   dashboard: ['Dashboard', 'Monitor your platform at a glance'],
   subscribers: ['Subscribers', 'Every business using The Label Board'],
@@ -155,14 +175,56 @@ function buildNav() {
     g[1].map(n => {
       const c = n[3] ? n[3]() : 0;
       return '<button class="nav" data-p="' + n[0] + '" onclick="go(\'' + n[0] + '\')">' +
-        '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
+        '<span class="ic" style="color:' + (NAV_HUE[n[0]] || 'currentColor') + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
         '<span class="tx">' + n[1] + '</span>' +
         (c ? '<span class="badge">' + c + '</span>' : '') + '</button>';
     }).join('') + '</div>').join('');
 }
 
+
+/* ---------------- mobile navigation ----------------
+   A hamburger opens the full nav as a drawer, and a bottom bar carries the five
+   pages you actually live in — the same two-part pattern as the customer app.
+   Thirteen items crammed into a scrolling strip was the wrong shape. */
+function toggleDrawer() {
+  const side = document.querySelector('.side');
+  const mask = document.getElementById('drawerMask');
+  const open = side.classList.toggle('open');
+  mask.classList.toggle('on', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+function closeDrawer() {
+  document.querySelector('.side').classList.remove('open');
+  document.getElementById('drawerMask').classList.remove('on');
+  document.body.style.overflow = '';
+}
+
+function buildMobBar() {
+  const lit = UI.detail ? UI.back : UI.page;
+  const flat = {};
+  NAV.forEach(g => g[1].forEach(n => { flat[n[0]] = n; }));
+  const items = MOB_BAR.map(id => {
+    const n = flat[id];
+    if (!n) return '';
+    const count = n[3] ? n[3]() : 0;
+    return '<button class="mb' + (lit === id ? ' on' : '') + '" onclick="go(\'' + id + '\')">' +
+      '<span class="mbi" style="color:' + (lit === id ? (NAV_HUE[id] || 'currentColor') : 'currentColor') + '">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
+      '<span class="mbt">' + (MOB_LABEL[id] || n[1]) + '</span>' +
+      (count ? '<span class="mbd">' + count + '</span>' : '') + '</button>';
+  }).join('');
+  /* the fifth slot is More, which opens the drawer to reach everything else */
+  document.getElementById('mobbar').innerHTML = items +
+    '<button class="mb" onclick="toggleDrawer()">' +
+    '<span class="mbi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+    'stroke-linecap="round"><use href="#i-menu"/></svg></span><span class="mbt">More</span></button>';
+}
+
 function render() {
   buildNav();
+  buildMobBar();
+  closeDrawer();
   const page = UI.detail ? null : UI.page;
 
   // nav highlight — a detail view keeps its parent page lit

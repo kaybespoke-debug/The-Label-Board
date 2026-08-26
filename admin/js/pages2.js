@@ -97,12 +97,12 @@ PAGES.support = function () {
       '</div>' +
       '<div class="pnl"><div class="ph"><div><h3>Most active subscribers</h3>' +
       '<div class="ph-sub">Volume is the best early signal of who will renew</div></div></div>' +
-      '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th class="num">Orders (30d)</th>' +
-      '<th class="num">Seats used</th><th>Last seen</th><th></th></tr></thead><tbody>' +
+      '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th class="num">Orders (30d)</th>' +
+      '<th class="num hide-sm">Seats used</th><th class="hide-sm">Last seen</th><th></th></tr></thead><tbody>' +
       Q.active().slice().sort((a, b) => b.ordersLast30 - a.ordersLast30).slice(0, 12).map(s =>
         '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')"><td class="t-main">' + esc(s.name) + '</td>' +
-        '<td><span class="tier">' + s.planName + '</span></td><td class="num">' + s.ordersLast30 + '</td>' +
-        '<td class="num">' + s.users + ' / ' + s.seats + '</td><td>' + ago(s.lastSeen) + '</td>' +
+        '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td><td class="num">' + s.ordersLast30 + '</td>' +
+        '<td class="num hide-sm">' + s.users + ' / ' + s.seats + '</td><td class="hide-sm">' + ago(s.lastSeen) + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
       '</tbody></table></div></div>';
   }
@@ -115,15 +115,16 @@ PAGES.support = function () {
       '<div class="ph-sub">A failed charge, a drop in orders, or a long gap since anyone signed in. ' +
       moneyShort(risk.reduce((t, s) => t + s.mrr, 0)) + ' of MRR is exposed here.</div></div>' +
       '<button class="btn" onclick="exportRisk()">Export CSV</button></div>' +
-      (risk.length ? '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Why</th>' +
-        '<th class="num">Orders 30d</th><th>Last seen</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
+      (risk.length ? '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th>Why</th>' +
+        '<th class="num hide-sm">Orders 30d</th><th class="hide-sm">Last seen</th>' +
+        '<th class="num">MRR</th><th></th></tr></thead><tbody>' +
         risk.slice().sort((a, b) => b.mrr - a.mrr).map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
-          '<td><span class="tier">' + s.planName + '</span></td>' +
+          '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
           '<td>' + (s.pastDue ? '<span class="pill red">Payment failed</span>'
             : s.ordersLast30 < 12 ? '<span class="pill amber">Low activity</span>'
               : '<span class="pill amber">Engagement drop</span>') + '</td>' +
-          '<td class="num">' + s.ordersLast30 + '</td><td>' + ago(s.lastSeen) + '</td>' +
+          '<td class="num hide-sm">' + s.ordersLast30 + '</td><td class="hide-sm">' + ago(s.lastSeen) + '</td>' +
           '<td class="num">' + money(s.mrr) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty">No accounts flagged at risk.</div>') + '</div>';
   }
@@ -192,14 +193,16 @@ PAGES.announcements = function () {
       { k: 'draft', t: 'Drafts', n: dr.length }, { k: 'all', t: 'All', n: all.length }
     ]) + '<span class="spacer"></span><button class="btn gold" onclick="formAnnouncement()">+ New announcement</button></div>' +
     '<div class="pnl">' +
-    (list.length ? '<div class="tw"><table><thead><tr><th>Announcement</th><th>Audience</th><th>Channel</th>' +
-      '<th>Status</th><th>Date</th><th class="num">Reach</th><th class="num">Opened</th><th></th></tr></thead><tbody>' +
+    (list.length ? '<div class="tw"><table><thead><tr><th>Announcement</th><th class="hide-sm">Audience</th><th class="hide-sm">Channel</th>' +
+      '<th>Status</th><th class="hide-sm">Date</th><th class="num hide-sm">Reach</th>' +
+      '<th class="num hide-sm">Opened</th><th></th></tr></thead><tbody>' +
       list.map(a => '<tr class="klik" onclick="openDetail(\'ann\',' + a.id + ')">' +
         '<td><div class="t-main">' + esc(a.title) + '</div><div class="t-sub">' + esc(a.body.slice(0, 58)) + '…</div></td>' +
-        '<td>' + a.audience + '</td><td>' + a.channel + '</td><td>' + statusPill(a.state) + '</td>' +
-        '<td>' + fmtD(a.date) + '</td>' +
-        '<td class="num">' + (a.reach || '—') + '</td>' +
-        '<td class="num">' + (a.reach ? pct(a.opened, a.reach) + '%' : '—') + '</td>' +
+        '<td class="hide-sm">' + a.audience + '</td><td class="hide-sm">' + a.channel + '</td>' +
+        '<td>' + statusPill(a.state) + '</td>' +
+        '<td class="hide-sm">' + fmtD(a.date) + '</td>' +
+        '<td class="num hide-sm">' + (a.reach || '—') + '</td>' +
+        '<td class="num hide-sm">' + (a.reach ? pct(a.opened, a.reach) + '%' : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>'
       : '<div class="empty">Nothing in this state.</div>') + '</div>';
 };
@@ -284,16 +287,16 @@ PAGES.staff = function () {
       '<div class="pnl"><div class="ph"><div><h3>Today · ' + fmtD(DB.today) + '</h3>' +
       '<div class="ph-sub">Clock people in and out from here, or from their own profile</div></div>' +
       '<span class="note">' + Q.onFloorNow() + ' of ' + all.length + ' on the floor</span></div>' +
-      '<div class="tw"><table><thead><tr><th>Staff</th><th>Department</th><th>In</th><th>Out</th>' +
-      '<th class="num">Hours</th><th>State</th><th></th></tr></thead><tbody>' +
+      '<div class="tw"><table><thead><tr><th>Staff</th><th class="hide-sm">Department</th><th>In</th><th>Out</th>' +
+      '<th class="num hide-sm">Hours</th><th class="hide-sm">State</th><th></th></tr></thead><tbody>' +
       all.map(s => {
         const a = Q.attToday(s.id);
         return '<tr><td class="klik t-main" onclick="openDetail(\'staff\',' + s.id + ')">' + esc(s.name) + '</td>' +
-          '<td>' + s.dept + '</td>' +
+          '<td class="hide-sm">' + s.dept + '</td>' +
           '<td>' + (a && a.in ? a.in : '<span class="note">—</span>') + '</td>' +
           '<td>' + (a && a.out ? a.out : (a && a.in ? '<span class="pill green">on floor</span>' : '<span class="note">—</span>')) + '</td>' +
-          '<td class="num">' + (a && a.hours ? a.hours : '—') + '</td>' +
-          '<td>' + (a ? statusPill(a.state) : '<span class="note">not recorded</span>') + '</td>' +
+          '<td class="num hide-sm">' + (a && a.hours ? a.hours : '—') + '</td>' +
+          '<td class="hide-sm">' + (a ? statusPill(a.state) : '<span class="note">not recorded</span>') + '</td>' +
           '<td>' + (!a || !a.in
             ? '<button class="btn sm" onclick="clockIn(' + s.id + ')">Clock in</button>'
             : (!a.out ? '<button class="btn sm gold" onclick="clockOut(' + s.id + ')">Clock out</button>'
@@ -303,18 +306,19 @@ PAGES.staff = function () {
       '<div class="cols">' +
       '<div class="pnl"><div class="ph"><div><h3>Attendance, last 30 days</h3>' +
       '<div class="ph-sub">Rate excludes approved leave</div></div></div>' +
-      '<div class="tw"><table><thead><tr><th>Staff</th><th class="num">Rate</th><th class="num">Present</th>' +
-      '<th class="num">Late</th><th class="num">Absent</th><th class="num">Hours</th><th></th></tr></thead><tbody>' +
+      '<div class="tw"><table><thead><tr><th>Staff</th><th class="num">Rate</th><th class="num hide-sm">Present</th>' +
+      '<th class="num">Late</th><th class="num hide-sm">Absent</th><th class="num hide-sm">Hours</th>' +
+      '<th></th></tr></thead><tbody>' +
       all.slice().sort((a, b) => Q.attRate(a.id) - Q.attRate(b.id)).map(s => {
         const att = Q.attFor(s.id, 30);
         const rate = Q.attRate(s.id);
         return '<tr class="klik" onclick="UI.vtab[\'staff' + s.id + '\']=\'attendance\';openDetail(\'staff\',' + s.id + ')">' +
           '<td class="t-main">' + esc(s.name) + '</td>' +
           '<td class="num"' + (rate < 85 ? ' style="color:var(--amber)"' : '') + '>' + rate + '%</td>' +
-          '<td class="num">' + att.filter(a => a.state === 'present').length + '</td>' +
+          '<td class="num hide-sm">' + att.filter(a => a.state === 'present').length + '</td>' +
           '<td class="num">' + att.filter(a => a.state === 'late').length + '</td>' +
-          '<td class="num">' + att.filter(a => a.state === 'absent').length + '</td>' +
-          '<td class="num">' + Math.round(att.reduce((t, a) => t + a.hours, 0)) + 'h</td>' +
+          '<td class="num hide-sm">' + att.filter(a => a.state === 'absent').length + '</td>' +
+          '<td class="num hide-sm">' + Math.round(att.reduce((t, a) => t + a.hours, 0)) + 'h</td>' +
           '<td class="chev">&rsaquo;</td></tr>';
       }).join('') + '</tbody></table></div></div>' +
 
@@ -379,15 +383,16 @@ PAGES.staff = function () {
 
     '<div class="pnl"><div class="ph"><div><h3>The team</h3>' +
     '<div class="ph-sub">' + list.length + ' of ' + all.length + ' shown · tap anyone for their full record</div></div></div>' +
-    (list.length ? '<div class="tw"><table><thead><tr><th>Name</th><th>Department</th><th>Role</th>' +
-      '<th class="num">Monthly basic</th><th>Started</th><th>Status</th><th></th></tr></thead><tbody>' +
+    (list.length ? '<div class="tw"><table><thead><tr><th>Name</th><th class="hide-sm">Department</th><th>Role</th>' +
+      '<th class="num">Monthly basic</th><th class="hide-sm">Started</th>' +
+      '<th class="hide-sm">Status</th><th></th></tr></thead><tbody>' +
       list.map(s => '<tr class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.staffId + ' · ' + s.username + '</div></td>' +
-        '<td>' + s.dept + '</td>' +
+        '<td class="hide-sm">' + s.dept + '</td>' +
         '<td><div>' + s.title + '</div><div class="t-sub">' + ((Q.role(s.roleId) || {}).name || '—') + '</div></td>' +
         '<td class="num">' + money(s.basic) + '</td>' +
-        '<td>' + fmtD(s.startDate) + '</td>' +
-        '<td>' + statusPill(s.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
+        '<td class="hide-sm">' + fmtD(s.startDate) + '</td>' +
+        '<td class="hide-sm">' + statusPill(s.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
       '</tbody></table></div>' : '<div class="empty">Nobody matches.</div>') + '</div>';
 };
 
@@ -424,12 +429,13 @@ PAGES.activity = function () {
     '<button class="btn" onclick="exportActivity()">Export CSV</button></div>' +
     '<div class="pnl"><div class="ph"><div><h3>Platform audit log</h3>' +
     '<div class="ph-sub">' + list.length + ' entries · tap any one for who, when, from where, on what, and why</div></div></div>' +
-    (list.length ? '<div class="tw"><table><thead><tr><th>Action</th><th>Detail</th><th>Who</th><th>When</th><th></th></tr></thead><tbody>' +
+    (list.length ? '<div class="tw"><table><thead><tr><th>Action</th><th class="hide-sm">Detail</th><th>Who</th>' +
+      '<th class="hide-sm">When</th><th></th></tr></thead><tbody>' +
       list.slice(0, 120).map(a => '<tr class="klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
         '<td class="t-main">' + a.action + '</td>' +
-        '<td style="white-space:normal;max-width:340px">' + esc(a.detail) + '</td>' +
+        '<td class="hide-sm" style="white-space:normal;max-width:340px">' + esc(a.detail) + '</td>' +
         '<td><div class="t-main">' + esc(a.actor) + '</div><div class="t-sub">' + a.actorRole + '</div></td>' +
-        '<td>' + ago(a.at) + '</td><td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>'
+        '<td class="hide-sm">' + ago(a.at) + '</td><td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>'
       : '<div class="empty">Nothing logged for that filter.</div>') + '</div>';
 };
 
@@ -547,19 +553,47 @@ PAGES.settings = function () {
     (i.state === 'connected' ? statusPill('connected') : '<button class="btn sm">Set up</button>') + '</div>').join('');
 
   /* --- data --- */
+  const loaded = DB.demoData;
   const data =
+    '<div class="sec-t">Example data</div>' +
+    '<p class="note">The console starts empty, as a real new install would. Load the example set to see every page ' +
+    'populated — 128 invented subscribers, three years of payments, a team of sixteen with payroll and payslips. ' +
+    'None of it is real, and it can be cleared again at any time.</p>' +
+    '<div class="pnl" style="background:var(--panel-2);margin:12px 0 0">' +
+    '<div class="ph"><div><h3 style="font-size:13px">' +
+    (loaded ? 'Example data is loaded' : 'This console is empty') + '</h3>' +
+    '<div class="ph-sub">' + (loaded
+      ? DB.subscribers.length + ' subscribers · ' + DB.staff.length + ' staff · ' +
+        DB.payments.length.toLocaleString() + ' payments'
+      : 'Your owner account and the plan catalogue only') + '</div></div>' +
+    (loaded ? '<span class="pill amber">Demo</span>' : '<span class="pill grey">Empty</span>') + '</div>' +
+    '<div class="kv"><span class="k">Subscribers</span><span class="v">' + DB.subscribers.length + '</span></div>' +
+    '<div class="kv"><span class="k">Staff accounts</span><span class="v">' + DB.staff.length + '</span></div>' +
+    '<div class="kv"><span class="k">Payments on record</span><span class="v">' + DB.payments.length.toLocaleString() + '</span></div>' +
+    '<div class="kv"><span class="k">Payroll runs</span><span class="v">' + DB.payrollRuns.length + '</span></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">' +
+    (loaded
+      ? '<button class="btn danger" onclick="formClearData()">Clear all data</button>' +
+        '<button class="btn" onclick="formLoadExample()">Reload the example set</button>'
+      : '<button class="btn gold" onclick="formLoadExample()">Load example data</button>') +
+    '</div>' +
+
     '<div class="sec-t">Export</div>' +
-    '<div class="chips">' +
+    '<p class="note">' + (loaded || DB.staff.length > 1
+      ? 'Downloads what is currently loaded, as CSV.'
+      : 'There is nothing to export yet.') + '</p>' +
+    '<div class="chips" style="margin-top:10px">' +
     '<button class="chip" onclick="exportSubscribers()">Subscribers</button>' +
     '<button class="chip" onclick="exportPayments()">Payments</button>' +
     '<button class="chip" onclick="exportPayroll()">Payroll</button>' +
     '<button class="chip" onclick="exportStaff()">Staff</button>' +
     '<button class="chip" onclick="exportActivity()">Audit log</button></div>' +
-    '<div class="sec-t">Reset</div>' +
-    '<p class="note">Clears every local change you have made in this prototype — role edits, platform settings, ' +
-    'clock-ins and published payslips — and puts the demo dataset back the way it started. It does not touch anything ' +
-    'outside this browser.</p>' +
-    '<button class="btn danger" style="margin-top:10px" onclick="resetAll()">Reset this prototype</button>';
+
+    '<div class="sec-t">Reset everything</div>' +
+    '<p class="note">Clears the data <em>and</em> every local change — role edits, platform settings, clock-ins, ' +
+    'published payslips — putting the console back to a first run. Nothing outside this browser is touched.</p>' +
+    '<button class="btn danger" style="margin-top:10px" onclick="resetAll()">Reset to a first run</button>';
 
   return '<div style="max-width:1000px">' +
     grp(false, ic('rgba(139,124,246,.16)', '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/>'), 'Appearance &amp; app', 'Theme, install', appearance) +

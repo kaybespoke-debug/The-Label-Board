@@ -8,6 +8,25 @@ const PAGES = {};
    Four cards, then four short panels across one row, then the charts.
    The row answers "is anything wrong" at a glance before you scroll.     */
 PAGES.dashboard = function () {
+  /* An empty console should read as ready, not broken. Rows of ₦0 and flat
+     charts say "something went wrong"; this says "nothing has happened yet". */
+  if (!DB.subscribers.length) {
+    return '<div class="pnl" style="max-width:640px;margin:8px auto;text-align:center;padding:38px 26px">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.4" stroke-linecap="round" ' +
+      'stroke-linejoin="round" style="width:46px;height:46px;opacity:.8;margin-bottom:16px">' +
+      '<use href="#i-users"/></svg>' +
+      '<h3 style="font-size:19px;margin-bottom:8px">No subscribers yet</h3>' +
+      '<p class="note" style="max-width:430px;margin:0 auto 20px">This is a clean console. Once businesses start ' +
+      'signing up, this page fills with what they are worth, what needs chasing and what is going wrong.</p>' +
+      '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+      '<button class="btn gold" onclick="formAddSubscriber()">+ Add a subscriber</button>' +
+      '<button class="btn" onclick="formLoadExample()">Load example data</button>' +
+      '</div>' +
+      '<p class="hint" style="margin-top:18px">Example data fills every page with an invented business so you can ' +
+      'see how the console behaves. It clears again from Settings &rarr; Data &amp; storage.</p>' +
+      '</div>';
+  }
+
   const subs = Q.subsAsOf(), act = Q.active(), nw = Q.newSubs();
   const mrr = Q.mrr(), rev = Q.revenue(), split = Q.planSplit();
   const openT = Q.openTickets(), urg = Q.urgentTickets();
@@ -93,13 +112,13 @@ PAGES.dashboard = function () {
     '<div class="pnl"><div class="ph"><div><h3>Recent subscribers</h3>' +
     '<div class="ph-sub">Newest six accounts</div></div>' +
     '<button class="lnk" onclick="go(\'subscribers\')">View all</button></div>' +
-    '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Joined</th>' +
+    '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th class="hide-sm">Joined</th>' +
     '<th class="num">MRR</th><th></th></tr></thead><tbody>' +
     recent.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
       '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
       '<td><span class="tier">' + s.planName + '</span></td>' +
       '<td>' + statusPill(s.status) + '</td>' +
-      '<td>' + fmtD(s.joined) + '</td>' +
+      '<td class="hide-sm">' + fmtD(s.joined) + '</td>' +
       '<td class="num">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
       '<td class="chev">&rsaquo;</td></tr>').join('') +
     '</tbody></table></div></div>';
@@ -191,13 +210,14 @@ PAGES.subscribers = function () {
       (planSel !== 'any' ? ' · ' + planById(planSel).name + ' only' : '') +
       ' · health, seats and referrals are on each profile',
       (list.length ? '<div class="tw"><table><thead><tr>' +
-        '<th>Business</th><th>Plan</th><th>Status</th><th>Joined</th><th>Renews</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
+        '<th>Business</th><th class="hide-sm">Plan</th><th>Status</th><th class="hide-sm">Joined</th>' +
+        '<th class="hide-sm">Renews</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
         list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + ' · ' + esc(s.city) + '</div></td>' +
-          '<td><span class="tier">' + s.planName + '</span></td>' +
+          '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
           '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') + '</td>' +
-          '<td>' + fmtD(s.joined) + '</td>' +
-          '<td>' + (s.status === 'expired' ? '<span class="note">—</span>' :
+          '<td class="hide-sm">' + fmtD(s.joined) + '</td>' +
+          '<td class="hide-sm">' + (s.status === 'expired' ? '<span class="note">—</span>' :
             (s.renewIn <= 7 ? '<span class="pill amber">' + (s.renewIn <= 0 ? 'due' : s.renewIn + 'd') + '</span>' : fmtDShort(s.renewsOn))) + '</td>' +
           '<td class="num">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
           '<td class="chev">&rsaquo;</td></tr>').join('') +
@@ -208,14 +228,14 @@ PAGES.subscribers = function () {
        the accounts. */
     section('subs-top', 'Top accounts by MRR',
       'The ten accounts carrying the most recurring revenue',
-      '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Since</th>' +
-      '<th class="num">MRR</th><th class="num">Lifetime</th><th></th></tr></thead><tbody>' +
+      '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th class="hide-sm">Since</th>' +
+      '<th class="num">MRR</th><th class="num hide-sm">Lifetime</th><th></th></tr></thead><tbody>' +
       Q.active().slice().sort((a, b) => b.mrr - a.mrr).slice(0, 10).map(s => {
         const lifetime = DB.payments.filter(p => p.subId === s.id && p.status === 'successful').reduce((t, p) => t + p.amount, 0);
         return '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
-          '<td class="t-main">' + esc(s.name) + '</td><td><span class="tier">' + s.planName + '</span></td>' +
-          '<td>' + fmtD(s.joined) + '</td><td class="num">' + money(s.mrr) + '</td>' +
-          '<td class="num">' + money(lifetime) + '</td><td class="chev">&rsaquo;</td></tr>';
+          '<td class="t-main">' + esc(s.name) + '</td><td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
+          '<td class="hide-sm">' + fmtD(s.joined) + '</td><td class="num">' + money(s.mrr) + '</td>' +
+          '<td class="num hide-sm">' + money(lifetime) + '</td><td class="chev">&rsaquo;</td></tr>';
       }).join('') + '</tbody></table></div>', true);
 };
 
@@ -294,18 +314,19 @@ PAGES.billing = function () {
     '<div class="pnl"><div class="ph"><div><h3>Plans &amp; pricing</h3>' +
     '<div class="ph-sub">Tap a plan to edit its price, seats or features</div></div>' +
     '<button class="btn gold" onclick="formPlan()">+ Create plan</button></div>' +
-    '<div class="tw"><table><thead><tr><th>Plan</th><th class="num">Monthly</th><th class="num">Annual</th>' +
-    '<th class="num">Seats</th><th class="num">Subscribers</th><th class="num">MRR</th><th>Status</th><th></th></tr></thead><tbody>' +
+    '<div class="tw"><table><thead><tr><th>Plan</th><th class="num">Monthly</th><th class="num hide-sm">Annual</th>' +
+    '<th class="num hide-sm">Seats</th><th class="num">Subscribers</th><th class="num hide-sm">MRR</th>' +
+    '<th class="hide-sm">Status</th><th></th></tr></thead><tbody>' +
     DB.plans.map(p => {
       const s = split.find(x => x.id === p.id) || { count: 0, mrr: 0 };
       return '<tr class="klik" onclick="formPlan(\'' + p.id + '\')">' +
         '<td><div class="t-main">' + p.name + '</div><div class="t-sub">' + p.features[0] + '</div></td>' +
         '<td class="num">' + (p.monthly ? money(p.monthly) : '—') + '</td>' +
-        '<td class="num">' + (p.annual ? money(p.annual) : '—') + '</td>' +
-        '<td class="num">' + p.seats + '</td>' +
+        '<td class="num hide-sm">' + (p.annual ? money(p.annual) : '—') + '</td>' +
+        '<td class="num hide-sm">' + p.seats + '</td>' +
         '<td class="num">' + s.count + '</td>' +
-        '<td class="num">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
-        '<td>' + statusPill(p.live ? 'active' : 'draft') + '</td>' +
+        '<td class="num hide-sm">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
+        '<td class="hide-sm">' + statusPill(p.live ? 'active' : 'draft') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>';
     }).join('') + '</tbody></table></div></div>' +
 
@@ -370,20 +391,20 @@ function referralBody() {
     '<div class="ph-sub">Tap anyone to open their referral ledger</div></div>' +
     '<button class="lnk" onclick="drill(\'referrers\')">Full breakdown &rsaquo;</button></div>' +
     (referrers.length
-      ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th>Plan</th><th class="num">Referred</th>' +
-      '<th class="num">Converted</th><th class="num">Earned</th><th class="num">Paid</th>' +
-      '<th class="num">Outstanding</th><th></th></tr></thead><tbody>' +
+      ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Plan</th><th class="num hide-sm">Referred</th>' +
+      '<th class="num">Converted</th><th class="num">Earned</th><th class="num hide-sm">Paid</th>' +
+      '<th class="num hide-sm">Outstanding</th><th></th></tr></thead><tbody>' +
       referrers.slice(0, 12).map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
-        '<td><span class="tier">' + s.planName + '</span></td>' +
-        '<td class="num">' + s.referrals.length + '</td>' +
+        '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
+        '<td class="num hide-sm">' + s.referrals.length + '</td>' +
         '<td class="num">' + s.referralConverted + '</td>' +
         '<td class="num">' + money(s.referralEarned) + '</td>' +
-        '<td class="num">' + money(s.referralPaid) + '</td>' +
-        '<td class="num"' + (s.referralPending ? ' style="color:var(--amber)"' : '') + '>' +
+        '<td class="num hide-sm">' + money(s.referralPaid) + '</td>' +
+        '<td class="num hide-sm"' + (s.referralPending ? ' style="color:var(--amber)"' : '') + '>' +
         (s.referralPending ? money(s.referralPending) : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
-      '<tr><td colspan="2" style="text-align:right;font-weight:600">All ' + referrers.length + ' referrers</td>' +
+      '<tr class="hide-sm"><td colspan="2" style="text-align:right;font-weight:600">All ' + referrers.length + ' referrers</td>' +
       '<td class="num"><b>' + invited + '</b></td><td class="num"><b>' + converted + '</b></td>' +
       '<td class="num"><b>' + money(earned) + '</b></td><td class="num"><b>' + money(paid) + '</b></td>' +
       '<td class="num"><b>' + money(pending) + '</b></td><td></td></tr>' +
@@ -445,15 +466,16 @@ PAGES.payments = function () {
 
     '<div class="pnl"><div class="ph"><div><h3>Transactions</h3>' +
     '<div class="ph-sub">' + list.length + ' in ' + PERIOD.label.toLowerCase() + '</div></div></div>' +
-    (list.length ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th>Reference</th><th>Invoice</th>' +
-      '<th class="num">Amount</th><th>Method</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>' +
+    (list.length ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Reference</th><th class="hide-sm">Invoice</th>' +
+      '<th class="num">Amount</th><th class="hide-sm">Method</th><th>Status</th>' +
+      '<th class="hide-sm">Date</th><th></th></tr></thead><tbody>' +
       list.slice(0, 200).map(p => '<tr class="klik" onclick="openDetail(\'pay\',' + p.id + ')">' +
         '<td><div class="t-main">' + esc(p.subscriber) + '</div><div class="t-sub">' + p.plan + ' · ' + p.cycle + '</div></td>' +
-        '<td>' + p.ref + '</td><td>' + p.invoice + '</td>' +
+        '<td class="hide-sm">' + p.ref + '</td><td class="hide-sm">' + p.invoice + '</td>' +
         '<td class="num">' + money(p.amount) + '</td>' +
-        '<td>' + p.method + '</td>' +
+        '<td class="hide-sm">' + p.method + '</td>' +
         '<td>' + statusPill(p.status) + '</td>' +
-        '<td>' + fmtD(p.date) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
+        '<td class="hide-sm">' + fmtD(p.date) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
       '</tbody></table></div>' + (list.length > 200 ? '<div class="pager"><span>Showing first 200 of ' + list.length + '</span></div>' : '')
       : '<div class="empty">No payments in this period with that status.<br><span class="note">Try widening the period from the picker above.</span></div>') +
     '</div>';
@@ -514,23 +536,24 @@ function payrollBody(key) {
     '<div class="pnl"><div class="ph"><div><h3>' + run.month + ' payroll</h3>' +
     '<div class="ph-sub">Tap a row to open the payslip, download it, or publish it to the staff member</div></div>' +
     statusPill(run.status) + '</div>' +
-    '<div class="tw"><table><thead><tr><th>Staff</th><th>Department</th><th class="num">Basic</th>' +
-    '<th class="num">Allowances</th><th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th>' +
-    '<th>Status</th><th>Payslip</th><th></th></tr></thead><tbody>' +
+    '<div class="tw"><table><thead><tr><th>Staff</th><th class="hide-sm">Department</th><th class="num hide-sm">Basic</th>' +
+    '<th class="num hide-sm">Allowances</th><th class="num hide-sm">Gross</th>' +
+    '<th class="num hide-sm">Deductions</th><th class="num">Net</th>' +
+    '<th>Status</th><th class="hide-sm">Payslip</th><th></th></tr></thead><tbody>' +
     slips.map(s => '<tr class="klik" onclick="openDetail(\'slip\',' + s.id + ')">' +
       '<td><div class="t-main">' + esc(s.staffName) + '</div><div class="t-sub">' + s.bank.split(' · ')[0] + '</div></td>' +
-      '<td>' + s.dept + '</td>' +
-      '<td class="num">' + money(s.basic) + '</td>' +
-      '<td class="num">' + money(s.housing + s.transport + s.bonus + s.overtime) + '</td>' +
-      '<td class="num">' + money(s.gross) + '</td>' +
-      '<td class="num" style="color:var(--red)">−' + money(s.deductions) + '</td>' +
+      '<td class="hide-sm">' + s.dept + '</td>' +
+      '<td class="num hide-sm">' + money(s.basic) + '</td>' +
+      '<td class="num hide-sm">' + money(s.housing + s.transport + s.bonus + s.overtime) + '</td>' +
+      '<td class="num hide-sm">' + money(s.gross) + '</td>' +
+      '<td class="num hide-sm" style="color:var(--red)">−' + money(s.deductions) + '</td>' +
       '<td class="num"><b>' + money(s.net) + '</b></td>' +
       '<td>' + statusPill(s.status) + '</td>' +
-      '<td>' + (s.uploaded ? '<span class="pill green">Published</span>' : '<span class="pill grey">Not published</span>') + '</td>' +
+      '<td class="hide-sm">' + (s.uploaded ? '<span class="pill green">Published</span>' : '<span class="pill grey">Not published</span>') + '</td>' +
       '<td class="chev">&rsaquo;</td></tr>').join('') +
-    '<tr><td colspan="4" style="text-align:right;font-weight:600">Run total</td>' +
-    '<td class="num"><b>' + money(run.gross) + '</b></td>' +
-    '<td class="num" style="color:var(--red)"><b>−' + money(run.deductions) + '</b></td>' +
+    '<tr class="hide-sm"><td colspan="4" style="text-align:right;font-weight:600">Run total</td>' +
+    '<td class="num hide-sm"><b>' + money(run.gross) + '</b></td>' +
+    '<td class="num hide-sm" style="color:var(--red)"><b>−' + money(run.deductions) + '</b></td>' +
     '<td class="num"><b>' + money(run.net) + '</b></td><td colspan="3"></td></tr>' +
     '</tbody></table></div></div>' +
 
@@ -538,22 +561,22 @@ function payrollBody(key) {
        it is the record you actually audit against. */
     '<div class="pnl"><div class="ph"><div><h3>Payroll history</h3>' +
     '<div class="ph-sub">Every run to date · tap a month to open it</div></div></div>' +
-    '<div class="tw"><table><thead><tr><th>Month</th><th>Value date</th><th class="num">Staff</th>' +
-    '<th class="num">Gross</th><th class="num">Deductions</th><th class="num">Net</th>' +
-    '<th class="num">Paid</th><th>Status</th><th></th></tr></thead><tbody>' +
+    '<div class="tw"><table><thead><tr><th>Month</th><th class="hide-sm">Value date</th><th class="num hide-sm">Staff</th>' +
+    '<th class="num hide-sm">Gross</th><th class="num hide-sm">Deductions</th><th class="num">Net</th>' +
+    '<th class="num hide-sm">Paid</th><th class="hide-sm">Status</th><th></th></tr></thead><tbody>' +
     DB.payrollRuns.map(r => '<tr class="klik"' + (r.monthKey === key ? ' style="background:color-mix(in srgb,var(--gold) 10%,var(--panel))"' : '') +
       ' onclick="UI.payMonth=\'' + r.monthKey + '\';render()">' +
       '<td class="t-main">' + r.month + (r.monthKey === key ? ' <span class="note">· open</span>' : '') + '</td>' +
-      '<td>' + fmtD(r.payDate) + '</td>' +
-      '<td class="num">' + r.headcount + '</td>' +
-      '<td class="num">' + money(r.gross) + '</td>' +
-      '<td class="num" style="color:var(--red)">−' + money(r.deductions) + '</td>' +
+      '<td class="hide-sm">' + fmtD(r.payDate) + '</td>' +
+      '<td class="num hide-sm">' + r.headcount + '</td>' +
+      '<td class="num hide-sm">' + money(r.gross) + '</td>' +
+      '<td class="num hide-sm" style="color:var(--red)">−' + money(r.deductions) + '</td>' +
       '<td class="num"><b>' + money(r.net) + '</b></td>' +
-      '<td class="num">' + r.paid + '/' + r.headcount + '</td>' +
-      '<td>' + statusPill(r.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
-    '<tr><td colspan="3" style="text-align:right;font-weight:600">' + DB.payrollRuns.length + ' runs</td>' +
-    '<td class="num"><b>' + money(DB.payrollRuns.reduce((t, r) => t + r.gross, 0)) + '</b></td>' +
-    '<td class="num" style="color:var(--red)"><b>−' + money(DB.payrollRuns.reduce((t, r) => t + r.deductions, 0)) + '</b></td>' +
+      '<td class="num hide-sm">' + r.paid + '/' + r.headcount + '</td>' +
+      '<td class="hide-sm">' + statusPill(r.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
+    '<tr class="hide-sm"><td colspan="3" style="text-align:right;font-weight:600">' + DB.payrollRuns.length + ' runs</td>' +
+    '<td class="num hide-sm"><b>' + money(DB.payrollRuns.reduce((t, r) => t + r.gross, 0)) + '</b></td>' +
+    '<td class="num hide-sm" style="color:var(--red)"><b>−' + money(DB.payrollRuns.reduce((t, r) => t + r.deductions, 0)) + '</b></td>' +
     '<td class="num"><b>' + money(DB.payrollRuns.reduce((t, r) => t + r.net, 0)) + '</b></td>' +
     '<td colspan="3"></td></tr>' +
     '</tbody></table></div></div>' +
