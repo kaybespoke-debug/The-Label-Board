@@ -121,7 +121,6 @@ const NAV = [
     ['announcements', 'Announcements', 'i-megaphone', () => DB.announcements.filter(a => a.state === 'scheduled').length]
   ]],
   ['Operations', [
-    ['health', 'Platform Health', 'i-heart', () => DB.health.incidents.filter(i => i.state !== 'resolved').length],
     ['tasks', 'Tasks', 'i-check', () => DB.tasks.filter(t => !t.done && t.dueIn <= 0).length],
     ['staff', 'Staff & Roles', 'i-shield', null],
     ['activity', 'Activity Log', 'i-list', null],
@@ -139,7 +138,6 @@ const TITLES = {
   revenue: ['Revenue', 'Recurring revenue and SaaS performance'],
   support: ['Support & Usage', 'Tickets, what subscribers are asking for, and how the product is used'],
   announcements: ['Announcements', 'Tell subscribers what changed'],
-  health: ['Platform Health', 'Services, integrations and failures'],
   tasks: ['Tasks', 'Internal work, who owns it, when it is due'],
   staff: ['Staff & Roles', 'Your team, their pay, attendance and access'],
   activity: ['Activity Log', 'Who did what, when, and why'],

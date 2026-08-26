@@ -407,14 +407,21 @@ DETAIL.slip = function (id) {
   const st = Q.staffM(sl.staffId);
   const allow = sl.housing + sl.transport + sl.bonus + sl.overtime;
 
+  const others = Q.slipsForStaff(sl.staffId).filter(x => x.id !== sl.id);
+
   return backBtn() +
-    '<div class="dhead"><div class="dav">' + initials(sl.staffName) + '</div>' +
+    '<div class="dhead"><div class="dav klik" style="cursor:pointer" onclick="openDetail(\'staff\',' + sl.staffId + ')">' +
+    initials(sl.staffName) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>Payslip · ' + sl.month + '</h2>' +
     '<div class="dmeta">' + esc(sl.staffName) + ' · ' + st.staffId + ' · ' + sl.dept + ' · pay date ' + fmtD(sl.payDate) + '</div></div>' +
-    '<div style="display:flex;gap:8px">' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    /* the person's record belongs at the top, next to the other actions */
+    '<button class="btn" onclick="openDetail(\'staff\',' + sl.staffId + ')">Open ' +
+    esc(sl.staffName.split(' ')[0]) + '&rsquo;s record &rarr;</button>' +
     '<button class="btn" onclick="downloadSlip(' + sl.id + ')">Download</button>' +
     (sl.uploaded ? '' : '<button class="btn gold" onclick="publishSlip(' + sl.id + ')">Publish to staff</button>') +
     '</div></div>' +
+
     '<div class="dstats">' +
     dstat(money(sl.gross), 'Gross', 'm') +
     dstat('−' + money(sl.deductions), 'Deductions', 'r') +
@@ -422,36 +429,60 @@ DETAIL.slip = function (id) {
     dstat(statusPill(sl.status), 'Status') +
     dstat(sl.uploaded ? 'Published' : 'Not published', 'Visible to staff', sl.uploaded ? 'g' : 'a') +
     '</div>' +
-    '<div class="cols"><div class="pnl"><div class="ph"><h3>How this pay was worked out</h3></div>' +
+
+    /* Payment and Other months side by side, above the breakdown */
+    '<div class="cols2">' +
+    '<div class="pnl"><div class="ph"><div><h3>Payment</h3>' +
+    '<div class="ph-sub">Where and when this was paid</div></div></div>' +
+    kv('Pay date', fmtD(sl.payDate)) +
+    kv('Method', 'Bank transfer') +
+    kv('Account', esc(sl.bank)) +
+    kv('Status', statusPill(sl.status)) +
+    kv('Visible to staff', sl.uploaded
+      ? '<span style="color:var(--green)">Published ' + fmtD(sl.publishedOn) + '</span>'
+      : '<span style="color:var(--amber)">Not yet</span>') +
+    '</div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Other months</h3>' +
+    '<div class="ph-sub">' + others.length + ' more on record · tap to open</div></div></div>' +
+    (others.length
+      ? '<div class="tw"><table><thead><tr><th>Month</th><th class="num">Net</th><th>Status</th><th></th></tr></thead><tbody>' +
+      others.map(x => '<tr class="klik" onclick="openDetail(\'slip\',' + x.id + ')">' +
+        '<td class="t-main">' + x.month + '</td>' +
+        '<td class="num">' + money(x.net) + '</td>' +
+        '<td>' + statusPill(x.status) + '</td>' +
+        '<td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>'
+      : '<div class="note">This is the only payslip on record.</div>') +
+    '</div></div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>How this pay was worked out</h3>' +
+    '<div class="ph-sub">Every line that moves gross to net</div></div></div>' +
+    '<div class="cols2"><div>' +
     '<div class="sec-t">Earnings</div>' +
     kv('Basic salary', money(sl.basic)) +
-    kv('Housing allowance', money(sl.housing)) +
-    kv('Transport allowance', money(sl.transport)) +
+    (DB.settings.allowances.enabled
+      ? kv('Housing allowance', money(sl.housing)) + kv('Transport allowance', money(sl.transport))
+      : '<div class="kv"><span class="k">Allowances</span><span class="v">' +
+        '<span class="pill grey">Not in use</span></span></div>') +
     (sl.bonus ? kv('Performance bonus', money(sl.bonus)) : '') +
     (sl.overtime ? kv('Overtime', money(sl.overtime)) : '') +
     kv('<b>Gross pay</b>', '<b>' + money(sl.gross) + '</b>') +
+    '</div><div>' +
     '<div class="sec-t">Deductions</div>' +
-    kv('PAYE tax', '−' + money(sl.paye)) +
-    kv('Pension (8% of basic)', '−' + money(sl.pension)) +
-    kv('NHF (2.5% of basic)', '−' + money(sl.nhf)) +
+    kv('PAYE tax <span class="note">11.5% of gross</span>', '−' + money(sl.paye)) +
+    '<div class="kv"><span class="k">Pension</span><span class="v">' +
+    (sl.pensionOptedIn ? '−' + money(sl.pension) : '<span class="pill grey">Not enrolled</span>') + '</span></div>' +
+    '<div class="kv"><span class="k">NHF</span><span class="v">' +
+    (sl.nhfOptedIn ? '−' + money(sl.nhf) : '<span class="pill grey">Not enrolled</span>') + '</span></div>' +
     (sl.loan ? kv('Staff loan repayment', '−' + money(sl.loan)) : '') +
     kv('<b>Total deductions</b>', '<b style="color:var(--red)">−' + money(sl.deductions) + '</b>') +
-    '<div style="border-top:2px solid var(--gold);margin-top:14px;padding-top:12px">' +
+    '</div></div>' +
+    '<div style="border-top:2px solid var(--gold);margin-top:16px;padding-top:14px">' +
     '<div class="kv" style="border:0"><span class="k" style="font-size:15px">Net pay</span>' +
-    '<span class="v" style="font-size:19px;font-family:\'Playfair Display\',serif">' + money(sl.net) + '</span></div></div>' +
-    '</div><div>' +
-    '<div class="pnl"><div class="ph"><h3>Payment</h3></div>' +
-    kv('Pay date', fmtD(sl.payDate)) + kv('Method', 'Bank transfer') +
-    kv('Account', esc(sl.bank)) + kv('Status', statusPill(sl.status)) +
-    kv('Published to staff', sl.uploaded ? fmtD(sl.publishedOn) : '<span class="note">Not yet</span>') + '</div>' +
-    '<div class="pnl"><div class="ph"><h3>Other months</h3></div>' +
-    Q.slipsForStaff(sl.staffId).filter(x => x.id !== sl.id).map(x =>
-      '<div class="row klik" onclick="openDetail(\'slip\',' + x.id + ')">' +
-      '<div><b>' + x.month + '</b><small>' + statusPill(x.status) + '</small></div>' +
-      '<b>' + money(x.net) + '</b></div>').join('') + '</div>' +
-    '<div class="pnl"><div class="ph"><h3>Open the full record</h3></div>' +
-    '<button class="btn" style="width:100%" onclick="openDetail(\'staff\',' + sl.staffId + ')">' + esc(sl.staffName) + ' &rarr;</button></div>' +
-    '</div></div>';
+    '<span class="v" style="font-size:21px;font-family:\'Playfair Display\',serif">' + money(sl.net) + '</span></div></div>' +
+    (sl.pensionOptedIn ? '' : '<p class="hint">No pension is deducted because ' +
+      esc(sl.staffName.split(' ')[0]) + ' has not opted in. Enrolment is voluntary and set on their Pay setup tab.</p>') +
+    '</div>';
 };
 
 /* =================== TICKET =================== */
@@ -635,62 +666,4 @@ DETAIL.audit = function (id) {
     kv('When', fmtD(a.at) + ' ' + new Date(a.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })) +
     kv('IP address', a.ip) + kv('Device', a.device) +
     kv('Target', a.target || '<span class="note">None</span>') + '</div></div>';
-};
-
-DETAIL.svc = function (i) {
-  const s = DB.health.services[+i];
-  if (!s) return '<div class="empty">Not found.</div>';
-  const degraded = s.state !== 'operational';
-  /* deterministic latency history, worse in the last few days when degraded */
-  const series = [];
-  for (let d = 29; d >= 0; d--) {
-    const wobble = 0.75 + ((d * 37) % 50) / 100;
-    const spike = degraded && d < 3 ? 1.9 : 1;
-    series.push({ label: fmtDShort(dAgo(d)), value: Math.round(s.latency * wobble * spike / (degraded ? 1.6 : 1)) });
-  }
-  const inc = DB.health.incidents.filter(x => x.service === s.name);
-
-  return backBtn() +
-    '<div class="dhead"><div style="flex:1;min-width:240px"><h2>' + s.name + ' ' + statusPill(s.state) + '</h2>' +
-    '<div class="dmeta">' + s.detail + '</div></div></div>' +
-    '<div class="dstats">' +
-    dstat(s.uptime + '%', 'Uptime 30d', s.uptime > 99.9 ? 'g' : 'a') +
-    dstat(s.latency + 'ms', 'Response time', s.latency > 500 ? 'r' : 'g') +
-    dstat(degraded ? 'Degraded' : 'Operational', 'Status', degraded ? 'a' : 'g') +
-    '</div>' +
-
-    '<div class="pnl" style="border-left:3px solid ' + (degraded ? 'var(--amber)' : 'var(--green)') + '">' +
-    '<div class="ph"><h3>What this service does</h3></div>' +
-    '<p class="note">' + s.what + '</p>' +
-    '<div class="sec-t">' + (degraded ? 'What is wrong' : 'Current state') + '</div>' +
-    '<p class="note">' + s.why + '</p>' +
-    '<div class="sec-t">Who this affects</div>' +
-    '<p class="note">' + s.affects + '</p>' +
-    (degraded ? '<div class="sec-t">What happens next</div>' +
-      '<p class="note">The retry queue drains on its own. Nothing needs doing unless the oldest item in it passes ' +
-      'about an hour, at which point it is worth opening a ticket with the provider.</p>' : '') +
-    '</div>' +
-
-    '<div class="cols"><div>' +
-    '<div class="pnl"><div class="ph"><div><h3>Response time</h3>' +
-    '<div class="ph-sub">Last 30 days, milliseconds' + (degraded ? ' — the rise at the right is the current problem' : '') + '</div></div></div>' +
-    areaChart(series, { color: degraded ? 'var(--amber)' : 'var(--green)', height: 200 }) + '</div>' +
-    (inc.length ? '<div class="pnl"><div class="ph"><h3>Incidents on this service</h3></div>' +
-      inc.map(x => '<div class="row klik" onclick="openDetail(\'inc\',' + x.id + ')">' +
-        '<div><b>' + x.title + '</b><small>started ' + ago(x.started) + '</small></div>' +
-        statusPill(x.state) + '</div>').join('') + '</div>' : '') +
-    '</div><div class="pnl"><div class="ph"><div><h3>The numbers behind that</h3>' +
-    '<div class="ph-sub">Measured over the last hour</div></div></div>' +
-    s.checks.map(c => kv(c[0], '<span style="font-variant-numeric:tabular-nums">' + c[1] + '</span>')).join('') +
-    '</div></div>';
-};
-
-DETAIL.inc = function (id) {
-  const i = DB.health.incidents.find(x => x.id === +id);
-  if (!i) return '<div class="empty">Not found.</div>';
-  return backBtn() +
-    '<div class="dhead"><div style="flex:1"><h2>' + i.title + ' ' + statusPill(i.state) + '</h2>' +
-    '<div class="dmeta">' + i.service + ' · started ' + fmtD(i.started) + ' · ' + ago(i.started) + '</div></div></div>' +
-    '<div class="pnl" style="max-width:720px"><div class="ph"><h3>Impact</h3></div>' +
-    '<p style="font-size:14px;line-height:1.75">' + i.impact + '</p></div>';
 };

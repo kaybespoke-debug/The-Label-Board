@@ -658,7 +658,7 @@ const ADMIN_PAGES = [
   ['dashboard', 'Dashboard'], ['subscribers', 'Subscribers'], ['onboarding', 'Onboarding'],
   ['billing', 'Plans & Billing'], ['payments', 'Payments'], ['payroll', 'Payroll'],
   ['revenue', 'Revenue'], ['support', 'Support & Usage'],
-  ['announcements', 'Announcements'], ['health', 'Platform Health'], ['tasks', 'Tasks'],
+  ['announcements', 'Announcements'], ['tasks', 'Tasks'],
   ['staff', 'Staff & Roles'], ['activity', 'Activity Log'], ['settings', 'Settings']
 ];
 const ADMIN_CAPS = [
@@ -686,7 +686,7 @@ function defaultRoles() {
       desc: 'Full access, always on and cannot be limited.', pages: all.slice(), caps: allCaps.slice() },
     { id: 'ops', name: 'Operations Lead', builtin: true, locked: false,
       desc: 'Runs the day to day across every team.',
-      pages: ['dashboard', 'subscribers', 'onboarding', 'billing', 'payments', 'revenue', 'support', 'announcements', 'health', 'tasks', 'staff', 'activity'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'billing', 'payments', 'revenue', 'support', 'announcements', 'tasks', 'staff', 'activity'],
       caps: ['see_money', 'edit_sub', 'change_plan', 'manage_staff', 'send_announce', 'close_ticket', 'export', 'see_audit'] },
     { id: 'finance', name: 'Finance', builtin: true, locked: false,
       desc: 'Billing, payments, payroll and revenue.',
@@ -702,7 +702,7 @@ function defaultRoles() {
       caps: ['close_ticket', 'impersonate'] },
     { id: 'product', name: 'Product', builtin: true, locked: false,
       desc: 'Usage, feedback and what ships next.',
-      pages: ['dashboard', 'support', 'announcements', 'health', 'tasks'],
+      pages: ['dashboard', 'support', 'announcements', 'tasks'],
       caps: ['send_announce', 'export'] }
   ];
 }
@@ -775,63 +775,6 @@ function buildUsage(subs) {
   return { series, atRisk };
 }
 
-/* ---------------- health ---------------- */
-function buildHealth() {
-  return {
-    services: [
-      { name: 'API server', detail: 'Edge functions + REST', state: 'operational', uptime: 99.98, latency: 148,
-        what: 'Every request the subscriber app makes — loading orders, saving a job, signing in.',
-        why: 'Responding normally. Median 148ms, no failed requests in the last hour.',
-        affects: 'Nothing right now.',
-        checks: [['Requests in last hour', '18,402'], ['Failing', '0'], ['Slowest endpoint', '/orders/export — 640ms']] },
-      { name: 'Database', detail: 'Supabase Postgres', state: 'operational', uptime: 99.99, latency: 22,
-        what: 'Where every subscriber\'s orders, customers, stock and staff records actually live.',
-        why: 'Healthy. Connection pool at 34% of capacity, no slow queries logged.',
-        affects: 'Nothing right now.',
-        checks: [['Connections in use', '17 of 50'], ['Slow queries (>1s)', '0'], ['Storage used', '4.2 GB of 8 GB']] },
-      { name: 'Payments', detail: 'Flutterwave webhooks', state: 'degraded', uptime: 99.42, latency: 890,
-        what: 'Taking card payments and, crucially, hearing back from Flutterwave that a payment succeeded.',
-        why: 'Cards are still being charged normally. What is slow is the confirmation coming back: ' +
-             'Flutterwave posts a webhook to tell us a payment went through, and 6 of those posts have timed out ' +
-             'and gone into the retry queue. So a subscriber can pay and still briefly show as unpaid until the ' +
-             'retry lands, usually within a few minutes.',
-        affects: '3 subscribers may see a payment as pending that has in fact cleared. No money is lost and ' +
-                 'nobody is charged twice — the retry is idempotent.',
-        checks: [['Charges attempted, last hour', '11'], ['Charges succeeded', '11'],
-          ['Webhook confirmations received', '5 of 11'], ['In the retry queue', '6'],
-          ['Median confirmation delay', '890ms, normally 120ms'], ['Oldest item in queue', '14 minutes']] },
-      { name: 'Email', detail: 'Transactional send', state: 'operational', uptime: 99.95, latency: 310,
-        what: 'Receipts, password resets, and announcements you send from this console.',
-        why: 'Sending normally. Delivery rate 99.4% over the last 24 hours.',
-        affects: 'Nothing right now.',
-        checks: [['Sent last 24h', '412'], ['Delivered', '409'], ['Bounced', '3 — invalid addresses']] },
-      { name: 'File storage', detail: 'Images & payslips', state: 'operational', uptime: 100, latency: 64,
-        what: 'Product photos subscribers upload, and the payslips you publish to staff.',
-        why: 'Fully operational, no failed uploads.',
-        affects: 'Nothing right now.',
-        checks: [['Uploads last 24h', '1,284'], ['Failed', '0'], ['Storage used', '61 GB']] },
-      { name: 'Web app', detail: 'Subscriber PWA', state: 'operational', uptime: 99.97, latency: 120,
-        what: 'The app your subscribers actually open, including its offline mode.',
-        why: 'Serving normally from the edge. Current release is live for everyone.',
-        affects: 'Nothing right now.',
-        checks: [['Sessions last hour', '312'], ['JS errors', '2 — non-blocking'], ['Offline syncs completed', '48']] }
-    ],
-    incidents: [
-      { id: 1, title: 'Flutterwave webhook retries', started: iso(dAgo(0)), state: 'investigating',
-        impact: '3 payment confirmations arrived late. No money lost, no duplicate charges.',
-        service: 'Payments' },
-      { id: 2, title: 'Slow order export', started: iso(dAgo(4)), state: 'resolved',
-        impact: 'Exports over 5,000 rows timed out for 40 minutes.', service: 'API server' }
-    ],
-    errors: [
-      { id: 1, code: 'FLW_WEBHOOK_TIMEOUT', count: 6, last: iso(dAgo(0)), severity: 'high', note: 'Retry queue draining' },
-      { id: 2, code: 'PG_CONN_POOL_EXHAUSTED', count: 2, last: iso(dAgo(0)), severity: 'high', note: 'Spike at 09:12' },
-      { id: 3, code: 'IMG_UPLOAD_413', count: 4, last: iso(dAgo(1)), severity: 'low', note: 'Subscriber uploaded 24MB photo' },
-      { id: 4, code: 'AUTH_TOKEN_EXPIRED', count: 2, last: iso(dAgo(1)), severity: 'low', note: 'Expected on idle tabs' }
-    ]
-  };
-}
-
 /* ---------------- assemble ---------------- */
 const DB = (function () {
   const subscribers = buildSubscribers();
@@ -848,7 +791,6 @@ const DB = (function () {
   const onboarding = buildOnboarding(subscribers);
   const activity = buildActivity(subscribers, staff, tickets);
   const usage = buildUsage(subscribers);
-  const health = buildHealth();
 
   return {
     today: TODAY,
@@ -856,7 +798,7 @@ const DB = (function () {
     subscribers, staff, payments,
     payrollRuns: runs, payslips: slips,
     attendance, leave, docs,
-    tickets, feedback, tasks, announcements, onboarding, activity, usage, health,
+    tickets, feedback, tasks, announcements, onboarding, activity, usage,
     roles: defaultRoles(),
     pages: ADMIN_PAGES,
     caps: ADMIN_CAPS,

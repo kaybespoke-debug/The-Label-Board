@@ -4,14 +4,14 @@
 
 const PAGES = {};
 
-/* =================== OVERVIEW =================== */
+/* =================== DASHBOARD ===================
+   Four cards, then four short panels across one row, then the charts.
+   The row answers "is anything wrong" at a glance before you scroll.     */
 PAGES.dashboard = function () {
   const subs = Q.subsAsOf(), act = Q.active(), nw = Q.newSubs();
   const mrr = Q.mrr(), rev = Q.revenue(), split = Q.planSplit();
   const openT = Q.openTickets(), urg = Q.urgentTickets();
 
-  /* Four cards. Revenue and open support are not cards because both numbers
-     already read on the panels below them. */
   const stats = [
     statCard({ label: 'Total subscribers', value: subs.length, tone: 'money', onclick: "drill('subs.total')",
       sub: (nw.length ? '<span class="up">↑ ' + nw.length + '</span> joined ' + PERIOD.label.toLowerCase()
@@ -26,8 +26,6 @@ PAGES.dashboard = function () {
         moneyShort(Q.renewing().reduce((t, s) => t + s.mrr, 0)) + ' at stake' })
   ].join('');
 
-  const revSeries = Q.revenueSeries();
-
   const donutSegs = split.filter(s => s.count).map(s => ({
     label: s.name, value: s.count,
     color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)', trial: 'var(--blue)' }[s.id],
@@ -38,27 +36,65 @@ PAGES.dashboard = function () {
 
   const alerts = []
     .concat(Q.pastDue().slice(0, 2).map(s => {
-      const ovd = DB.payments.filter(p => p.subId === s.id && p.status === 'overdue').sort((a, b) => a.date.localeCompare(b.date))[0];
-      return { t: 'Payment failed', d: s.name + ' · ' + money(s.mrr) + ' unpaid', when: ovd ? ago(ovd.date) : 'this cycle', go: "openDetail('sub'," + s.id + ")" };
+      const ovd = DB.payments.filter(p => p.subId === s.id && p.status === 'overdue')
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
+      return { t: 'Payment failed', d: s.name, when: ovd ? ago(ovd.date) : 'this cycle',
+        go: "openDetail('sub'," + s.id + ")" };
     }))
     .concat(Q.trial().filter(s => s.renewIn <= 4).slice(0, 2).map(s =>
-      ({ t: 'Trial ending', d: s.name, when: s.renewIn <= 0 ? 'today' : 'in ' + s.renewIn + ' days', go: "openDetail('sub'," + s.id + ")" })))
-    .concat(recent.slice(0, 2).map(s => ({ t: 'New subscriber', d: s.name, when: ago(s.joined), go: "openDetail('sub'," + s.id + ")" })))
-    .slice(0, 6);
+      ({ t: 'Trial ending', d: s.name, when: s.renewIn <= 0 ? 'today' : 'in ' + s.renewIn + 'd',
+         go: "openDetail('sub'," + s.id + ")" })))
+    .concat(recent.slice(0, 1).map(s => ({ t: 'New subscriber', d: s.name, when: ago(s.joined),
+      go: "openDetail('sub'," + s.id + ")" })))
+    .slice(0, 4);
 
   return periodBar() +
     '<div class="stats">' + stats + '</div>' +
-    '<div class="cols"><div>' +
+
+    /* the four-across row */
+    '<div class="cols4" style="margin-bottom:14px">' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Subscribers by plan</h3>' +
+    '<div class="ph-sub">' + subs.length + ' accounts</div></div></div>' +
+    donut(donutSegs, subs.length, 'Total') + '</div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Alerts</h3>' +
+    '<div class="ph-sub">' + (alerts.length ? alerts.length + ' needing a look' : 'All clear') + '</div></div>' +
+    '<button class="lnk" onclick="openAlerts()">All</button></div>' +
+    (alerts.length ? alerts.map(a => '<div class="row klik" onclick="' + a.go + '">' +
+      '<div><b>' + a.t + '</b><small>' + esc(a.d) + '</small></div>' +
+      '<span class="note">' + a.when + '</span></div>').join('')
+      : '<div class="empty" style="padding:20px 6px">Nothing needs you.</div>') + '</div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Support</h3>' +
+    '<div class="ph-sub">' + openT.length + ' open' +
+    (urg.length ? ' · <span style="color:var(--red)">' + urg.length + ' urgent</span>' : '') + '</div></div>' +
+    '<button class="lnk" onclick="drill(\'tickets.open\')">All</button></div>' +
+    (openT.length ? openT.slice(0, 4).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+      '<div><b>' + esc(t.title.length > 26 ? t.title.slice(0, 25) + '…' : t.title) + '</b>' +
+      '<small>' + esc(t.subscriber) + '</small></div>' + statusPill(t.state) + '</div>').join('')
+      : '<div class="empty" style="padding:20px 6px">No open tickets.</div>') + '</div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Recent activity</h3>' +
+    '<div class="ph-sub">Last few admin actions</div></div>' +
+    '<button class="lnk" onclick="go(\'activity\')">All</button></div>' +
+    DB.activity.slice(0, 4).map(a => '<div class="row klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
+      '<div><b>' + a.action + '</b><small>' + esc(a.actor) + '</small></div>' +
+      '<span class="note">' + ago(a.at) + '</span></div>').join('') + '</div>' +
+
+    '</div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Revenue overview</h3>' +
     '<div class="ph-sub"><b style="color:var(--gold)">' + money(rev) + '</b> collected · ' + PERIOD.label +
     ' · ' + trend(rev, Q.revenuePrev()) + '</div></div>' +
     '<button class="lnk" onclick="drill(\'revenue\')">See the payments &rsaquo;</button></div>' +
-    areaChart(revSeries, { money: true, color: 'var(--gold)', height: 210 }) + '</div>' +
+    areaChart(Q.revenueSeries(), { money: true, color: 'var(--gold)', height: 220 }) + '</div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Recent subscribers</h3>' +
+    '<div class="pnl"><div class="ph"><div><h3>Recent subscribers</h3>' +
+    '<div class="ph-sub">Newest six accounts</div></div>' +
     '<button class="lnk" onclick="go(\'subscribers\')">View all</button></div>' +
-    '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Joined</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
+    '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Joined</th>' +
+    '<th class="num">MRR</th><th></th></tr></thead><tbody>' +
     recent.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
       '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
       '<td><span class="tier">' + s.planName + '</span></td>' +
@@ -66,34 +102,7 @@ PAGES.dashboard = function () {
       '<td>' + fmtD(s.joined) + '</td>' +
       '<td class="num">' + (s.mrr ? money(s.mrr) : '—') + '</td>' +
       '<td class="chev">&rsaquo;</td></tr>').join('') +
-    '</tbody></table></div></div>' +
-
-    '</div><div>' +
-
-    '<div class="pnl"><div class="ph"><h3>Subscribers by plan</h3></div>' +
-    donut(donutSegs, subs.length, 'Total') +
-    '<button class="btn" style="width:100%;margin-top:14px" onclick="go(\'subscribers\')">View all subscribers &rarr;</button></div>' +
-
-    '<div class="pnl"><div class="ph"><h3>Alerts</h3><button class="lnk" onclick="openAlerts()">View all</button></div>' +
-    (alerts.length ? alerts.map(a => '<div class="row klik" onclick="' + a.go + '">' +
-      '<div><b>' + a.t + '</b><small>' + esc(a.d) + '</small></div>' +
-      '<span class="note">' + a.when + '</span></div>').join('') : '<div class="empty">Nothing needs you right now.</div>') +
-    '</div>' +
-
-    '<div class="pnl"><div class="ph"><div><h3>Support</h3>' +
-    '<div class="ph-sub">' + openT.length + ' open' + (urg.length ? ' · <span style="color:var(--red)">' + urg.length + ' urgent</span>' : '') + '</div></div>' +
-    '<button class="lnk" onclick="drill(\'tickets.open\')">Breakdown &rsaquo;</button></div>' +
-    Q.openTickets().slice(0, 4).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
-      '<div><b>' + esc(t.title) + '</b><small>' + esc(t.subscriber) + '</small></div>' +
-      statusPill(t.state) + '</div>').join('') +
-    '<button class="btn" style="width:100%;margin-top:12px" onclick="go(\'support\')">Go to support centre &rarr;</button></div>' +
-
-    '<div class="pnl"><div class="ph"><h3>Recent activity</h3><button class="lnk" onclick="go(\'activity\')">View all</button></div>' +
-    DB.activity.slice(0, 6).map(a => '<div class="row klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
-      '<div><b>' + a.action + '</b><small>' + esc(a.detail.slice(0, 46)) + '</small></div>' +
-      '<span class="note">' + ago(a.at) + '</span></div>').join('') + '</div>' +
-
-    '</div></div>';
+    '</tbody></table></div></div>';
 };
 
 /* =================== SUBSCRIBERS =================== */
@@ -251,20 +260,35 @@ PAGES.onboarding = function () {
       : '<div class="pnl"><div class="empty">Nothing in this stage.</div></div>');
 };
 
-/* =================== PLANS & BILLING =================== */
+/* =================== PLANS & BILLING ===================
+   Split into sub-tabs. Plans and the referral programme each had five cards,
+   and ten cards on one page reads as noise rather than as information.     */
 PAGES.billing = function () {
+  const tab = UI.billingTab || 'plans';
   const split = Q.planSplit();
   const subs = Q.subsAsOf();
-  const annual = subs.filter(s => s.cycle === 'annual').length;
+  const referrers = DB.subscribers.filter(s => s.referralConverted > 0);
 
-  return periodBar() +
+  const head = '<div class="utabs">' +
+    [['plans', 'Plans & pricing', DB.plans.length],
+     ['referrals', 'Referral programme', referrers.length]]
+      .map(t => '<button class="utab' + (tab === t[0] ? ' on' : '') +
+        '" onclick="UI.billingTab=\'' + t[0] + '\';render()">' + t[1] +
+        ' <span class="note">' + t[2] + '</span></button>').join('') +
+    '</div>';
+
+  /* ---------- referral programme ---------- */
+  if (tab === 'referrals') return head + referralBody();
+
+  /* ---------- plans & pricing ---------- */
+  const annual = subs.filter(s => s.cycle === 'annual').length;
+  return head + periodBar() +
     '<div class="stats">' +
     split.map(p => statCard({
       label: p.name, value: p.count, tone: p.id === 'trial' ? 'info' : 'money',
       onclick: "UI.planFilter='" + p.id + "';UI.filters.subscribers='all';go('subscribers')",
       sub: p.share + '% of base · ' + (p.mrr ? moneyShort(p.mrr) + ' MRR' : 'no MRR')
     })).join('') +
-    statCard({ label: 'Blended ARPU', value: moneyShort(Q.arpu()), tone: 'money', onclick: "drill('arpu')", sub: pct(annual, subs.length) + '% on annual billing' }) +
     '</div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Plans &amp; pricing</h3>' +
@@ -273,7 +297,7 @@ PAGES.billing = function () {
     '<div class="tw"><table><thead><tr><th>Plan</th><th class="num">Monthly</th><th class="num">Annual</th>' +
     '<th class="num">Seats</th><th class="num">Subscribers</th><th class="num">MRR</th><th>Status</th><th></th></tr></thead><tbody>' +
     DB.plans.map(p => {
-      const s = split.find(x => x.id === p.id);
+      const s = split.find(x => x.id === p.id) || { count: 0, mrr: 0 };
       return '<tr class="klik" onclick="formPlan(\'' + p.id + '\')">' +
         '<td><div class="t-main">' + p.name + '</div><div class="t-sub">' + p.features[0] + '</div></td>' +
         '<td class="num">' + (p.monthly ? money(p.monthly) : '—') + '</td>' +
@@ -285,6 +309,7 @@ PAGES.billing = function () {
         '<td class="chev">&rsaquo;</td></tr>';
     }).join('') + '</tbody></table></div></div>' +
 
+    '<div class="cols2">' +
     '<div class="pnl"><div class="ph"><div><h3>MRR by plan</h3>' +
     '<div class="ph-sub">Where the recurring revenue actually sits</div></div></div>' +
     hBars(split.filter(s => s.mrr).map(s => ({
@@ -293,12 +318,19 @@ PAGES.billing = function () {
       onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
     })), { money: true }) + '</div>' +
 
-    /* Referral programme gets the full width, same as Plans & pricing above it. */
-    referralPanel();
+    '<div class="pnl"><div class="ph"><div><h3>Billing cycle</h3>' +
+    '<div class="ph-sub">Annual is paid up front, so it lands as one large payment</div></div></div>' +
+    donut([
+      { label: 'Monthly', value: Q.active().filter(s => s.cycle === 'monthly').length, color: 'var(--gold)' },
+      { label: 'Annual', value: annual, color: 'var(--green)' }
+    ], Q.active().length, 'Paying') +
+    '<div class="kv" style="margin-top:10px"><span class="k">Blended ARPU</span>' +
+    '<span class="v klik" style="cursor:pointer" onclick="drill(\'arpu\')">' + money(Q.arpu()) + ' &rsaquo;</span></div>' +
+    '</div></div>';
 };
 
-/* The referral programme, laid out properly rather than squeezed into a corner. */
-function referralPanel() {
+/* The referral programme, its own tab. */
+function referralBody() {
   const referrers = DB.subscribers.filter(s => s.referralConverted > 0)
     .sort((a, b) => b.referralEarned - a.referralEarned);
   const earned = Q.refCommissionTotal();
@@ -308,32 +340,40 @@ function referralPanel() {
   const invited = DB.subscribers.reduce((t, s) => t + s.referrals.length, 0);
   const mrrFromRef = DB.subscribers.filter(s => s.referredBy && s.status === 'active').reduce((t, s) => t + s.mrr, 0);
 
-  return '<div class="pnl"><div class="ph"><div><h3>Referral programme</h3>' +
-    '<div class="ph-sub">Subscribers earn ' + DB.settings.referralPct +
-    '% of a referred account\'s first month, credited 31 days after that account converts</div></div>' +
-    '<button class="btn" onclick="editSetting(\'referralPct\',\'Referral commission %\',\'number\')">Change rate</button></div>' +
-
-    '<div class="stats" style="margin-bottom:16px">' +
-    statCard({ label: 'Accounts referred', value: invited, tone: 'info',
-      sub: converted + ' converted to paid · ' + pct(converted, invited) + '% conversion' }) +
-    statCard({ label: 'MRR from referrals', value: moneyShort(mrrFromRef), tone: 'money',
+  return '<div class="stats">' +
+    statCard({ label: 'Accounts referred', value: invited, tone: 'info', onclick: "drill('referrers')",
+      sub: converted + ' converted · ' + pct(converted, invited) + '% conversion' }) +
+    statCard({ label: 'MRR from referrals', value: moneyShort(mrrFromRef), tone: 'money', onclick: "drill('referrers')",
       sub: pct(mrrFromRef, Q.mrr()) + '% of all MRR' }) +
-    statCard({ label: 'Commission earned', value: moneyShort(earned), tone: 'money',
+    statCard({ label: 'Commission earned', value: moneyShort(earned), tone: 'money', onclick: "drill('referrers')",
       sub: 'Across ' + referrers.length + ' referring subscribers' }) +
-    statCard({ label: 'Paid out', value: moneyShort(paid), tone: 'good',
-      sub: pct(paid, earned) + '% of what has been earned' }) +
     statCard({ label: 'Outstanding', value: moneyShort(pending), tone: pending ? 'warn' : 'good',
-      sub: pending ? 'Still inside the 31-day hold' : 'Nothing owing' }) +
+      sub: pending ? 'Inside the 31-day hold' : 'Nothing owing' }) +
     '</div>' +
 
-    '<div class="ph"><div><h3 style="font-size:13px">Top referrers</h3>' +
+    '<div class="pnl"><div class="ph"><div><h3>How the programme works</h3></div>' +
+    '<button class="btn" onclick="editSetting(\'referralPct\',\'Referral commission %\',\'number\')">Change rate</button></div>' +
+    '<p class="note">A subscriber earns <b style="color:var(--gold)">' + DB.settings.referralPct + '%</b> of a referred ' +
+    'account\'s first month, credited 31 days after that account converts to a paid plan. The hold exists so a refund ' +
+    'inside the first month does not leave commission paid on revenue we gave back. Referrals are recognised from the ' +
+    'invite link, never self-reported, so the attribution is reliable.</p>' +
+    '<div class="cols2" style="margin-top:14px">' +
+    '<div>' + kv('Commission rate', DB.settings.referralPct + '% of first month') +
+    kv('Hold period', '31 days after conversion') +
+    kv('Attribution', 'Inferred from the invite link') + '</div>' +
+    '<div>' + kv('Earned to date', money(earned)) +
+    kv('Paid out', money(paid) + ' <span class="note">(' + pct(paid, earned) + '%)</span>') +
+    kv('Still on hold', '<span style="color:var(--amber)">' + money(pending) + '</span>') + '</div>' +
+    '</div></div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Top referrers</h3>' +
     '<div class="ph-sub">Tap anyone to open their referral ledger</div></div>' +
     '<button class="lnk" onclick="drill(\'referrers\')">Full breakdown &rsaquo;</button></div>' +
     (referrers.length
       ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th>Plan</th><th class="num">Referred</th>' +
       '<th class="num">Converted</th><th class="num">Earned</th><th class="num">Paid</th>' +
       '<th class="num">Outstanding</th><th></th></tr></thead><tbody>' +
-      referrers.slice(0, 10).map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
+      referrers.slice(0, 12).map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
         '<td><span class="tier">' + s.planName + '</span></td>' +
         '<td class="num">' + s.referrals.length + '</td>' +
@@ -527,8 +567,9 @@ function payrollBody(key) {
 }
 
 /* =================== REVENUE ===================
-   Charts carry their own time range so you can look at years of progression
-   without changing the period that drives the cards.                       */
+   Order: the numbers, then the four small breakdowns, then the two trend
+   charts, then the collected chart last. Charts carry their own time range so
+   you can look at years without changing the period that drives the cards.  */
 PAGES.revenue = function () {
   const mrr = Q.mrr(), split = Q.planSplit();
   const rev = Q.revenue(), churn = Q.churnedMrr();
@@ -538,11 +579,12 @@ PAGES.revenue = function () {
   const growR = chartRange('grow', '12m');
   const mrrR = chartRange('mrrline', '12m');
   const revData = revenueSeriesFor(revR);
-  const growData = growthSeriesFor(growR);
-  const mrrData = mrrSeriesFor(mrrR);
   const rangeName = r => (CHART_RANGES.find(x => x[0] === r) || [])[1] || r;
+  const planColor = { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)', trial: 'var(--blue)' };
 
   return periodBar() +
+
+    /* 1 — the headline numbers */
     '<div class="stats">' +
     statCard({ label: 'MRR', value: moneyShort(mrr), tone: 'money', onclick: "drill('mrr')", sub: trend(mrr, Q.mrrPrev()) }) +
     statCard({ label: 'Collected', value: moneyShort(rev), tone: 'good', onclick: "drill('revenue')",
@@ -555,50 +597,58 @@ PAGES.revenue = function () {
       sub: pct(churn, mrr) + '% of MRR · ' + Q.expired().length + ' accounts' }) +
     '</div>' +
 
-    '<div class="pnl"><div class="ph"><div><h3>Revenue collected</h3>' +
-    '<div class="ph-sub"><b style="color:var(--gold)">' + money(revData.reduce((t, d) => t + d.value, 0)) +
-    '</b> over the last ' + rangeName(revR).toLowerCase() + '</div></div>' +
-    chartRangeBar('rev', '12m') + '</div>' +
-    areaChart(revData, { money: true, color: 'var(--gold)', height: 230 }) + '</div>' +
+    /* 2 — the four small breakdowns, straight after the cards */
+    '<div class="cols4" style="margin-bottom:14px">' +
 
-    '<div class="cols3">' +
-    '<div class="pnl"><div class="ph"><div><h3>MRR over time</h3>' +
-    '<div class="ph-sub">Recurring revenue as it stood each month</div></div></div>' +
-    chartRangeBar('mrrline', '12m') +
-    areaChart(mrrData, { money: true, color: 'var(--blue)', height: 190 }) + '</div>' +
-    '<div class="pnl"><div class="ph"><div><h3>Subscriber growth</h3>' +
-    '<div class="ph-sub">Total accounts, cumulative</div></div></div>' +
-    chartRangeBar('grow', '12m') +
-    areaChart(growData, { color: 'var(--green)', height: 190 }) + '</div>' +
-    '</div>' +
-
-    '<div class="cols3">' +
-    '<div class="pnl"><div class="ph"><h3>Subscribers by plan</h3></div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Subscribers by plan</h3>' +
+    '<div class="ph-sub">' + Q.subsAsOf().length + ' accounts</div></div></div>' +
     donut(split.filter(s => s.count).map(s => ({
-      label: s.name, value: s.count,
-      color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)', trial: 'var(--blue)' }[s.id],
+      label: s.name, value: s.count, color: planColor[s.id],
       onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
     })), Q.subsAsOf().length, 'Total') + '</div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Revenue by plan</h3><span class="note">MRR</span></div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Revenue by plan</h3>' +
+    '<div class="ph-sub">Monthly recurring</div></div></div>' +
     hBars(split.filter(s => s.mrr).map(s => ({
-      label: s.name, value: s.mrr,
-      color: { premium: 'var(--gold)', pro: 'var(--green)', starter: 'var(--purple)' }[s.id] || 'var(--blue)',
+      label: s.name, value: s.mrr, color: planColor[s.id],
       onclick: "UI.planFilter='" + s.id + "';UI.filters.subscribers='all';go('subscribers')"
     })), { money: true }) + '</div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Billing cycle mix</h3></div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Billing cycle mix</h3>' +
+    '<div class="ph-sub">Paying accounts</div></div></div>' +
     donut([
       { label: 'Monthly', value: Q.active().filter(s => s.cycle === 'monthly').length, color: 'var(--gold)' },
       { label: 'Annual', value: Q.active().filter(s => s.cycle === 'annual').length, color: 'var(--green)' }
     ], Q.active().length, 'Paying') + '</div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Health of the base</h3></div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Health of the base</h3>' +
+    '<div class="ph-sub">Early churn signals</div></div></div>' +
     ['healthy', 'steady', 'at-risk', 'onboarding', 'churned'].map(h => {
       const n = Q.subsAsOf().filter(s => s.health === h).length;
       return '<div class="row klik" onclick="UI.sort.subscribers=\'health\';go(\'subscribers\')">' +
         '<div>' + statusPill(h) + '</div><b>' + n + '</b></div>';
     }).join('') + '</div>' +
-    '</div>';
-};
 
+    '</div>' +
+
+    /* 3 — the two trend charts, side by side */
+    '<div class="cols2">' +
+    '<div class="pnl"><div class="ph"><div><h3>MRR over time</h3>' +
+    '<div class="ph-sub">Recurring revenue as it stood each period · now ' + moneyShort(mrr) + '</div></div></div>' +
+    chartRangeBar('mrrline', '12m') +
+    areaChart(mrrSeriesFor(mrrR), { money: true, color: 'var(--blue)', height: 200 }) + '</div>' +
+
+    '<div class="pnl"><div class="ph"><div><h3>Subscriber growth</h3>' +
+    '<div class="ph-sub">Total accounts, cumulative · now ' + Q.subsAsOf().length + '</div></div></div>' +
+    chartRangeBar('grow', '12m') +
+    areaChart(growthSeriesFor(growR), { color: 'var(--green)', height: 200 }) + '</div>' +
+    '</div>' +
+
+    /* 4 — revenue collected, last */
+    '<div class="pnl"><div class="ph"><div><h3>Revenue collected</h3>' +
+    '<div class="ph-sub"><b style="color:var(--gold)">' + money(revData.reduce((t, d) => t + d.value, 0)) +
+    '</b> over the last ' + rangeName(revR).toLowerCase() + ' · cash in, not MRR</div></div>' +
+    '<button class="lnk" onclick="drill(\'revenue\')">See the payments &rsaquo;</button></div>' +
+    chartRangeBar('rev', '12m') +
+    areaChart(revData, { money: true, color: 'var(--gold)', height: 240 }) + '</div>';
+};

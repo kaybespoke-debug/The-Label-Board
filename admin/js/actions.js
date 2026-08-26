@@ -753,7 +753,3 @@ function exportRisk() {
   exportCsv('at-risk-accounts', ['Business', 'Owner', 'Plan', 'Status', 'Past due', 'Orders 30d', 'Last seen', 'MRR'],
     Q.atRisk().map(s => [s.name, s.owner, s.planName, s.status, s.pastDue ? 'yes' : 'no', s.ordersLast30, s.lastSeen, s.mrr]));
 }
-function exportErrors() {
-  exportCsv('errors-24h', ['Code', 'Count', 'Severity', 'Last seen', 'Note'],
-    DB.health.errors.map(e => [e.code, e.count, e.severity, e.last, e.note]));
-}
