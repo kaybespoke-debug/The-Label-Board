@@ -301,7 +301,37 @@ function buildStaff() {
       lastActive: iso(dAgo(0)),
       lastActiveLabel: i === 0 ? 'Now' : pick(['3m ago', '12m ago', '45m ago', '2h ago', 'Yesterday']),
       leaveEntitlement: 20,
-      rating: Math.round((3.6 + rnd() * 1.3) * 10) / 10
+      rating: Math.round((3.6 + rnd() * 1.3) * 10) / 10,
+
+      /* Sign-in state. No password is ever stored here — only when it was last
+         set, so the age can be shown. */
+      auth: {
+        passwordSetOn: iso(dAgo(int(3, 420))),
+        mustReset: i > 12 && rnd() < 0.5,          // newer accounts still on their invite
+        neverSignedIn: false,
+        twoFactor: i === 0 ? true : rnd() < 0.35,
+        failedAttempts: rnd() < 0.12 ? int(1, 3) : 0,
+        locked: false,
+        lockedAt: null,
+        resetSentOn: null,
+        sessions: (function () {
+          const out = [];
+          const count = i === 0 ? 3 : int(1, 2);
+          for (let k = 0; k < count; k++) {
+            const mins = k === 0 ? int(0, 25) : int(90, 8000);
+            out.push({
+              id: 'S' + (i + 1) + '-' + (k + 1),
+              device: pick(['Chrome on Windows', 'Safari on macOS', 'Chrome on Android',
+                'Safari on iPhone', 'Edge on Windows', 'Firefox on Windows']),
+              place: pick(['Lagos, NG', 'Abuja, NG', 'Port Harcourt, NG', 'Ibadan, NG']),
+              ip: '102.' + int(10, 250) + '.' + int(1, 250) + '.' + int(1, 250),
+              lastSeenMins: mins,
+              current: k === 0 && i === 0
+            });
+          }
+          return out;
+        })()
+      }
     };
   });
 }
@@ -830,6 +860,18 @@ const DB = (function () {
          so turning them on later needs no rework. */
       allowances: { enabled: false, housingPct: 15, transportPct: 10 },
       pensionDefaultRate: 8,
+      /* Sign-in rules, applied to everyone. */
+      security: {
+        minLength: 10,
+        requireMix: true,          // upper, lower and a number
+        requireSymbol: false,
+        expiryDays: 0,             // 0 = passwords do not expire
+        blockReuse: 3,             // cannot reuse the last N
+        lockoutAfter: 5,           // failed attempts before the account locks
+        sessionIdleMins: 720,      // signed out after 12 hours idle
+        twoFactorRequired: false,
+        resetLinkHours: 24
+      },
       notify: { sound: 'chime', volume: 70, popups: false,
         alerts: { payment: true, signup: true, failed: true, ticket: true, churn: true, payroll: false } },
       integrations: [

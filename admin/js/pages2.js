@@ -569,6 +569,8 @@ PAGES.settings = function () {
       '<div class="sec-t">Team accounts</div>' + accounts +
       '<div class="sec-t" style="margin-top:26px">Roles &amp; permissions</div>' + roles +
       '<div class="sec-t" style="margin-top:26px">Notifications</div>' + notif) +
+    grp(false, ic('rgba(214,112,111,.16)', '<rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.5" r="1.4"/>'),
+      'Login &amp; passwords', 'Your password, two-step, devices, policy', loginSection()) +
     grp(false, ic('rgba(211,163,74,.16)', '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'), 'Integrations', 'Supabase, payments, email, WhatsApp', integ) +
     grp(false, ic('rgba(120,128,143,.16)', '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/>'), 'Data &amp; storage', 'Export, reset', data) +
     '</div>';

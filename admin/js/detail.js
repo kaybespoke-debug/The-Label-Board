@@ -208,8 +208,28 @@ DETAIL.staff = function (id) {
       kv('Role', '<span class="pill grey">' + role.name + '</span>') +
       kv('Pages they can open', role.locked ? 'All pages' : role.pages.length + ' of ' + DB.pages.length) +
       kv('Permissions granted', role.locked ? 'Everything' : role.caps.length + ' of ' + DB.caps.length) +
+      '<div class="sec-t">Sign-in</div>' +
+      kv('Username', s.username) +
+      kv('Password', '•••••••••••• <span class="note">changed ' +
+        (Math.round((DB.today - parseD(s.auth.passwordSetOn)) / DAY) || 'today') +
+        (Math.round((DB.today - parseD(s.auth.passwordSetOn)) / DAY) ? ' days ago' : '') + '</span>') +
+      kv('Two-step verification', s.auth.twoFactor
+        ? '<span style="color:var(--green)">On</span>' : '<span style="color:var(--amber)">Off</span>') +
+      kv('Signed in on', s.auth.sessions.length + ' device' + (s.auth.sessions.length === 1 ? '' : 's')) +
+      kv('Account state', s.auth.locked ? '<span class="pill red">Locked</span>'
+        : s.auth.mustReset ? '<span class="pill amber">Must change password</span>'
+          : '<span class="pill green">Normal</span>') +
+      (s.id === ME.staffId
+        ? '<p class="hint">This is your own account. Change your password under ' +
+          '<button class="lnk" onclick="go(\'settings\')">Settings &rarr; Login &amp; passwords</button>.</p>'
+        : '<p class="hint">Nobody can set somebody else\'s password, including you. Send a reset link and ' +
+          esc(s.name.split(' ')[0]) + ' chooses their own.</p>') +
       '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
       '<button class="btn" onclick="formStaffRole(' + s.id + ')">Change role</button>' +
+      (s.id === ME.staffId
+        ? '<button class="btn gold" onclick="formChangePassword()">Change my password</button>'
+        : '<button class="btn" onclick="formSendReset(' + s.id + ')">Send a reset link</button>') +
+      (s.auth.locked ? '<button class="btn gold" onclick="unlockAccount(' + s.id + ')">Unlock account</button>' : '') +
       '<button class="btn" onclick="go(\'settings\')">Edit permissions</button></div>';
   }
 
