@@ -48,12 +48,7 @@ PAGES.dashboard = function () {
       go: "openDetail('sub'," + s.id + ")" })))
     .slice(0, 4);
 
-  return (DB.demoData ? '<div class="demo-bar">' +
-      '<b>This is a working prototype on invented data.</b> The 128 subscribers, the revenue, the ' +
-      'payroll and the staff records are all made up so the console can be judged properly before it is ' +
-      'connected to Supabase. Nothing here bills anyone, emails anyone or pays anyone.' +
-      '</div>' : '') +
-    periodBar() +
+  return periodBar() +
     '<div class="stats">' + stats + '</div>' +
 
     /* the four-across row */
