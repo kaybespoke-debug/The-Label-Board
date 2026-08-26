@@ -4,18 +4,99 @@
    ============================================================ */
 
 const UI = {
-  page: 'overview',
+  page: 'dashboard',
   detail: null,               // {type,id} — when set, the detail view renders
-  back: 'overview',
+  back: 'dashboard',
   filters: {                  // per-page sub-tab state
     subscribers: 'all', payments: 'all', announcements: 'published',
     tasks: 'mine', staff: 'all', support: 'tickets', feedback: 'all',
     onboarding: 'all', activity: 'all'
   },
-  sort: { subscribers: 'name' },
+  sort: { subscribers: 'name', payments: 'date-desc', payroll: 'net-desc', activity: 'newest' },
   search: '',
-  vtab: {}                    // detail-view vertical tab state
+  q: {},                      // per-page search boxes
+  vtab: {},                   // detail-view vertical tab state
+  chartRange: {},             // per-chart time window, independent of the page period
+  collapsed: {},              // collapsible sections
+  openRole: null,
+  planFilter: 'any'
 };
+
+/* ---------------- per-chart time ranges ----------------
+   Charts get their own window so you can look at years of progression without
+   changing the page period, which drives the cards and tables. */
+const CHART_RANGES = [
+  ['30d', '30 days'], ['3m', '3 months'], ['12m', '12 months'],
+  ['3y', '3 years'], ['all', 'All time']
+];
+function chartRange(key, dflt) { return UI.chartRange[key] || dflt || '12m'; }
+function setChartRange(key, r) { UI.chartRange[key] = r; render(); }
+function chartRangeBar(key, dflt) {
+  const cur = chartRange(key, dflt);
+  return '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
+    CHART_RANGES.map(r => '<button class="tab' + (cur === r[0] ? ' on' : '') +
+      '" style="padding:5px 9px;font-size:11px" onclick="setChartRange(\'' + key + '\',\'' + r[0] + '\')">' +
+      r[1] + '</button>').join('') + '</div>';
+}
+
+/* buckets for a range: [{from,to,label}] */
+function rangeBuckets(range) {
+  const t = DB.today, out = [];
+  const mLabel = d => d.toLocaleDateString('en-GB', { month: 'short' });
+  const myLabel = d => d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+
+  if (range === '30d') {
+    for (let i = 29; i >= 0; i--) {
+      const d = startOfDay(new Date(t.getTime() - i * DAY));
+      out.push({ from: d, to: endOfDay(d), label: fmtDShort(d) });
+    }
+  } else if (range === '3m') {
+    for (let i = 12; i >= 0; i--) {                      // 13 weeks
+      const end = endOfDay(new Date(t.getTime() - i * 7 * DAY));
+      const from = startOfDay(new Date(end.getTime() - 6 * DAY));
+      out.push({ from, to: end, label: fmtDShort(from) });
+    }
+  } else if (range === '12m' || range === '3y') {
+    const months = range === '12m' ? 12 : 36;
+    for (let i = months - 1; i >= 0; i--) {
+      const from = new Date(t.getFullYear(), t.getMonth() - i, 1);
+      const to = new Date(t.getFullYear(), t.getMonth() - i + 1, 0, 23, 59, 59);
+      out.push({ from, to, label: months > 12 ? myLabel(from) : mLabel(from) });
+    }
+  } else {                                               // all time, by quarter
+    const first = DB.payments.reduce((m, p) => p.date < m ? p.date : m, '9999-99-99');
+    let d = parseD(first); d = new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1);
+    while (d <= t) {
+      const to = new Date(d.getFullYear(), d.getMonth() + 3, 0, 23, 59, 59);
+      out.push({ from: new Date(d), to, label: 'Q' + (Math.floor(d.getMonth() / 3) + 1) + " '" + String(d.getFullYear()).slice(2) });
+      d = new Date(d.getFullYear(), d.getMonth() + 3, 1);
+    }
+  }
+  return out;
+}
+/* revenue actually collected, bucketed */
+function revenueSeriesFor(range) {
+  return rangeBuckets(range).map(b => ({
+    label: b.label,
+    value: DB.payments.filter(p => p.status === 'successful' && parseD(p.date) >= b.from && parseD(p.date) <= b.to)
+      .reduce((t, p) => t + p.amount, 0)
+  }));
+}
+/* cumulative subscriber count at the end of each bucket */
+function growthSeriesFor(range) {
+  return rangeBuckets(range).map(b => ({
+    label: b.label,
+    value: DB.subscribers.filter(s => parseD(s.joined) <= b.to).length
+  }));
+}
+/* MRR as it stood at the end of each bucket */
+function mrrSeriesFor(range) {
+  return rangeBuckets(range).map(b => ({
+    label: b.label,
+    value: DB.subscribers.filter(s => s.status === 'active' && parseD(s.joined) <= b.to)
+      .reduce((t, s) => t + s.mrr, 0)
+  }));
+}
 
 /* ---------------- period ---------------- */
 const PERIOD = {
@@ -336,7 +417,7 @@ function openDetail(type, id) {
 }
 function goBack() {
   UI.detail = null;
-  UI.page = UI.back || 'overview';
+  UI.page = UI.back || 'dashboard';
   render();
   document.querySelector('.main').scrollTop = 0;
 }
@@ -416,6 +497,19 @@ function tabBar(page, items) {
     '<button class="tab' + (UI.filters[page] === i.k ? ' on' : '') + '" onclick="setFilter(\'' + page + '\',\'' + i.k + '\')">' +
     i.t + (i.n !== undefined ? '<span class="n">' + i.n + '</span>' : '') + '</button>').join('');
 }
+/* Collapsible panel. Long tables fold away so what sits under them is
+   reachable on a phone without scrolling past a hundred rows. */
+function section(key, title, sub, body, startClosed) {
+  if (UI.collapsed[key] === undefined) UI.collapsed[key] = !!startClosed;
+  const closed = UI.collapsed[key];
+  return '<div class="pnl">' +
+    '<div class="ph klik" style="cursor:pointer;margin-bottom:' + (closed ? '0' : '14px') + '" onclick="toggleSection(\'' + key + '\')">' +
+    '<div><h3>' + title + '</h3>' + (sub ? '<div class="ph-sub">' + sub + '</div>' : '') + '</div>' +
+    '<span class="sgrp-cv" style="transform:rotate(' + (closed ? 0 : 90) + 'deg)">&rsaquo;</span></div>' +
+    (closed ? '' : body) + '</div>';
+}
+function toggleSection(key) { UI.collapsed[key] = !UI.collapsed[key]; render(); }
+
 function statusPill(s) {
   const map = {
     active: ['green', 'Active'], trial: ['amber', 'Trial'], expired: ['red', 'Expired'],

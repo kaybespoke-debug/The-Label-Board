@@ -5,7 +5,9 @@
 
 const DETAIL = {};
 
-function backBtn(label) { return '<button class="back" onclick="goBack()">&larr; Back to ' + label + '</button>'; }
+/* Just "Back". Naming the destination was wrong as often as it was right —
+   arriving at a staff profile from Revenue still read "Back to staff". */
+function backBtn() { return '<button class="back" onclick="goBack()">&larr; Back</button>'; }
 function dstat(v, l, tone) { return '<div class="dstat ' + (tone || '') + '"><div class="dv">' + v + '</div><div class="dl">' + l + '</div></div>'; }
 function vtabs(key, items, current) {
   return '<div class="vtabs">' + items.map(i =>
@@ -143,7 +145,7 @@ DETAIL.sub = function (id) {
         : '<div class="note">No admin actions recorded against this account.</div>');
   }
 
-  return backBtn(UI.back === 'overview' ? 'overview' : 'subscribers') +
+  return backBtn() +
     '<div class="dhead"><div class="dav">' + initials(s.name) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>' + esc(s.name) + ' ' + statusPill(s.status) + '</h2>' +
     '<div class="dmeta">TLB-S' + String(s.id).padStart(4, '0') + ' · ' + esc(s.owner) + ' · ' + s.planName + ' · ' + esc(s.city) + '</div></div>' +
@@ -183,7 +185,10 @@ DETAIL.staff = function (id) {
   if (tab === 'profile') {
     body = '<div class="actrow"><a href="tel:' + s.phone.replace(/\s/g, '') + '">Call</a>' +
       '<a href="https://wa.me/' + s.phone.replace(/[^0-9]/g, '') + '" target="_blank" rel="noopener">WhatsApp</a>' +
-      '<a href="mailto:' + s.email + '">Email</a></div>' +
+      '<a href="mailto:' + s.email + '">Email</a>' +
+      (can('manage_staff') ? '<button class="lnk" onclick="formEditStaff(' + s.id + ')">Edit profile</button>' : '') + '</div>' +
+      (can('manage_staff') ? '' : '<p class="hint">Read-only. Editing a staff record needs the ' +
+        '&ldquo;Manage staff accounts&rdquo; permission, which your role does not have.</p>') +
       '<div class="sec-t">Personal information</div>' +
       kv('Staff ID', s.staffId) + kv('Username', s.username) + kv('Gender', s.gender) +
       kv('Date of birth', fmtD(s.dob)) + kv('Phone', s.phone) + kv('Email', esc(s.email)) +
@@ -230,19 +235,48 @@ DETAIL.staff = function (id) {
   }
 
   else if (tab === 'pay') {
-    body = '<div class="sec-t">Pay setup</div>' +
+    const al = DB.settings.allowances;
+    const lastSlip = slips[0];
+    body = '<div class="actrow">' +
+      '<button class="lnk" onclick="formSalary(' + s.id + ')">Set salary</button>' +
+      '<button class="lnk" onclick="formBank(' + s.id + ')">Bank details</button>' +
+      '<button class="lnk" onclick="formPension(' + s.id + ')">Pension &amp; NHF</button></div>' +
+
+      '<div class="sec-t">Earnings</div>' +
       kv('Salary type', s.salaryType) +
-      kv('Basic (monthly)', money(s.basic)) +
-      kv('Housing allowance', money(s.housing) + ' <span class="note">15% of basic</span>') +
-      kv('Transport allowance', money(s.transport) + ' <span class="note">10% of basic</span>') +
-      kv('Gross (monthly)', '<b>' + money(gross) + '</b>') +
-      '<div class="sec-t">Standing deductions</div>' +
-      kv('PAYE', '11.5% of gross') + kv('Pension', '8% of basic') + kv('NHF', '2.5% of basic') +
+      kv('Monthly basic', '<b>' + money(s.basic) + '</b>') +
+      (al.enabled
+        ? kv('Housing allowance', money(s.housing) + ' <span class="note">' + al.housingPct + '% of basic</span>') +
+          kv('Transport allowance', money(s.transport) + ' <span class="note">' + al.transportPct + '% of basic</span>')
+        : '<div class="kv"><span class="k">Allowances</span><span class="v"><span class="pill grey">Not in use</span></span></div>') +
+      kv('Monthly gross', '<b>' + money(gross) + '</b>') +
+      (al.enabled ? '' : '<p class="hint">Allowances are switched off across the platform while we are a startup, so ' +
+        'gross is basic plus anything variable. The housing and transport fields still exist and can be turned on in ' +
+        'Settings &rarr; Platform later, without reworking anyone\'s record.</p>') +
+
+      '<div class="sec-t">Deductions</div>' +
+      kv('PAYE', '11.5% of gross' + (lastSlip ? ' · ' + money(lastSlip.paye) + ' last month' : '')) +
+      '<div class="kv"><span class="k">Pension</span><span class="v">' +
+      (s.pension.optedIn
+        ? s.pension.rate + '% of basic · ' + money(Math.round(s.basic * s.pension.rate / 100)) +
+          '<div class="t-sub" style="font-weight:400">Agreed ' + fmtD(s.pension.agreedOn) + '</div>'
+        : '<span class="pill grey">Not enrolled</span>') + '</span></div>' +
+      '<div class="kv"><span class="k">NHF</span><span class="v">' +
+      (s.nhfOptIn ? '2.5% of basic · ' + money(Math.round(s.basic * 0.025)) : '<span class="pill grey">Not enrolled</span>') +
+      '</span></div>' +
       (s.id % 7 === 0 ? kv('Staff loan', money(25000) + ' / month') : '') +
-      '<div class="sec-t">Bank</div>' + kv('Account', esc(s.bank)) +
-      '<div class="sec-t">Annual</div>' +
+      '<p class="hint">Pension is voluntary — nothing is deducted until the person agrees to it, and the signed ' +
+      'enrolment sits under Documents. NHF works the same way.</p>' +
+
+      '<div class="sec-t">Where the money goes</div>' +
+      kv('Bank', esc(s.bankName)) +
+      kv('Account number', esc(s.bankAccount)) +
+      kv('Account name', esc(s.bankAccountName)) +
+
+      '<div class="sec-t">Over a year</div>' +
       kv('Annual gross', money(gross * 12)) +
-      kv('Estimated annual net', money(slips.length ? slips[0].net * 12 : gross * 0.85 * 12)) +
+      kv('Take-home last month', lastSlip ? money(lastSlip.net) : '—') +
+      kv('Annualised take-home', lastSlip ? money(lastSlip.net * 12) : '—') +
       '<button class="btn" style="margin-top:16px" onclick="setVTab(\'' + key + '\',\'payslips\')">See payslips &rarr;</button>';
   }
 
@@ -324,18 +358,26 @@ DETAIL.staff = function (id) {
   }
 
   else if (tab === 'docs') {
-    body = '<div class="sec-t">Documents on file</div>' +
-      [['Employment contract', 'Signed ' + fmtD(s.startDate), true],
-       ['ID verification', 'NIN on file', true],
-       ['Bank mandate', s.bank.split(' · ')[0], true],
-       ['Next of kin form', 'Emergency contact recorded', true],
-       ['Tax ID (TIN)', 'Pending upload', false]]
-        .map(d => '<div class="row"><div><b>' + d[0] + '</b><small>' + d[1] + '</small></div>' +
-          (d[2] ? '<span class="pill green">On file</span>' : '<span class="pill amber">Missing</span>') + '</div>').join('') +
-      '<button class="btn" style="margin-top:14px" onclick="toast(\'File upload needs the Supabase storage bucket — coming with the backend\')">Upload a document</button>';
+    const docs = DB.docs.filter(d => d.staffId === s.id);
+    const onFile = docs.filter(d => d.status === 'on file').length;
+    body = '<div class="sec-t">Documents</div>' +
+      '<p class="note">' + onFile + ' of ' + docs.length + ' on file. Tap any document to read it — ' +
+      'only the Owner and this person\'s manager can open these.</p>' +
+      '<div style="margin-top:12px">' +
+      docs.map(d => '<div class="row klik" onclick="viewDoc(' + d.id + ')">' +
+        '<div><b>' + d.kind + '</b><small>' +
+        (d.status === 'on file' ? d.pages + ' page' + (d.pages === 1 ? '' : 's') + ' · added ' + fmtD(d.addedOn)
+          : d.status === 'not enrolled' ? 'Nothing to show — not enrolled' : 'Not supplied yet') +
+        '</small></div>' +
+        (d.status === 'on file' ? '<span class="pill green">View &rsaquo;</span>'
+          : d.status === 'not enrolled' ? '<span class="pill grey">Not enrolled</span>'
+            : '<span class="pill amber">Missing</span>') + '</div>').join('') + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
+      '<button class="btn" onclick="toast(\'File upload lands with the Supabase storage bucket\')">Upload a document</button>' +
+      '<button class="btn" onclick="downloadStaffDocs(' + s.id + ')">Export the index</button></div>';
   }
 
-  return backBtn(UI.back === 'settings' ? 'settings' : 'staff') +
+  return backBtn() +
     '<div class="dhead"><div class="dav">' + initials(s.name) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>' + esc(s.name) + ' ' + statusPill(s.status) + '</h2>' +
     '<div class="dmeta">' + s.staffId + ' · ' + s.title + ' · ' + s.dept + ' · <span class="pill grey">' + role.name + '</span></div></div>' +
@@ -365,7 +407,7 @@ DETAIL.slip = function (id) {
   const st = Q.staffM(sl.staffId);
   const allow = sl.housing + sl.transport + sl.bonus + sl.overtime;
 
-  return backBtn(UI.back === 'staff' ? 'staff' : 'payroll') +
+  return backBtn() +
     '<div class="dhead"><div class="dav">' + initials(sl.staffName) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>Payslip · ' + sl.month + '</h2>' +
     '<div class="dmeta">' + esc(sl.staffName) + ' · ' + st.staffId + ' · ' + sl.dept + ' · pay date ' + fmtD(sl.payDate) + '</div></div>' +
@@ -417,7 +459,7 @@ DETAIL.ticket = function (id) {
   const t = Q.ticket(id);
   if (!t) return '<div class="empty">Ticket not found.</div>';
   const s = Q.sub(t.subId);
-  return backBtn('support') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1;min-width:220px"><h2>' + esc(t.title) + ' ' + statusPill(t.state) + '</h2>' +
     '<div class="dmeta">#' + t.ref + ' · ' + t.kind + ' · opened ' + ago(t.openedAt) + ' · ' + (t.assignedTo ? 'assigned to ' + esc(t.assignedName) : 'unassigned') + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
@@ -455,7 +497,7 @@ DETAIL.pay = function (id) {
   const p = DB.payments.find(x => x.id === +id);
   if (!p) return '<div class="empty">Payment not found.</div>';
   const s = Q.sub(p.subId);
-  return backBtn(UI.back === 'subscribers' ? 'subscribers' : 'payments') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1;min-width:220px"><h2>' + money(p.amount) + ' ' + statusPill(p.status) + '</h2>' +
     '<div class="dmeta">' + p.ref + ' · ' + esc(p.subscriber) + ' · ' + fmtD(p.date) + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
@@ -484,7 +526,7 @@ DETAIL.onb = function (id) {
   const o = DB.onboarding.find(x => x.id === +id);
   if (!o) return '<div class="empty">Not found.</div>';
   const s = Q.sub(o.subId);
-  return backBtn('onboarding') +
+  return backBtn() +
     '<div class="dhead"><div class="dav">' + initials(o.name) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>' + esc(o.name) + ' ' + statusPill(o.state) + '</h2>' +
     '<div class="dmeta">' + esc(o.owner) + ' · ' + esc(o.city) + ' · found us via ' + esc(o.channel) + '</div></div>' +
@@ -523,7 +565,7 @@ DETAIL.fb = function (id) {
   const f = DB.feedback.find(x => x.id === +id);
   if (!f) return '<div class="empty">Not found.</div>';
   const s = Q.sub(f.subId);
-  return backBtn('feedback') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + esc(f.title) + '</h2>' +
     '<div class="dmeta">' + f.kind + ' · ' + esc(f.subscriber) + ' · ' + fmtD(f.at) + '</div></div>' +
     '<div style="display:flex;gap:8px"><button class="btn gold" onclick="toast(\'Status change saved locally\')">Change status</button></div></div>' +
@@ -539,7 +581,7 @@ DETAIL.fb = function (id) {
 DETAIL.ann = function (id) {
   const a = DB.announcements.find(x => x.id === +id);
   if (!a) return '<div class="empty">Not found.</div>';
-  return backBtn('announcements') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + esc(a.title) + ' ' + statusPill(a.state) + '</h2>' +
     '<div class="dmeta">' + a.audience + ' · ' + a.channel + ' · ' + fmtD(a.date) + ' · by ' + a.author + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
@@ -555,7 +597,7 @@ DETAIL.ann = function (id) {
 DETAIL.task = function (id) {
   const t = DB.tasks.find(x => x.id === +id);
   if (!t) return '<div class="empty">Not found.</div>';
-  return backBtn('tasks') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + esc(t.title) + '</h2>' +
     '<div class="dmeta">' + t.priority + ' priority · assigned to ' + esc(t.assignedName) + ' · due ' + fmtD(t.due) + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
@@ -575,7 +617,7 @@ DETAIL.audit = function (id) {
   const a = DB.activity.find(x => x.id === +id);
   if (!a) return '<div class="empty">Entry not found.</div>';
   const tgt = a.target ? a.target.split(':') : null;
-  return backBtn(UI.back === 'overview' ? 'overview' : 'activity') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + a.action + '</h2>' +
     '<div class="dmeta">' + fmtD(a.at) + ' at ' + new Date(a.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' · ' + ago(a.at) + '</div></div></div>' +
     '<div class="cols"><div class="pnl"><div class="ph"><h3>What happened</h3></div>' +
@@ -598,22 +640,55 @@ DETAIL.audit = function (id) {
 DETAIL.svc = function (i) {
   const s = DB.health.services[+i];
   if (!s) return '<div class="empty">Not found.</div>';
+  const degraded = s.state !== 'operational';
+  /* deterministic latency history, worse in the last few days when degraded */
   const series = [];
-  for (let d = 29; d >= 0; d--) series.push({ label: fmtDShort(dAgo(d)), value: Math.round(s.latency * (0.7 + Math.random() * 0.6)) });
-  return backBtn('platform health') +
-    '<div class="dhead"><div style="flex:1"><h2>' + s.name + ' ' + statusPill(s.state) + '</h2>' +
+  for (let d = 29; d >= 0; d--) {
+    const wobble = 0.75 + ((d * 37) % 50) / 100;
+    const spike = degraded && d < 3 ? 1.9 : 1;
+    series.push({ label: fmtDShort(dAgo(d)), value: Math.round(s.latency * wobble * spike / (degraded ? 1.6 : 1)) });
+  }
+  const inc = DB.health.incidents.filter(x => x.service === s.name);
+
+  return backBtn() +
+    '<div class="dhead"><div style="flex:1;min-width:240px"><h2>' + s.name + ' ' + statusPill(s.state) + '</h2>' +
     '<div class="dmeta">' + s.detail + '</div></div></div>' +
-    '<div class="dstats">' + dstat(s.uptime + '%', 'Uptime 30d', s.uptime > 99.9 ? 'g' : 'a') +
+    '<div class="dstats">' +
+    dstat(s.uptime + '%', 'Uptime 30d', s.uptime > 99.9 ? 'g' : 'a') +
     dstat(s.latency + 'ms', 'Response time', s.latency > 500 ? 'r' : 'g') +
-    dstat(statusPill(s.state), 'Status') + '</div>' +
-    '<div class="pnl"><div class="ph"><div><h3>Response time</h3><div class="ph-sub">Last 30 days, milliseconds</div></div></div>' +
-    areaChart(series, { color: s.state === 'operational' ? 'var(--green)' : 'var(--amber)', height: 200 }) + '</div>';
+    dstat(degraded ? 'Degraded' : 'Operational', 'Status', degraded ? 'a' : 'g') +
+    '</div>' +
+
+    '<div class="pnl" style="border-left:3px solid ' + (degraded ? 'var(--amber)' : 'var(--green)') + '">' +
+    '<div class="ph"><h3>What this service does</h3></div>' +
+    '<p class="note">' + s.what + '</p>' +
+    '<div class="sec-t">' + (degraded ? 'What is wrong' : 'Current state') + '</div>' +
+    '<p class="note">' + s.why + '</p>' +
+    '<div class="sec-t">Who this affects</div>' +
+    '<p class="note">' + s.affects + '</p>' +
+    (degraded ? '<div class="sec-t">What happens next</div>' +
+      '<p class="note">The retry queue drains on its own. Nothing needs doing unless the oldest item in it passes ' +
+      'about an hour, at which point it is worth opening a ticket with the provider.</p>' : '') +
+    '</div>' +
+
+    '<div class="cols"><div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Response time</h3>' +
+    '<div class="ph-sub">Last 30 days, milliseconds' + (degraded ? ' — the rise at the right is the current problem' : '') + '</div></div></div>' +
+    areaChart(series, { color: degraded ? 'var(--amber)' : 'var(--green)', height: 200 }) + '</div>' +
+    (inc.length ? '<div class="pnl"><div class="ph"><h3>Incidents on this service</h3></div>' +
+      inc.map(x => '<div class="row klik" onclick="openDetail(\'inc\',' + x.id + ')">' +
+        '<div><b>' + x.title + '</b><small>started ' + ago(x.started) + '</small></div>' +
+        statusPill(x.state) + '</div>').join('') + '</div>' : '') +
+    '</div><div class="pnl"><div class="ph"><div><h3>The numbers behind that</h3>' +
+    '<div class="ph-sub">Measured over the last hour</div></div></div>' +
+    s.checks.map(c => kv(c[0], '<span style="font-variant-numeric:tabular-nums">' + c[1] + '</span>')).join('') +
+    '</div></div>';
 };
 
 DETAIL.inc = function (id) {
   const i = DB.health.incidents.find(x => x.id === +id);
   if (!i) return '<div class="empty">Not found.</div>';
-  return backBtn('platform health') +
+  return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + i.title + ' ' + statusPill(i.state) + '</h2>' +
     '<div class="dmeta">' + i.service + ' · started ' + fmtD(i.started) + ' · ' + ago(i.started) + '</div></div></div>' +
     '<div class="pnl" style="max-width:720px"><div class="ph"><h3>Impact</h3></div>' +

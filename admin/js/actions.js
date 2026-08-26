@@ -16,8 +16,29 @@ function periodBar() {
     '<div class="pfield"><label>To</label><input type="date" id="pTo" value="' + iso(PERIOD.to) + '"></div>' +
     '<button class="papply" onclick="applyCustom()">Apply date range</button>' +
     '</div></div>' +
-    '<span class="prange">' + fmtD(PERIOD.from) + ' &rarr; ' + fmtD(PERIOD.to) + ' · ' + periodDays() + ' day' + (periodDays() === 1 ? '' : 's') + '</span>' +
+    /* The exact dates only earn their place when the label alone does not say it. */
+    (PERIOD.key === 'custom' ? '' : '') +
     '</div>';
+}
+
+/* ---------------- reusable search + sort ---------------- */
+function searchBox(page, placeholder) {
+  const v = UI.q[page] || '';
+  return '<input class="srch" style="min-width:200px;flex:1;max-width:320px" value="' + esc(v) +
+    '" placeholder="' + placeholder + '" oninput="UI.q[\'' + page + '\']=this.value;renderDebounced()">';
+}
+function sortSelect(page, opts) {
+  const cur = UI.sort[page];
+  return '<select class="sel" onchange="UI.sort[\'' + page + '\']=this.value;render()">' +
+    opts.map(o => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>Sort: ' + o[1] + '</option>').join('') +
+    '</select>';
+}
+let rdT;
+function renderDebounced() { clearTimeout(rdT); rdT = setTimeout(render, 220); }
+function matches(q, fields) {
+  if (!q) return true;
+  const s = q.toLowerCase();
+  return fields.some(f => String(f == null ? '' : f).toLowerCase().includes(s));
 }
 function togglePop(e) { e.stopPropagation(); document.getElementById('ppop').classList.toggle('on'); }
 function applyPeriod(k) { setPeriod(k); render(); }
@@ -119,7 +140,7 @@ function doNewRole() {
   if (!n) { toast('Give the role a name'); return; }
   const id = n.toLowerCase().replace(/[^a-z0-9]+/g, '_');
   if (Q.role(id)) { toast('A role with that name already exists'); return; }
-  DB.roles.push({ id, name: n, builtin: false, locked: false, desc: document.getElementById('nrd').value || 'Custom role', pages: ['overview'], caps: [] });
+  DB.roles.push({ id, name: n, builtin: false, locked: false, desc: document.getElementById('nrd').value || 'Custom role', pages: ['dashboard'], caps: [] });
   saveRoles(); closeModal(); toast('Role "' + n + '" created');
   logAction('role_change', 'Role created', 'Kayode Ojomo created the ' + n + ' role');
   render();
@@ -569,7 +590,7 @@ function reopenTask(id) {
 }
 
 /* ---------------- staff ---------------- */
-function formInviteStaff() {
+function formAddStaff() {
   modal('Invite staff', 'They get an email with a link to set their own password',
     '<div class="f2"><div class="fg"><label>Full name</label><input id="isName" placeholder="Full name"></div>' +
     '<div class="fg"><label>Work email</label><input id="isEmail" type="email" placeholder="name@thelabelboard.com"></div></div>' +

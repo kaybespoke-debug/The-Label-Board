@@ -69,7 +69,7 @@
   <main class="main">
     <div class="top">
       <div>
-        <h1 id="ttl">Overview</h1>
+        <h1 id="ttl">Dashboard</h1>
         <div class="top-sub" id="sub">Monitor your platform at a glance</div>
       </div>
       <div class="top-act">
@@ -97,13 +97,14 @@
 <script src="js/detail.js"></script>
 <script src="js/metrics.js"></script>
 <script src="js/actions.js"></script>
+<script src="js/staffforms.js"></script>
 <script>
 /* ============================================================
    app.js — nav, render loop, boot
    ============================================================ */
 const NAV = [
   ['Platform', [
-    ['overview', 'Overview', 'i-home', null]
+    ['dashboard', 'Dashboard', 'i-home', null]
   ]],
   ['Subscribers', [
     ['subscribers', 'Subscribers', 'i-users', () => DB.subscribers.length],
@@ -116,8 +117,7 @@ const NAV = [
     ['revenue', 'Revenue', 'i-chart', null]
   ]],
   ['Engagement', [
-    ['support', 'Support & Usage', 'i-chat', () => Q.openTickets().length],
-    ['feedback', 'Feedback & Reviews', 'i-star', () => DB.feedback.filter(f => f.state === 'under review' || f.state === 'pending').length],
+    ['support', 'Support & Usage', 'i-chat', () => Q.openTickets().length + DB.feedback.filter(f => f.state === 'under review' || f.state === 'pending').length],
     ['announcements', 'Announcements', 'i-megaphone', () => DB.announcements.filter(a => a.state === 'scheduled').length]
   ]],
   ['Operations', [
@@ -130,15 +130,14 @@ const NAV = [
 ];
 
 const TITLES = {
-  overview: ['Overview', 'Monitor your platform at a glance'],
+  dashboard: ['Dashboard', 'Monitor your platform at a glance'],
   subscribers: ['Subscribers', 'Every business using The Label Board'],
   onboarding: ['Onboarding', 'From signup to a live, paying account'],
   billing: ['Plans & Billing', 'Plans, pricing and the referral programme'],
   payments: ['Payments', 'Every subscription transaction'],
   payroll: ['Payroll', 'Salaries, deductions and payslips'],
   revenue: ['Revenue', 'Recurring revenue and SaaS performance'],
-  support: ['Support & Usage', 'Fix problems and watch how the product is used'],
-  feedback: ['Feedback & Reviews', 'Turn what subscribers say into what ships'],
+  support: ['Support & Usage', 'Tickets, what subscribers are asking for, and how the product is used'],
   announcements: ['Announcements', 'Tell subscribers what changed'],
   health: ['Platform Health', 'Services, integrations and failures'],
   tasks: ['Tasks', 'Internal work, who owns it, when it is due'],

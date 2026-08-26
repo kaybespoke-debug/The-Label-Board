@@ -3,60 +3,132 @@
    Platform Health, Tasks, Staff & Roles, Activity, Settings
    ============================================================ */
 
-/* =================== SUPPORT & USAGE =================== */
+/* =================== SUPPORT & USAGE ===================
+   Tickets, what subscribers are asking for, how the product is used, and
+   who is at risk — one nav item, four sub-tabs. Feedback & Reviews used to
+   be its own page; it belongs next to the tickets it overlaps with.       */
 PAGES.support = function () {
   const tab = UI.filters.support;
   const open = Q.openTickets(), urg = Q.urgentTickets();
   const prog = DB.tickets.filter(t => t.state === 'in-progress');
   const res = DB.tickets.filter(t => t.state === 'resolved');
+  const feats = DB.feedback.filter(x => x.kind === 'feature');
+  const sugg = DB.feedback.filter(x => x.kind === 'suggestion');
+  const revs = DB.feedback.filter(x => x.kind === 'review');
   const u = DB.usage.series;
   const last = u[u.length - 1];
 
   const head = '<div class="utabs">' +
-    [['tickets', 'Support tickets'], ['usage', 'Product usage'], ['risk', 'At-risk accounts']]
-      .map(t => '<button class="utab' + (tab === t[0] ? ' on' : '') + '" onclick="setFilter(\'support\',\'' + t[0] + '\')">' + t[1] + '</button>').join('') +
+    [['tickets', 'Support tickets', open.length],
+     ['requests', 'Requests & reviews', feats.length + sugg.length],
+     ['usage', 'Product usage', 0],
+     ['risk', 'At-risk accounts', Q.atRisk().length]]
+      .map(t => '<button class="utab' + (tab === t[0] ? ' on' : '') +
+        '" onclick="setFilter(\'support\',\'' + t[0] + '\')">' + t[1] +
+        (t[2] ? ' <span class="note">' + t[2] + '</span>' : '') + '</button>').join('') +
     '</div>';
 
+  /* ---------- requests & reviews ---------- */
+  if (tab === 'requests') {
+    const rf = UI.reqFilter || 'all';
+    const buckets = {
+      all: DB.feedback, feature: feats, suggestion: sugg, review: revs,
+      review_state: DB.feedback.filter(x => x.state === 'under review'),
+      planned: DB.feedback.filter(x => x.state === 'planned')
+    };
+    let list = (buckets[rf] || DB.feedback).slice();
+    const q = UI.q.requests || '';
+    if (q) list = list.filter(x => matches(q, [x.title, x.body, x.subscriber]));
+    list.sort((a, b) => b.votes - a.votes);
+    const avg = revs.length ? Math.round(revs.reduce((t, r) => t + r.rating, 0) / revs.length * 10) / 10 : 0;
+
+    return head +
+      '<div class="stats">' +
+      statCard({ label: 'Feature requests', value: feats.length, tone: 'info', onclick: "UI.reqFilter='feature';render()",
+        sub: feats.filter(x => x.state === 'under review').length + ' under review · ' + feats.filter(x => x.state === 'planned').length + ' planned' }) +
+      statCard({ label: 'Suggestions', value: sugg.length, tone: 'info', onclick: "UI.reqFilter='suggestion';render()",
+        sub: 'Smaller changes and polish' }) +
+      statCard({ label: 'Reviews', value: revs.length, tone: 'good', onclick: "UI.reqFilter='review';render()",
+        sub: 'Average ' + avg + ' ' + '★'.repeat(Math.round(avg)) }) +
+      statCard({ label: 'Total votes', value: DB.feedback.reduce((t, x) => t + x.votes, 0), tone: 'money',
+        sub: 'Top request has ' + Math.max.apply(null, DB.feedback.map(x => x.votes)) }) +
+      '</div>' +
+      '<div class="bar">' +
+      [['all', 'All', DB.feedback.length], ['feature', 'Feature requests', feats.length],
+       ['suggestion', 'Suggestions', sugg.length], ['review', 'Reviews', revs.length],
+       ['review_state', 'Under review', buckets.review_state.length], ['planned', 'Planned', buckets.planned.length]]
+        .map(t => '<button class="tab' + (rf === t[0] ? ' on' : '') + '" onclick="UI.reqFilter=\'' + t[0] + '\';render()">' +
+          t[1] + '<span class="n">' + t[2] + '</span></button>').join('') +
+      '<span class="spacer"></span>' + searchBox('requests', 'Search requests…') +
+      '<button class="btn" onclick="exportFeedback()">Export CSV</button></div>' +
+      (list.length ? '<div class="cards">' + list.map(x =>
+        '<div class="card" onclick="openDetail(\'fb\',' + x.id + ')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span class="pill ' + (x.kind === 'feature' ? 'amber' : x.kind === 'suggestion' ? 'purple' : 'green') + '">' + x.kind.toUpperCase() + '</span>' +
+        (x.rating ? '<span class="note">' + '★'.repeat(x.rating) + '</span>' : '<span class="note">' + x.votes + ' votes</span>') + '</div>' +
+        '<h4>' + esc(x.title) + '</h4><p>' + esc(x.body) + '</p>' +
+        '<div class="meta"><span>' + esc(x.subscriber) + '</span>' +
+        '<span>' + statusPill(x.state === 'published' ? 'published' : x.state === 'planned' ? 'approved' : 'open') + '</span></div>' +
+        '</div>').join('') + '</div>'
+        : '<div class="pnl"><div class="empty">Nothing matches.</div></div>');
+  }
+
+  /* ---------- product usage ---------- */
   if (tab === 'usage') {
-    return head + periodBar() +
+    const totalOrders = u.reduce((t, d) => t + d.orders, 0);
+    const seatsUsed = Q.active().reduce((t, s) => t + s.users, 0);
+    const seatsTotal = Q.active().reduce((t, s) => t + s.seats, 0);
+    return head +
       '<div class="stats">' +
       statCard({ label: 'Daily active businesses', value: last.dab, tone: 'good', sub: trend(last.dab, u[u.length - 8].dab, { unit: 'week' }) }) +
       statCard({ label: 'Monthly active users', value: last.mau.toLocaleString(), tone: 'good', sub: trend(last.mau, u[0].mau, { unit: '30 days' }) }) +
-      statCard({ label: 'Orders created', value: u.reduce((t, d) => t + d.orders, 0).toLocaleString(), tone: 'money', sub: 'Last 30 days across all subscribers' }) +
-      statCard({ label: 'Avg orders / business', value: Math.round(u.reduce((t, d) => t + d.orders, 0) / Math.max(1, Q.active().length)), tone: 'info', sub: 'Per active account, 30 days' }) +
-      statCard({ label: 'At-risk accounts', value: Q.atRisk().length, tone: 'bad', onclick: "drill('subs.atrisk')", sub: 'Low activity or failed payment' }) +
-      statCard({ label: 'Seat utilisation', value: pct(Q.active().reduce((t, s) => t + s.users, 0), Q.active().reduce((t, s) => t + s.seats, 0)) + '%', tone: 'info', sub: Q.active().reduce((t, s) => t + s.users, 0) + ' of ' + Q.active().reduce((t, s) => t + s.seats, 0) + ' seats used' }) +
+      statCard({ label: 'Orders created', value: totalOrders.toLocaleString(), tone: 'money', sub: 'Last 30 days, all subscribers' }) +
+      statCard({ label: 'Seat utilisation', value: pct(seatsUsed, seatsTotal) + '%', tone: 'info', sub: seatsUsed + ' of ' + seatsTotal + ' seats in use' }) +
+      statCard({ label: 'At-risk accounts', value: Q.atRisk().length, tone: 'bad', onclick: "drill('subs.atrisk')", sub: 'Low activity or a failed payment' }) +
       '</div>' +
-      '<div class="pnl"><div class="ph"><div><h3>Daily active businesses</h3><div class="ph-sub">Last 30 days</div></div></div>' +
-      areaChart(Q.usageSeries('dab'), { color: 'var(--green)', height: 200 }) + '</div>' +
-      '<div class="pnl"><div class="ph"><div><h3>Orders created</h3><div class="ph-sub">Last 30 days, all subscribers</div></div></div>' +
-      areaChart(Q.usageSeries('orders'), { color: 'var(--gold)', height: 200 }) + '</div>' +
-      '<div class="pnl"><div class="ph"><h3>Most active subscribers</h3></div>' +
-      '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th class="num">Orders (30d)</th><th class="num">Users</th><th>Last seen</th><th></th></tr></thead><tbody>' +
-      Q.active().slice().sort((a, b) => b.ordersLast30 - a.ordersLast30).slice(0, 10).map(s =>
+      /* Side by side — they are read together, and stacking them wasted a whole screen. */
+      '<div class="cols3">' +
+      '<div class="pnl"><div class="ph"><div><h3>Daily active businesses</h3>' +
+      '<div class="ph-sub">Accounts where somebody signed in that day</div></div></div>' +
+      areaChart(Q.usageSeries('dab'), { color: 'var(--green)', height: 190 }) + '</div>' +
+      '<div class="pnl"><div class="ph"><div><h3>Orders created</h3>' +
+      '<div class="ph-sub">Across every subscriber, per day</div></div></div>' +
+      areaChart(Q.usageSeries('orders'), { color: 'var(--gold)', height: 190 }) + '</div>' +
+      '</div>' +
+      '<div class="pnl"><div class="ph"><div><h3>Most active subscribers</h3>' +
+      '<div class="ph-sub">Volume is the best early signal of who will renew</div></div></div>' +
+      '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th class="num">Orders (30d)</th>' +
+      '<th class="num">Seats used</th><th>Last seen</th><th></th></tr></thead><tbody>' +
+      Q.active().slice().sort((a, b) => b.ordersLast30 - a.ordersLast30).slice(0, 12).map(s =>
         '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')"><td class="t-main">' + esc(s.name) + '</td>' +
         '<td><span class="tier">' + s.planName + '</span></td><td class="num">' + s.ordersLast30 + '</td>' +
-        '<td class="num">' + s.users + '</td><td>' + ago(s.lastSeen) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
+        '<td class="num">' + s.users + ' / ' + s.seats + '</td><td>' + ago(s.lastSeen) + '</td>' +
+        '<td class="chev">&rsaquo;</td></tr>').join('') +
       '</tbody></table></div></div>';
   }
 
+  /* ---------- at-risk ---------- */
   if (tab === 'risk') {
     const risk = Q.atRisk();
     return head +
       '<div class="pnl"><div class="ph"><div><h3>At-risk accounts</h3>' +
-      '<div class="ph-sub">Failed payment, low activity, or a trial running out. ' + moneyShort(risk.reduce((t, s) => t + s.mrr, 0)) + ' of MRR exposed.</div></div>' +
+      '<div class="ph-sub">A failed charge, a drop in orders, or a long gap since anyone signed in. ' +
+      moneyShort(risk.reduce((t, s) => t + s.mrr, 0)) + ' of MRR is exposed here.</div></div>' +
       '<button class="btn" onclick="exportRisk()">Export CSV</button></div>' +
-      (risk.length ? '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Why</th><th class="num">Orders 30d</th><th>Last seen</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
-        risk.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
+      (risk.length ? '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Why</th>' +
+        '<th class="num">Orders 30d</th><th>Last seen</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
+        risk.slice().sort((a, b) => b.mrr - a.mrr).map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
           '<td><span class="tier">' + s.planName + '</span></td>' +
-          '<td>' + (s.pastDue ? '<span class="pill red">Payment failed</span>' : s.ordersLast30 < 12 ? '<span class="pill amber">Low activity</span>' : '<span class="pill amber">Engagement drop</span>') + '</td>' +
+          '<td>' + (s.pastDue ? '<span class="pill red">Payment failed</span>'
+            : s.ordersLast30 < 12 ? '<span class="pill amber">Low activity</span>'
+              : '<span class="pill amber">Engagement drop</span>') + '</td>' +
           '<td class="num">' + s.ordersLast30 + '</td><td>' + ago(s.lastSeen) + '</td>' +
           '<td class="num">' + money(s.mrr) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty">No accounts flagged at risk.</div>') + '</div>';
   }
 
-  /* tickets */
+  /* ---------- tickets ---------- */
   const f2 = UI.ticketFilter || 'all';
   let list = DB.tickets.slice();
   if (f2 === 'open') list = list.filter(t => t.state === 'open');
@@ -64,65 +136,40 @@ PAGES.support = function () {
   else if (f2 === 'progress') list = list.filter(t => t.state === 'in-progress');
   else if (f2 === 'resolved') list = list.filter(t => t.state === 'resolved');
   else if (f2 === 'unassigned') list = list.filter(t => !t.assignedTo);
+  const tq = UI.q.tickets || '';
+  if (tq) list = list.filter(t => matches(tq, [t.title, t.body, t.subscriber, t.ref, t.assignedName]));
 
   return head +
     '<div class="stats">' +
-    statCard({ label: 'Open tickets', value: open.length, tone: 'bad', onclick: "drill('tickets.open')", sub: '<span class="down">' + urg.length + ' urgent</span> · SLA ' + DB.settings.slaHours + 'h' }) +
-    statCard({ label: 'In progress', value: prog.length, tone: 'info', onclick: "UI.ticketFilter='progress';render()", sub: 'Assigned to an agent' }) +
-    statCard({ label: 'Unassigned', value: DB.tickets.filter(t => !t.assignedTo).length, tone: 'warn', onclick: "UI.ticketFilter='unassigned';render()", sub: 'Waiting to be picked up' }) +
-    statCard({ label: 'Avg first reply', value: Q.avgFirstReply() + 'm', tone: 'good', sub: 'Target under ' + (DB.settings.slaHours * 60) + 'm' }) +
-    statCard({ label: 'Resolved', value: res.length, tone: 'good', onclick: "UI.ticketFilter='resolved';render()", sub: 'Satisfaction ' + Q.satisfaction() + '%' }) +
-    statCard({ label: 'Support agents', value: DB.staff.filter(s => s.dept === 'Support').length, tone: 'info', onclick: "UI.filters.staff='support';go('staff')", sub: Math.round(open.length / Math.max(1, DB.staff.filter(s => s.dept === 'Support').length) * 10) / 10 + ' open each' }) +
+    statCard({ label: 'Open tickets', value: open.length, tone: urg.length ? 'bad' : 'warn', onclick: "drill('tickets.open')",
+      sub: '<span class="down">' + urg.length + ' urgent</span> · SLA ' + DB.settings.slaHours + 'h' }) +
+    statCard({ label: 'Unassigned', value: DB.tickets.filter(t => !t.assignedTo).length, tone: 'warn',
+      onclick: "UI.ticketFilter='unassigned';render()", sub: 'Waiting to be picked up' }) +
+    statCard({ label: 'Avg first reply', value: Q.avgFirstReply() + 'm', tone: 'good',
+      sub: 'Target under ' + (DB.settings.slaHours * 60) + 'm' }) +
+    statCard({ label: 'Resolved', value: res.length, tone: 'good', onclick: "UI.ticketFilter='resolved';render()",
+      sub: 'Satisfaction ' + Q.satisfaction() + '%' }) +
     '</div>' +
     '<div class="bar">' +
-    [['all', 'All', DB.tickets.length], ['urgent', 'Urgent', urg.length], ['open', 'Open', DB.tickets.filter(t => t.state === 'open').length],
-     ['progress', 'In progress', prog.length], ['unassigned', 'Unassigned', DB.tickets.filter(t => !t.assignedTo).length], ['resolved', 'Resolved', res.length]]
-      .map(t => '<button class="tab' + (f2 === t[0] ? ' on' : '') + '" onclick="UI.ticketFilter=\'' + t[0] + '\';render()">' + t[1] + '<span class="n">' + t[2] + '</span></button>').join('') +
-    '<span class="spacer"></span><button class="btn gold" onclick="formNewTicket()">+ Log a ticket</button></div>' +
+    [['all', 'All', DB.tickets.length], ['urgent', 'Urgent', urg.length],
+     ['open', 'Open', DB.tickets.filter(t => t.state === 'open').length],
+     ['progress', 'In progress', prog.length],
+     ['unassigned', 'Unassigned', DB.tickets.filter(t => !t.assignedTo).length],
+     ['resolved', 'Resolved', res.length]]
+      .map(t => '<button class="tab' + (f2 === t[0] ? ' on' : '') + '" onclick="UI.ticketFilter=\'' + t[0] + '\';render()">' +
+        t[1] + '<span class="n">' + t[2] + '</span></button>').join('') +
+    '<span class="spacer"></span>' + searchBox('tickets', 'Search tickets…') +
+    '<button class="btn gold" onclick="formNewTicket()">+ Log a ticket</button></div>' +
     (list.length ? '<div class="cards">' + list.map(t =>
       '<div class="card" onclick="openDetail(\'ticket\',' + t.id + ')">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' + statusPill(t.state) +
       '<span class="note">#' + t.ref + '</span></div>' +
       '<h4>' + esc(t.title) + '</h4><p>' + esc(t.body) + '</p>' +
       '<div class="meta"><span>' + esc(t.subscriber) + '</span><span>' + ago(t.openedAt) + '</span></div>' +
-      '<div class="meta" style="margin-top:5px"><span>' + (t.assignedTo ? '→ ' + esc(t.assignedName) : '<span style="color:var(--amber)">Unassigned</span>') + '</span>' +
+      '<div class="meta" style="margin-top:5px"><span>' +
+      (t.assignedTo ? '→ ' + esc(t.assignedName) : '<span style="color:var(--amber)">Unassigned</span>') + '</span>' +
       '<span>' + t.kind + '</span></div></div>').join('') + '</div>'
-      : '<div class="pnl"><div class="empty">No tickets here.</div></div>');
-};
-
-/* =================== FEEDBACK =================== */
-PAGES.feedback = function () {
-  const f = UI.filters.feedback;
-  const all = DB.feedback;
-  const feats = all.filter(x => x.kind === 'feature');
-  const sugg = all.filter(x => x.kind === 'suggestion');
-  const revs = all.filter(x => x.kind === 'review');
-  const list = f === 'all' ? all : f === 'feature' ? feats : f === 'suggestion' ? sugg : f === 'review' ? revs
-    : all.filter(x => x.state === f);
-  const avg = revs.length ? Math.round(revs.reduce((t, r) => t + r.rating, 0) / revs.length * 10) / 10 : 0;
-
-  return '<div class="stats">' +
-    statCard({ label: 'Feature requests', value: feats.length, tone: 'info', onclick: "setFilter('feedback','feature')", sub: feats.filter(x => x.state === 'under review').length + ' under review · ' + feats.filter(x => x.state === 'planned').length + ' planned' }) +
-    statCard({ label: 'Suggestions', value: sugg.length, tone: 'info', onclick: "setFilter('feedback','suggestion')", sub: 'Smaller changes and polish' }) +
-    statCard({ label: 'Reviews', value: revs.length, tone: 'good', onclick: "setFilter('feedback','review')", sub: revs.filter(x => x.state === 'published').length + ' approved for testimonial' }) +
-    statCard({ label: 'Average rating', value: avg, tone: 'good', sub: '★'.repeat(Math.round(avg)) }) +
-    statCard({ label: 'Total votes', value: all.reduce((t, x) => t + x.votes, 0), tone: 'money', sub: 'Across all open requests' }) +
-    statCard({ label: 'Top request', value: Math.max.apply(null, all.map(x => x.votes)) + ' votes', tone: 'money', sub: esc(all.slice().sort((a, b) => b.votes - a.votes)[0].title) }) +
-    '</div>' +
-    '<div class="bar">' + tabBar('feedback', [
-      { k: 'all', t: 'All', n: all.length }, { k: 'feature', t: 'Feature requests', n: feats.length },
-      { k: 'suggestion', t: 'Suggestions', n: sugg.length }, { k: 'review', t: 'Reviews', n: revs.length },
-      { k: 'planned', t: 'Planned', n: all.filter(x => x.state === 'planned').length },
-      { k: 'under review', t: 'Under review', n: all.filter(x => x.state === 'under review').length }
-    ]) + '<span class="spacer"></span><button class="btn" onclick="exportFeedback()">Export CSV</button></div>' +
-    (list.length ? '<div class="cards">' + list.slice().sort((a, b) => b.votes - a.votes).map(x =>
-      '<div class="card" onclick="openDetail(\'fb\',' + x.id + ')">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-      '<span class="pill ' + (x.kind === 'feature' ? 'amber' : x.kind === 'suggestion' ? 'purple' : 'green') + '">' + x.kind.toUpperCase() + '</span>' +
-      (x.rating ? '<span class="note">' + '★'.repeat(x.rating) + '</span>' : '<span class="note">' + x.votes + ' votes</span>') + '</div>' +
-      '<h4>' + esc(x.title) + '</h4><p>' + esc(x.body) + '</p>' +
-      '<div class="meta"><span>' + esc(x.subscriber) + '</span><span>' + statusPill(x.state === 'published' ? 'published' : x.state === 'planned' ? 'approved' : 'open') + '</span></div>' +
-      '</div>').join('') + '</div>' : '<div class="pnl"><div class="empty">Nothing here yet.</div></div>');
+      : '<div class="pnl"><div class="empty">No tickets match.</div></div>');
 };
 
 /* =================== ANNOUNCEMENTS =================== */
@@ -157,50 +204,85 @@ PAGES.announcements = function () {
       : '<div class="empty">Nothing in this state.</div>') + '</div>';
 };
 
-/* =================== PLATFORM HEALTH =================== */
+/* =================== PLATFORM HEALTH ===================
+   Not a wall of graphs. Each service says what it is, whether it is fine, and
+   if it is not, exactly what is wrong and who is feeling it.                */
 PAGES.health = function () {
   const h = DB.health;
-  const down = h.services.filter(s => s.state !== 'operational');
+  const bad = h.services.filter(s => s.state !== 'operational');
   const errs = h.errors.reduce((t, e) => t + e.count, 0);
+  const openInc = h.incidents.filter(i => i.state !== 'resolved');
   const avgUp = Math.round(h.services.reduce((t, s) => t + s.uptime, 0) / h.services.length * 100) / 100;
 
-  return '<div class="pnl" style="border-left:3px solid var(--gold)">' +
-    '<div class="ph"><h3>What this page is for</h3></div>' +
-    '<p class="note">Platform Health watches the machinery your subscribers depend on: the API, the database, the payment ' +
-    'gateway, email delivery, file storage and the subscriber app itself. When something here goes amber or red, ' +
-    'subscribers are likely already feeling it, so it tells you what broke, since when, and who it affects, before the ' +
-    'support tickets arrive. The error list underneath is the raw fault log with counts, so a fault that fires six times ' +
-    'reads differently from one that fired once.</p></div>' +
+  /* the one thing worth reading first */
+  const headline = bad.length
+    ? '<div class="pnl" style="border-left:3px solid var(--amber)">' +
+      '<div class="ph"><div><h3>' + bad.map(s => s.name).join(' and ') + ' ' +
+      (bad.length === 1 ? 'is' : 'are') + ' degraded</h3>' +
+      '<div class="ph-sub">Everything else is operating normally</div></div>' +
+      statusPill('degraded') + '</div>' +
+      bad.map(s => '<p class="note" style="margin-bottom:10px"><b style="color:var(--text)">' + s.name + ':</b> ' + s.why + '</p>' +
+        '<p class="note"><b style="color:var(--text)">Who this affects:</b> ' + s.affects + '</p>' +
+        '<button class="btn" style="margin-top:12px" onclick="openDetail(\'svc\',' + h.services.indexOf(s) + ')">' +
+        'Open ' + s.name + ' &rarr;</button>').join('<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">') +
+      '</div>'
+    : '<div class="pnl" style="border-left:3px solid var(--green)">' +
+      '<div class="ph"><h3>Everything is operating normally</h3>' + statusPill('operational') + '</div>' +
+      '<p class="note">All six services are responding, no open incidents, and nothing in the error log needs a decision.</p></div>';
 
+  return headline +
     '<div class="stats">' +
-    statCard({ label: 'Overall', value: down.length ? 'Degraded' : 'Operational', tone: down.length ? 'warn' : 'good', sub: avgUp + '% average uptime, 30 days' }) +
-    statCard({ label: 'Services up', value: (h.services.length - down.length) + '/' + h.services.length, tone: down.length ? 'warn' : 'good', sub: down.length ? down.map(d => d.name).join(', ') + ' affected' : 'Everything responding' }) +
-    statCard({ label: 'Open incidents', value: h.incidents.filter(i => i.state !== 'resolved').length, tone: h.incidents.filter(i => i.state !== 'resolved').length ? 'bad' : 'good', sub: h.incidents.filter(i => i.state !== 'resolved').length ? 'Being investigated now' : 'None open' }) +
-    statCard({ label: 'Errors, 24h', value: errs, tone: errs > 10 ? 'bad' : 'warn', sub: h.errors.filter(e => e.severity === 'high').length + ' need a look' }) +
+    statCard({ label: 'Overall', value: bad.length ? 'Degraded' : 'Operational', tone: bad.length ? 'warn' : 'good',
+      sub: avgUp + '% average uptime over 30 days' }) +
+    statCard({ label: 'Services up', value: (h.services.length - bad.length) + '/' + h.services.length,
+      tone: bad.length ? 'warn' : 'good', sub: bad.length ? bad.map(d => d.name).join(', ') + ' affected' : 'Everything responding' }) +
+    statCard({ label: 'Open incidents', value: openInc.length, tone: openInc.length ? 'bad' : 'good',
+      sub: openInc.length ? openInc[0].title : 'None open' }) +
+    statCard({ label: 'Errors, 24h', value: errs, tone: errs > 10 ? 'bad' : 'warn',
+      sub: h.errors.filter(e => e.severity === 'high').length + ' need a look' }) +
     '</div>' +
 
-    '<div class="cols"><div>' +
-    '<div class="pnl"><div class="ph"><div><h3>Services</h3><div class="ph-sub">Tap a service for its recent history</div></div></div>' +
-    '<div class="tw"><table><thead><tr><th>Service</th><th>Status</th><th class="num">Uptime 30d</th><th class="num">Latency</th><th></th></tr></thead><tbody>' +
+    '<div class="pnl"><div class="ph"><div><h3>Services</h3>' +
+    '<div class="ph-sub">Tap a service for what it does, what is happening to it, and the numbers behind that</div></div></div>' +
+    '<div class="tw"><table><thead><tr><th>Service</th><th>Status</th><th>What it does</th>' +
+    '<th class="num">Uptime 30d</th><th class="num">Response</th><th></th></tr></thead><tbody>' +
     h.services.map((s, i) => '<tr class="klik" onclick="openDetail(\'svc\',' + i + ')">' +
       '<td><div class="t-main">' + s.name + '</div><div class="t-sub">' + s.detail + '</div></td>' +
       '<td>' + statusPill(s.state) + '</td>' +
+      '<td style="white-space:normal;max-width:300px" class="note">' + s.what + '</td>' +
       '<td class="num">' + s.uptime + '%</td>' +
       '<td class="num"' + (s.latency > 500 ? ' style="color:var(--amber)"' : '') + '>' + s.latency + 'ms</td>' +
       '<td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div></div>' +
 
-    '<div class="pnl"><div class="ph"><h3>Error log, last 24 hours</h3>' +
+    '<div class="cols"><div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Error log, last 24 hours</h3>' +
+    '<div class="ph-sub">Counts matter — a fault that fired six times is not the same as one that fired once</div></div>' +
     '<button class="lnk" onclick="exportErrors()">Export</button></div>' +
-    '<div class="tw"><table><thead><tr><th>Code</th><th class="num">Count</th><th>Severity</th><th>Last seen</th><th>Note</th></tr></thead><tbody>' +
+    '<div class="tw"><table><thead><tr><th>Code</th><th class="num">Count</th><th>Severity</th>' +
+    '<th>Last seen</th><th>What it means</th></tr></thead><tbody>' +
     h.errors.map(e => '<tr><td class="t-main" style="font-family:monospace;font-size:11.5px">' + e.code + '</td>' +
       '<td class="num">' + e.count + '</td>' +
       '<td>' + (e.severity === 'high' ? '<span class="pill red">High</span>' : '<span class="pill grey">Low</span>') + '</td>' +
-      '<td>' + ago(e.last) + '</td><td class="note">' + e.note + '</td></tr>').join('') +
+      '<td>' + ago(e.last) + '</td><td class="note" style="white-space:normal">' + e.note + '</td></tr>').join('') +
     '</tbody></table></div></div>' +
+
+    '<div class="pnl"><div class="ph"><h3>What the statuses mean</h3></div>' +
+    '<div class="kv"><span class="k">' + statusPill('operational') + '</span>' +
+    '<span class="v" style="font-weight:400;text-align:right;max-width:420px">Working as it should. ' +
+    'Requests are being answered inside the normal time.</span></div>' +
+    '<div class="kv"><span class="k">' + statusPill('degraded') + '</span>' +
+    '<span class="v" style="font-weight:400;text-align:right;max-width:420px">Still working, but not properly — slow, ' +
+    'or succeeding only after a retry. Nothing has been switched off or reduced. ' +
+    'It is not the same as downgraded, which would mean a plan or a version being moved to a lower one.</span></div>' +
+    '<div class="kv"><span class="k">' + statusPill('down') + '</span>' +
+    '<span class="v" style="font-weight:400;text-align:right;max-width:420px">Not responding at all. ' +
+    'Subscribers cannot use whatever depends on it.</span></div>' +
+    '</div>' +
+
     '</div><div>' +
     '<div class="pnl"><div class="ph"><h3>Incidents</h3></div>' +
     h.incidents.map(i => '<div class="row klik" onclick="openDetail(\'inc\',' + i.id + ')">' +
-      '<div><b>' + i.title + '</b><small>' + i.service + ' · ' + ago(i.started) + '</small></div>' +
+      '<div><b>' + i.title + '</b><small>' + i.service + ' · started ' + ago(i.started) + '</small></div>' +
       statusPill(i.state) + '</div>').join('') + '</div>' +
     '<div class="pnl"><div class="ph"><h3>Integrations</h3></div>' +
     DB.settings.integrations.map(i => '<div class="row"><div><b>' + i.name + '</b><small>' + i.detail + '</small></div>' +
@@ -244,81 +326,155 @@ PAGES.tasks = function () {
       : '<div class="pnl"><div class="empty">Nothing in this list.</div></div>');
 };
 
-/* =================== STAFF & ROLES =================== */
+/* =================== STAFF & ROLES ===================
+   Two sub-tabs, same pattern as Support & Usage: the team, and attendance.
+   Attendance carries its own detail (clock in/out, the daily log, headcount by
+   department) rather than crowding the team list.                          */
 PAGES.staff = function () {
-  const f = UI.filters.staff;
+  const tab = UI.staffTab || 'team';
   const all = DB.staff;
   const byDept = d => all.filter(s => s.dept.toLowerCase() === d);
-  const list = f === 'all' ? all : byDept(f);
   const totalPay = all.reduce((t, s) => t + s.basic + s.housing + s.transport, 0);
 
-  return '<div class="stats">' +
-    statCard({ label: 'Total staff', value: all.length, tone: 'money', onclick: "drill('staff.total')", sub: all.filter(s => s.empType === 'Full time').length + ' full time · ' + DB.roles.length + ' roles' }) +
-    statCard({ label: 'On the floor now', value: Q.onFloorNow(), tone: 'good', onclick: "drill('staff.onfloor')", sub: 'Clocked in and not out yet' }) +
-    statCard({ label: 'Late today', value: Q.lateToday(), tone: Q.lateToday() ? 'warn' : 'good', onclick: "drill('staff.late')", sub: 'Clocked in after 09:00' }) +
-    statCard({ label: 'On leave today', value: Q.onLeaveToday(), tone: 'info', onclick: "drill('staff.leave')", sub: DB.leave.filter(l => l.status === 'pending').length + ' requests pending' }) +
-    statCard({ label: 'Monthly payroll', value: moneyShort(totalPay), tone: 'money', onclick: "drill('pay.gross')", sub: 'Gross before bonuses' }) +
+  const head = '<div class="utabs">' +
+    [['team', 'All staff', all.length], ['attendance', 'Attendance', Q.onFloorNow()]]
+      .map(t => '<button class="utab' + (tab === t[0] ? ' on' : '') +
+        '" onclick="UI.staffTab=\'' + t[0] + '\';render()">' + t[1] +
+        ' <span class="note">' + t[2] + '</span></button>').join('') +
+    '</div>';
+
+  /* ---------- attendance ---------- */
+  if (tab === 'attendance') {
+    const notIn = all.filter(s => { const a = Q.attToday(s.id); return !a || !a.in; });
+    const doneToday = all.filter(s => { const a = Q.attToday(s.id); return a && a.in && a.out; });
+    const avgRate = Math.round(all.reduce((t, s) => t + Q.attRate(s.id), 0) / all.length);
+    const deptRows = ['Management', 'Finance', 'Support', 'Product', 'Operations'].map((d, i) => ({
+      label: d, value: all.filter(s => s.dept === d).length,
+      color: ['var(--gold)', 'var(--green)', 'var(--blue)', 'var(--purple)', 'var(--amber)'][i]
+    })).filter(r => r.value);
+
+    return head +
+      '<div class="stats">' +
+      statCard({ label: 'On the floor now', value: Q.onFloorNow(), tone: 'good', onclick: "drill('staff.onfloor')",
+        sub: 'Clocked in and not out yet' }) +
+      statCard({ label: 'Late today', value: Q.lateToday(), tone: Q.lateToday() ? 'warn' : 'good', onclick: "drill('staff.late')",
+        sub: 'Clocked in after 09:00' }) +
+      statCard({ label: 'On leave today', value: Q.onLeaveToday(), tone: 'info', onclick: "drill('staff.leave')",
+        sub: DB.leave.filter(l => l.status === 'pending').length + ' requests pending' }) +
+      statCard({ label: 'Not clocked in', value: notIn.length, tone: notIn.length ? 'warn' : 'good',
+        sub: doneToday.length + ' already finished for the day' }) +
+      statCard({ label: 'Team average, 30d', value: avgRate + '%', tone: avgRate >= 90 ? 'good' : 'warn',
+        sub: 'Late still counts as present' }) +
+      '</div>' +
+
+      '<div class="pnl"><div class="ph"><div><h3>Today · ' + fmtD(DB.today) + '</h3>' +
+      '<div class="ph-sub">Clock people in and out from here, or from their own profile</div></div>' +
+      '<span class="note">' + Q.onFloorNow() + ' of ' + all.length + ' on the floor</span></div>' +
+      '<div class="tw"><table><thead><tr><th>Staff</th><th>Department</th><th>In</th><th>Out</th>' +
+      '<th class="num">Hours</th><th>State</th><th></th></tr></thead><tbody>' +
+      all.map(s => {
+        const a = Q.attToday(s.id);
+        return '<tr><td class="klik t-main" onclick="openDetail(\'staff\',' + s.id + ')">' + esc(s.name) + '</td>' +
+          '<td>' + s.dept + '</td>' +
+          '<td>' + (a && a.in ? a.in : '<span class="note">—</span>') + '</td>' +
+          '<td>' + (a && a.out ? a.out : (a && a.in ? '<span class="pill green">on floor</span>' : '<span class="note">—</span>')) + '</td>' +
+          '<td class="num">' + (a && a.hours ? a.hours : '—') + '</td>' +
+          '<td>' + (a ? statusPill(a.state) : '<span class="note">not recorded</span>') + '</td>' +
+          '<td>' + (!a || !a.in
+            ? '<button class="btn sm" onclick="clockIn(' + s.id + ')">Clock in</button>'
+            : (!a.out ? '<button class="btn sm gold" onclick="clockOut(' + s.id + ')">Clock out</button>'
+              : '<span class="note">done</span>')) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>' +
+
+      '<div class="cols">' +
+      '<div class="pnl"><div class="ph"><div><h3>Attendance, last 30 days</h3>' +
+      '<div class="ph-sub">Rate excludes approved leave</div></div></div>' +
+      '<div class="tw"><table><thead><tr><th>Staff</th><th class="num">Rate</th><th class="num">Present</th>' +
+      '<th class="num">Late</th><th class="num">Absent</th><th class="num">Hours</th><th></th></tr></thead><tbody>' +
+      all.slice().sort((a, b) => Q.attRate(a.id) - Q.attRate(b.id)).map(s => {
+        const att = Q.attFor(s.id, 30);
+        const rate = Q.attRate(s.id);
+        return '<tr class="klik" onclick="UI.vtab[\'staff' + s.id + '\']=\'attendance\';openDetail(\'staff\',' + s.id + ')">' +
+          '<td class="t-main">' + esc(s.name) + '</td>' +
+          '<td class="num"' + (rate < 85 ? ' style="color:var(--amber)"' : '') + '>' + rate + '%</td>' +
+          '<td class="num">' + att.filter(a => a.state === 'present').length + '</td>' +
+          '<td class="num">' + att.filter(a => a.state === 'late').length + '</td>' +
+          '<td class="num">' + att.filter(a => a.state === 'absent').length + '</td>' +
+          '<td class="num">' + Math.round(att.reduce((t, a) => t + a.hours, 0)) + 'h</td>' +
+          '<td class="chev">&rsaquo;</td></tr>';
+      }).join('') + '</tbody></table></div></div>' +
+
+      '<div>' +
+      '<div class="pnl"><div class="ph"><h3>Headcount by department</h3></div>' +
+      hBars(deptRows) + '</div>' +
+      '<div class="pnl"><div class="ph"><div><h3>Leave requests</h3>' +
+      '<div class="ph-sub">' + DB.leave.filter(l => l.status === 'pending').length + ' awaiting approval</div></div></div>' +
+      (DB.leave.filter(l => l.status === 'pending').length
+        ? DB.leave.filter(l => l.status === 'pending').slice(0, 8).map(l =>
+          '<div class="row klik" onclick="UI.vtab[\'staff' + l.staffId + '\']=\'leave\';openDetail(\'staff\',' + l.staffId + ')">' +
+          '<div><b>' + esc((Q.staffM(l.staffId) || {}).name) + '</b><small>' + l.type + ' · ' + l.days +
+          ' day' + (l.days === 1 ? '' : 's') + ' from ' + fmtDShort(l.from) + '</small></div>' +
+          '<span class="pill amber">Pending</span></div>').join('')
+        : '<div class="note">Nothing awaiting approval.</div>') + '</div>' +
+      '</div></div>';
+  }
+
+  /* ---------- the team ---------- */
+  const f = UI.filters.staff;
+  let list = f === 'all' ? all.slice() : byDept(f).slice();
+  const q = UI.q.staff || '';
+  if (q) list = list.filter(s => matches(q, [s.name, s.title, s.dept, s.email, s.staffId, s.username]));
+  const sorters = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    dept: (a, b) => a.dept.localeCompare(b.dept) || a.name.localeCompare(b.name),
+    'pay-desc': (a, b) => b.basic - a.basic,
+    'pay-asc': (a, b) => a.basic - b.basic,
+    longest: (a, b) => a.startDate.localeCompare(b.startDate),
+    newest: (a, b) => b.startDate.localeCompare(a.startDate),
+    attendance: (a, b) => Q.attRate(a.id) - Q.attRate(b.id),
+    rating: (a, b) => b.rating - a.rating
+  };
+  list.sort(sorters[UI.sort.staff || 'name'] || sorters.name);
+
+  return head +
+    '<div class="stats">' +
+    statCard({ label: 'Total staff', value: all.length, tone: 'money', onclick: "drill('staff.total')",
+      sub: all.filter(s => s.empType === 'Full time').length + ' full time · ' + DB.roles.length + ' roles' }) +
+    statCard({ label: 'Monthly payroll', value: moneyShort(totalPay), tone: 'money', onclick: "drill('pay.gross')",
+      sub: 'Basic pay, before bonus or overtime' }) +
+    statCard({ label: 'On the floor now', value: Q.onFloorNow(), tone: 'good', onclick: "UI.staffTab='attendance';render()",
+      sub: Q.lateToday() + ' late · ' + Q.onLeaveToday() + ' on leave' }) +
+    statCard({ label: 'Pension enrolled', value: all.filter(s => s.pension.optedIn).length + '/' + all.length, tone: 'info',
+      sub: 'Voluntary — each person opts in' }) +
     '</div>' +
+
     '<div class="bar">' + tabBar('staff', [
-      { k: 'all', t: 'All staff', n: all.length },
+      { k: 'all', t: 'All', n: all.length },
       { k: 'management', t: 'Management', n: byDept('management').length },
       { k: 'support', t: 'Support', n: byDept('support').length },
       { k: 'finance', t: 'Finance', n: byDept('finance').length },
       { k: 'product', t: 'Product', n: byDept('product').length },
       { k: 'operations', t: 'Operations', n: byDept('operations').length }
     ]) + '<span class="spacer"></span>' +
+    searchBox('staff', 'Search name, role, email…') +
+    sortSelect('staff', [['name', 'Name A–Z'], ['dept', 'Department'], ['pay-desc', 'Pay high → low'],
+      ['pay-asc', 'Pay low → high'], ['longest', 'Longest serving'], ['newest', 'Newest joiner'],
+      ['attendance', 'Attendance (lowest first)'], ['rating', 'Rating']]) +
     '<button class="btn" onclick="exportStaff()">Export CSV</button>' +
-    '<button class="btn gold" onclick="formInviteStaff()">+ Invite staff</button></div>' +
+    '<button class="btn gold" onclick="formAddStaff()">+ Add staff</button></div>' +
 
-    '<div class="pnl"><div class="ph"><div><h3>Team</h3>' +
-    '<div class="ph-sub">Tap anyone to open their full record: profile, pay, payslips, attendance, leave and documents</div></div></div>' +
-    '<div class="tw"><table><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Today</th>' +
-    '<th class="num">Attendance 30d</th><th class="num">Monthly gross</th><th>Status</th><th></th></tr></thead><tbody>' +
-    list.map(s => {
-      const a = Q.attToday(s.id);
-      const todayCell = !a ? '<span class="note">—</span>'
-        : a.state === 'leave' ? statusPill('leave')
-          : a.state === 'absent' ? statusPill('absent')
-            : a.in && !a.out ? '<span class="pill green">In since ' + a.in + '</span>'
-              : a.in ? '<span class="note">' + a.in + '–' + a.out + '</span>' : '<span class="note">—</span>';
-      return '<tr class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
+    '<div class="pnl"><div class="ph"><div><h3>The team</h3>' +
+    '<div class="ph-sub">' + list.length + ' of ' + all.length + ' shown · tap anyone for their full record</div></div></div>' +
+    (list.length ? '<div class="tw"><table><thead><tr><th>Name</th><th>Department</th><th>Role</th>' +
+      '<th class="num">Monthly basic</th><th>Started</th><th>Status</th><th></th></tr></thead><tbody>' +
+      list.map(s => '<tr class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.staffId + ' · ' + s.username + '</div></td>' +
-        '<td>' + s.dept + '</td><td>' + s.title + '</td>' +
-        '<td>' + todayCell + '</td>' +
-        '<td class="num">' + Q.attRate(s.id) + '%</td>' +
-        '<td class="num">' + money(s.basic + s.housing + s.transport) + '</td>' +
-        '<td>' + statusPill(s.status) + '</td><td class="chev">&rsaquo;</td></tr>';
-    }).join('') + '</tbody></table></div></div>' +
-
-    '<div class="cols"><div class="pnl"><div class="ph"><div><h3>Attendance today</h3>' +
-    '<div class="ph-sub">Clock people in and out from their profile, or right here</div></div>' +
-    '<span class="note">' + fmtD(DB.today) + '</span></div>' +
-    '<div class="tw"><table><thead><tr><th>Staff</th><th>In</th><th>Out</th><th class="num">Hours</th><th>State</th><th></th></tr></thead><tbody>' +
-    all.map(s => {
-      const a = Q.attToday(s.id);
-      return '<tr><td class="t-main">' + esc(s.name) + '</td>' +
-        '<td>' + (a && a.in ? a.in : '<span class="note">—</span>') + '</td>' +
-        '<td>' + (a && a.out ? a.out : (a && a.in ? '<span class="pill green">on floor</span>' : '<span class="note">—</span>')) + '</td>' +
-        '<td class="num">' + (a && a.hours ? a.hours : '—') + '</td>' +
-        '<td>' + (a ? statusPill(a.state) : '<span class="note">not recorded</span>') + '</td>' +
-        '<td>' + (!a || !a.in
-          ? '<button class="btn sm" onclick="clockIn(' + s.id + ')">Clock in</button>'
-          : (!a.out ? '<button class="btn sm" onclick="clockOut(' + s.id + ')">Clock out</button>'
-            : '<span class="note">done</span>')) + '</td></tr>';
-    }).join('') + '</tbody></table></div></div>' +
-    '<div class="pnl"><div class="ph"><h3>Headcount by department</h3></div>' +
-    hBars(['Management', 'Finance', 'Support', 'Product', 'Operations'].map((d, i) => ({
-      label: d, value: all.filter(s => s.dept === d).length,
-      color: ['var(--gold)', 'var(--green)', 'var(--blue)', 'var(--purple)', 'var(--amber)'][i],
-      onclick: "setFilter('staff','" + d.toLowerCase() + "')"
-    }))) +
-    '<div class="sec-t">Leave requests</div>' +
-    (DB.leave.filter(l => l.status === 'pending').length
-      ? DB.leave.filter(l => l.status === 'pending').slice(0, 5).map(l => '<div class="row klik" onclick="openDetail(\'staff\',' + l.staffId + ')">' +
-        '<div><b>' + esc((Q.staffM(l.staffId) || {}).name) + '</b><small>' + l.type + ' · ' + l.days + ' days · ' + fmtDShort(l.from) + '</small></div>' +
-        '<span class="pill amber">Pending</span></div>').join('')
-      : '<div class="note">No pending requests.</div>') +
-    '</div></div>';
+        '<td>' + s.dept + '</td>' +
+        '<td><div>' + s.title + '</div><div class="t-sub">' + ((Q.role(s.roleId) || {}).name || '—') + '</div></td>' +
+        '<td class="num">' + money(s.basic) + '</td>' +
+        '<td>' + fmtD(s.startDate) + '</td>' +
+        '<td>' + statusPill(s.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
+      '</tbody></table></div>' : '<div class="empty">Nobody matches.</div>') + '</div>';
 };
 
 /* =================== ACTIVITY LOG =================== */
@@ -326,7 +482,15 @@ PAGES.activity = function () {
   const f = UI.filters.activity;
   let list = DB.activity.slice();
   if (f !== 'all') list = list.filter(a => a.kind === f);
-  if (UI.search) { const q = UI.search.toLowerCase(); list = list.filter(a => a.detail.toLowerCase().includes(q) || a.actor.toLowerCase().includes(q)); }
+  const q = UI.q.activity || '';
+  if (q) list = list.filter(a => matches(q, [a.detail, a.actor, a.action, a.actorRole, a.ip, a.reason]));
+  const sorters = {
+    newest: (a, b) => b.at.localeCompare(a.at),
+    oldest: (a, b) => a.at.localeCompare(b.at),
+    actor: (a, b) => a.actor.localeCompare(b.actor) || b.at.localeCompare(a.at),
+    action: (a, b) => a.action.localeCompare(b.action) || b.at.localeCompare(a.at)
+  };
+  list.sort(sorters[UI.sort.activity || 'newest'] || sorters.newest);
   const kinds = [['all', 'Everything'], ['plan_change', 'Plan changes'], ['refund', 'Refunds'],
     ['role_change', 'Permission changes'], ['payroll', 'Payroll'], ['slip_publish', 'Payslips'],
     ['account_view', 'Account access'], ['export', 'Exports'], ['login', 'Sign-ins'], ['announce', 'Announcements']];
@@ -339,9 +503,13 @@ PAGES.activity = function () {
     '</div>' +
     '<div class="bar">' +
     kinds.map(k => '<button class="tab' + (f === k[0] ? ' on' : '') + '" onclick="setFilter(\'activity\',\'' + k[0] + '\')">' + k[1] + '</button>').join('') +
-    '<span class="spacer"></span><button class="btn" onclick="exportActivity()">Export CSV</button></div>' +
+    '</div>' +
+    '<div class="bar">' + searchBox('activity', 'Search who, what, or why…') +
+    sortSelect('activity', [['newest', 'Newest first'], ['oldest', 'Oldest first'],
+      ['actor', 'Who did it'], ['action', 'Type of action']]) +
+    '<button class="btn" onclick="exportActivity()">Export CSV</button></div>' +
     '<div class="pnl"><div class="ph"><div><h3>Platform audit log</h3>' +
-    '<div class="ph-sub">Tap any entry for the full record: who, when, from where, on what, and why</div></div></div>' +
+    '<div class="ph-sub">' + list.length + ' entries · tap any one for who, when, from where, on what, and why</div></div></div>' +
     (list.length ? '<div class="tw"><table><thead><tr><th>Action</th><th>Detail</th><th>Who</th><th>When</th><th></th></tr></thead><tbody>' +
       list.slice(0, 120).map(a => '<tr class="klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
         '<td class="t-main">' + a.action + '</td>' +
@@ -379,15 +547,45 @@ PAGES.settings = function () {
     kvEdit('Trial length', s.trialDays + ' days', "editSetting('trialDays','Trial length in days','number')") +
     kvEdit('Support SLA', s.slaHours + ' hours', "editSetting('slaHours','Support SLA in hours','number')") +
     kvEdit('Referral commission', s.referralPct + '% of first month', "editSetting('referralPct','Referral commission %','number')") +
-    kvEdit('Tax rate', s.taxPct + '% VAT', "editSetting('taxPct','Tax rate %','number')");
+    kvEdit('Tax rate', s.taxPct + '% VAT', "editSetting('taxPct','Tax rate %','number')") +
+    '<div class="sec-t">Pay policy</div>' +
+    '<div class="kv klik" style="cursor:pointer" onclick="formAllowances()">' +
+    '<span class="k">Staff allowances</span><span class="v">' +
+    (s.allowances.enabled
+      ? 'Housing ' + s.allowances.housingPct + '% · transport ' + s.allowances.transportPct + '%'
+      : '<span class="pill grey">Not in use</span>') + ' <span class="chev">&rsaquo;</span></span></div>' +
+    kvEdit('Default pension rate', s.pensionDefaultRate + '% of basic', "editSetting('pensionDefaultRate','Default pension rate %','number')") +
+    '<p class="note">Allowances are off while we are a startup, so gross pay equals basic. Pension is voluntary and ' +
+    'set per person on their Pay setup tab — this is only the rate offered by default.</p>';
 
-  /* --- company --- */
+  /* --- company & settlement --- */
+  const t = s.settlement;
   const company =
+    '<div class="sec-t">Settlement account</div>' +
+    '<p class="note">Every subscription payment is paid out to this account. Held as separate fields so it can be ' +
+    'validated and reconciled, rather than one line of text.</p>' +
+    '<div class="pnl" style="background:var(--panel-2);margin:12px 0 0">' +
+    '<div class="ph"><div><h3 style="font-size:13px">' + esc(t.accountName) + '</h3>' +
+    '<div class="ph-sub">' + esc(t.bankName) + ' · ' + esc(t.accountNumber) + '</div></div>' +
+    (t.verified ? '<span class="pill green">Verified ' + fmtDShort(t.verifiedOn) + '</span>'
+      : '<span class="pill amber">Awaiting verification</span>') + '</div>' +
+    kv('Account name', esc(t.accountName)) +
+    kv('Account number', esc(t.accountNumber)) +
+    kv('Bank', esc(t.bankName)) +
+    kv('Account type', esc(t.accountType)) +
+    kv('Branch', esc(t.branch)) +
+    kv('Currency', esc(t.currency)) +
+    kv('Sort code', esc(t.sortCode)) +
+    kv('SWIFT / BIC', esc(t.swift)) +
+    kv('Tax ID (TIN)', esc(t.tin)) +
+    kv('Payout schedule', esc(t.payoutSchedule)) +
+    kv('Verified', t.verified ? 'Yes, on ' + fmtD(t.verifiedOn) : '<span style="color:var(--amber)">Not since the last change</span>') +
+    '</div>' +
+    '<button class="btn gold" style="margin-top:14px" onclick="formSettlement()">Edit settlement account</button>' +
+    '<div class="sec-t">Invoice numbering</div>' +
     kvEdit('Invoice prefix', s.invoicePrefix, "editSetting('invoicePrefix','Invoice prefix','text')") +
-    kvEdit('Settlement account', s.bank, "editSetting('bank','Settlement account','text')") +
-    '<div class="sec-t">Numbering</div>' +
-    '<p class="note">Invoices run as ' + s.invoicePrefix + '-00001 upward. Changing the prefix affects new invoices only, ' +
-    'never ones already issued.</p>';
+    '<p class="note">Invoices run as ' + s.invoicePrefix + '-00001 upward. Changing the prefix affects new invoices ' +
+    'only, never ones already issued.</p>';
 
   /* --- team accounts --- */
   const accounts =
@@ -401,7 +599,7 @@ PAGES.settings = function () {
         '<small>' + st.username + ' · ' + st.email + '</small></div>' +
         '<button class="btn sm" onclick="event.stopPropagation();formStaffRole(' + st.id + ')">Change role</button></div>';
     }).join('') + '</div>' +
-    '<button class="btn gold" style="margin-top:14px" onclick="formInviteStaff()">+ Add account</button>';
+    '<button class="btn gold" style="margin-top:14px" onclick="formAddStaff()">+ Add account</button>';
 
   /* --- roles & permissions (editable) --- */
   const roles =

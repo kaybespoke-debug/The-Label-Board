@@ -122,9 +122,13 @@ a{color:var(--gold);text-decoration:none}
 .st.info .sv{color:var(--blue)}
 
 /* ---------- panels ---------- */
-.cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(310px,.5fr);gap:14px;align-items:start}
-.cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.pnl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;margin-bottom:14px}
+/* minmax(0,…) everywhere: a grid item defaults to min-width:auto, which lets a
+   wide table's min-width stretch the whole column instead of scrolling inside it. */
+.cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(min(310px,100%),.5fr);gap:14px;align-items:start}
+.cols>*{min-width:0}
+.cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px}
+.cols3>*{min-width:0}
+.pnl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;margin-bottom:14px;min-width:0}
 .ph{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .pnl h3{font-size:14.5px}
 .ph-sub{font-size:11.5px;color:var(--faint);margin-top:3px}
@@ -133,8 +137,10 @@ a{color:var(--gold);text-decoration:none}
 .empty{padding:34px 10px;text-align:center;color:var(--faint);font-size:13px}
 .note{font-size:12px;color:var(--faint);line-height:1.65}
 
-/* ---------- tables ---------- */
-.tw{overflow-x:auto}
+/* ---------- tables ----------
+   .tw is the scroll boundary. max-width keeps it from being widened by the
+   table's own min-width, so wide tables scroll rather than push the page. */
+.tw{overflow-x:auto;max-width:100%;min-width:0}
 table{width:100%;border-collapse:collapse;min-width:640px}
 th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line-soft);font-size:12.5px;white-space:nowrap}
 th{font-size:9.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.9px;font-weight:600;
@@ -325,28 +331,107 @@ tbody tr:last-child td{border-bottom:0}
   box-shadow:var(--shadow);opacity:0;transition:.28s;pointer-events:none;max-width:90vw}
 .toast.on{transform:translateX(-50%) translateY(0);opacity:1}
 
-/* ---------- responsive ---------- */
+/* ---------- responsive ----------
+   The phone is the primary device, so the small-screen rules do real work:
+   the sidebar becomes a bottom bar, tables scroll inside their own box, and
+   every tap target stays at least 44px. */
 @media(max-width:1080px){
-  .cols{grid-template-columns:1fr}
-  .dsplit{grid-template-columns:1fr}
-  .vtabs{flex-direction:row;overflow-x:auto;padding-bottom:6px}
-  .vtab{white-space:nowrap}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .dsplit{grid-template-columns:minmax(0,1fr)}
+  .dsplit>*{min-width:0}
+  .vtabs{flex-direction:row;overflow-x:auto;padding-bottom:6px;gap:6px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .vtabs::-webkit-scrollbar{display:none}
+  .vtab{white-space:nowrap;background:var(--panel-2);border:1px solid var(--line)}
+  .vtab.on{border-color:var(--gold)}
 }
 @media(max-width:860px){
   .shell{grid-template-columns:66px minmax(0,1fr)}
   .brand-name,.brand-sub,.grp-t,.nav .tx,.badge,.me-n,.me-r{display:none}
-  .nav{justify-content:center;padding:11px 0}
+  .nav{justify-content:center;padding:12px 0;min-height:44px}
   .brand{justify-content:center;padding:4px 0 14px}
   .me{justify-content:center}
   .main{padding:20px 16px 50px}
   .srch{min-width:0;width:100%}
   .top-act{width:100%}
+  .modal{max-width:none;margin:0 auto}
 }
-@media(max-width:620px){
-  .stats{grid-template-columns:1fr 1fr}
-  .st .sv{font-size:26px}
+
+/* ---- phone ---- */
+@media(max-width:680px){
+  /* sidebar becomes a scrollable bottom bar: thumbs reach the bottom, not the top-left */
+  .shell{grid-template-columns:1fr;padding-bottom:64px}
+  .side{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;width:100%;
+    flex-direction:row;align-items:center;gap:2px;padding:6px 8px;border-right:0;
+    border-top:1px solid var(--line);background:var(--bg-2);z-index:400;
+    overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+    box-shadow:0 -8px 24px -12px rgba(0,0,0,.5)}
+  .side::-webkit-scrollbar{display:none}
+  .brand,.grp-t,.side-foot{display:none}
+  #nav{display:flex;gap:2px}
+  .grp{display:flex;gap:2px;margin:0}
+  .nav{width:auto;min-width:52px;min-height:48px;padding:6px 10px;border-radius:10px;justify-content:center}
+  .nav.on::before{left:8px;right:8px;top:auto;bottom:2px;width:auto;height:3px}
+
+  .main{height:auto;min-height:100vh;padding:16px 14px 30px;overflow:visible}
+  html,body{height:auto}
+  .top{margin-bottom:16px;gap:10px}
+  .top h1{font-size:23px}
+  .top-sub{font-size:11.5px}
+  .top-act{gap:7px}
+  .iconbtn{width:40px;height:40px}
+
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+  .st{padding:14px 15px}
+  .st .sl{font-size:9.5px;letter-spacing:.9px;padding-right:16px}
+  .st .sv{font-size:23px;margin-top:7px}
+  .st .sd{font-size:10.5px;margin-top:5px}
+  .st .arrow{top:11px;right:11px;font-size:13px}
+
+  .pnl{padding:14px 14px;border-radius:12px}
+  .ph{flex-wrap:wrap;gap:8px}
+  .pnl h3{font-size:13.5px}
+  .ph-sub{font-size:11px}
+
+  /* tables keep their columns and scroll sideways inside the panel */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;
+    margin:0 -14px;padding:0 14px;scrollbar-width:thin;max-width:calc(100% + 28px)}
+  table{min-width:480px}
+  .chartbox{min-width:0;max-width:100%}
+  .chartbox svg{max-width:100%}
+  .cols3{grid-template-columns:minmax(0,1fr)}
+  th,td{padding:9px 8px;font-size:11.5px}
+  .t-sub{font-size:10px}
+
+  .cards{grid-template-columns:1fr;gap:10px}
+  .bar{gap:6px}
+  .tab,.btn,.sel{min-height:40px;font-size:12px;padding:9px 11px}
+  .btn.gold,.btn:last-child{flex:1}
   .f2{grid-template-columns:1fr}
-  .dstats{gap:16px}
-  th,td{padding:9px 7px;font-size:11.5px}
+  .dstats{gap:14px;row-gap:12px}
+  .dstat .dv{font-size:18px}
+  .dhead h2{font-size:21px}
+  .dav{width:46px;height:46px;font-size:16px}
+  .mask{padding:0}
+  .modal{border-radius:14px 14px 0 0;margin:auto 0 0;min-height:60vh}
+  .mh{padding:16px 16px;border-radius:14px 14px 0 0}
+  .mb{padding:16px}
+  .mf{padding:12px 16px;position:sticky;bottom:0;background:var(--bg)}
+  .mf .btn{flex:1}
+  .donutwrap{flex-direction:column;align-items:flex-start}
+  .donutwrap svg{width:130px;height:130px;margin:0 auto}
+  .hbar .hl{width:52px;font-size:11px}
+  .hbar .hv{width:74px;font-size:11px}
+  .chips{gap:5px}
+  .chip{font-size:11px;padding:7px 10px}
+  .row.klik:hover{margin:0;padding:10px 0}
+  .toast{bottom:76px;left:14px;right:14px;transform:translateY(80px);max-width:none}
+  .toast.on{transform:translateY(0)}
+  .sgrp-h{padding:13px 14px}
+  .sgrp-b{padding:2px 14px 16px}
 }
-@media(max-width:420px){.stats{grid-template-columns:1fr}}
+@media(max-width:420px){
+  .stats{grid-template-columns:1fr}
+  .st .sv{font-size:25px}
+  .nav{min-width:48px;padding:6px 7px}
+}

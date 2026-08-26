@@ -130,12 +130,14 @@ function buildSubscribers() {
       const cycle = block.plan === 'trial' ? 'trial' : (rnd() < 0.22 ? 'annual' : 'monthly');
 
       // tenure: expired & premium tend to be older
+      /* Tenure spread over roughly three and a half years, so the year-on-year
+         views have real history behind them rather than a flat line. */
       let ageDays;
       if (block.status === 'trial') ageDays = int(0, 13);
       else if (block.status === 'active' && rnd() < 0.07) ageDays = int(0, 8);  // a few brand-new paid accounts
-      else if (block.plan === 'premium') ageDays = int(60, 540);
-      else if (block.plan === 'pro') ageDays = int(30, 420);
-      else ageDays = int(14, 300);
+      else if (block.plan === 'premium') ageDays = int(90, 1240);
+      else if (block.plan === 'pro') ageDays = int(45, 1000);
+      else ageDays = int(20, 700);
 
       const joined = dAgo(ageDays);
       const mrr = block.status === 'active'
@@ -187,6 +189,10 @@ function buildSubscribers() {
         renewIn,
         mrr,
         channel: pick(CHANNELS),
+        /* Where the attribution actually came from. A referral is inferred from the
+           link, never self-reported; a demo request is typed in by sales; everything
+           else is the optional one-tap question on the last step of signup. */
+        channelSource: 'signup',
         businesses,
         referredBy: null,
         lastSeen: iso(dAgo(block.status === 'expired' ? int(30, 200) : int(0, 9))),
@@ -205,8 +211,15 @@ function buildSubscribers() {
     const invitee = pick(out);
     if (!invitee || invitee.id === referrer.id || invitee.referredBy) continue;
     invitee.referredBy = referrer.id;
+    invitee.channel = 'Referral';
+    invitee.channelSource = 'referral-link';   // inferred, not self-reported
     referrer.referrals.push(invitee.id);
   }
+  /* A minority arrive through a sales conversation, where the channel is typed in
+     by whoever took the call rather than chosen by the subscriber. */
+  out.forEach(s => {
+    if (s.channelSource === 'signup' && s.plan === 'premium' && rnd() < 0.3) s.channelSource = 'demo-request';
+  });
   // commission = 15% of first month for each converted referral, paid once
   out.forEach(s => {
     s.referralLedger = s.referrals.map(rid => {
@@ -273,11 +286,18 @@ function buildStaff() {
       status: 'active',
       reportsTo: i === 0 ? null : (dept === 'Management' ? 1 : (dept === 'Finance' ? 3 : dept === 'Support' ? 6 : dept === 'Product' ? 11 : 2)),
       workLocation: pick(['Lagos office', 'Abuja office', 'Remote']),
-      bank: pick(['GTBank', 'Access Bank', 'Zenith Bank', 'UBA', 'Kuda']) + ' · ' + int(1000000000, 9999999999),
+      bankName: pick(['GTBank', 'Access Bank', 'Zenith Bank', 'UBA', 'Kuda']),
+      bankAccount: String(int(1000000000, 9999999999)),
+      bankAccountName: name,
       salaryType: 'Monthly salary',
       basic,
-      housing: Math.round(basic * 0.15),
-      transport: Math.round(basic * 0.10),
+      /* Allowances are switched off platform-wide while we are a startup.
+         The fields stay so they can be turned on later without a migration. */
+      housing: 0,
+      transport: 0,
+      /* Pension is voluntary — the staff member has to agree to it. */
+      pension: { optedIn: i % 3 !== 0, rate: 8, agreedOn: i % 3 !== 0 ? iso(dAgo(startDays - 5)) : null },
+      nhfOptIn: i % 4 !== 0,
       lastActive: iso(dAgo(0)),
       lastActiveLabel: i === 0 ? 'Now' : pick(['3m ago', '12m ago', '45m ago', '2h ago', 'Yesterday']),
       leaveEntitlement: 20,
@@ -294,7 +314,7 @@ function buildPayments(subs) {
     if (s.status === 'trial') return;
     const start = new Date(s.joined);
     const monthsHeld = Math.max(1, Math.floor((TODAY - start) / (30.44 * DAY)));
-    const cap = Math.min(monthsHeld, 18);
+    const cap = Math.min(monthsHeld, 42);
     const amt = s.cycle === 'annual' ? planById(s.plan).annual : planById(s.plan).monthly;
     const step = s.cycle === 'annual' ? 12 : 1;
     for (let m = 0; m < cap; m += step) {
@@ -371,8 +391,8 @@ function buildPayroll(staff) {
       const overtime = s.dept === 'Support' && rnd() < 0.4 ? int(5, 20) * 2500 : 0;
       const g = s.basic + s.housing + s.transport + bonus + overtime;
       const paye = Math.round(g * 0.115 / 100) * 100;
-      const pension = Math.round(s.basic * 0.08 / 100) * 100;
-      const nhf = Math.round(s.basic * 0.025 / 100) * 100;
+      const pension = s.pension && s.pension.optedIn ? Math.round(s.basic * (s.pension.rate / 100) / 100) * 100 : 0;
+      const nhf = s.nhfOptIn ? Math.round(s.basic * 0.025 / 100) * 100 : 0;
       const loan = (s.id % 7 === 0) ? 25000 : 0;
       const dd = paye + pension + nhf + loan;
       const nn = g - dd;
@@ -385,7 +405,8 @@ function buildPayroll(staff) {
         payDate: iso(d), basic: s.basic, housing: s.housing, transport: s.transport,
         bonus, overtime, gross: g,
         paye, pension, nhf, loan, deductions: dd, net: nn,
-        status: state, bank: s.bank,
+        pensionOptedIn: !!(s.pension && s.pension.optedIn), nhfOptedIn: !!s.nhfOptIn,
+        status: state, bank: s.bankName + ' · ' + s.bankAccount,
         uploaded: m > 0,                     // historic slips already published to staff
         publishedOn: m > 0 ? iso(d) : null
       });
@@ -435,6 +456,56 @@ function buildAttendance(staff) {
     });
   }
   return rows;
+}
+
+/* ---------------- staff documents ---------------- */
+function buildDocs(staff) {
+  const out = []; let id = 1;
+  staff.forEach(s => {
+    const start = fmtD(s.startDate);
+    const set = [
+      { kind: 'Employment contract', status: 'on file', pages: 6,
+        body: [['Employee', s.name], ['Staff ID', s.staffId], ['Job title', s.title],
+          ['Department', s.dept], ['Employment type', s.empType], ['Start date', start],
+          ['Monthly basic', money(s.basic)], ['Notice period', '1 month either side'],
+          ['Probation', '3 months from start date'], ['Signed by employee', start],
+          ['Signed by company', start], ['Governing law', 'Federal Republic of Nigeria']],
+        note: 'Standard contract of employment. Salary is stated as a monthly basic with no allowances, matching the current pay policy.' },
+      { kind: 'ID verification', status: 'on file', pages: 1,
+        body: [['Document type', 'National Identity Number (NIN)'],
+          ['Number', '••••••' + int(1000, 9999)], ['Name on document', s.name],
+          ['Date of birth', fmtD(s.dob)], ['Verified on', start], ['Verified by', 'Funmi Oladele'],
+          ['Status', 'Matched against payroll record']],
+        note: 'Identity confirmed against the NIMC database. Full number is masked here and held encrypted.' },
+      { kind: 'Bank mandate', status: 'on file', pages: 1,
+        body: [['Account name', s.bankAccountName], ['Bank', s.bankName],
+          ['Account number', s.bankAccount], ['Account type', 'Savings'],
+          ['Mandate signed', start], ['Last changed', 'Never']],
+        note: 'Authorises salary payment into this account. A change of account requires a fresh mandate and a second approver.' },
+      { kind: 'Next of kin', status: 'on file', pages: 1,
+        body: [['Emergency contact', s.emergency.split(' · ')[0]],
+          ['Phone', s.emergency.split(' · ')[1] || '—'],
+          ['Relationship', s.emergency.split(' · ')[2] || '—'],
+          ['Home address', s.address], ['Recorded on', start]],
+        note: 'Used only in an emergency. Visible to the Owner and to whoever the person reports to.' },
+      { kind: 'Pension enrolment', status: s.pension.optedIn ? 'on file' : 'not enrolled', pages: 1,
+        body: s.pension.optedIn
+          ? [['Scheme', 'Contributory pension'], ['Employee rate', s.pension.rate + '% of basic'],
+             ['Monthly contribution', money(Math.round(s.basic * s.pension.rate / 100))],
+             ['Agreed on', fmtD(s.pension.agreedOn)], ['Status', 'Active']]
+          : [['Status', 'Not enrolled'], ['Reason', 'Employee has not opted in'],
+             ['Note', 'Enrolment is voluntary and needs the employee\'s written agreement']],
+        note: s.pension.optedIn
+          ? 'Signed enrolment form. Deductions began the month after it was agreed.'
+          : 'No enrolment on file. Nothing is deducted for pension until this person opts in.' },
+      { kind: 'Tax identification (TIN)', status: rnd() < 0.75 ? 'on file' : 'missing', pages: 1,
+        body: [['TIN', rnd() < 0.75 ? int(10000000, 99999999) + '-0001' : 'Not supplied'],
+          ['Issued by', 'Federal Inland Revenue Service'], ['Required for', 'PAYE remittance']],
+        note: 'Needed to remit PAYE against the right taxpayer. Chase anyone showing as missing.' }
+    ];
+    set.forEach(d => out.push(Object.assign({ id: id++, staffId: s.id, addedOn: s.startDate }, d)));
+  });
+  return out;
 }
 
 /* ---------------- leave ---------------- */
@@ -584,9 +655,9 @@ function buildOnboarding(subs) {
 
 /* ---------------- roles & permissions ---------------- */
 const ADMIN_PAGES = [
-  ['overview', 'Overview'], ['subscribers', 'Subscribers'], ['onboarding', 'Onboarding'],
+  ['dashboard', 'Dashboard'], ['subscribers', 'Subscribers'], ['onboarding', 'Onboarding'],
   ['billing', 'Plans & Billing'], ['payments', 'Payments'], ['payroll', 'Payroll'],
-  ['revenue', 'Revenue'], ['support', 'Support & Usage'], ['feedback', 'Feedback & Reviews'],
+  ['revenue', 'Revenue'], ['support', 'Support & Usage'],
   ['announcements', 'Announcements'], ['health', 'Platform Health'], ['tasks', 'Tasks'],
   ['staff', 'Staff & Roles'], ['activity', 'Activity Log'], ['settings', 'Settings']
 ];
@@ -615,23 +686,23 @@ function defaultRoles() {
       desc: 'Full access, always on and cannot be limited.', pages: all.slice(), caps: allCaps.slice() },
     { id: 'ops', name: 'Operations Lead', builtin: true, locked: false,
       desc: 'Runs the day to day across every team.',
-      pages: ['overview', 'subscribers', 'onboarding', 'billing', 'payments', 'revenue', 'support', 'feedback', 'announcements', 'health', 'tasks', 'staff', 'activity'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'billing', 'payments', 'revenue', 'support', 'announcements', 'health', 'tasks', 'staff', 'activity'],
       caps: ['see_money', 'edit_sub', 'change_plan', 'manage_staff', 'send_announce', 'close_ticket', 'export', 'see_audit'] },
     { id: 'finance', name: 'Finance', builtin: true, locked: false,
       desc: 'Billing, payments, payroll and revenue.',
-      pages: ['overview', 'subscribers', 'billing', 'payments', 'payroll', 'revenue', 'activity'],
+      pages: ['dashboard', 'subscribers', 'billing', 'payments', 'payroll', 'revenue', 'activity'],
       caps: ['see_money', 'change_plan', 'refund', 'run_payroll', 'publish_slips', 'export', 'see_audit'] },
     { id: 'support_mgr', name: 'Support Manager', builtin: true, locked: false,
       desc: 'Owns the support queue and the team on it.',
-      pages: ['overview', 'subscribers', 'onboarding', 'support', 'feedback', 'announcements', 'tasks', 'activity'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'support', 'announcements', 'tasks', 'activity'],
       caps: ['edit_sub', 'close_ticket', 'send_announce', 'impersonate', 'export'] },
     { id: 'support', name: 'Support Agent', builtin: true, locked: false,
       desc: 'Answers tickets. No money, no staff records.',
-      pages: ['overview', 'subscribers', 'onboarding', 'support', 'feedback', 'tasks'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'support', 'tasks'],
       caps: ['close_ticket', 'impersonate'] },
     { id: 'product', name: 'Product', builtin: true, locked: false,
       desc: 'Usage, feedback and what ships next.',
-      pages: ['overview', 'support', 'feedback', 'announcements', 'health', 'tasks'],
+      pages: ['dashboard', 'support', 'announcements', 'health', 'tasks'],
       caps: ['send_announce', 'export'] }
   ];
 }
@@ -708,12 +779,42 @@ function buildUsage(subs) {
 function buildHealth() {
   return {
     services: [
-      { name: 'API server', detail: 'Edge functions + REST', state: 'operational', uptime: 99.98, latency: 148 },
-      { name: 'Database', detail: 'Supabase Postgres', state: 'operational', uptime: 99.99, latency: 22 },
-      { name: 'Payments', detail: 'Flutterwave webhooks', state: 'degraded', uptime: 99.42, latency: 890 },
-      { name: 'Email', detail: 'Transactional send', state: 'operational', uptime: 99.95, latency: 310 },
-      { name: 'File storage', detail: 'Images & payslips', state: 'operational', uptime: 100, latency: 64 },
-      { name: 'Web app', detail: 'Subscriber PWA', state: 'operational', uptime: 99.97, latency: 120 }
+      { name: 'API server', detail: 'Edge functions + REST', state: 'operational', uptime: 99.98, latency: 148,
+        what: 'Every request the subscriber app makes — loading orders, saving a job, signing in.',
+        why: 'Responding normally. Median 148ms, no failed requests in the last hour.',
+        affects: 'Nothing right now.',
+        checks: [['Requests in last hour', '18,402'], ['Failing', '0'], ['Slowest endpoint', '/orders/export — 640ms']] },
+      { name: 'Database', detail: 'Supabase Postgres', state: 'operational', uptime: 99.99, latency: 22,
+        what: 'Where every subscriber\'s orders, customers, stock and staff records actually live.',
+        why: 'Healthy. Connection pool at 34% of capacity, no slow queries logged.',
+        affects: 'Nothing right now.',
+        checks: [['Connections in use', '17 of 50'], ['Slow queries (>1s)', '0'], ['Storage used', '4.2 GB of 8 GB']] },
+      { name: 'Payments', detail: 'Flutterwave webhooks', state: 'degraded', uptime: 99.42, latency: 890,
+        what: 'Taking card payments and, crucially, hearing back from Flutterwave that a payment succeeded.',
+        why: 'Cards are still being charged normally. What is slow is the confirmation coming back: ' +
+             'Flutterwave posts a webhook to tell us a payment went through, and 6 of those posts have timed out ' +
+             'and gone into the retry queue. So a subscriber can pay and still briefly show as unpaid until the ' +
+             'retry lands, usually within a few minutes.',
+        affects: '3 subscribers may see a payment as pending that has in fact cleared. No money is lost and ' +
+                 'nobody is charged twice — the retry is idempotent.',
+        checks: [['Charges attempted, last hour', '11'], ['Charges succeeded', '11'],
+          ['Webhook confirmations received', '5 of 11'], ['In the retry queue', '6'],
+          ['Median confirmation delay', '890ms, normally 120ms'], ['Oldest item in queue', '14 minutes']] },
+      { name: 'Email', detail: 'Transactional send', state: 'operational', uptime: 99.95, latency: 310,
+        what: 'Receipts, password resets, and announcements you send from this console.',
+        why: 'Sending normally. Delivery rate 99.4% over the last 24 hours.',
+        affects: 'Nothing right now.',
+        checks: [['Sent last 24h', '412'], ['Delivered', '409'], ['Bounced', '3 — invalid addresses']] },
+      { name: 'File storage', detail: 'Images & payslips', state: 'operational', uptime: 100, latency: 64,
+        what: 'Product photos subscribers upload, and the payslips you publish to staff.',
+        why: 'Fully operational, no failed uploads.',
+        affects: 'Nothing right now.',
+        checks: [['Uploads last 24h', '1,284'], ['Failed', '0'], ['Storage used', '61 GB']] },
+      { name: 'Web app', detail: 'Subscriber PWA', state: 'operational', uptime: 99.97, latency: 120,
+        what: 'The app your subscribers actually open, including its offline mode.',
+        why: 'Serving normally from the edge. Current release is live for everyone.',
+        affects: 'Nothing right now.',
+        checks: [['Sessions last hour', '312'], ['JS errors', '2 — non-blocking'], ['Offline syncs completed', '48']] }
     ],
     incidents: [
       { id: 1, title: 'Flutterwave webhook retries', started: iso(dAgo(0)), state: 'investigating',
@@ -739,6 +840,7 @@ const DB = (function () {
   const { runs, slips } = buildPayroll(staff);
   const attendance = buildAttendance(staff);
   const leave = buildLeave(staff);
+  const docs = buildDocs(staff);
   const tickets = buildTickets(subscribers, staff);
   const feedback = buildFeedback(subscribers);
   const tasks = buildTasks(staff);
@@ -753,7 +855,7 @@ const DB = (function () {
     plans: PLANS,
     subscribers, staff, payments,
     payrollRuns: runs, payslips: slips,
-    attendance, leave,
+    attendance, leave, docs,
     tickets, feedback, tasks, announcements, onboarding, activity, usage, health,
     roles: defaultRoles(),
     pages: ADMIN_PAGES,
@@ -766,7 +868,26 @@ const DB = (function () {
       referralPct: 15,
       taxPct: 7.5,
       invoicePrefix: 'INV',
-      bank: 'GTBank · 0011223344 · The Label Board Ltd',
+      /* Where subscription money lands. Structured, because "GTBank · 0011223344 · The
+         Label Board Ltd" in one box is impossible to validate or reconcile against. */
+      settlement: {
+        accountName: 'The Label Board Ltd',
+        bankName: 'Guaranty Trust Bank',
+        accountNumber: '0011223344',
+        accountType: 'Current',
+        currency: 'NGN',
+        branch: 'Victoria Island, Lagos',
+        sortCode: '058152036',
+        swift: 'GTBINGLA',
+        tin: '31459872-0001',
+        payoutSchedule: 'T+1 working day',
+        verified: true,
+        verifiedOn: '2026-02-14'
+      },
+      /* Allowances are off while we are a startup. Kept as a switch, not deleted,
+         so turning them on later needs no rework. */
+      allowances: { enabled: false, housingPct: 15, transportPct: 10 },
+      pensionDefaultRate: 8,
       notify: { sound: 'chime', volume: 70, popups: false,
         alerts: { payment: true, signup: true, failed: true, ticket: true, churn: true, payroll: false } },
       integrations: [
