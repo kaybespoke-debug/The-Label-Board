@@ -13,6 +13,7 @@ const UI = {
     onboarding: 'all', activity: 'all'
   },
   sort: { subscribers: 'name', payments: 'date-desc', payroll: 'net-desc', activity: 'newest' },
+  dashPanel: 0,               // which of the four dashboard panels shows on a phone
   search: '',
   q: {},                      // per-page search boxes
   vtab: {},                   // detail-view vertical tab state
@@ -403,10 +404,20 @@ function hBars(items, opts) {
 
 /* ---------------- router ---------------- */
 function go(page) {
+  if (typeof canPage === 'function' && !canPage(page)) { refusePage(page); return; }
   UI.detail = null;
   UI.page = page;
   render();
   document.querySelector('.main').scrollTop = 0;
+}
+function refusePage(page) {
+  const t = (typeof TITLES !== 'undefined' && TITLES[page]) ? TITLES[page][0] : page;
+  modal('Not allowed', t,
+    '<p class="note">Your role is <b>' + myRole().name + '</b>, which does not include the ' +
+    '<b>' + t + '</b> page.</p>' +
+    '<p class="hint">Whoever holds the Owner role can grant it in Settings &rarr; Team &amp; notifications ' +
+    '&rarr; Roles &amp; permissions.</p>',
+    '<button class="btn" onclick="closeModal()">Close</button>');
 }
 function openDetail(type, id) {
   UI.back = UI.page;
@@ -421,6 +432,15 @@ function goBack() {
   render();
   document.querySelector('.main').scrollTop = 0;
 }
+/* The strip that picks between panels on a phone. Rendered always, shown by CSS
+   only under 760px, so the desktop row of four is untouched. */
+function swapTabs(labels) {
+  return '<div class="swap-tabs">' + labels.map((l, i) =>
+    '<button class="sw' + (UI.dashPanel === i ? ' on' : '') + '" onclick="setDashPanel(' + i + ')">' +
+    l + '</button>').join('') + '</div>';
+}
+function setDashPanel(i) { UI.dashPanel = i; render(); }
+
 function setFilter(page, val) { UI.filters[page] = val; render(); }
 function setVTab(key, val) { UI.vtab[key] = val; render(); }
 

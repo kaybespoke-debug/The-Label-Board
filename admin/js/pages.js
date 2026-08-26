@@ -51,14 +51,19 @@ PAGES.dashboard = function () {
   return periodBar() +
     '<div class="stats">' + stats + '</div>' +
 
-    /* the four-across row */
-    '<div class="cols4" style="margin-bottom:14px">' +
+    /* The four-across row. On a desktop these sit side by side and cost one
+       screen. Stacked on a phone they came to 1,268px — over half the whole
+       dashboard before you reached the revenue chart. So on small screens they
+       become one panel with a tab strip: same four things, a quarter of the
+       scroll. The markup is identical either way; CSS decides. */
+    swapTabs(['Plans', 'Alerts', 'Support', 'Activity']) +
+    '<div class="cols4 swap" style="margin-bottom:14px">' +
 
-    '<div class="pnl"><div class="ph"><div><h3>Subscribers by plan</h3>' +
+    '<div class="pnl' + (UI.dashPanel === 0 ? ' on' : '') + '"><div class="ph"><div><h3>Subscribers by plan</h3>' +
     '<div class="ph-sub">' + subs.length + ' accounts</div></div></div>' +
     donut(donutSegs, subs.length, 'Total') + '</div>' +
 
-    '<div class="pnl"><div class="ph"><div><h3>Alerts</h3>' +
+    '<div class="pnl' + (UI.dashPanel === 1 ? ' on' : '') + '"><div class="ph"><div><h3>Alerts</h3>' +
     '<div class="ph-sub">' + (alerts.length ? alerts.length + ' needing a look' : 'All clear') + '</div></div>' +
     '<button class="lnk" onclick="openAlerts()">All</button></div>' +
     (alerts.length ? alerts.map(a => '<div class="row klik" onclick="' + a.go + '">' +
@@ -66,7 +71,7 @@ PAGES.dashboard = function () {
       '<span class="note">' + a.when + '</span></div>').join('')
       : '<div class="empty" style="padding:20px 6px">Nothing needs you.</div>') + '</div>' +
 
-    '<div class="pnl"><div class="ph"><div><h3>Support</h3>' +
+    '<div class="pnl' + (UI.dashPanel === 2 ? ' on' : '') + '"><div class="ph"><div><h3>Support</h3>' +
     '<div class="ph-sub">' + openT.length + ' open' +
     (urg.length ? ' · <span style="color:var(--red)">' + urg.length + ' urgent</span>' : '') + '</div></div>' +
     '<button class="lnk" onclick="drill(\'tickets.open\')">All</button></div>' +
@@ -75,7 +80,7 @@ PAGES.dashboard = function () {
       '<small>' + esc(t.subscriber) + '</small></div>' + statusPill(t.state) + '</div>').join('')
       : '<div class="empty" style="padding:20px 6px">No open tickets.</div>') + '</div>' +
 
-    '<div class="pnl"><div class="ph"><div><h3>Recent activity</h3>' +
+    '<div class="pnl' + (UI.dashPanel === 3 ? ' on' : '') + '"><div class="ph"><div><h3>Recent activity</h3>' +
     '<div class="ph-sub">Last few admin actions</div></div>' +
     '<button class="lnk" onclick="go(\'activity\')">All</button></div>' +
     DB.activity.slice(0, 4).map(a => '<div class="row klik" onclick="openDetail(\'audit\',' + a.id + ')">' +

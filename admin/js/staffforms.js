@@ -9,6 +9,21 @@
 const ME = { staffId: 1 };
 function myRole() { return Q.role((Q.staffM(ME.staffId) || {}).roleId) || { locked: true, caps: [], pages: [] }; }
 function can(cap) { const r = myRole(); return !!(r.locked || r.caps.indexOf(cap) >= 0); }
+
+/* Pages, not just actions. A role lists the pages it may open, and that list
+   has to be honoured in three places or it means nothing: the sidebar, the
+   bottom bar, and go() itself — otherwise a hidden page is still one link
+   away. Settings stays reachable by everyone so anyone can change their own
+   password; what they see inside it is gated separately. */
+function canPage(page) {
+  const r = myRole();
+  if (r.locked || page === 'settings') return true;
+  return (r.pages || []).indexOf(page) >= 0;
+}
+function firstAllowedPage() {
+  const order = ['dashboard'].concat((myRole().pages || []));
+  return order.find(canPage) || 'settings';
+}
 function needs(cap, what) {
   if (can(cap)) return false;
   const label = (DB.caps.find(c => c[0] === cap) || [, cap])[1];

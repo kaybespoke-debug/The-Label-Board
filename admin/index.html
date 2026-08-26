@@ -44,11 +44,27 @@
     <g id="i-bell"><path d="M18 15V10a6 6 0 1 0-12 0v5l-1.5 2.5h15z"/><path d="M9.5 20.5a2.6 2.6 0 0 0 5 0"/></g>
     <g id="i-search"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></g>
     <g id="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></g>
+    <g id="i-signout"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/></g>
     <g id="i-menu"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></g>
     <g id="i-moon"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></g>
   </defs>
 </svg>
 
+<div id="splash" role="presentation">
+  <div class="sp-inner">
+    <div class="sp-mark">
+      <svg viewBox="0 0 220 220" role="img" aria-label="The Label Board"><path class="sp-draw" d="M72 28 L72 154 Q72 188 106 188 L157 188 Q187 188 187 159 Q187 132 158 132 L118 132 L118 73 L158 73 Q186 73 186 101 Q186 132 158 132"/></svg>
+      <span class="sp-dot"></span>
+    </div>
+    <div class="sp-copy">
+      <div class="sp-the">THE</div>
+      <div class="sp-name">LABEL BOARD</div>
+    </div>
+    <div class="sp-tag">ADMIN CONTROL CENTRE</div>
+  </div>
+</div>
+
+<div id="login"></div>
 <div id="drawerMask" onclick="closeDrawer()"></div>
 <div class="shell">
   <!-- ================= sidebar ================= -->
@@ -68,10 +84,11 @@
     </div>
     <nav id="nav"></nav>
     <div class="side-foot">
-      <div class="me" onclick="openDetail('staff',1)">
-        <div class="av">KO</div>
-        <div><div class="me-n">Kayode Ojomo</div><div class="me-r">Super Admin</div></div>
+      <div class="me" id="meRow" onclick="openDetail('staff',ME.staffId)">
+        <div class="av" id="meAv">KO</div>
+        <div style="flex:1;min-width:0"><div class="me-n" id="meName">Kayode Ojomo</div><div class="me-r" id="meRole">Super Admin</div></div>
       </div>
+      <button class="nav" style="margin-top:2px" onclick="signOut()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-signout"/></svg></span><span class="tx">Sign out</span></button>
     </div>
   </aside>
 
@@ -117,6 +134,7 @@
 <script src="js/actions.js"></script>
 <script src="js/staffforms.js"></script>
 <script src="js/login.js"></script>
+<script src="js/signin.js"></script>
 <script>
 /* ============================================================
    app.js — nav, render loop, boot
@@ -178,15 +196,18 @@ const TITLES = {
 };
 
 function buildNav() {
-  document.getElementById('nav').innerHTML = NAV.map(g =>
-    '<div class="grp"><div class="grp-t">' + g[0] + '</div>' +
-    g[1].map(n => {
+  document.getElementById('nav').innerHTML = NAV.map(g => {
+    const allowed = g[1].filter(n => canPage(n[0]));
+    if (!allowed.length) return '';           // a whole group can drop away
+    return '<div class="grp"><div class="grp-t">' + g[0] + '</div>' +
+    allowed.map(n => {
       const c = n[3] ? n[3]() : 0;
       return '<button class="nav" data-p="' + n[0] + '" onclick="go(\'' + n[0] + '\')">' +
         '<span class="ic" style="color:' + (NAV_HUE[n[0]] || 'currentColor') + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
         '<span class="tx">' + n[1] + '</span>' +
         (c ? '<span class="badge">' + c + '</span>' : '') + '</button>';
-    }).join('') + '</div>').join('');
+    }).join('') + '</div>';
+  }).join('');
 }
 
 
@@ -213,7 +234,7 @@ function buildMobBar() {
   NAV.forEach(g => g[1].forEach(n => { flat[n[0]] = n; }));
   const items = MOB_BAR.map(id => {
     const n = flat[id];
-    if (!n) return '';
+    if (!n || !canPage(id)) return '';
     const count = n[3] ? n[3]() : 0;
     return '<button class="mb' + (lit === id ? ' on' : '') + '" onclick="go(\'' + id + '\')">' +
       '<span class="mbi" style="color:' + (lit === id ? (NAV_HUE[id] || 'currentColor') : 'currentColor') + '">' +
@@ -284,6 +305,10 @@ function openSettingsGroup(which) {
 }
 
 function render() {
+  /* Last line of defence: whatever put us on this page — a leftover session, a
+     stale link, a detail view whose parent is off-limits — the role decides. */
+  if (!UI.detail && !canPage(UI.page)) UI.page = firstAllowedPage();
+  if (UI.detail && UI.back && !canPage(UI.back)) UI.back = firstAllowedPage();
   buildNav();
   buildMobBar();
   closeDrawer();
@@ -324,6 +349,14 @@ function render() {
   // demo-data marker — hidden the moment real data is wired in
   const dt = document.getElementById('demoTag');
   if (dt) dt.style.display = DB.demoData ? 'inline-block' : 'none';
+
+  // whoever is signed in shows in the footer
+  const meNow = Q.staffM(ME.staffId);
+  if (meNow) {
+    document.getElementById("meAv").textContent = initials(meNow.name);
+    document.getElementById("meName").textContent = meNow.name;
+    document.getElementById("meRole").textContent = (Q.role(meNow.roleId) || {}).name || meNow.title;
+  }
 
   // theme icon
   const dark = !document.body.classList.contains('light');
@@ -367,11 +400,30 @@ function openAlerts() {
     '<button class="btn" onclick="closeModal()">Close</button>');
 }
 
+/* ---- splash ----
+   The same start page the customer app opens with. It sits over whatever is
+   behind it — the sign-in screen, or the dashboard if a session is already
+   open — so the app is fully built by the time it fades. Tap to skip. */
+function hideSplash() {
+  const s = document.getElementById('splash');
+  if (!s) return;
+  s.classList.add('hide');
+  setTimeout(() => { if (s) s.style.display = 'none'; }, 600);
+}
+function startSplash() {
+  const s = document.getElementById('splash');
+  if (!s) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  s.addEventListener('click', hideSplash);
+  setTimeout(hideSplash, reduce ? 700 : 2900);
+}
+
 /* boot */
 (function boot() {
   if (localStorage.getItem('tlb_admin_theme') === 'light') document.body.classList.add('light');
   setPeriod('today');
-  render();
+  if (initSignIn()) render();
+  startSplash();
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeModal();
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); document.getElementById('srch').focus(); }
