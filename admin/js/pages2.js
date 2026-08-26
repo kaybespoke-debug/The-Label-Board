@@ -444,8 +444,9 @@ PAGES.settings = function () {
   const s = DB.settings;
   const ic = (bg, path) => '<div class="sgrp-ic" style="background:' + bg + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg></div>';
 
-  const grp = (open, iconHtml, title, desc, body) =>
-    '<details class="sgrp"' + (open ? ' open' : '') + '><summary class="sgrp-h">' + iconHtml +
+  const grp = (open, iconHtml, title, desc, body, key) =>
+    '<details class="sgrp"' + (open || UI.openSettingsGroup === key ? ' open' : '') +
+    (key ? ' data-sgrp="' + key + '"' : '') + '><summary class="sgrp-h">' + iconHtml +
     '<div><div class="sgrp-t">' + title + '</div><div class="sgrp-d">' + desc + '</div></div>' +
     '<span class="sgrp-cv">&rsaquo;</span></summary><div class="sgrp-b">' + body + '</div></details>';
 
@@ -456,9 +457,17 @@ PAGES.settings = function () {
     '<button class="chip' + (!document.body.classList.contains('light') ? ' on' : '') + '" onclick="setTheme(\'dark\')">Black</button>' +
     '<button class="chip' + (document.body.classList.contains('light') ? ' on' : '') + '" onclick="setTheme(\'light\')">White</button>' +
     '</div>' +
-    '<div class="sec-t">Install</div>' +
-    '<p class="note">Add the Admin Control Centre to your home screen or desktop so it opens like an app and keeps working ' +
-    'when the connection drops. Use your browser menu and choose Install, or Add to Home Screen.</p>';
+    '<div class="sec-t">Install as an app</div>' +
+    (isInstalled()
+      ? '<p class="note"><b style="color:var(--green)">Installed.</b> You are running it as an app — ' +
+        'no address bar, and it keeps working when the connection drops.</p>'
+      : '<p class="note">Add it to your home screen or desktop and it opens like an app: full screen, its own ' +
+        'icon, and it still works when the signal goes.</p>' +
+        '<button class="btn gold" style="margin-top:12px" onclick="installApp()">' +
+        (typeof _installEvent !== 'undefined' && _installEvent ? 'Install now' : 'How to install') + '</button>' +
+        (typeof _installEvent !== 'undefined' && _installEvent ? ''
+          : '<p class="hint">Your browser has not offered a one-tap install yet. It needs HTTPS, so it will not ' +
+            'appear on a plain local address — on the deployed site it will.</p>'));
 
   /* --- platform --- */
   const platform =
@@ -596,17 +605,17 @@ PAGES.settings = function () {
     '<button class="btn danger" style="margin-top:10px" onclick="resetAll()">Reset to a first run</button>';
 
   return '<div style="max-width:1000px">' +
-    grp(false, ic('rgba(139,124,246,.16)', '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/>'), 'Appearance &amp; app', 'Theme, install', appearance) +
-    grp(false, ic('rgba(90,159,212,.16)', '<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/>'), 'Platform', 'Name, currency, trial, SLA, referral rate', platform) +
-    grp(false, ic('rgba(63,157,120,.16)', '<path d="M14 3v5h5"/><path d="M19 21H5V3h9l5 5z"/>'), 'Company &amp; invoices', 'Numbering, settlement account', company) +
+    grp(false, ic('rgba(139,124,246,.16)', '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/>'), 'Appearance &amp; app', 'Theme, install', appearance, 'appearance') +
+    grp(false, ic('rgba(90,159,212,.16)', '<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/>'), 'Platform', 'Name, currency, trial, SLA, referral rate', platform, 'platform') +
+    grp(false, ic('rgba(63,157,120,.16)', '<path d="M14 3v5h5"/><path d="M19 21H5V3h9l5 5z"/>'), 'Company &amp; invoices', 'Numbering, settlement account', company, 'company') +
     grp(true, ic('rgba(233,150,190,.16)', '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6h5M18.5 3.5v5"/>'), 'Team &amp; notifications', 'Accounts, roles, alerts',
       '<div class="sec-t">Team accounts</div>' + accounts +
       '<div class="sec-t" style="margin-top:26px">Roles &amp; permissions</div>' + roles +
       '<div class="sec-t" style="margin-top:26px">Notifications</div>' + notif) +
     grp(false, ic('rgba(214,112,111,.16)', '<rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.5" r="1.4"/>'),
-      'Login &amp; passwords', 'Your password, two-step, devices, policy', loginSection()) +
-    grp(false, ic('rgba(211,163,74,.16)', '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'), 'Integrations', 'Supabase, payments, email, WhatsApp', integ) +
-    grp(false, ic('rgba(120,128,143,.16)', '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/>'), 'Data &amp; storage', 'Export, reset', data) +
+      'Login &amp; passwords', 'Your password, two-step, devices, policy', loginSection(), 'login') +
+    grp(false, ic('rgba(211,163,74,.16)', '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'), 'Integrations', 'Supabase, payments, email, WhatsApp', integ, 'integrations') +
+    grp(false, ic('rgba(120,128,143,.16)', '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/>'), 'Data &amp; storage', 'Example data, export, reset', data, 'data') +
     '</div>';
 };
 

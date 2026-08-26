@@ -1,15 +1,41 @@
 {
-  "name": "The Label Board — Admin Control Centre",
+  "name": "The Label Board — Admin",
   "short_name": "TLB Admin",
   "description": "Operator console for The Label Board: subscribers, billing, payroll, support and staff access.",
-  "start_url": "index.html",
+  "id": "/?tlb-admin",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#0a0b0e",
   "theme_color": "#0a0b0e",
+  "categories": ["business", "productivity"],
+  "lang": "en-GB",
+  "dir": "ltr",
   "icons": [
-    { "src": "icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Subscribers", "url": "./?go=subscribers", "description": "Every business on the platform" },
+    { "name": "Payments", "url": "./?go=payments", "description": "Transactions and failures" },
+    { "name": "Payroll", "url": "./?go=payroll", "description": "Salaries and payslips" }
   ]
 }

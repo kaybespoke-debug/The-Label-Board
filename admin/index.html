@@ -4,10 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TLB Admin">
+<meta name="application-name" content="TLB Admin">
 <meta name="color-scheme" content="dark light">
 <title>The Label Board — Admin Control Centre</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -76,7 +84,7 @@
         <!-- the badge is a sibling, not a child: render() sets textContent on #ttl -->
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
           <h1 id="ttl">Dashboard</h1>
-          <span class="demo" id="demoTag" title="Every figure here is invented">Demo data</span>
+          <button class="demo" id="demoTag" onclick="openSettingsGroup('data')" title="Invented data. Tap to load or clear it.">Demo data</button>
         </div>
         <div class="top-sub" id="sub">Monitor your platform at a glance</div>
       </div>
@@ -219,6 +227,60 @@ function buildMobBar() {
     '<button class="mb" onclick="toggleDrawer()">' +
     '<span class="mbi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
     'stroke-linecap="round"><use href="#i-menu"/></svg></span><span class="mbt">More</span></button>';
+}
+
+
+/* ---------------- install as an app ----------------
+   Chrome fires beforeinstallprompt when the manifest, service worker and HTTPS
+   all check out; we hold the event so Settings can offer a real button. iOS has
+   no such event, so there it is a short instruction instead. */
+var _installEvent = null;
+function isInstalled() {
+  try {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || window.navigator.standalone === true;
+  } catch (e) { return false; }
+}
+function isIOS() { try { return /iphone|ipad|ipod/i.test(navigator.userAgent || ''); } catch (e) { return false; } }
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault(); _installEvent = e;
+  if (UI.page === 'settings') render();
+});
+window.addEventListener('appinstalled', function () {
+  _installEvent = null; toast('Installed. Look for TLB Admin on your home screen.');
+  if (UI.page === 'settings') render();
+});
+function installApp() {
+  if (isInstalled()) { toast('Already installed'); return; }
+  if (_installEvent) {
+    _installEvent.prompt();
+    _installEvent.userChoice.then(function (c) {
+      if (c && c.outcome === 'accepted') toast('Installing…');
+      _installEvent = null;
+    });
+    return;
+  }
+  modal('Add to your home screen', isIOS() ? 'On iPhone and iPad' : 'From the browser menu',
+    isIOS()
+      ? '<p class="note">Safari does not give apps an install button, so it is done from the share menu:</p>' +
+        '<div style="margin-top:12px">' +
+        '<div class="kv"><span class="k">1</span><span class="v" style="font-weight:400;text-align:right">Tap the Share button at the bottom of Safari</span></div>' +
+        '<div class="kv"><span class="k">2</span><span class="v" style="font-weight:400;text-align:right">Scroll down and tap Add to Home Screen</span></div>' +
+        '<div class="kv"><span class="k">3</span><span class="v" style="font-weight:400;text-align:right">Tap Add</span></div></div>' +
+        '<p class="hint">It then opens full screen with no address bar, like the customer app.</p>'
+      : '<p class="note">Open your browser menu and choose <b>Install app</b>, or <b>Add to Home screen</b>.</p>' +
+        '<p class="hint">If neither appears, the page may still be loading its service worker — give it a moment and try again. Chrome also only offers it over HTTPS, so it will not appear on a plain local address.</p>',
+    '<button class="btn gold" onclick="closeModal()">Got it</button>');
+}
+
+/* open Settings with one group already expanded */
+function openSettingsGroup(which) {
+  UI.openSettingsGroup = which;
+  go('settings');
+  setTimeout(function () {
+    var el = document.querySelector('[data-sgrp="' + which + '"]');
+    if (el) { el.open = true; el.scrollIntoView({ block: 'start' }); }
+  }, 30);
 }
 
 function render() {
