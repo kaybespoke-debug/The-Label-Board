@@ -8,25 +8,6 @@ const PAGES = {};
    Four cards, then four short panels across one row, then the charts.
    The row answers "is anything wrong" at a glance before you scroll.     */
 PAGES.dashboard = function () {
-  /* An empty console should read as ready, not broken. Rows of ₦0 and flat
-     charts say "something went wrong"; this says "nothing has happened yet". */
-  if (!DB.subscribers.length) {
-    return '<div class="pnl" style="max-width:640px;margin:8px auto;text-align:center;padding:38px 26px">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.4" stroke-linecap="round" ' +
-      'stroke-linejoin="round" style="width:46px;height:46px;opacity:.8;margin-bottom:16px">' +
-      '<use href="#i-users"/></svg>' +
-      '<h3 style="font-size:19px;margin-bottom:8px">No subscribers yet</h3>' +
-      '<p class="note" style="max-width:430px;margin:0 auto 20px">This is a clean console. Once businesses start ' +
-      'signing up, this page fills with what they are worth, what needs chasing and what is going wrong.</p>' +
-      '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
-      '<button class="btn gold" onclick="formAddSubscriber()">+ Add a subscriber</button>' +
-      '<button class="btn" onclick="formLoadExample()">Load example data</button>' +
-      '</div>' +
-      '<p class="hint" style="margin-top:18px">Example data fills every page with an invented business so you can ' +
-      'see how the console behaves. It clears again from Settings &rarr; Data &amp; storage.</p>' +
-      '</div>';
-  }
-
   const subs = Q.subsAsOf(), act = Q.active(), nw = Q.newSubs();
   const mrr = Q.mrr(), rev = Q.revenue(), split = Q.planSplit();
   const openT = Q.openTickets(), urg = Q.urgentTickets();
