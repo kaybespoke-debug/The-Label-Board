@@ -1389,6 +1389,7 @@ body.modal-open{overflow:hidden}
         <div class="panel" data-setperm="setBranches">
           <div class="panel-head"><h3>Branches &amp; outlets</h3></div>
           <p class="page-sub" style="margin-bottom:12px">Add each shop, studio or outlet you operate. Orders, sales, expenses and staff can then be tagged to a branch.</p>
+          <div id="unplacedNotice"></div>
           <div id="branchBox"></div>
         </div>
         <div class="panel" data-setperm="setWorkflow">
@@ -1748,9 +1749,57 @@ const setAppts=v=>save('layi_dash_appts',v);
 const getSupplies=()=>load('layi_dash_supplies',[]);
 const getProducts=()=>load('layi_dash_products',[]);
 const setProducts=v=>save('layi_dash_products',v);
-function productUnits(p){return (p.variants||[]).reduce((s,v)=>s+(+v.qty||0),0);}
-function productStockValue(p){return productUnits(p)*(+p.cost||0);}
-function productLow(p){const th=(SETTINGS.defaults&&+SETTINGS.defaults.lowStock)||0;const u=productUnits(p);if(u<=0)return'out';if(th&&u<=th)return'low';return'ok';}
+/* ---- Stock, per branch ------------------------------------------------------
+   One catalogue for the label, one stock count per outlet. "Do you have this
+   kaftan in Abuja?" is the question a shop floor actually asks, and it cannot
+   be answered by a single number on the product.
+
+   v.stock maps branch name -> quantity. v.qty is kept in step as the total
+   across every branch so that anything still reading it sees a real figure.
+   Branch names are the key because that is what the rest of the app scopes
+   by; renameBranchRefs carries the keys across when a branch is renamed. */
+function stockBranch(){
+  if(activeBranchView&&activeBranchView!=='all')return activeBranchView;
+  const home=(typeof userBranch==='function')?userBranch():'';
+  return home||defaultBranchName();
+}
+function variantStock(v){
+  if(!v)return {};
+  if(v.stock&&typeof v.stock==='object')return v.stock;
+  // pre-migration shape: one number, belonging to the only branch there was
+  const home=defaultBranchName();const out={};out[home]=+v.qty||0;return out;
+}
+function variantQty(v,branch){
+  const st=variantStock(v);
+  const b=branch||activeBranchView;
+  if(!b||b==='all')return Object.keys(st).reduce((a,k)=>a+(+st[k]||0),0);
+  return +st[b]||0;
+}
+function setVariantQty(v,branch,n){
+  if(!v)return;
+  const st=Object.assign({},variantStock(v));
+  const b=branch||defaultBranchName();
+  st[b]=Math.max(0,Math.round(+n||0));
+  v.stock=st;
+  v.qty=Object.keys(st).reduce((a,k)=>a+(+st[k]||0),0);
+}
+function addVariantQty(v,branch,delta){setVariantQty(v,branch,variantQty(v,branch)+(+delta||0));}
+/* Units of this product held by the studio in view. In the All studios view
+   that is every branch's stock added up, which is the company's position. */
+function productUnits(p,branch){return (p&&p.variants||[]).reduce((s,v)=>s+variantQty(v,branch),0);}
+function productUnitsTotal(p){return (p&&p.variants||[]).reduce((s,v)=>s+variantQty(v,'all'),0);}
+function productStockValue(p,branch){return productUnits(p,branch)*(+p.cost||0);}
+function productLow(p,branch){const th=(SETTINGS.defaults&&+SETTINGS.defaults.lowStock)||0;const u=productUnits(p,branch);if(u<=0)return'out';if(th&&u<=th)return'low';return'ok';}
+/* Where else in the label this piece is, for the "not here, but Abuja has 3"
+   answer that stops a sale being lost. */
+function productElsewhere(p,branch){
+  const b=branch||activeBranchView;const out=[];
+  if(!b||b==='all')return out;
+  const totals={};
+  (p&&p.variants||[]).forEach(v=>{const st=variantStock(v);Object.keys(st).forEach(k=>{if(k!==b&&(+st[k]||0)>0)totals[k]=(totals[k]||0)+(+st[k]||0);});});
+  Object.keys(totals).forEach(k=>out.push({branch:k,qty:totals[k]}));
+  return out.sort((a,b2)=>b2.qty-a.qty);
+}
 const setSupplies=v=>save('layi_dash_supplies',v);
 const getSuppliers=()=>load('layi_dash_suppliers',[]);
 const setSuppliers=v=>{save('layi_dash_suppliers',v);};
@@ -1984,14 +2033,16 @@ function normalizeWebOrder(raw){raw=raw||{};
 }
 // When a website RETAIL sale comes in, take the sold pieces out of studio stock. Matches a
 // studio product by its id, its studio_ref/SKU, or a variant SKU; draws from stock safely.
-function webDecrementStock(productId,qty){
+function webDecrementStock(productId,qty,branch){
   if(!productId)return false;const list=getProducts();
   const p=list.find(x=>x.id===productId||x.studio_ref===productId||x.sku===productId||(x.variants||[]).some(v=>v.sku===productId||v.id===productId));
   if(!p)return false;
   let need=+qty||1;const vs=p.variants||[];const match=vs.find(v=>v.sku===productId||v.id===productId);
   const ordered=match?[match].concat(vs.filter(v=>v!==match)):vs;
   let changed=false;
-  ordered.forEach(v=>{if(need<=0)return;const take=Math.min(need,+v.qty||0);if(take>0){v.qty=(+v.qty||0)-take;need-=take;changed=true;}});
+  // A sale takes stock out of the branch that made it, not out of a pool.
+  const selling=(branch&&branch!=='all')?branch:branchOfOr(null,activeBranchView!=='all'?activeBranchView:'');
+  ordered.forEach(v=>{if(need<=0)return;const have=variantQty(v,selling);const take=Math.min(need,have);if(take>0){setVariantQty(v,selling,have-take);need-=take;changed=true;}});
   if(changed)setProducts(list);
   return changed;
 }
@@ -2018,7 +2069,9 @@ function importWebOrders(rows){
   (rows||[]).forEach(r=>{const n=normalizeWebOrder(r.order||r);const items=(r.items&&r.items.length)?normalizeWebOrder({items:r.items}).items:n.items;const m=webOrderToStudio(n.order,items);
     if(m.type==='appointment'){if(haveA.has(m.record.id)){skipped++;return;}appts.push(m.record);haveA.add(m.record.id);asAppt++;added++;}
     else{if(haveO.has(m.record.id)){skipped++;return;}orders.push(m.record);haveO.add(m.record.id);added++;
-      if(m.record.kind==='sale')(m.record.saleItems||[]).forEach(it=>webDecrementStock(it.productId,it.qty)); // web retail sale → take out of stock
+      // A website sale is routed to a studio; its stock comes out of that studio,
+      // never out of whichever branch the person importing happens to be viewing.
+      if(m.record.kind==='sale')(m.record.saleItems||[]).forEach(it=>webDecrementStock(it.productId,it.qty,branchOf(m.record))); // web retail sale → take out of stock
     }});
   if(added){save('layi_dash_orders',orders);setAppts(appts);logAudit('Imported website orders',added+' record(s)');if(typeof renderAll==='function')renderAll();}
   return {added,skipped,appointments:asAppt};
@@ -2259,8 +2312,53 @@ function payFigures(staffId,monthKey){
    "Direct reports" are DERIVED (never stored) as everyone whose manager points here.
    Anyone can supervise anyone — this is not tied to role. Guards: no self, no cycles, no dangling. */
 const staffActive=s=>!!s&&s.active!==false&&(s.status||'Active')!=='Left Company';
-function staffBranch(s){return (s&&(s.branch||s.location))||defaultBranchName();}
-function staffInView(s){return activeBranchView==='all'||staffBranch(s)===activeBranchView;}
+/* A person works somewhere. Where, exactly, is not something to guess: an
+   unplaced staff member shows in every studio so an owner can see them and fix
+   it, rather than being filed under whichever branch sorts first. */
+function staffBranch(s){return (s&&(s.branch||s.location))||'';}
+function staffBranchLabel(s){return staffBranch(s)||defaultBranchName();}
+function staffInView(s){
+  if(activeBranchView==='all')return true;
+  return staffBranch(s)===activeBranchView;
+}
+/* Anyone whose work location is not one of the studios. Surfaced in Settings so
+   it gets fixed, rather than being discovered by a manager who cannot find
+   somebody on the rota. */
+/* Records that name no studio, or a studio that is no longer on the list.
+   These are the ones the All studios view shows and a single studio does not,
+   which is precisely how a record goes missing without anybody noticing. The
+   Settings page reports the count so it is a task, not a mystery. */
+/* Say it out loud on the Branches page. A record that shows in All studios and
+   in none of them is invisible from a manager's chair, and the only thing worse
+   than data in the wrong studio is data the owner does not know they have. */
+function renderUnplacedNotice(){
+  const el=document.getElementById('unplacedNotice');if(!el)return;
+  const list=recordsNeedingAStudio();
+  if(!list.length||!multiBranch()){el.innerHTML='';return;}
+  const byKind={};list.forEach(r=>{byKind[r.kind]=(byKind[r.kind]||0)+1;});
+  const bits=Object.keys(byKind).map(k=>byKind[k]+' '+k.toLowerCase()+(byKind[k]===1?'':'s'));
+  const places=Array.from(new Set(list.map(r=>r.at).filter(Boolean)));
+  el.innerHTML='<div class="kv" style="border:1px solid var(--amber);border-radius:10px;padding:11px 13px;margin-bottom:12px">'
+    +'<b style="color:var(--amber)">'+list.length+' record'+(list.length===1?'':'s')+' not assigned to a studio</b><br>'
+    +'<span style="color:var(--text-dim);font-size:13px">'+esc(bits.join(' \u00b7 '))
+    +(places.length?('. '+(places.length===1?'It names ':'They name ')+esc(places.join(', '))+', which '+(places.length===1?'is not a studio':'are not studios')+' on this list.'):'.')
+    +' They show under All studios but in none of the individual ones, so nobody working in a single studio can see them.</span></div>';
+}
+function recordsNeedingAStudio(){
+  const out=[];
+  const add=(label,list,key)=>{(list||[]).forEach(r=>{
+    const b=(r&&r[key])?String(r[key]):'';
+    if(!b||!branchExists(b))out.push({kind:label,name:(r&&(r.name||r.label||r.client||r.id))||'(untitled)',at:b});
+  });};
+  add('Order',getOrders(),'branch');
+  add('Payment',getTxns(),'branch');
+  add('Stock item',getSupplies(),'branch');
+  add('Appointment',getAppts(),'branch');
+  add('Bill',getBills(),'branch');
+  add('Staff',getStaff().filter(staffActive),'location');
+  return out;
+}
+function staffNeedingAStudio(){return getStaff().filter(st=>staffActive(st)&&(!staffBranch(st)||(typeof branchExists==='function'&&!branchExists(staffBranch(st)))));}
 // Branch scoping for records that hang off a staff member. A record whose staff is gone shows only in the all-studios view.
 function leaveInView(l){const s=staffById(l&&l.staffId);return s?staffInView(s):activeBranchView==='all';}
 function attInView(a){const u=(a&&a.userId)?getUsers().find(x=>x.id===a.userId):null;const s=(u&&u.staffId)?staffById(u.staffId):null;return s?staffInView(s):activeBranchView==='all';}
@@ -4041,11 +4139,13 @@ var activeBranchView='all';
    ever does, the row is shown in every branch rather than filed under the
    first one — a visible symptom the branch-scope gate will catch, instead of
    an invisible one nobody notices until a customer does. */
+function branchExists(name){return !!name&&branchNames().indexOf(name)>=0;}
+/* A record whose studio we cannot place: never assigned, or assigned to a
+   studio that is no longer on the list. */
+function branchOrphan(rec){const b=branchOf(rec);return !b||!branchExists(b);}
 function inBranch(rec){
   if(activeBranchView==='all')return true;
-  const b=branchOf(rec);
-  if(!b)return true;
-  return b===activeBranchView;
+  return branchOf(rec)===activeBranchView;
 }
 
 /* Company records. They belong to the label, so they show everywhere, unless
@@ -4053,6 +4153,68 @@ function inBranch(rec){
 function branchesOf(rec){
   const a=rec&&rec.branches;
   return Array.isArray(a)?a.filter(Boolean):[];
+}
+/* Every tab says how it answers the studio switcher. This is not documentation:
+   the branch-scope gate reads it, and a tab that is not listed here fails the
+   build. A new screen therefore cannot ship until somebody has decided what it
+   shows when an owner switches studios — which is exactly the decision that got
+   missed on the Shop, the Vendors list and the bills.
+
+     branch    strictly this studio's records
+     company   the label's, shown in every studio
+     stock     the label's catalogue, but the quantities are per studio
+     person    whoever is signed in, the same on any studio
+*/
+const VIEW_SCOPE={
+  activity:'branch',   calendar:'branch',   production:'branch', orders:'branch',
+  sales:'branch',      customers:'branch',  supplies:'branch',   products:'stock',
+  suppliers:'company', marketing:'company', logistics:'branch',  expenses:'branch',
+  payroll:'branch',    finance:'branch',    pots:'company',      team:'branch',
+  rota:'branch',       attendance:'branch', leave:'branch',      tasks:'company',
+  companylog:'branch', audit:'company',     settings:'company',  mywork:'person'
+};
+/* The stores that belong to a branch, and the key each one keeps it under.
+   The gate checks these partition cleanly: every record in exactly one studio. */
+const BRANCH_OWNED_STORES=[
+  ['orders','getOrders','branch'],
+  ['txns','getTxns','branch'],
+  ['supplies','getSupplies','branch'],
+  ['appts','getAppts','branch'],
+  ['bills','getBills','branch'],
+  ['staff','getStaff','location']
+];
+/* The stores that belong to the label. These show everywhere, unless the
+   record names the studios it applies to. */
+const COMPANY_STORES=[
+  ['suppliers','getSuppliers'],
+  ['campaigns','getCampaigns'],
+  ['anns','getAnns'],
+  ['pots','getPots'],
+  ['products','getProducts']
+];
+/* The control for assigning a company record to particular studios, and the
+   reader for it. Ticking nothing means all of them. */
+function branchAssignField(prefix,rec,label){
+  if(!multiBranch())return '';
+  const on=branchesOf(rec);
+  return '<div class="field"><label>'+esc(label||'Which studios use this')+'</label>'
+    +'<div class="sd" style="color:var(--text-faint);margin-bottom:8px">Leave them all unticked if it applies to the whole business. Ticking some limits it to those, without hiding it from your own records.</div>'
+    +branchNames().map(function(n,i){
+        return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;margin-bottom:5px">'
+          +'<input type="checkbox" id="'+prefix+'_br_'+i+'" '+(on.indexOf(n)>=0?'checked':'')+'> '+esc(n)+'</label>';
+      }).join('')
+    +'</div>';
+}
+function readBranchAssign(prefix){
+  if(!multiBranch())return [];
+  const out=[];
+  branchNames().forEach(function(n,i){
+    const el=document.getElementById(prefix+'_br_'+i);
+    if(el&&el.checked)out.push(n);
+  });
+  // every studio ticked means the same thing as none ticked, and storing the
+  // shorter answer means adding a studio later does not silently exclude it
+  return out.length===branchNames().length?[]:out;
 }
 function inCompanyScope(rec){
   if(activeBranchView==='all')return true;
@@ -4095,6 +4257,19 @@ function migrateBranchOwnership(){
   stamp(getAppts,setAppts,'branch');
   stamp(getBills,setBills,'branch');
   if(typeof getAttendance==='function'&&typeof setAttendance==='function')stamp(getAttendance,setAttendance,'branch');
+  // Stock: one number per variant becomes one number per branch. The existing
+  // count belonged to the only branch there was when it was entered, so that is
+  // where it goes. Doing this here rather than lazily means the totals a studio
+  // sees never change under them halfway through a session.
+  if(typeof getProducts==='function'&&typeof setProducts==='function'){
+    const prods=getProducts();let pchanged=false;
+    prods.forEach(pr=>(pr.variants||[]).forEach(v=>{
+      if(v&&(!v.stock||typeof v.stock!=='object')){
+        const st={};st[home]=+v.qty||0;v.stock=st;pchanged=true;touched++;
+      }
+    }));
+    if(pchanged)setProducts(prods);
+  }
   // Only worth telling the owner about the first time. After that this is
   // housekeeping that runs on every load and finds nothing.
   if(touched&&!SETTINGS.branchScopeV1&&typeof logAudit==='function')
@@ -4236,9 +4411,11 @@ function openBill(id){if(!can('money'))return;const b=id?getBills().find(x=>x.id
   openModal(`<h3>${b?'Edit bill':'Recurring bill'}</h3><div class="msub">Regular overheads: rent, electricity, subscriptions, salaries</div>
     <div class="field"><label>Bill name</label><input class="fld" id="b_label" value="${b?esc(b.label):''}" placeholder="e.g. Studio rent, NEPA, Adobe"></div>
     <div class="field"><label>Amount per month (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="b_amt" value="${b&&b.amount?fmtNum(b.amount):''}" placeholder="0"></div>
+    ${multiBranch()?'<div class="field"><label>Which studio pays this</label><select class="fld" id="b_branch"><option value="">The whole business</option>'+branchNames().map(function(n){return '<option value="'+esc(n)+'" '+((b&&b.branch===n)?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select><div class="sd" style="color:var(--text-faint);margin-top:4px">Rent and electricity belong to a studio. A subscription usually belongs to the whole business.</div></div>':''}
     <div class="field"><label>Note (optional)</label><input class="fld" id="b_note" value="${b?esc(b.note||''):''}" placeholder="Due date, account…"></div>
     <div class="modal-foot">${b?`<button class="btn danger sm" onclick="delBill('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveBill('${b?b.id:''}')">${b?'Update':'Save'}</button></div>`);}
-function saveBill(id){const label=(fv('b_label')||'').trim();if(!label){alert('Bill name is required.');return;}const amount=amt('b_amt');const list=getBills();const data={label,amount,note:fv('b_note')||''};if(id){Object.assign(list.find(x=>x.id===id),data);}else{list.push(Object.assign({id:uid('b'),lastLogged:''},data));}setBills(list);closeModal();renderExpensesView();}
+function b_existingBranch(id){const b=id?getBills().find(x=>x.id===id):null;return b?(b.branch||''):'';}
+function saveBill(id){const label=(fv('b_label')||'').trim();if(!label){alert('Bill name is required.');return;}const amount=amt('b_amt');const list=getBills();const data={label,amount,note:fv('b_note')||'',branch:(document.getElementById('b_branch')?fv('b_branch'):(b_existingBranch(id)||''))};if(id){Object.assign(list.find(x=>x.id===id),data);}else{list.push(Object.assign({id:uid('b'),lastLogged:''},data));}setBills(list);closeModal();renderExpensesView();}
 function delBill(id){if(!confirm('Delete this recurring bill? Past logged entries stay in your transactions.'))return;setBills(getBills().filter(b=>b.id!==id));closeModal();renderExpensesView();}
 function logBillsThisMonth(){if(!can('money'))return;const month=new Date().toISOString().slice(0,7);const bills=getBills();const due=bills.filter(b=>b.lastLogged!==month&&+b.amount>0);
   if(!bills.length){alert('No recurring bills yet. Add one with “+ Recurring bill”.');return;}
@@ -4249,7 +4426,10 @@ function logBillsThisMonth(){if(!can('money'))return;const month=new Date().toIS
   due.forEach(b=>{t.push({id:uid('t'),dir:'out',label:b.label,amount:+b.amount||0,at:today,cat:'expense',recurring:true,billId:b.id});b.lastLogged=month;});
   setTxns(t);setBills(bills);renderFinance();renderActivity();renderExpensesView();
   alert('Logged '+cur(total)+' across '+due.length+' bill(s).');}
-function renderBills(){const el=document.getElementById('billsList');if(!el)return;const bills=getBills();const month=new Date().toISOString().slice(0,7);
+function renderBills(){const el=document.getElementById('billsList');if(!el)return;
+  // Rent belongs to a studio; a subscription belongs to the label. A bill with no
+  // branch on it is the whole business's and shows everywhere.
+  const bills=getBills().filter(inBranch);const month=new Date().toISOString().slice(0,7);
   if(!bills.length){el.innerHTML='<div class="kv" style="color:var(--text-faint)">No recurring bills yet. Add rent, electricity, subscriptions and salaries here. Tap “Log this month” to post them to overheads.</div>';return;}
   el.innerHTML=`<table class="oledger"><tr><th>Bill</th><th class="hide-sm">Note</th><th class="num">Amount / month</th><th>This month</th></tr>${bills.map(b=>{const logged=b.lastLogged===month;return`<tr class="orow" style="cursor:pointer" onclick="openBill('${b.id}')"><td><div class="oref">${esc(b.label)}</div></td><td class="hide-sm" style="color:var(--text-dim)">${b.note?esc(b.note):'<span style=\'color:var(--text-faint)\'>—</span>'}</td><td class="num" style="font-weight:600">${cur(b.amount)}</td><td>${logged?'<span class="sup-status ok">logged</span>':'<span class="sup-status low">not yet</span>'}</td></tr>`;}).join('')}</table>`;}
 function openAppt(id){if(!can('appts'))return;const e=id?getAppts().find(x=>x.id===id):null;openModal(`<h3>${e?'Edit appointment':'Add fitting / appointment'}</h3><div class="msub">Shows on the calendar and the dashboard</div>
@@ -4649,6 +4829,7 @@ function saveRecipe(){syncRecipeDraft();const clean=(recipeDraft||[]).filter(r=>
 let branchDraft=null;
 const BRANCH_TYPES=[['bespoke','Bespoke / made-to-order'],['rtw','Ready-to-wear / retail'],['both','Both'],['haberdashery','Haberdashery (materials & notions)'],['fabrics','Fabrics (sold by length)']];
 function renderBranchesSettings(){const box=document.getElementById('branchBox');if(!box)return;
+  renderUnplacedNotice();
   if(!branchDraft)branchDraft=getBranches().map(b=>({id:b.id||uid('br'),name:b.name,location:b.location||'',does:branchDoes(b),channels:Array.isArray(b.channels)&&b.channels.length?b.channels.slice():['showroom']}));
   const lbl='font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:6px';
   box.innerHTML=branchDraft.map((b,i)=>{
@@ -5372,6 +5553,7 @@ function openSupplier(id,prefillType){
     <div class="field"><label>Email</label><input class="fld" id="sp_email" value="${s?esc(s.email||''):''}" placeholder="name@email.com"></div>
     <div class="field"><label>Location / address</label><textarea class="fld" id="sp_location" placeholder="Market, city…">${s?esc(s.location||''):''}</textarea></div>
     <div class="field"><label>Notes</label><textarea class="fld" id="sp_notes" placeholder="Lead time, what they supply, pricing…">${s?esc(s.notes||''):''}</textarea></div>
+    ${branchAssignField('sp',s,'Which studios use this vendor')}
     <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="sp_pref" ${s&&s.preferred?'checked':''} style="width:18px;height:18px;accent-color:var(--gold)"> ★ Preferred supplier</label>
     <div class="modal-foot">
       ${s?`<button class="btn danger sm" onclick="delSupplier('${s.id}')">Delete</button>`:''}
@@ -5383,7 +5565,7 @@ function openSupplier(id,prefillType){
 function saveSupplier(id){
   const business=(fv('sp_business')||'').trim();if(!business){alert('Business name is required.');return;}
   const list=getSuppliers();
-  const data={business,type:fvOther('sp_type')||'Other',contact:fv('sp_contact')||'',phone:fv('sp_phone')||'',whatsapp:fv('sp_whatsapp')||'',email:fv('sp_email')||'',location:fv('sp_location')||'',notes:fv('sp_notes')||'',preferred:document.getElementById('sp_pref').checked};
+  const data={business,type:fvOther('sp_type')||'Other',contact:fv('sp_contact')||'',phone:fv('sp_phone')||'',whatsapp:fv('sp_whatsapp')||'',email:fv('sp_email')||'',location:fv('sp_location')||'',notes:fv('sp_notes')||'',preferred:document.getElementById('sp_pref').checked,branches:readBranchAssign('sp')};
   if(id){Object.assign(list.find(x=>x.id===id),data);}else{list.push(Object.assign({id:uid('sp')},data));}
   setSuppliers(list);
   if(pendingSupply&&!id){const ps=pendingSupply;ps.supplierId=list[list.length-1].id;pendingSupply=null;renderSuppliers();renderSupplies();openSupply(null,ps);toast&&toast('Supplier added. Finish your stock item');return;}
@@ -5399,7 +5581,8 @@ function vendorTableHTML(list){const lc=id=>getSupplies().filter(x=>x.supplierId
   return `<table class="oledger">${head}${body}</table>`;}
 function renderSuppliers(){
   const sb=document.getElementById('suprSyncBtn');if(sb)sb.style.display=liveMode?'inline-flex':'none';
-  const all=getSuppliers();
+  // Company records, filtered by the branches they name rather than fenced off.
+  const all=getSuppliers().filter(inCompanyScope);
   const fab=all.filter(s=>s.type==='Fabric Supplier').length,log=all.filter(s=>s.type==='Logistics Company').length,pref=all.filter(s=>s.preferred).length;
   document.getElementById('suprStats').innerHTML=[
     stat('Vendors',all.length,'on record','','suprDrill(\'all\')'),
@@ -5637,7 +5820,7 @@ function openProductDetail(id){
   const salesLog=[];getOrders().filter(o=>o.kind==='sale').forEach(o=>(o.saleItems||[]).forEach(it=>{if(it.productId===id)salesLog.push({at:o.createdAt||o.date||o.at,client:o.client||'Walk-in',qty:+it.qty||0,price:+it.unitPrice||0});}));salesLog.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
   const lowAt=(SETTINGS.defaults&&+SETTINGS.defaults.lowStock)||0;
   const vstatus=q=>q<=0?'out':(lowAt&&q<=lowAt?'low':'ok');const vlabel={out:'Sold out',low:'Low',ok:'In stock'};
-  const rows=(p.variants||[]).map(v=>{const q=+v.qty||0;const s=vstatus(q);const parts=[];if(v.size)parts.push('<span style="color:var(--text-faint)">Size</span> '+esc(v.size));if(v.color)parts.push('<span style="color:var(--text-faint)">Colour</span> '+esc(v.color));return `<div class="srow ${s}"><div class="smain"><div class="sup-name">${parts.join(' &nbsp;·&nbsp; ')||'One size'} <span class="sup-status ${s}">${vlabel[s]}</span></div></div><div class="sqty"><span class="sup-qty">${q}</span><span class="sup-unit">units</span></div></div>`;}).join('');
+  const rows=(p.variants||[]).map(v=>{const q=variantQty(v);const s=vstatus(q);const parts=[];if(v.size)parts.push('<span style="color:var(--text-faint)">Size</span> '+esc(v.size));if(v.color)parts.push('<span style="color:var(--text-faint)">Colour</span> '+esc(v.color));return `<div class="srow ${s}"><div class="smain"><div class="sup-name">${parts.join(' &nbsp;·&nbsp; ')||'One size'} <span class="sup-status ${s}">${vlabel[s]}</span></div></div><div class="sqty"><span class="sup-qty">${q}</span><span class="sup-unit">units</span></div></div>`;}).join('');
   const tiles=[stat('In stock',units,'units across variants',''),stat('Status',lbl,st==='out'?'restock now ›':st==='low'?'restock soon ›':'healthy',st==='ok'?'up':'warn',(st!=='ok'&&can('products'))?`openProduct('${id}')`:'')];
   if(can('money'))tiles.push(stat('Stock value',cur(val),'inventory asset','up'));
   if(can('money'))tiles.push(stat('Sold to date',sales.units+(can('seeProfit')&&sales.rev?' · '+cur(sales.rev):''),'recorded sales',''));
@@ -5687,18 +5870,28 @@ function renderProducts(){
   list.sort((a,b)=>{const r={out:0,low:1,ok:2};return r[productLow(a)]-r[productLow(b)]||(a.name||'').localeCompare(b.name||'');});
   renderSortControl('products');
   sortInPlace('products',list);
-  const sub=document.getElementById('rtwSub');if(sub)sub.textContent=all.length+(all.length===1?' style':' styles');
+  const sub=document.getElementById('rtwSub');
+  if(sub){
+    // The catalogue belongs to the label; the stock belongs to the studio in view.
+    const here=all.filter(p=>productUnits(p)>0).length;
+    sub.textContent=all.length+(all.length===1?' style':' styles')
+      +((activeBranchView!=='all'&&multiBranch())?(' \u00b7 '+here+' stocked at '+activeBranchView):'');
+  }
   const el=document.getElementById('rtwList');if(!el)return;
   if(!all.length){el.innerHTML=emptyBlock('🏷','No products in your shop yet',can('products')?'Add a style with its sizes, colours and stock. You can record sales from these later.':'Products will appear here.',can('products')?'+ Add product':null,'openProduct()');return;}
   el.innerHTML=list.length?`<div class="rtw-grid">${list.map(p=>{
     const st=productLow(p);const lbl=st==='out'?'Out of stock':st==='low'?'Low':'In stock';
-    const vbits=(p.variants||[]).map(v=>`${esc([v.size,v.color].filter(Boolean).join(' '))||'one size'} · ${+v.qty||0}`).join('  ·  ');
+    const vbits=(p.variants||[]).map(v=>`${esc([v.size,v.color].filter(Boolean).join(' '))||'one size'} · ${variantQty(v)}`).join('  ·  ');
+    // Nothing here does not mean nothing anywhere. Saying where it is keeps a
+    // sale alive instead of ending the conversation at "out of stock".
+    const away=productElsewhere(p);
+    const awayBits=away.length?away.map(a=>esc(a.branch)+' '+a.qty).join(' · '):'';
     return`<div class="rtw-card ${st}" style="cursor:pointer" onclick="openProductDetail('${p.id}')">
       <div class="rtw-thumb">${p.photo?`<img src="${p.photo}" alt="">`:'🏷'}</div>
       <div class="rtw-body">
         <div class="rtw-name">${esc(p.name||'Untitled')} <span class="sup-status ${st}" style="font-size:10px">${lbl}</span></div>
         <div class="rtw-meta">${cur(p.price||0)}${can('seeCost')&&p.cost?' · cost '+cur(p.cost):''}</div>
-        <div class="rtw-foot"><div class="rtw-units" style="color:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--text)'}">${productUnits(p)}<small>units</small></div>${can('products')?`<button class="btn sm ghost" onclick="event.stopPropagation();openProduct('${p.id}')">Edit</button>`:''}</div>
+        <div class="rtw-foot"><div class="rtw-units" style="color:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--text)'}">${productUnits(p)}<small>units${(activeBranchView!=='all'&&multiBranch())?' here':''}</small>${awayBits?`<div style="font-size:10.5px;color:var(--text-faint);font-weight:400">also ${awayBits}</div>`:''}</div>${can('products')?`<button class="btn sm ghost" onclick="event.stopPropagation();openProduct('${p.id}')">Edit</button>`:''}</div>
       </div>
     </div>`;}).join('')}</div>`:'<div class="kv" style="color:var(--text-faint)">No products match your search.</div>';
 }
@@ -5712,7 +5905,7 @@ function openProduct(id){
 }
 function renderProductModal(){
   const p=productDraft;if(!p)return;
-  const vrows=p.variants.map((v,i)=>`<div class="row2" style="gap:8px;margin-bottom:6px;align-items:end"><div class="field" style="margin:0"><label>Size</label><input class="fld" id="pv_size_${i}" value="${esc(v.size||'')}" placeholder="S / M / L / 42"></div><div class="field" style="margin:0"><label>Colour</label><input class="fld" id="pv_color_${i}" value="${esc(v.color||'')}" placeholder="e.g. Navy"></div><div class="field" style="margin:0;max-width:90px"><label>Stock</label><input class="fld" type="number" id="pv_qty_${i}" value="${+v.qty||0}"></div><button class="btn ghost sm" style="margin-bottom:2px" onclick="removeVariant(${i})">✕</button></div>`).join('');
+  const vrows=p.variants.map((v,i)=>`<div class="row2" style="gap:8px;margin-bottom:6px;align-items:end"><div class="field" style="margin:0"><label>Size</label><input class="fld" id="pv_size_${i}" value="${esc(v.size||'')}" placeholder="S / M / L / 42"></div><div class="field" style="margin:0"><label>Colour</label><input class="fld" id="pv_color_${i}" value="${esc(v.color||'')}" placeholder="e.g. Navy"></div><div class="field" style="margin:0;max-width:110px"><label>Stock${(activeBranchView!=='all'&&multiBranch())?' here':''}</label><input class="fld" type="number" id="pv_qty_${i}" value="${variantQty(v,stockBranch())}"></div><button class="btn ghost sm" style="margin-bottom:2px" onclick="removeVariant(${i})">✕</button></div>`).join('');
   openModal(`<h3>${p.id?'Edit product':'Add product'}</h3><div class="msub">A ready-to-wear style with its sizes, colours & stock</div>
     <div class="field"><label>Product name</label><input class="fld" id="pp_name" value="${esc(p.name||'')}" placeholder="e.g. Signature linen shirt"></div>
     <div class="field"><label>Photo (optional)</label><div style="display:flex;align-items:center;gap:14px"><div style="width:66px;height:66px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint);cursor:pointer" onclick="document.getElementById('ppPhotoFile').click()">${p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:'add'}</div><button class="btn ghost sm" type="button" onclick="document.getElementById('ppPhotoFile').click()">Upload</button>${p.photo?`<button class="btn ghost sm" type="button" onclick="removeProductPhoto()">Remove</button>`:''}<input type="file" id="ppPhotoFile" accept="image/*" style="display:none" onchange="uploadProductPhoto(this)"></div></div>
@@ -5725,7 +5918,7 @@ function renderProductModal(){
     <div class="field"><label>Note (optional)</label><input class="fld" id="pp_note" value="${esc(p.note||'')}" placeholder="Fabric, fit, care, anything"></div>
     <div class="modal-foot">${p.id?`<button class="btn danger sm" onclick="delProduct('${p.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveProduct()">Save</button></div>`);
 }
-function syncProductDraft(){const p=productDraft;if(!p)return;if(fv('pp_name')!==undefined)p.name=fv('pp_name');if(fvOther('pp_category')!==undefined)p.category=fvOther('pp_category');if(fv('pp_price')!==undefined)p.price=amt('pp_price');if(fv('pp_cost')!==undefined)p.cost=amt('pp_cost');if(fv('pp_note')!==undefined)p.note=fv('pp_note');p.variants.forEach((v,i)=>{if(fv('pv_size_'+i)!==undefined)v.size=fv('pv_size_'+i);if(fv('pv_color_'+i)!==undefined)v.color=fv('pv_color_'+i);if(fv('pv_qty_'+i)!==undefined)v.qty=Math.max(0,+fv('pv_qty_'+i)||0);});}
+function syncProductDraft(){const p=productDraft;if(!p)return;if(fv('pp_name')!==undefined)p.name=fv('pp_name');if(fvOther('pp_category')!==undefined)p.category=fvOther('pp_category');if(fv('pp_price')!==undefined)p.price=amt('pp_price');if(fv('pp_cost')!==undefined)p.cost=amt('pp_cost');if(fv('pp_note')!==undefined)p.note=fv('pp_note');p.variants.forEach((v,i)=>{if(fv('pv_size_'+i)!==undefined)v.size=fv('pv_size_'+i);if(fv('pv_color_'+i)!==undefined)v.color=fv('pv_color_'+i);if(fv('pv_qty_'+i)!==undefined)setVariantQty(v,stockBranch(),Math.max(0,+fv('pv_qty_'+i)||0));});}
 function addVariant(){syncProductDraft();productDraft.variants.push(blankVariant());renderProductModal();}
 function removeVariant(i){syncProductDraft();productDraft.variants.splice(i,1);if(!productDraft.variants.length)productDraft.variants=[blankVariant()];renderProductModal();}
 async function uploadProductPhoto(input){const f=input.files&&input.files[0];if(!f)return;syncProductDraft();try{productDraft.photo=await compressImage(f,800,0.74);}catch(e){alert('Could not load that image.');}input.value='';renderProductModal();}
@@ -5734,7 +5927,9 @@ function saveProduct(){
   syncProductDraft();const p=productDraft;
   if(!(p.name||'').trim()){alert('Product name is required.');return;}
   p.name=p.name.trim();
-  p.variants=(p.variants||[]).filter(v=>(v.size||'').trim()||(v.color||'').trim()||(+v.qty||0)>0);
+  // Careful: a size with no stock HERE may still be held elsewhere. Dropping it
+  // on the branch total would quietly delete another studio's stock.
+  p.variants=(p.variants||[]).filter(v=>(v.size||'').trim()||(v.color||'').trim()||variantQty(v,'all')>0);
   if(!p.variants.length)p.variants=[{id:uid('v'),size:'',color:'',qty:0}];
   const list=getProducts();
   if(p.id){const t=list.find(x=>x.id===p.id);if(t)Object.assign(t,p);logAudit('Product updated',p.name);}
@@ -5825,7 +6020,7 @@ function recordSale(){
   const client=(d.client||'').trim()||'Walk-in';
   const label=p.name+' · '+variantLabel(v)+' ×'+d.qty;
   // decrement stock
-  {const list=getProducts();const tp=list.find(x=>x.id===p.id);if(tp){const tv=(tp.variants||[]).find(x=>x.id===v.id);if(tv)tv.qty=Math.max(0,(+tv.qty||0)-d.qty);}setProducts(list);}
+  {const list=getProducts();const tp=list.find(x=>x.id===p.id);if(tp){const tv=(tp.variants||[]).find(x=>x.id===v.id);const b=branchOfOr(d,activeBranchView!=='all'?activeBranchView:'');if(tv)setVariantQty(tv,b,Math.max(0,variantQty(tv,b)-d.qty));}setProducts(list);}
   // build the sale as an order so it flows through revenue, loyalty, finance & pots
   const orders=rawOrders();
   const saleNo=orders.filter(o=>o.kind==='sale').length+1;
@@ -6041,7 +6236,8 @@ function deleteSale(id){
   if(!(can('products')||can('orders')))return;
   if(!confirm('Delete this sale? The stock will be returned and the income reversed.'))return;
   const orders=rawOrders();const o=orders.find(x=>x.id===id);if(!o)return;
-  {const list=getProducts();(o.saleItems||[]).forEach(it=>{const tp=list.find(x=>x.id===it.productId);if(tp){const tv=(tp.variants||[]).find(x=>x.id===it.variantId);if(tv)tv.qty=(+tv.qty||0)+(+it.qty||0);}});setProducts(list);}
+  // Reversing a sale returns the pieces to the branch that sold them.
+  {const list=getProducts();const back=branchOfOr(o,defaultBranchName());(o.saleItems||[]).forEach(it=>{const tp=list.find(x=>x.id===it.productId);if(tp){const tv=(tp.variants||[]).find(x=>x.id===it.variantId);if(tv)addVariantQty(tv,back,+it.qty||0);}});setProducts(list);}
   {const ps=getPots();let touched=false;(o.potContribs||[]).forEach(pc=>{const pot=ps.find(x=>x.id===pc.potId);if(pot){pot.saved=Math.max(0,(+pot.saved||0)-(+pc.amount||0));pot.entries=(pot.entries||[]).filter(e=>e.orderId!==id);touched=true;}});if(touched)setPots(ps);}
   setTxns(getTxns().filter(t=>t.orderId!==id));
   save('layi_dash_orders',orders.filter(x=>x.id!==id));
@@ -6664,6 +6860,18 @@ function renameBranchRefs(oldName,newName){
   // company records name the branches they apply to, so those names move too
   const doList=(get,set)=>{const a=get();let ch=false;a.forEach(r=>{if(r&&Array.isArray(r.branches)){r.branches=r.branches.map(n=>n===oldName?newName:n);ch=true;}});if(ch)set(a);};
   doList(getSuppliers,setSuppliers);
+  // Stock is keyed by branch name, so a rename must move the key across or the
+  // renamed studio wakes up with nothing on its shelves.
+  if(typeof getProducts==='function'&&typeof setProducts==='function'){
+    const prods=getProducts();let ch=false;
+    prods.forEach(pr=>(pr.variants||[]).forEach(v=>{
+      if(v&&v.stock&&Object.prototype.hasOwnProperty.call(v.stock,oldName)){
+        v.stock[newName]=(+v.stock[newName]||0)+(+v.stock[oldName]||0);
+        delete v.stock[oldName];ch=true;
+      }
+    }));
+    if(ch)setProducts(prods);
+  }
   if(typeof getCampaigns==='function'&&typeof setCampaigns==='function')doList(getCampaigns,setCampaigns);
   if(typeof getAnns==='function'&&typeof setAnns==='function')doList(getAnns,setAnns);
   if(typeof getProducts==='function'&&typeof setProducts==='function')doArr(getProducts,setProducts,'branch');
@@ -7718,7 +7926,9 @@ function saveLogEntry(id){if(!can('team'))return;const title=fv('lg_title');if(!
   setLog(list);closeModal();renderCompanyLog();}
 function delLogEntry(id){if(!can('team'))return;if(!confirm('Delete this log entry?'))return;setLog(getLog().filter(x=>x.id!==id));closeModal();renderCompanyLog();}
 function renderCompanyLog(){
-  const list=getLog().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.at||'').localeCompare(a.at||''));
+  // An entry about one studio is not another studio's news. Entries with no
+  // studio on them belong to the label and show everywhere.
+  const list=getLog().filter(inBranch).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.at||'').localeCompare(a.at||''));
   const q=(document.getElementById('companyLogSearch')?.value||'').toLowerCase();
   const f=list.filter(e=>!q||((e.title||'')+' '+(e.note||'')+' '+(e.category||'')).toLowerCase().includes(q));
   document.getElementById('companyLogList').innerHTML=f.length?f.map(e=>`<div class="up-line"><b>${esc(e.title)}</b> <span class="badge" style="font-size:10px">${esc(e.category||'')}</span><br><span style="color:var(--text-faint);font-size:12px">${e.date?new Date(e.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):''}${e.by?' · '+esc(e.by):''}</span>${e.note?'<br>'+esc(e.note):''} <span class="x" style="float:right" onclick="openLogEntry('${e.id}')">✎</span></div>`).join('')
@@ -9090,6 +9300,8 @@ function saveAnn(id){const text=(fv('an_text')||'').trim();if(!text){alert('Writ
 function delAnn(id){if(!confirm('Delete this announcement?'))return;setAnns(getAnns().filter(a=>a.id!==id));closeModal();renderTasks();}
 function renderTasks(){
   const el=document.getElementById('annList');if(!el)return;
+  // An announcement belongs to the label and reaches every studio, unless it
+  // names the ones it is for. Tasks follow the person they are assigned to.
   const mineOnly=can('ownTasksOnly');
   const ab=document.getElementById('newAnnBtn');if(ab)ab.style.display=mineOnly?'none':'inline-flex';
   const anns=getAnns();
