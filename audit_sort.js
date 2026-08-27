@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const file = path.resolve(process.argv[2] || 'layi_dashboard.html');
+const file = path.resolve(process.argv[2] || 'site/layi_dashboard.html');
 const src = fs.readFileSync(file, 'utf8');
 const fail = [];
 const ok = [];

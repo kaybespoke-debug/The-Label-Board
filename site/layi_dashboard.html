@@ -1002,6 +1002,7 @@ body.modal-open{overflow:hidden}
       <div class="nav-item" data-view="payroll" id="navPayroll" onclick="go('payroll')"><span class="ni">⛁</span> Payroll <span class="lock" id="payLockIco">🔒</span></div>
       <div class="nav-item" data-view="pots" id="navPots" onclick="go('pots')"><span class="ni">⛃</span> Funds <span class="lock" id="potLockIco">🔒</span></div>
       <div class="nav-group">System</div>
+      <div class="nav-item" id="navFeedback" onclick="openFeedback()"><span class="ni">✎</span> Help &amp; feedback</div>
       <div class="nav-item" data-view="audit" id="navAudit" onclick="go('audit')"><span class="ni">❑</span> Audit trail</div>
       <div class="nav-item" data-view="settings" id="navSettings" onclick="go('settings')"><span class="ni">⚙</span> Settings</div>
       <div class="side-foot">
@@ -1393,15 +1394,21 @@ body.modal-open{overflow:hidden}
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Production workflow</h3></div>
           <p class="page-sub" style="margin-bottom:12px">The stages every order moves through. Tailor the making stages to how your studio works. <b>Order Received</b> opens every order, and <b>Quality Check → Ready for Delivery → Dispatched → Delivered</b> close it out. Those are added automatically.</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-            <button class="chip" onclick="applyStagePreset('bespoke')">Bespoke / Tailoring</button>
-            <button class="chip" onclick="applyStagePreset('bridal')">Bridal</button>
-            <button class="chip" onclick="applyStagePreset('rtw')">Ready-to-wear</button>
-            <button class="chip" onclick="applyStagePreset('factory')">Factory / Production</button>
-          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="stagePresetChips"></div>
           <div class="field"><label>Making stages, one per line, in order</label><textarea class="fld" id="set_stages" rows="7" placeholder="Cutting&#10;Stitching&#10;Finishing" oninput="renderStagePreview()"></textarea></div>
           <div id="stagePreview" class="sd" style="color:var(--text-faint);margin-bottom:12px"></div>
           <button class="btn" id="stageSaveBtn" onclick="saveStages()">Save workflow</button>
+          <div class="field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label>What you call one piece of work</label>
+            <input type="text" class="fld" id="set_itemword" placeholder="garment" maxlength="24">
+            <div class="sd" style="color:var(--text-faint);margin-top:6px">A tailor makes a <b>garment</b>, a shoemaker a <b>pair</b>, a bag maker a <b>piece</b>. Leave this empty and the app picks the word from what your studio does. Fill it in to use your own.</div>
+          </div>
+          <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
+        </div>
+        <div class="panel" data-setperm="setWorkflow" id="payrollSetupPanel">
+          <div class="panel-head"><h3>Pay, allowances &amp; deductions</h3></div>
+          <p class="page-sub" style="margin-bottom:12px">Everything here is off to begin with. A studio that pays a basic and nothing else never has to look at it, and payslips print exactly as they do now. Switch on only what your business actually runs.</p>
+          <div id="payrollSetupBox"></div>
+          <button class="btn" id="payrollSaveBtn" onclick="savePayrollPanel()" style="margin-top:12px">Save pay setup</button>
         </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Products &amp; materials</h3><button class="btn sm" onclick="addCatalogProduct()">+ Add product</button></div>
@@ -1411,7 +1418,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Stock used per product <span class="page-sub" style="font-weight:400">(auto-deduct from inventory)</span></h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Set the materials each garment type uses, as a reference for what each piece consumes.</p>
+          <p class="page-sub" id="matPerTypeSub" style="margin-bottom:12px">Set the materials each garment type uses, as a reference for what each piece consumes.</p>
           <div id="recipeBox"></div>
         </div>
         <div class="panel" data-setperm="setCatalog">
@@ -1476,6 +1483,7 @@ body.modal-open{overflow:hidden}
     <div class="ms-item" data-view="payroll" id="msPayroll" onclick="go('payroll');toggleMore()"><span>⛁</span> Payroll</div>
     <div class="ms-item" data-view="pots" id="msPots" onclick="go('pots');toggleMore()"><span>⛃</span> Funds</div>
     <div class="ms-item" data-view="settings" id="msSettings" onclick="go('settings');toggleMore()"><span>⚙</span> Settings</div>
+    <div class="ms-item" onclick="openFeedback();toggleMore()"><span>✎</span> Help &amp; feedback</div>
     <div class="ms-item" onclick="openMyAccount();toggleMore()"><span>☺</span> My account</div>
     <div class="ms-item" id="msSwitch" onclick="switchAccount()"><span>⇄</span> Switch account</div>
     <div class="ms-item" onclick="logout()"><span>⏻</span> Sign out</div>
@@ -1552,7 +1560,24 @@ const STAGE_PRESETS={
   bespoke:['Fabric Received','Cutting','Stitching','Fitting','Finishing'],
   bridal:['Design','Pattern','Cutting','First Fitting','Beading','Second Fitting','Final Fitting'],
   rtw:['Sampling','Cutting','Sewing','Finishing','Pressing'],
-  factory:['Cutting','Sewing','Assembly','Finishing','Pressing']
+  factory:['Cutting','Sewing','Assembly','Finishing','Pressing'],
+  footwear:['Last & Pattern','Clicking','Closing','Lasting','Soling','Finishing'],
+  leather:['Pattern','Cutting','Skiving','Edge Finishing','Assembly','Hardware','Stitching'],
+  fabrics:['Cloth Received','Measured & Cut','Packed'],
+  haberdashery:['Stock Received','Counted','Packed']
+};
+/* A preset only makes sense for the trade that uses those words. Each one names the
+   activities it belongs to so Settings can lead with the right suggestion instead of
+   offering a shoemaker 'Fabric Received'. */
+const STAGE_PRESET_META={
+  bespoke:{label:'Bespoke tailoring',for:['bespoke']},
+  bridal:{label:'Bridal & occasion',for:['bespoke']},
+  rtw:{label:'Ready-to-wear run',for:['rtw']},
+  factory:{label:'Factory / bulk',for:['rtw','bespoke']},
+  footwear:{label:'Shoemaking',for:['footwear']},
+  leather:{label:'Bags & leather goods',for:['leather']},
+  fabrics:{label:'Fabric cutting',for:['fabrics']},
+  haberdashery:{label:'Haberdashery',for:['haberdashery']}
 };
 function buildStages(mid){const m=(Array.isArray(mid)&&mid.length)?mid:DEFAULT_MIDDLE;return [STAGE_HEAD].concat(m,STAGE_TAIL);}
 let STAGES=buildStages(null);
@@ -1594,7 +1619,7 @@ const PERM_FUNCS=[
   {k:'del',l:'Delete orders'},
   {k:'setCatalog',l:'Settings: catalog & tiers',hint:'Loyalty tiers, inventory categories & QC checklist'},
   {k:'setCompany',l:'Settings: company details',hint:'Business name, logo, bank details & invoice info'},
-  {k:'setWorkflow',l:'Settings: workflow & recipes',hint:'Production stages, presets & materials per garment'},
+  {k:'setWorkflow',l:'Settings: workflow & recipes',hint:'Production stages, presets & materials per item type'},
   {k:'setBranches',l:'Settings: branches & outlets',hint:'Add and manage shops/outlets'},
   {k:'setData',l:'Import, backup & wipe data',hint:'CSV import, backups and clearing all data'},
 ];
@@ -1761,6 +1786,15 @@ const getTasks=()=>load('layi_dash_tasks',[]);
 const setTasks=v=>save('layi_dash_tasks',v);
 const getAnns=()=>load('layi_dash_anns',[]);
 const setAnns=v=>save('layi_dash_anns',v);
+/* ---- Talking to us ----------------------------------------------------------
+   A studio can send a suggestion, a feature request, a complaint or a support
+   ticket, and the operator console picks it up. It is kept on the device first
+   and pushed after, for the same reason everything else here is: a workroom with
+   no signal is the normal case, and "your message could not be sent" would mean
+   the complaint never gets made. Anything not yet delivered stays queued and
+   goes on the next connection. */
+const getFeedback=()=>load('layi_dash_feedback',[]);
+const setFeedback=v=>save('layi_dash_feedback',v);
 const getAttendance=()=>load('layi_dash_attendance',[]);
 const setAttendance=v=>save('layi_dash_attendance',v);
 const CURRENCIES=['NGN','GBP','USD','EUR'];
@@ -1796,6 +1830,29 @@ async function pullCustomers(){
 }
 let _custPushTimer=null;
 function pushCustomers(obj){if(!supa||!liveMode)return;clearTimeout(_custPushTimer);_custPushTimer=setTimeout(()=>_pushCustomersNow(obj),400);}
+let _fbPushTimer=null;
+function pushFeedback(arr){if(!supa||!liveMode)return;clearTimeout(_fbPushTimer);_fbPushTimer=setTimeout(()=>_pushFeedbackNow(arr),400);}
+async function _pushFeedbackNow(arr){
+  if(!supa||!liveMode||!myBusinessId)return;
+  try{
+    const queued=(arr||[]).filter(f=>!f.sentAt);
+    if(!queued.length)return;
+    let changed=false;
+    for(const f of queued){
+      const row={business_id:myBusinessId,kind:f.kind,title:f.title,body:f.body,
+        rating:(f.kind==='review'&&+f.rating)?+f.rating:null,
+        urgency:f.urgency==='blocking'?'blocking':'normal',
+        contact_name:f.contactName||'',contact_email:f.contactEmail||'',
+        context_page:f.page||'',app_version:f.appVersion||''};
+      const {data,error}=await supa.from('feedback').insert(row).select('id,ref').single();
+      // A failure here is not an error the owner should see. It stays queued and
+      // goes again on the next connection, which is what they would want anyway.
+      if(error){console.warn('feedback send:',error.message);continue;}
+      if(data){f.dbId=data.id;f.ref=data.ref;f.sentAt=new Date().toISOString();changed=true;}
+    }
+    if(changed){save('layi_dash_feedback',arr);if(typeof renderFeedbackList==='function')renderFeedbackList();}
+  }catch(e){console.warn('pushFeedback:',e);}
+}
 async function _pushCustomersNow(obj){
   if(!supa)return;
   try{
@@ -1818,7 +1875,8 @@ async function syncCustomersNow(){await syncNow();}
 let _hydrating=false;
 const SYNC_PUSHERS={
   'layi_dash_customers':()=>pushCustomers(getCustomers()),
-  'layi_dash_suppliers':()=>pushSuppliers(getSuppliers())
+  'layi_dash_suppliers':()=>pushSuppliers(getSuppliers()),
+  'layi_dash_feedback':()=>pushFeedback(getFeedback())
 };
 // Every other data key syncs as a JSON blob in the generic `app_state` table (one row per business + key).
 // Customers & suppliers keep their own relational tables above; everything else rides this generic path.
@@ -2048,13 +2106,39 @@ function financeTotals(period,custom){
 /* loyalty: tier by total net spend */
 const tierList=()=>(SETTINGS.tiers&&SETTINGS.tiers.length?SETTINGS.tiers:DEFAULTS.tiers).slice().sort((a,b)=>a.min-b.min);
 const loyaltyOn=()=>SETTINGS.loyaltyEnabled!==false;
-const MEAS_FIELDS=['Neck','Shoulder','Chest / Bust','Tummy / Stomach','Waist','Hip','Sleeve length','Round sleeve','Bicep','Forearm','Wrist','Shirt / Kaftan length','Top / Jacket length','Trouser waist','Trouser length','Thigh','Knee','Calf','Ankle','Inseam','Outseam','Agbada width (arm-span)','Agbada length','Cap / Kufi size'];
-function measGrid(prefix,meas){meas=meas||{};return`<div class="meas-grid">${MEAS_FIELDS.map((f,i)=>`<div class="meas-cell"><label>${f}</label><input class="fld" id="${prefix}_${i}" value="${esc(meas[f]||'')}" placeholder="—"></div>`).join('')}</div>`;}
-function readMeas(prefix){const m={};MEAS_FIELDS.forEach((f,i)=>{const v=fv(prefix+'_'+i);if(v)m[f]=v;});return m;}
+/* Measurements are trade-specific. A tailor measures a body, a shoemaker measures a
+   foot, a bag maker measures the bag itself. MEAS_BODY is the original list and keeps
+   its name and its values, so every measurement already saved still reads back.
+   Entry shows only the sets this studio needs; display always shows every value on
+   file, so nothing a client gave you can disappear because the studio changed trade. */
+const MEAS_BODY=['Neck','Shoulder','Chest / Bust','Tummy / Stomach','Waist','Hip','Sleeve length','Round sleeve','Bicep','Forearm','Wrist','Shirt / Kaftan length','Top / Jacket length','Trouser waist','Trouser length','Thigh','Knee','Calf','Ankle','Inseam','Outseam','Agbada width (arm-span)','Agbada length','Cap / Kufi size'];
+const MEAS_FOOT=['Shoe size','Foot length (L)','Foot length (R)','Foot width (L)','Foot width (R)','Instep / girth','Heel to ball','Ankle girth','Calf girth','Last / fitting notes'];
+const MEAS_BAG=['Bag height','Bag width','Bag depth','Strap length','Strap drop','Handle length','Gusset','Hardware finish'];
+const MEAS_FIELDS=MEAS_BODY;
+const MEAS_ALL=MEAS_BODY.concat(MEAS_FOOT,MEAS_BAG);
+const MEAS_SETS={bespoke:MEAS_BODY,rtw:MEAS_BODY,footwear:MEAS_FOOT,leather:MEAS_BAG};
+/* Which sets to offer for entry, based on what the studio does. */
+function measFields(){
+  const does={};activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>does[k]=1));
+  const out=[],seen={};
+  Object.keys(does).forEach(k=>{(MEAS_SETS[k]||[]).forEach(f=>{if(!seen[f]){seen[f]=1;out.push(f);}});});
+  return out.length?out:MEAS_BODY;
+}
+/* Entry list plus anything already recorded on this client that the list would miss. */
+function measFieldsFor(meas){
+  const base=measFields(),seen={};base.forEach(f=>seen[f]=1);
+  const extra=MEAS_ALL.filter(f=>meas&&meas[f]&&!seen[f]);
+  return base.concat(extra);
+}
+/* measGrid writes inputs as prefix_index, so readMeas has to read back against the
+   very list that was rendered, not today's list. */
+const _measRendered={};
+function measGrid(prefix,meas){meas=meas||{};const F=measFieldsFor(meas);_measRendered[prefix]=F;return`<div class="meas-grid">${F.map((f,i)=>`<div class="meas-cell"><label>${f}</label><input class="fld" id="${prefix}_${i}" value="${esc(meas[f]||'')}" placeholder="—"></div>`).join('')}</div>`;}
+function readMeas(prefix){const m={};(_measRendered[prefix]||MEAS_BODY).forEach((f,i)=>{const v=fv(prefix+'_'+i);if(v)m[f]=v;});return m;}
 function measHistoryOf(key){const c=getCustomers()[key];if(!c)return [];let h=Array.isArray(c.measHistory)?c.measHistory.slice():[];if(!h.length&&c.meas&&Object.keys(c.meas).length){h=[{id:'legacy',at:'',meas:c.meas,posture:'',fit:'',note:c.measurements||''}];}return h.sort((a,b)=>(b.at||'').localeCompare(a.at||''));}
 function latestMeasOf(key){return measHistoryOf(key)[0]||null;}
-function measReadGrid(meas){meas=meas||{};const ks=MEAS_FIELDS.filter(f=>meas[f]);if(!ks.length)return '<div class="kv" style="color:var(--text-faint)">No measurement values.</div>';return `<div class="meas-grid">${ks.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)">${esc(meas[f])}</div></div>`).join('')}</div>`;}
-function measReadGridFull(meas){meas=meas||{};return `<div class="meas-grid">${MEAS_FIELDS.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);${meas[f]?'':'color:var(--text-faint)'}">${esc(meas[f]||'—')}</div></div>`).join('')}</div>`;}
+function measReadGrid(meas){meas=meas||{};const ks=MEAS_ALL.filter(f=>meas[f]);if(!ks.length)return '<div class="kv" style="color:var(--text-faint)">No measurement values.</div>';return `<div class="meas-grid">${ks.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)">${esc(meas[f])}</div></div>`).join('')}</div>`;}
+function measReadGridFull(meas){meas=meas||{};return `<div class="meas-grid">${measFieldsFor(meas).map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);${meas[f]?'':'color:var(--text-faint)'}">${esc(meas[f]||'—')}</div></div>`).join('')}</div>`;}
 function openMeasRecord(key,recId){if(!can('customers'))return;const h=measHistoryOf(key);const rec=recId?h.find(r=>r.id===recId):null;const base=rec?rec.meas:(h[0]?h[0].meas:{});
   openModal(`<h3>${rec?'Measurement record':'New measurement record'}</h3><div class="msub">${esc((getCustomers()[key]||{}).name||key)}</div>
     <div class="row2"><div class="field"><label>Date taken</label><input class="fld" type="date" id="mr_date" value="${rec&&rec.at?rec.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div>
@@ -2075,6 +2159,101 @@ function loyaltyTier(spend){const L=tierList();let t=L[0],next=null;for(let i=0;
 /* staff + commission */
 const staffById=id=>getStaff().find(s=>s.id===id);
 const staffName=id=>{const s=staffById(id);return s?s.name:'';};
+/* ===== PAY SETUP: allowances, pension & the studio's own lines =====
+   A business that is still growing pays a basic and nothing else, and must never be
+   made to look at deductions it does not run. So everything here is off until the
+   owner turns it on, and a payslip with nothing switched on prints exactly as it
+   always did: basic + commission = gross.
+
+   Three layers, in the order they were asked for:
+     allowances — housing & transport as a percentage of basic, a whole-studio switch
+     pension    — a whole-studio switch, then opted into per person at an agreed rate
+     lines      — anything else this business runs: an earning or a deduction, a
+                  percentage or a fixed amount, for everyone or opted into per person
+
+   Percentages are of basic unless the line says gross, because that is how housing,
+   transport and pension are actually quoted. */
+const PAYROLL_DEFAULTS={
+  allowances:{enabled:false,housingPct:15,transportPct:10},
+  pension:{enabled:false,defaultRate:8},
+  lines:[]
+};
+function payrollSetup(){
+  const p=SETTINGS.payroll||{};
+  return {
+    allowances:Object.assign({},PAYROLL_DEFAULTS.allowances,p.allowances||{}),
+    pension:Object.assign({},PAYROLL_DEFAULTS.pension,p.pension||{}),
+    lines:Array.isArray(p.lines)?p.lines:[]
+  };
+}
+function savePayrollSetup(next){SETTINGS.payroll=next;save('layi_dash_settings',SETTINGS);}
+/* Is this studio running anything beyond basic + commission? Drives whether the
+   payslip grows a deductions section at all. */
+function payrollInUse(){
+  const c=payrollSetup();
+  return !!(c.allowances.enabled||c.pension.enabled||c.lines.length);
+}
+function staffPension(st){
+  const d=payrollSetup().pension;
+  const pn=(st&&st.pension)||{};
+  return {optedIn:!!pn.optedIn,rate:(pn.rate===0||pn.rate)?+pn.rate:+d.defaultRate,agreedOn:pn.agreedOn||''};
+}
+/* A line applies to someone if the studio runs it and either it is for everyone or
+   this person opted in. An opt-in that was never answered means no, never yes:
+   nothing is deducted from anyone's pay by default. */
+function lineApplies(st,ln){
+  if(!ln)return false;
+  if(!ln.optIn)return true;
+  const op=(st&&st.payLines)||{};
+  return !!op[ln.id];
+}
+function lineAmount(ln,basic,gross){
+  const base=(ln.of==='gross')?gross:basic;
+  const v=+ln.value||0;
+  return ln.basis==='fixed'?Math.max(0,Math.round(v)):Math.max(0,Math.round(base*v/100));
+}
+/* One month's pay for one person, from the same numbers the payroll table and the
+   payslip both read, so the two can never disagree. */
+function payFigures(staffId,monthKey){
+  const st=staffById(staffId)||{};
+  const cfg=payrollSetup();
+  const basic=+st.basic||0;
+  const ents=(typeof staffMonthEntries==='function')?staffMonthEntries(staffId,monthKey):[];
+  const commission=ents.reduce((a,e)=>a+(+e.amount||0),0);
+  const earnings=[];
+  if(basic>0)earnings.push({label:'Monthly basic salary',amount:basic,note:''});
+  if(cfg.allowances.enabled&&basic>0){
+    const h=Math.round(basic*(+cfg.allowances.housingPct||0)/100);
+    const t=Math.round(basic*(+cfg.allowances.transportPct||0)/100);
+    if(h>0)earnings.push({label:'Housing allowance',amount:h,note:(+cfg.allowances.housingPct||0)+'% of basic'});
+    if(t>0)earnings.push({label:'Transport allowance',amount:t,note:(+cfg.allowances.transportPct||0)+'% of basic'});
+  }
+  const allowanceTotal=earnings.reduce((a,e)=>a+e.amount,0)-basic;
+  if(commission!==0)earnings.push({label:'Commission earned',amount:commission,note:ents.length+' item'+(ents.length===1?'':'s')});
+  // custom EARNING lines sit on top of basic + allowances, before anything is taken off
+  const preGross=basic+allowanceTotal+commission;
+  cfg.lines.filter(l=>l.kind==='earning'&&lineApplies(st,l)).forEach(l=>{
+    const amt=lineAmount(l,basic,preGross);
+    if(amt>0)earnings.push({label:l.name||'Allowance',amount:amt,note:l.basis==='pct'?((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic')):''});
+  });
+  const gross=earnings.reduce((a,e)=>a+e.amount,0);
+  const deductions=[];
+  const pn=staffPension(st);
+  if(cfg.pension.enabled&&pn.optedIn&&basic>0){
+    const amt=Math.round(basic*(+pn.rate||0)/100);
+    if(amt>0)deductions.push({label:'Pension',amount:amt,note:(+pn.rate||0)+'% of basic'});
+  }
+  cfg.lines.filter(l=>l.kind==='deduction'&&lineApplies(st,l)).forEach(l=>{
+    const amt=lineAmount(l,basic,gross);
+    if(amt>0)deductions.push({label:l.name||'Deduction',amount:amt,note:l.basis==='pct'?((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic')):''});
+  });
+  const totalDeductions=deductions.reduce((a,d)=>a+d.amount,0);
+  // A deduction can never turn a wage negative — it is capped at what was earned.
+  const capped=Math.min(totalDeductions,gross);
+  return {staff:st,basic:basic,commission:commission,entries:ents,earnings:earnings,
+    allowanceTotal:allowanceTotal,gross:gross,deductions:deductions,
+    totalDeductions:capped,clipped:totalDeductions>gross,net:gross-capped};
+}
 /* ===== REPORTING LINES =====
    Single source of truth: staff.manager = the id of the person this staff reports to.
    "Direct reports" are DERIVED (never stored) as everyone whose manager points here.
@@ -2557,11 +2736,42 @@ function isGarmentShopType(t){return t==='rtw'||t==='both';}
 function isRetailType(t){return t==='rtw'||t==='both'||t==='haberdashery'||t==='fabrics';}
 // ---- What a studio does: a multi-select set of activities. Each maps to a capability that drives the app. ----
 const DEFAULT_ACTIVITIES=[
-  {key:'bespoke',label:'Bespoke',desc:'Made-to-order / custom tailoring',kind:'bespoke'},
-  {key:'rtw',label:'Ready-to-wear',desc:'Finished garments sold off the rack',kind:'retail',catalog:true},
-  {key:'haberdashery',label:'Haberdashery',desc:'Trims, notions & sewing bits',kind:'retail'},
-  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail'}
+  {key:'bespoke',label:'Bespoke tailoring',desc:'Clothing made to order',kind:'bespoke',stages:'bespoke'},
+  {key:'footwear',label:'Footwear',desc:'Shoes & sandals, made to order or stocked',kind:'bespoke',catalog:true,stages:'footwear'},
+  {key:'leather',label:'Bags & leather',desc:'Bags, belts & leather goods',kind:'bespoke',catalog:true,stages:'leather'},
+  {key:'rtw',label:'Ready-to-wear',desc:'Finished garments sold off the rack',kind:'retail',catalog:true,stages:'rtw'},
+  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail',stages:'fabrics'},
+  {key:'haberdashery',label:'Haberdashery',desc:'Trims, notions & sewing bits',kind:'retail',stages:'haberdashery'}
 ];
+/* What one piece of work is called in each trade. A tailor makes a garment, a
+   shoemaker makes a pair, a bag maker makes a piece. The studio can override this
+   in Settings; when a studio does more than one thing, the neutral word wins. */
+const ACTIVITY_WORDS={bespoke:'garment',rtw:'garment',footwear:'pair',leather:'piece',fabrics:'piece',haberdashery:'item'};
+function tradeWord(){
+  const set=(SETTINGS.itemWord||'').trim();
+  if(set)return set.toLowerCase();
+  const seen={};
+  activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>{seen[ACTIVITY_WORDS[k]||'item']=1;}));
+  const words=Object.keys(seen);
+  if(words.length===1)return words[0];
+  if(!words.length)return 'garment';
+  return 'piece';
+}
+function tradeWordCap(){const w=tradeWord();return w.charAt(0).toUpperCase()+w.slice(1);}
+function tradeWordPlural(){const w=tradeWord();return /s$/.test(w)?w:w+'s';}
+function tradeWordPluralCap(){const w=tradeWordPlural();return w.charAt(0).toUpperCase()+w.slice(1);}
+/* Static markup written for tailors is re-worded on render, so a shoemaker never
+   reads 'garment' in a placeholder we forgot about. */
+function applyTradeWording(){
+  const w=tradeWord();
+  renderStagePresetChips();
+  const iw=document.getElementById('set_itemword');
+  if(iw){iw.placeholder=w;if(document.activeElement!==iw)iw.value=SETTINGS.itemWord||'';}
+  const ps=document.getElementById('prodSearch');
+  if(ps)ps.placeholder='Search client or '+w+'…';
+  const mp=document.getElementById('matPerTypeSub');
+  if(mp)mp.textContent='Set the materials each '+w+' type uses, as a reference for what each piece consumes.';
+}
 function branchActivities(){const a=SETTINGS.branchActivities;return (Array.isArray(a)&&a.length)?a:DEFAULT_ACTIVITIES.slice();}
 // The chips shown for a branch = the current option list, plus any activity this branch already
 // uses that has since been removed from the list (so nothing a branch does silently vanishes).
@@ -2590,6 +2800,7 @@ function applyBizVisibility(){
   const mbProd=document.querySelector('.mob-bar .mb[data-view="production"]');if(mbProd)mbProd.style.display=bsp?'':'none';
   const sp=document.getElementById('snapPanel');if(sp)sp.style.display=bsp?'':'none';
   applyTeamVisibility();if(typeof renderMobBar==='function')renderMobBar();
+  applyTradeWording();
 }
 // Progressive disclosure: a one-person shop should not be shown the team & HR cluster.
 // Auto-reveal once there is a real team (2+ active staff) or a second studio; an explicit
@@ -2832,10 +3043,21 @@ function fvOther(id){const v=fv(id);if(v===undefined)return undefined;if(v!=='Ot
 /* ===== ORDER FORM (multi-item, photos, notes) ===== */
 const DEFAULT_PRODUCT_TYPES=['Bespoke outfit','Agbada','Kaftan','Shoes','Mules','Leather slippers','Casual set','Ankara trousers','Linen shirt','Linen shorts','Wrapper / fabric','Accessory','Other'];
 const PRODUCT_CATEGORIES=['Garment','Footwear','Bag','Accessory','Fabric','Other'];
+/* A name-only product list (an import, or an older studio) still deserves the right
+   category, or a shoemaker's whole catalogue files itself under Garment. */
+function guessCategory(n){
+  const t=String(n||'').toLowerCase();
+  if(/shoe|boot|sandal|slipper|mule|loafer|sneaker|pump|heel|brogue|espadrille/.test(t))return 'Footwear';
+  if(/bag|purse|clutch|tote|belt|wallet|satchel|backpack|holdall|luggage/.test(t))return 'Bag';
+  if(/fabric|cloth|aso.?oke|ankara|lace|brocade|wrapper|yard|damask|adire/.test(t))return 'Fabric';
+  if(/button|zip|thread|trim|notion|lining|interfacing|hook|stud|bead|ribbon|elastic/.test(t))return 'Other';
+  if(/cap|kufi|tie|scarf|gele|accessor|jewel|cuff/.test(t))return 'Accessory';
+  return 'Garment';
+}
 function productCatalog(){
   if(SETTINGS.productCatalog&&Array.isArray(SETTINGS.productCatalog)&&SETTINGS.productCatalog.length)return SETTINGS.productCatalog;
   const names=(SETTINGS.garmentTypes&&SETTINGS.garmentTypes.length)?SETTINGS.garmentTypes:DEFAULT_PRODUCT_TYPES;
-  return names.map(n=>({id:uid('pc'),name:n,category:'Garment',materials:[]}));
+  return names.map(n=>({id:uid('pc'),name:n,category:guessCategory(n),materials:[]}));
 }
 function productTypes(){return productCatalog().map(p=>p.name);}
 function productByName(n){return productCatalog().find(p=>(p.name||'').toLowerCase()===String(n||'').toLowerCase());}
@@ -2949,7 +3171,7 @@ function applyRecipesToOrder(){
   if(!draft)return;syncOrderDraft();
   const bq=(draft.batch&&draft.batch.on)?(+draft.batch.qty||1):1;
   const agg=aggregateRecipes(draft.outfits,bq);
-  if(!agg.length){toast('No materials set for these garment types yet. Add them in Settings \u2192 Materials per garment.');return;}
+  if(!agg.length){toast('No materials set for these '+tradeWord()+' types yet. Add them in Settings \u2192 Materials per '+tradeWord()+'.');return;}
   draft.stockUsed=draft.stockUsed||[];
   const byId={};draft.stockUsed.forEach(s=>{if(s.supplyId)byId[s.supplyId]=s;});
   agg.forEach(a=>{if(byId[a.supplyId])byId[a.supplyId].qty=a.qty;else draft.stockUsed.push({supplyId:a.supplyId,qty:a.qty});});
@@ -3008,7 +3230,7 @@ function syncOrderDraft(){
     if(fv('ofm_fit_'+i)!==undefined)o.measFit=fv('ofm_fit_'+i);
     if(fv('ofm_posture_'+i)!==undefined)o.measPosture=fv('ofm_posture_'+i);
     if(fv('ofm_note_'+i)!==undefined)o.measNote=fv('ofm_note_'+i);
-    if(document.getElementById('ofm'+i+'_0')!==null){o.meas=o.meas||{};MEAS_FIELDS.forEach((f,k)=>{const el=document.getElementById('ofm'+i+'_'+k);if(el)o.meas[f]=el.value;});}
+    if(document.getElementById('ofm'+i+'_0')!==null){o.meas=o.meas||{};(_measRendered['ofm'+i]||MEAS_BODY).forEach((f,k)=>{const el=document.getElementById('ofm'+i+'_'+k);if(el)o.meas[f]=el.value;});}
   });
   (draft.costs||[]).forEach((c,i)=>{
     if(fv('c_label_'+i)!==undefined)c.label=fv('c_label_'+i);
@@ -3045,7 +3267,7 @@ function openGroup(id){if(!can('update'))return;const o=getOrders().find(x=>x.id
 function renderGroupModal(){
   const o=getOrders().find(x=>x.id===groupId);if(!o)return;const dispI=STAGES.indexOf('Dispatched');
   const rows=(o.outfits||[]).map((m,i)=>{const si=+m.stageIndex||0;const pct=Math.round((si+1)/STAGES.length*100);
-    const ks=MEAS_FIELDS.filter(f=>m.meas&&m.meas[f]);const measSummary=ks.length?ks.slice(0,6).map(f=>esc(f)+' '+esc(m.meas[f])).join(' · ')+(ks.length>6?' …':''):'no measurements on file';
+    const ks=MEAS_ALL.filter(f=>m.meas&&m.meas[f]);const measSummary=ks.length?ks.slice(0,6).map(f=>esc(f)+' '+esc(m.meas[f])).join(' · ')+(ks.length>6?' …':''):'no measurements on file';
     return `<div class="srow"><div class="smain"><div class="sup-name">${esc(m.person||('Person '+(i+1)))} <span style="color:var(--text-faint);font-weight:400">· ${esc(m.name||m.type||'piece')}</span></div>
       <div class="sup-meta"><b style="color:var(--gold)">${esc(STAGES[si])}</b> · ${pct}%</div>
       <div class="sup-meta" style="color:var(--text-faint)">${measSummary}</div>
@@ -3105,7 +3327,7 @@ function addOutfit(){syncOrderDraft();draft.outfits.push(blankOutfit());reRender
 function removeOutfit(i){syncOrderDraft();draft.outfits.splice(i,1);if(!draft.outfits.length)draft.outfits.push(blankOutfit());reRenderOrder();}
 async function addClientPhotos(files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.clientPhotos.push(await compressImage(f));}reRenderOrder();}
 function removeClientPhoto(idx){syncOrderDraft();draft.clientPhotos.splice(idx,1);reRenderOrder();}
-function orderMeasRefHtml(client){const key=nameKey(client||'');if(!key)return '';const latest=latestMeasOf(key);if(!latest)return '';const ks=MEAS_FIELDS.filter(f=>latest.meas&&latest.meas[f]);if(!ks.length&&!latest.fit&&!latest.posture)return '';
+function orderMeasRefHtml(client){const key=nameKey(client||'');if(!key)return '';const latest=latestMeasOf(key);if(!latest)return '';const ks=MEAS_ALL.filter(f=>latest.meas&&latest.meas[f]);if(!ks.length&&!latest.fit&&!latest.posture)return '';
   return `<div class="kv" style="margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-2)"><b>📐 Measurements on file</b>${latest.at&&latest.at>new Date(1).toISOString()?' <span style="color:var(--text-faint)">('+new Date(latest.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+')</span>':''}${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}<br><span style="color:var(--text-faint);font-size:12px">${ks.slice(0,8).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')}${ks.length>8?' …':''}</span></div>`;}
 function refreshOrderMeas(){const el=document.getElementById('orderMeasRef');if(el)el.innerHTML=orderMeasRefHtml(fv('f_client')||'');}
 let orderMeasOpen=false;
@@ -3428,7 +3650,7 @@ function openDetail(id){
       ${(of.materials&&of.materials.length)?`<div class="kv"><b>Materials:</b> ${of.materials.map(m=>esc(m)).join(' · ')}</div>`:''}
       ${of.style?`<div class="kv"><b>Styling:</b> ${esc(of.style)}</div>`:''}
       ${of.finish?`<div class="kv"><b>Finishing:</b> ${esc(of.finish)}</div>`:''}
-      ${isGroup(o)&&of.meas&&MEAS_FIELDS.some(f=>of.meas[f])?`<div class="kv"><b>📐 Measurements:</b> ${MEAS_FIELDS.filter(f=>of.meas[f]).map(f=>esc(f)+' '+esc(of.meas[f])).join(' · ')}</div>`:''}
+      ${isGroup(o)&&of.meas&&MEAS_ALL.some(f=>of.meas[f])?`<div class="kv"><b>📐 Measurements:</b> ${MEAS_ALL.filter(f=>of.meas[f]).map(f=>esc(f)+' '+esc(of.meas[f])).join(' · ')}</div>`:''}
       ${isGroup(o)&&(of.measFit||of.measNote)?`<div class="kv">${of.measFit?'<b>Fit:</b> '+esc(of.measFit):''}${of.measNote?(of.measFit?' · ':'')+esc(of.measNote):''}</div>`:''}
     </div>`).join('');
   const ups=(o.updates||[]).slice().reverse().map(u=>`<div class="up-line"><b>${esc(u.by)}</b> · ${esc(u.stage)}${u.worker?' · <span style="color:var(--gold)">'+esc(u.worker)+'</span>':''} <span style="color:var(--text-faint)">· ${timeAgo(u.at)}</span><br>${esc(u.note)}
@@ -3520,7 +3742,7 @@ function openDetail(id){
       ${commInfo}
     </div>
     <div class="opane" data-pane="measurements" style="display:none">
-      ${(()=>{const latest=latestMeasOf(nameKey(o.client));if(!latest){return '<div class="kv" style="color:var(--text-faint)">No measurements on file for this client yet.</div>';}const full=can('update');return `<div class="kv" style="font-weight:600;margin-bottom:8px">📐 Measurements on file${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}</div>${latest.note?'<div style="color:var(--text-faint);font-size:12.5px;margin-bottom:8px">'+esc(latest.note)+'</div>':''}${full?measReadGridFull(latest.meas):`<div style="color:var(--text-dim);font-size:13px">${MEAS_FIELDS.filter(f=>latest.meas&&latest.meas[f]).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')||'—'}</div>`}`;})()}
+      ${(()=>{const latest=latestMeasOf(nameKey(o.client));if(!latest){return '<div class="kv" style="color:var(--text-faint)">No measurements on file for this client yet.</div>';}const full=can('update');return `<div class="kv" style="font-weight:600;margin-bottom:8px">📐 Measurements on file${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}</div>${latest.note?'<div style="color:var(--text-faint);font-size:12.5px;margin-bottom:8px">'+esc(latest.note)+'</div>':''}${full?measReadGridFull(latest.meas):`<div style="color:var(--text-dim);font-size:13px">${MEAS_ALL.filter(f=>latest.meas&&latest.meas[f]).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')||'—'}</div>`}`;})()}
       ${isGroup(o)?`<div class="kv" style="margin-top:10px;color:var(--text-faint)">This is a group order. Per-person measurements show under each person in the Overview tab.</div>`:''}
     </div>
   `);
@@ -3600,7 +3822,7 @@ function docHeader(label){const co=SETTINGS.company||{};
     <div style="text-align:right"><div style="font-size:16px;letter-spacing:2px;color:#c9a86a">${esc(label)}</div><div style="font-size:12px;color:#888">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div></div>
   </div>`;
 }
-function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?MEAS_FIELDS.filter(f=>meas[f]):MEAS_FIELDS;
+function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?MEAS_ALL.filter(f=>meas[f]):measFieldsFor(meas);
   if(onlyFilled&&!fields.length)return '<div style="color:#888;font-size:13px">No measurements on file for this client.</div>';
   return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 18px">'+fields.map(f=>`<div style="border-bottom:1px solid #eee;padding:5px 0;display:flex;justify-content:space-between;font-size:13px"><span style="color:#666">${esc(f)}</span><span style="font-weight:600">${esc(meas[f]||'')||'&nbsp;'}</span></div>`).join('')+'</div>';
 }
@@ -3993,7 +4215,7 @@ const SET_GROUPS=[
   {key:'appearance',hue:'#6d5dd3',t:'Appearance & app',s:'Theme, accent, install',heads:['Theme & display','Theme','Settings']},
   {key:'business',hue:'#2563a8',t:'Your business',s:'Type, team, branches, your pay',heads:['What your studio does','Branches','How the owner is paid']},
   {key:'company',hue:'#0f8a80',t:'Company & invoices',s:'Details, banks, messages',heads:['Company details','Message templates']},
-  {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers',heads:['Order defaults','Defaults','Loyalty tiers']},
+  {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers, pay',heads:['Order defaults','Defaults','Loyalty tiers','Pay, allowances & deductions']},
   {key:'rules',hue:'#c47d12',t:'Rules & inventory',s:'Workflow, quality, stock',heads:['Production workflow','Products & materials','Stock used per product','Quality control','Inventory categories']},
   {key:'team',hue:'#c04668',t:'Team & notifications',s:'Accounts, roles, alerts',heads:['Team accounts','Roles','Notifications']},
   {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Storage, backup, reset',heads:['Storage','Backup','Import old data','Data']}
@@ -4064,7 +4286,7 @@ function renderStorageMeter(){const el=document.getElementById('storageMeter');i
   const col=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
   el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(u.bytes)} used <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span></span><span style="color:var(--text-dim)">${esc(storageTierName())} · ${fmtBytes(lim)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div></div><div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
 }
-function fillSettings(){fillOwnerPay();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -4097,6 +4319,205 @@ function syncBanks(){companyBanks.forEach((bk,i)=>{const g=id=>{const e=document
 function addBankRow(){syncBanks();companyBanks.push({currency:'NGN',bank:'',name:'',no:''});renderBankRows();}
 function removeBankRow(i){syncBanks();companyBanks.splice(i,1);renderBankRows();}
 function saveQCChecklist(){const raw=fv('set_qc')||'';SETTINGS.qcChecklist=raw.split('\n').map(s=>s.trim()).filter(Boolean);if(!SETTINGS.qcChecklist.length)SETTINGS.qcChecklist=DEFAULTS.qcChecklist.slice();save('layi_dash_settings',SETTINGS);flashSaved('qcSaveBtn','Save checklist');}
+/* Only offer the presets that belong to what this studio actually does, so a
+   shoemaker is led to Lasting and Soling rather than Fabric Received. Presets for
+   other trades stay available under "Other trades" instead of disappearing. */
+function renderStagePresetChips(){
+  const box=document.getElementById('stagePresetChips');if(!box)return;
+  const does={};activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>does[k]=1));
+  const keys=Object.keys(STAGE_PRESETS);
+  const mine=keys.filter(k=>((STAGE_PRESET_META[k]||{}).for||[]).some(a=>does[a]));
+  const rest=keys.filter(k=>mine.indexOf(k)<0);
+  const Q=String.fromCharCode(39);
+  const chip=k=>'<button class="chip" onclick="applyStagePreset('+Q+k+Q+')">'+esc((STAGE_PRESET_META[k]||{}).label||k)+'</button>';
+  box.innerHTML=(mine.length?mine.map(chip).join(''):keys.map(chip).join(''))
+    +(mine.length&&rest.length?'<span style="width:100%;height:0"></span><span class="sd" style="color:var(--text-faint);align-self:center;margin-right:2px">Other trades:</span>'+rest.map(chip).join(''):'');
+}
+/* ---- Pay setup panel ---------------------------------------------------------- */
+let payLineDraft=null;
+function payLines(){if(!payLineDraft)payLineDraft=payrollSetup().lines.map(l=>Object.assign({},l));return payLineDraft;}
+function renderPayrollSetup(){
+  const box=document.getElementById('payrollSetupBox');if(!box)return;
+  const c=payrollSetup();const cur=SETTINGS.currency;
+  const lines=payLines();
+  const lineRows=lines.map((l,i)=>`<div class="row2" style="align-items:end;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin:0"><label>Name</label><input class="fld" id="pl_name_${i}" value="${esc(l.name||'')}" placeholder="e.g. Staff loan"></div>
+      <div class="field" style="margin:0"><label>Earning or deduction</label><select class="fld" id="pl_kind_${i}">
+        <option value="earning"${l.kind==='earning'?' selected':''}>Extra earning</option>
+        <option value="deduction"${l.kind!=='earning'?' selected':''}>Deduction</option></select></div>
+    </div>
+    <div class="row2" style="align-items:end;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin:0"><label>How it is worked out</label><select class="fld" id="pl_basis_${i}">
+        <option value="pct"${l.basis!=='fixed'?' selected':''}>Percentage</option>
+        <option value="fixed"${l.basis==='fixed'?' selected':''}>Fixed amount</option></select></div>
+      <div class="field" style="margin:0"><label>${l.basis==='fixed'?('Amount ('+cur+')'):'Percentage (%)'}</label><input class="fld" type="number" min="0" step="0.5" id="pl_value_${i}" value="${l.value||''}"></div>
+    </div>
+    <div class="row2" style="align-items:end;gap:8px;margin-bottom:6px">
+      <div class="field" style="margin:0"><label>Worked out on</label><select class="fld" id="pl_of_${i}">
+        <option value="basic"${l.of!=='gross'?' selected':''}>Basic salary</option>
+        <option value="gross"${l.of==='gross'?' selected':''}>Gross pay</option></select></div>
+      <div class="field" style="margin:0"><label>Applies to</label><select class="fld" id="pl_optin_${i}">
+        <option value=""${l.optIn?'':' selected'}>Everyone</option>
+        <option value="1"${l.optIn?' selected':''}>Only staff who opt in</option></select></div>
+    </div>
+    <div style="text-align:right;margin-bottom:14px"><button class="btn ghost sm" onclick="removePayLine(${i})">Remove this line</button></div>`).join('');
+  box.innerHTML=`
+    <div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="pay_allow_on" ${c.allowances.enabled?'checked':''} onchange="renderPayrollSetupLive()"> Pay housing &amp; transport allowances</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">A share of basic paid on top of it. Common once a business is established; skip it while you are growing.</div></div>
+    <div class="row2" id="pay_allow_rows" style="${c.allowances.enabled?'':'display:none'}">
+      <div class="field"><label>Housing (% of basic)</label><input class="fld" type="number" min="0" max="200" step="0.5" id="pay_housing" value="${c.allowances.housingPct}"></div>
+      <div class="field"><label>Transport (% of basic)</label><input class="fld" type="number" min="0" max="200" step="0.5" id="pay_transport" value="${c.allowances.transportPct}"></div>
+    </div>
+    <div class="field" style="margin-top:14px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="pay_pension_on" ${c.pension.enabled?'checked':''} onchange="renderPayrollSetupLive()"> Run a pension scheme</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">Voluntary per person. Nothing is deducted from anyone until you record that they agreed to it, on their own profile.</div></div>
+    <div class="field" id="pay_pension_rows" style="${c.pension.enabled?'':'display:none'}"><label>Standard employee rate (% of basic)</label>
+      <input class="fld" type="number" min="0" max="100" step="0.5" id="pay_pension_rate" value="${c.pension.defaultRate}">
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">The rate a new enrolment starts on. Each person's rate can differ.</div></div>
+    <div class="bd-sub" style="margin-top:18px">Your own pay lines</div>
+    <div class="sd" style="color:var(--text-faint);margin-bottom:10px">Anything else this business runs: a meal allowance, a staff loan repayment, a union due, a tax your country requires. Add as many as you need.</div>
+    ${lineRows||'<div class="kv" style="color:var(--text-faint);margin-bottom:10px">No lines of your own yet.</div>'}
+    <button class="btn ghost sm" style="width:100%" onclick="addPayLine()">＋ Add a pay line</button>`;
+}
+function renderPayrollSetupLive(){
+  const a=document.getElementById('pay_allow_rows'),ac=document.getElementById('pay_allow_on');
+  if(a&&ac)a.style.display=ac.checked?'':'none';
+  const q=document.getElementById('pay_pension_rows'),qc=document.getElementById('pay_pension_on');
+  if(q&&qc)q.style.display=qc.checked?'':'none';
+}
+function syncPayLines(){
+  const lines=payLines();
+  lines.forEach((l,i)=>{
+    if(document.getElementById('pl_name_'+i))l.name=fv('pl_name_'+i)||'';
+    if(document.getElementById('pl_kind_'+i))l.kind=fv('pl_kind_'+i)||'deduction';
+    if(document.getElementById('pl_basis_'+i))l.basis=fv('pl_basis_'+i)||'pct';
+    if(document.getElementById('pl_value_'+i))l.value=Math.max(0,+fv('pl_value_'+i)||0);
+    if(document.getElementById('pl_of_'+i))l.of=fv('pl_of_'+i)||'basic';
+    if(document.getElementById('pl_optin_'+i))l.optIn=!!fv('pl_optin_'+i);
+  });
+}
+function addPayLine(){syncPayLines();payLines().push({id:uid('pl'),name:'',kind:'deduction',basis:'pct',value:0,of:'basic',optIn:false});renderPayrollSetup();}
+function removePayLine(i){syncPayLines();payLines().splice(i,1);renderPayrollSetup();}
+function savePayrollPanel(){
+  syncPayLines();
+  const lines=payLines().filter(l=>(l.name||'').trim()).map(l=>({id:l.id||uid('pl'),name:l.name.trim(),kind:l.kind==='earning'?'earning':'deduction',basis:l.basis==='fixed'?'fixed':'pct',value:Math.max(0,+l.value||0),of:l.of==='gross'?'gross':'basic',optIn:!!l.optIn}));
+  const next={
+    allowances:{enabled:!!(document.getElementById('pay_allow_on')||{}).checked,
+      housingPct:Math.max(0,+fv('pay_housing')||0),transportPct:Math.max(0,+fv('pay_transport')||0)},
+    pension:{enabled:!!(document.getElementById('pay_pension_on')||{}).checked,
+      defaultRate:Math.max(0,Math.min(100,+fv('pay_pension_rate')||0))},
+    lines:lines
+  };
+  savePayrollSetup(next);
+  payLineDraft=null;
+  if(typeof logAudit==='function')logAudit('Pay setup updated',[next.allowances.enabled?'allowances on':'',next.pension.enabled?'pension on':'',lines.length?lines.length+' own line'+(lines.length===1?'':'s'):''].filter(Boolean).join(' · ')||'everything off');
+  renderPayrollSetup();
+  if(typeof renderPayrollView==='function')renderPayrollView();
+  flashSaved('payrollSaveBtn','Save pay setup');
+}
+/* ===== HELP & FEEDBACK =======================================================
+   The one place a studio can tell us something. Four kinds, because those are
+   the four queues the operator console sorts them into, and asking someone to
+   pick between "suggestion" and "feature request" is easier than asking us to
+   guess later.
+
+   It saves to this device first and sends after. On a device with no signal the
+   message is still written down, still visible, and marked as waiting to send.
+   Nothing is ever lost because a workroom has bad reception.
+   ========================================================================== */
+const FEEDBACK_KINDS=[
+  {k:'suggestion',label:'A suggestion',hint:'A small idea that would make the app nicer to use.'},
+  {k:'feature',label:'Something you need built',hint:'A tool or screen your business needs that is not here yet.'},
+  {k:'complaint',label:'Something went wrong',hint:'The app did something it should not have, or let you down.'},
+  {k:'support',label:'You are stuck',hint:'You cannot work out how to do something, or something is broken.'},
+  {k:'review',label:'Something you like',hint:'What is working well. We may ask if we can quote you.'}
+];
+let feedbackDraft=null,feedbackTab='new';
+function feedbackKindLabel(k){const f=FEEDBACK_KINDS.find(x=>x.k===k);return f?f.label:k;}
+function openFeedback(kind){
+  feedbackTab='new';
+  feedbackDraft={kind:kind||'suggestion',title:'',body:'',rating:0,urgency:'normal',
+    contactName:(currentUser&&currentUser.name)||userLabel()||'',
+    contactEmail:(currentUser&&currentUser.email)||''};
+  renderFeedbackModal();
+}
+function setFeedbackTab(t){feedbackTab=t;renderFeedbackModal();}
+function renderFeedbackModal(){
+  const d=feedbackDraft||{};
+  const sent=getFeedback().slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  const waiting=sent.filter(f=>!f.sentAt).length;
+  const kindOpts=FEEDBACK_KINDS.map(f=>`<option value="${f.k}"${d.kind===f.k?' selected':''}>${esc(f.label)}</option>`).join('');
+  const hint=(FEEDBACK_KINDS.find(f=>f.k===d.kind)||{}).hint||'';
+  const body=feedbackTab==='new'?`
+    <div class="field"><label>What is this about?</label>
+      <select class="fld" id="fb_kind" onchange="syncFeedbackDraft();renderFeedbackModal()">${kindOpts}</select>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">${esc(hint)}</div></div>
+    <div class="field"><label>In one line</label>
+      <input class="fld" id="fb_title" maxlength="160" value="${esc(d.title||'')}" placeholder="${d.kind==='support'?'What are you trying to do?':'Sum it up'}"></div>
+    <div class="field"><label>Tell us properly</label>
+      <textarea class="fld" id="fb_body" rows="5" maxlength="4000" placeholder="${d.kind==='complaint'||d.kind==='support'?'What happened, and what did you expect instead? If it happens on one screen, say which.':'As much or as little as you like.'}">${esc(d.body||'')}</textarea></div>
+    ${d.kind==='review'?`<div class="field"><label>Out of five</label>
+      <select class="fld" id="fb_rating">${[5,4,3,2,1].map(n=>`<option value="${n}"${(+d.rating||5)===n?' selected':''}>${'\u2605'.repeat(n)} ${n}</option>`).join('')}</select></div>`:''}
+    ${(d.kind==='complaint'||d.kind==='support')?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0">
+      <input type="checkbox" id="fb_blocking" ${d.urgency==='blocking'?'checked':''}> This is stopping me working right now</label></div>`:''}
+    <div class="row2"><div class="field"><label>Your name</label><input class="fld" id="fb_name" value="${esc(d.contactName||'')}"></div>
+      <div class="field"><label>Email to reply to</label><input class="fld" id="fb_email" type="email" value="${esc(d.contactEmail||'')}" placeholder="Optional"></div></div>
+    <div class="sd" style="color:var(--text-faint)">We see which studio this came from and what screen you were on. We do not see your clients, your orders or your figures.</div>
+  `:`
+    ${sent.length?sent.map(f=>`<div class="up-line" style="padding:10px 0;border-bottom:1px solid var(--line-soft)">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <b>${esc(f.title)}</b>
+          <span style="color:var(--text-faint);font-size:12px">${f.sentAt?esc(f.ref||'sent'):'<span style="color:var(--amber)">waiting to send</span>'}</span></div>
+        <div style="color:var(--text-dim);font-size:13px;margin-top:2px">${esc(feedbackKindLabel(f.kind))} \u00b7 ${esc(fmtDateShort(f.at))}</div>
+        <div style="color:var(--text-faint);font-size:13px;margin-top:4px;white-space:pre-wrap">${esc(f.body||'')}</div>
+      </div>`).join(''):'<div class="kv" style="color:var(--text-faint)">You have not sent us anything yet.</div>'}
+  `;
+  openModal(`<h3>Help &amp; feedback</h3>
+    <div class="msub">Tell us what would make this better, or what went wrong. A person reads every one.</div>
+    <div class="toolbar" style="gap:8px;margin:12px 0">
+      <button class="chip${feedbackTab==='new'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('new')">Send something</button>
+      <button class="chip${feedbackTab==='sent'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('sent')">What you have sent${sent.length?' ('+sent.length+')':''}</button>
+    </div>
+    ${waiting&&feedbackTab==='sent'?`<div class="kv" style="color:var(--amber);margin-bottom:8px">${waiting} message${waiting===1?'':'s'} still to send. ${waiting===1?'It goes':'They go'} automatically once you are back online.</div>`:''}
+    ${body}
+    <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Close</button>${feedbackTab==='new'?'<button class="btn" onclick="sendFeedback()">Send</button>':''}</div>`);
+}
+function syncFeedbackDraft(){
+  if(!feedbackDraft)return;
+  const d=feedbackDraft;
+  if(document.getElementById('fb_kind'))d.kind=fv('fb_kind')||'suggestion';
+  if(document.getElementById('fb_title'))d.title=fv('fb_title')||'';
+  if(document.getElementById('fb_body'))d.body=fv('fb_body')||'';
+  if(document.getElementById('fb_rating'))d.rating=+fv('fb_rating')||0;
+  const bl=document.getElementById('fb_blocking');if(bl)d.urgency=bl.checked?'blocking':'normal';
+  if(document.getElementById('fb_name'))d.contactName=fv('fb_name')||'';
+  if(document.getElementById('fb_email'))d.contactEmail=fv('fb_email')||'';
+}
+function sendFeedback(){
+  syncFeedbackDraft();
+  const d=feedbackDraft||{};
+  const title=(d.title||'').trim(),body=(d.body||'').trim();
+  if(!title){alert('Give it a one-line summary so we can find it again.');return;}
+  if(!body){alert('Tell us a little more than the title.');return;}
+  const list=getFeedback();
+  list.push({id:uid('fb'),kind:d.kind||'suggestion',title:title.slice(0,160),body:body.slice(0,4000),
+    rating:d.kind==='review'?(+d.rating||5):0,urgency:d.urgency==='blocking'?'blocking':'normal',
+    contactName:(d.contactName||'').trim(),contactEmail:(d.contactEmail||'').trim(),
+    page:activeView||'',appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),
+    at:new Date().toISOString(),by:userLabel(),sentAt:null,ref:'',dbId:''});
+  setFeedback(list);
+  if(typeof logAudit==='function')logAudit('Feedback sent','\u201c'+title+'\u201d \u00b7 '+feedbackKindLabel(d.kind));
+  feedbackTab='sent';feedbackDraft=null;
+  renderFeedbackModal();
+  toast(liveMode?'Sent. Thank you.':'Saved. It sends as soon as you are online.');
+}
+function renderFeedbackList(){if(document.getElementById('modal')&&feedbackTab==='sent')renderFeedbackModal();}
+function saveItemWord(){
+  const el=document.getElementById('set_itemword');if(!el)return;
+  const v=(el.value||'').trim().replace(/[^A-Za-z -]/g,'').slice(0,24);
+  SETTINGS.itemWord=v;save('layi_dash_settings',SETTINGS);
+  if(typeof logAudit==='function')logAudit('Wording updated',v?('one piece of work is a "'+v+'"'):'back to the automatic word');
+  applyTradeWording();renderAll();flashSaved('itemWordSaveBtn','Save wording');
+}
 function applyStagePreset(key){const el=document.getElementById('set_stages');if(el)el.value=(STAGE_PRESETS[key]||DEFAULT_MIDDLE).join('\n');renderStagePreview();}
 function renderStagePreview(){const el=document.getElementById('stagePreview');if(!el)return;const mid=(fv('set_stages')||'').split('\n').map(s=>s.trim()).filter(Boolean);const full=buildStages(mid.length?mid:null);el.innerHTML='<b>Full pipeline:</b> '+full.map(s=>esc(s)).join(' \u2192 ');}
 function renderStagesSettings(){const el=document.getElementById('set_stages');if(!el)return;const mid=(SETTINGS.productionStages&&SETTINGS.productionStages.length)?SETTINGS.productionStages:DEFAULT_MIDDLE;el.value=mid.join('\n');renderStagePreview();}
@@ -4117,10 +4538,10 @@ function renderRecipesSettings(){
   if(!recipeDraft)recipeDraft=(getRecipes()[recipeType]||[]).map(r=>({supplyId:r.supplyId,qty:r.qty}));
   const sup=getSupplies();
   const typeSel=`<select class="fld" id="rcp_type" onchange="setRecipeType(this.value)" style="max-width:260px">${productTypes().map(t=>`<option ${t===recipeType?'selected':''}>${esc(t)}</option>`).join('')}</select>`;
-  if(!sup.length){box.innerHTML=`<div class="field"><label>Garment type</label>${typeSel}</div><div class="kv" style="color:var(--text-faint);margin-top:6px">Add inventory items first (Inventory tab), then build recipes here.</div>`;return;}
+  if(!sup.length){box.innerHTML=`<div class="field"><label>${tradeWordCap()} type</label>${typeSel}</div><div class="kv" style="color:var(--text-faint);margin-top:6px">Add inventory items first (Inventory tab), then build recipes here.</div>`;return;}
   const rows=recipeDraft.map((r,i)=>`<div class="cost-line"><select class="fld" id="rcp_item_${i}"><option value="">Material</option>${sup.map(s=>`<option value="${s.id}" ${r.supplyId===s.id?'selected':''}>${esc(s.name)} (${esc(s.unit||'unit')})</option>`).join('')}</select><input class="fld price" type="number" min="0" step="0.01" id="rcp_qty_${i}" value="${r.qty||''}" placeholder="qty" style="max-width:90px"><span class="rm" onclick="removeRecipeRow(${i})">✕</span></div>`).join('');
   const have=Object.keys(getRecipes()).filter(t=>recipeFor(t).length);
-  box.innerHTML=`<div class="field"><label>Garment type</label>${typeSel}</div>
+  box.innerHTML=`<div class="field"><label>${tradeWordCap()} type</label>${typeSel}</div>
     <div class="bd-sub">Materials to make one ${esc(recipeType)}</div>
     ${rows||'<div class="kv" style="color:var(--text-faint)">No materials yet for this type.</div>'}
     <button class="btn ghost sm" style="width:100%;margin:6px 0" onclick="addRecipeRow()">＋ Add material</button>
@@ -4165,7 +4586,7 @@ function toast(msg){var t=document.getElementById('layiToast');if(!t){t=document
 function renderLogoPreview(){const el=document.getElementById('logoPreview');if(!el)return;const logo=(SETTINGS.company||{}).logo;el.innerHTML=logo?`<img src="${logo}" style="width:100%;height:100%;object-fit:contain">`:'none';}
 async function uploadLogo(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
 function clearLogo(){SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
-function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one garment type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit('Garment types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save garment types');}
+function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one '+tradeWord()+' type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit(tradeWordCap()+' types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save '+tradeWord()+' types');}
 function saveCompany(){syncBanks();SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,banks:companyBanks.filter(b=>b.bank||b.name||b.no)});save('layi_dash_settings',SETTINGS);applyBranding();if(typeof renderActivity==='function')renderActivity();flashSaved('coSaveBtn','Update company details');}
 /* The studio's own name and logo, saved in Settings, drive every in-app surface.
    The login screen is deliberately NOT one of them: no tenant is known yet. */
@@ -4231,7 +4652,28 @@ function impDate(v){v=(v||'').trim();if(!v)return new Date().toISOString().slice
   m=v.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);if(m){var y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);}
   var d=new Date(v);return isNaN(d.getTime())?new Date().toISOString().slice(0,10):d.toISOString().slice(0,10);}
 const IMP_MEAS={'Neck':['neck'],'Shoulder':['shoulder','shoulders'],'Chest / Bust':['chest','bust','chest/bust'],'Tummy / Stomach':['tummy','stomach','belly'],'Waist':['waist'],'Hip':['hip','hips'],'Sleeve length':['sleeve','sleeve length','sleeve len'],'Round sleeve':['round sleeve'],'Bicep':['bicep','biceps'],'Forearm':['forearm'],'Wrist':['wrist'],'Shirt / Kaftan length':['shirt length','kaftan length','top length'],'Top / Jacket length':['jacket length'],'Trouser waist':['trouser waist','pant waist'],'Trouser length':['trouser length','pant length','trouser'],'Thigh':['thigh'],'Knee':['knee'],'Calf':['calf'],'Ankle':['ankle'],'Inseam':['inseam'],'Outseam':['outseam'],'Agbada width (arm-span)':['agbada width','arm span','arm-span','armspan'],'Agbada length':['agbada length'],'Cap / Kufi size':['cap size','kufi']};
-function impMeasFromRow(head,row){var m={};MEAS_FIELDS.forEach(function(f){var al=(IMP_MEAS[f]||[]).concat([f.toLowerCase()]);var idx=impCol(head,al);if(idx>=0){var v=impCell(row,idx);if(v)m[f]=v;}});return m;}
+/* Foot and bag aliases, so a shoemaker's or bag maker's spreadsheet imports too. */
+Object.assign(IMP_MEAS,{
+  'Shoe size':['shoe size','size','uk size','eu size'],
+  'Foot length (L)':['foot length left','left foot length','foot length (l)','left length'],
+  'Foot length (R)':['foot length right','right foot length','foot length (r)','right length'],
+  'Foot width (L)':['foot width left','left foot width','foot width (l)','left width'],
+  'Foot width (R)':['foot width right','right foot width','foot width (r)','right width'],
+  'Instep / girth':['instep','instep girth','girth'],
+  'Heel to ball':['heel to ball','ball length'],
+  'Ankle girth':['ankle girth','ankle circumference'],
+  'Calf girth':['calf girth','calf circumference'],
+  'Last / fitting notes':['last','last notes','fitting notes'],
+  'Bag height':['bag height','height'],
+  'Bag width':['bag width','width'],
+  'Bag depth':['bag depth','depth'],
+  'Strap length':['strap length','strap'],
+  'Strap drop':['strap drop','drop'],
+  'Handle length':['handle length','handle'],
+  'Gusset':['gusset','gusset width'],
+  'Hardware finish':['hardware','hardware finish','fittings']
+});
+function impMeasFromRow(head,row){var m={};MEAS_ALL.forEach(function(f){var al=(IMP_MEAS[f]||[]).concat([f.toLowerCase()]);var idx=impCol(head,al);if(idx>=0){var v=impCell(row,idx);if(v)m[f]=v;}});return m;}
 const IMP_ICO={
   cust:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.8 20c.5-3.1 2.7-5.2 5.2-5.2s4.7 2.1 5.2 5.2"/><circle cx="17.2" cy="9.5" r="2.3"/><path d="M16 14.9c2.2.2 3.9 1.9 4.3 4.4"/></svg>',
   orders:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4.5"/></svg>',
@@ -6401,7 +6843,7 @@ function renderDashSalesTrio(){
     bs=Object.keys(prod).map(k=>{const p=getProducts().find(x=>x.id===k);return {id:k,hasP:!!p,name:p?p.name:'Item',qty:prod[k].qty,rev:prod[k].rev};}).sort((a,b)=>b.qty-a.qty).slice(0,3);bsLabel='Best sellers';
   }else{
     const g={};getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)).forEach(o=>{const t=((o.garment||orderItems(o)||'Order')+'').split(',')[0].trim()||'Order';if(!g[t])g[t]={qty:0,rev:0};g[t].qty++;g[t].rev+=orderNetBase(o);});
-    bs=Object.keys(g).map(k=>({id:'',hasP:false,name:k,qty:g[k].qty,rev:g[k].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);bsLabel='Top garments';
+    bs=Object.keys(g).map(k=>({id:'',hasP:false,name:k,qty:g[k].qty,rev:g[k].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);bsLabel='Top '+tradeWordPlural();
   }
   const cust={};allO.forEach(o=>{const c=o.client||'Walk-in';if(!cust[c])cust[c]={n:0,rev:0};cust[c].n++;cust[c].rev+=(o.kind==='sale'?(+o.value||0):orderNetBase(o));});
   const tc=Object.keys(cust).map(c=>({name:c,n:cust[c].n,rev:cust[c].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);
@@ -6829,7 +7271,7 @@ function renderOrders(){
   let head,body;
   if(bespokeView){
     // Bespoke branch: measurements-forward, production-focused — no retail/financial clutter
-    head=`<tr><th>Client</th><th class="hide-sm">Garment</th><th>Measurements</th><th>Due</th><th>Stage</th></tr>`;
+    head=`<tr><th>Client</th><th class="hide-sm">${tradeWordCap()}</th><th>Measurements</th><th>Due</th><th>Stage</th></tr>`;
     body=rows.map(o=>{
       const du=daysUntil(o.due);const _deliv=o.stageIndex>=DELI;const _disp=o.stageIndex>=DIS&&!_deliv;const overdue=du!==null&&du<0&&o.stageIndex<DIS;
       const dueTxt=_deliv?'<span style="color:var(--green);font-weight:600">delivered ✓</span>':_disp?'<span style="color:#2bb0a6;font-weight:600">pending delivery</span>':overdue?'<span style="color:var(--red);font-weight:600">overdue</span>':(o.due?new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'<span style="color:var(--text-faint)">—</span>');
@@ -7320,11 +7762,13 @@ function renderPayrollView(){
   ].join('');
   const el=document.getElementById('payroll');
   if(!staff.length){el.innerHTML=emptyBlock('⛁','No staff yet','Add salaried staff and commission tailors. Commission is added automatically when an order names them as maker, referrer or director.','+ Add staff','openStaff()');return;}
+  const showNet=payrollInUse();const thisMonthKey=new Date().toISOString().slice(0,7);
   const pq=(document.getElementById('paySearch')?.value||'').toLowerCase();
   const staffF=staff.filter(s=>!pq||((s.name||'')+' '+(s.role||'')+' '+(s.staffId||'')).toLowerCase().includes(pq));
-  el.innerHTML=(staffF.length?(`<table class="oledger"><tr><th>Name</th><th class="hide-sm">Role</th><th class="hide-sm">Pay setup</th><th class="num">Commission owed</th><th class="num">Pay</th></tr>`+staffF.map(s=>{const o=owed[s.id]||{commission:0};
+  el.innerHTML=(staffF.length?(`<table class="oledger"><tr><th>Name</th><th class="hide-sm">Role</th><th class="hide-sm">Pay setup</th>${showNet?'<th class="num hide-sm">Take-home</th>':''}<th class="num">Commission owed</th><th class="num">Pay</th></tr>`+staffF.map(s=>{const o=owed[s.id]||{commission:0};
     const bits=[];if(+s.basic>0)bits.push(cur(s.basic)+'/mo basic');if(+s.rate>0)bits.push(cur(s.rate)+'/item');if(s.director)bits.push('Director');
-    return`<tr class="orow"><td style="cursor:pointer" onclick="openStaffDetail('${s.id}')"><div class="oref">${esc(s.name)}${branchTag(staffBranch(s))}</div></td><td class="hide-sm">${s.role?esc(s.role):'<span style="color:var(--text-faint)">—</span>'}</td><td class="hide-sm" style="color:var(--text-dim)">${bits.join(' · ')||'<span style="color:var(--text-faint)">no pay set</span>'}</td><td class="num">${o.commission?`<span style="color:var(--amber);font-weight:600">${cur(o.commission)}</span>`:'—'}</td><td class="num" style="white-space:nowrap">${+s.basic>0?(salaryPaidThisMonth(s.id)?`<button class="btn sm ghost" style="color:var(--green)" onclick="event.stopPropagation();payBasic('${s.id}')">✓ Salary</button>`:`<button class="btn sm ghost" onclick="event.stopPropagation();payBasic('${s.id}')">Pay salary</button>`):''}${o.commission>0?` <button class="btn sm" onclick="event.stopPropagation();payCommission('${s.id}')">Pay commission</button>`:''}</td></tr>`;}).join('')+`</table>`):'<div class="kv" style="color:var(--text-faint)">No staff match your search.</div>');
+    const pf=showNet?payFigures(s.id,thisMonthKey):null;
+    return`<tr class="orow"><td style="cursor:pointer" onclick="openStaffDetail('${s.id}')"><div class="oref">${esc(s.name)}${branchTag(staffBranch(s))}</div></td><td class="hide-sm">${s.role?esc(s.role):'<span style="color:var(--text-faint)">—</span>'}</td><td class="hide-sm" style="color:var(--text-dim)">${bits.join(' · ')||'<span style="color:var(--text-faint)">no pay set</span>'}</td>${showNet?`<td class="num hide-sm" style="color:var(--text-dim)">${pf&&pf.gross>0?cur(pf.net):'—'}</td>`:''}<td class="num">${o.commission?`<span style="color:var(--amber);font-weight:600">${cur(o.commission)}</span>`:'—'}</td><td class="num" style="white-space:nowrap">${+s.basic>0?(salaryPaidThisMonth(s.id)?`<button class="btn sm ghost" style="color:var(--green)" onclick="event.stopPropagation();payBasic('${s.id}')">✓ Salary</button>`:`<button class="btn sm ghost" onclick="event.stopPropagation();payBasic('${s.id}')">Pay salary</button>`):''}${o.commission>0?` <button class="btn sm" onclick="event.stopPropagation();payCommission('${s.id}')">Pay commission</button>`:''}</td></tr>`;}).join('')+`</table>`):'<div class="kv" style="color:var(--text-faint)">No staff match your search.</div>');
   const psm=document.getElementById('payslipMonth');if(psm&&(!psm.options||!psm.options.length)){const n=new Date();let html='';for(let i=0;i<12;i++){const d=new Date(n.getFullYear(),n.getMonth()-i,1);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');html+=`<option value="${k}">${monthLabel(k)}</option>`;}psm.innerHTML=html;}
 }
 function printOnePayslip(id){const k=(document.getElementById('payslipMonth')&&document.getElementById('payslipMonth').value)||new Date().toISOString().slice(0,7);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to open the payslip.');return;}w.document.write(`<!doctype html><html><head><title>Payslip · ${monthLabel(k)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:14mm}}</style></head><body>${payslipInner(id,k)}</body></html>`);w.document.close();}
@@ -7359,7 +7803,8 @@ function payslipInner(id,k){
   const ents=staffMonthEntries(id,k);
   const comm=ents.reduce((a,e)=>a+(+e.amount||0),0);
   const basic=+s.basic||0;const includeBasic=basic>0;
-  const gross=comm+(includeBasic?basic:0);
+  const fig=payFigures(id,k);
+  const gross=fig.gross;
   const paidComm=ents.filter(e=>e.paid).reduce((a,e)=>a+(+e.amount||0),0);
   const line=(l,v,strong)=>`<tr><td style="padding:7px 0;border-bottom:1px solid #eee;${strong?'font-weight:700':''}">${l}</td><td style="padding:7px 0;border-bottom:1px solid #eee;text-align:right;${strong?'font-weight:700':''}">${v}</td></tr>`;
   const commRows=ents.length?ents.map(e=>`<tr><td style="padding:6px 0;border-bottom:1px solid #f1f1f1;font-size:13px">${esc(e.work||'Commission')}${e.garment?' · '+esc(e.garment):''} <span style="color:#999">${esc(e.client||'')}${e.orderId?' · '+esc(e.orderId):''}</span></td><td style="padding:6px 0;border-bottom:1px solid #f1f1f1;text-align:right;font-size:13px;white-space:nowrap">${cur(e.amount)}${e.paid?'':' <span style="color:#b8860b">(unpaid)</span>'}</td></tr>`).join(''):`<tr><td colspan="2" style="padding:8px 0;color:#999;font-size:13px">No commission recorded this month.</td></tr>`;
@@ -7376,14 +7821,19 @@ function payslipInner(id,k){
       <thead><tr><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #ddd;padding-bottom:6px">Earnings</th><th style="text-align:right;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #ddd;padding-bottom:6px">Amount</th></tr></thead>
       <tbody>
         ${includeBasic?line('Monthly basic salary',cur(basic)):''}
+        ${fig.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned').map(e=>line(esc(e.label)+(e.note?' <span style="color:#999;font-size:11px">'+esc(e.note)+'</span>':''),cur(e.amount))).join('')}
         <tr><td colspan="2" style="padding:12px 0 4px;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Commission · ${ents.length} item${ents.length===1?'':'s'} (how it was earned)</td></tr>
         ${commRows}
       </tbody>
     </table>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-left:auto;max-width:300px;margin-top:12px">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-left:auto;max-width:340px;margin-top:12px">
       ${includeBasic?line('Basic salary',cur(basic)):''}
+      ${fig.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned').map(e=>line(esc(e.label),cur(e.amount))).join('')}
       ${line('Commission earned',cur(comm))}
       ${line('Gross pay',cur(gross),true)}
+      ${fig.deductions.length?fig.deductions.map(d=>line(esc(d.label)+(d.note?' <span style="color:#999;font-size:11px">'+esc(d.note)+'</span>':''),'− '+cur(d.amount))).join(''):''}
+      ${fig.deductions.length?line('Total deductions','− '+cur(fig.totalDeductions)):''}
+      ${fig.deductions.length?line('Net pay',cur(fig.net),true):''}
     </table>
     <div style="margin-top:8px;text-align:right;font-size:12px;color:#888">Commission paid so far: ${cur(paidComm)}${comm-paidComm>0?` · outstanding ${cur(comm-paidComm)}`:''}</div>
     ${(s.bankName||s.accountNo)?`<div style="margin-top:18px;padding:12px 14px;background:#faf6ee;border-radius:8px;font-size:13px"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Paid to</div>${[s.bankName,s.accountName,s.accountNo].filter(Boolean).map(esc).join(' · ')}</div>`:''}
@@ -7416,7 +7866,11 @@ function openStaffDetail(id){
   const personal=kv('Staff ID',s.staffId)+kv('Gender',s.gender)+kv('Date of birth',s.dob)+kv('Phone',s.phone)+kv('Email',s.email)+kv('Address',s.address)+kv('Nationality',s.nationality)+kv('Emergency contact',[s.emergencyName,s.emergencyPhone,s.emergencyRel].filter(Boolean).join(' · '));
   const contactRow=(s.phone||s.email)?`<div class="kv" style="margin-bottom:10px">${s.phone?`<a href="tel:${esc(s.phone)}" style="color:var(--gold)">Call</a> · <a href="https://wa.me/${String(s.phone).replace(/[^0-9]/g,'')}" target="_blank" style="color:var(--gold)">WhatsApp</a>`:''}${s.email?(s.phone?' · ':'')+`<a href="mailto:${esc(s.email)}" style="color:var(--gold)">Email</a>`:''}</div>`:'';
   const employ=kv('Job title',s.role)+kv('Department',s.department)+kv('Employment type',s.employmentType)+kv('Start date',s.startDate)+`<div class="bd-row"><span class="bl">Status</span><span class="bv" style="color:var(--${statusCls==='ok'?'green':statusCls==='out'?'red':'amber'})">${esc(st)}</span></div>`+reportingRows+kv('Work location',s.location)+kv('Specialisation',s.specialty)+kv('Skills',s.skills)+kv('Notes',s.notes);
-  const payroll=money?(kv('Salary type',s.salaryType)+kv('Commission basis',s.commMethod==='pctValue'?((+s.commPct||0)+'% of order value'):s.commMethod==='pctProfit'?((+s.commPct||0)+'% of profit'):'Fixed per garment')+kv('Monthly basic',+s.basic>0?cur(s.basic):'')+kv('Commission / item',(s.commMethod==='fixed'&&+s.rate>0)?cur(s.rate):'')+(s.rates&&s.rates.length?`<div class="bd-row"><span class="bl">Garment rates</span><span class="bv">${s.rates.map(r=>esc(r.type)+' '+cur(r.amount)).join(', ')}</span></div>`:'')+kv('Bank',[s.bankName,s.accountNo,s.accountName].filter(Boolean).join(' · '))):'';
+  const payroll=money?(kv('Salary type',s.salaryType)+kv('Commission basis',s.commMethod==='pctValue'?((+s.commPct||0)+'% of order value'):s.commMethod==='pctProfit'?((+s.commPct||0)+'% of profit'):('Fixed per '+tradeWord()))+kv('Monthly basic',+s.basic>0?cur(s.basic):'')+kv('Commission / item',(s.commMethod==='fixed'&&+s.rate>0)?cur(s.rate):'')+(s.rates&&s.rates.length?`<div class="bd-row"><span class="bl">${tradeWordCap()} rates</span><span class="bv">${s.rates.map(r=>esc(r.type)+' '+cur(r.amount)).join(', ')}</span></div>`:'')+(()=>{if(!payrollInUse())return '';const f=payFigures(s.id,new Date().toISOString().slice(0,7));
+      const rows=f.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned').map(e=>kv(e.label,cur(e.amount)+(e.note?' <span style="color:var(--text-faint)">'+esc(e.note)+'</span>':''))).join('')
+        +(f.deductions.length?f.deductions.map(d=>kv(d.label,'− '+cur(d.amount)+(d.note?' <span style="color:var(--text-faint)">'+esc(d.note)+'</span>':''))).join(''):'')
+        +kv('Take-home this month','<b>'+cur(f.net)+'</b>');
+      return rows;})()+kv('Bank',[s.bankName,s.accountNo,s.accountName].filter(Boolean).join(' · '))):'';
   const pendingBankHtml=(money&&s.pendingBank)?`<div class="kv" style="border:1px solid var(--amber);border-radius:8px;padding:10px 12px;margin-top:8px"><b>⚠ Bank change requested by ${esc(s.name)}</b><br><span style="color:var(--text-dim)">New: ${esc(s.pendingBank.bank||'')} · ${esc(s.pendingBank.no||'')} · ${esc(s.pendingBank.name||'')}</span><br><span style="color:var(--text-faint);font-size:12px">Requested ${fmtDateShort(s.pendingBank.at)}</span><div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm" onclick="approveBankChange('${id}')">Approve</button><button class="btn sm ghost" onclick="rejectBankChange('${id}')">Reject</button></div></div>`:'';
   const docs=(s.docs||[]).length?(s.docs||[]).map(d=>`<div class="bd-row"><span class="bl">${esc(d.type)} <span style="color:var(--text-faint)">${esc(d.name||'')}</span></span><span class="bv">${d.data?`<a href="${d.data}" download="${esc(d.name||'document')}" style="color:var(--gold)">open</a>`:''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No documents uploaded. Add them via Edit profile.</div>';
   const tl=(s.timeline||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
@@ -7540,15 +7994,22 @@ function renderStaffModal(){
     <div class="row2"><div class="field"><label>Payment method</label><select class="fld" id="st_salType">${opts(SALARY_TYPES,({'Per Piece':'Commission','Hybrid':'Salary + Commission'}[s.salaryType])||s.salaryType||'Monthly Salary')}</select></div>
       <div class="field"><label>Monthly basic (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="st_basic" value="${s.basic?fmtNum(s.basic):''}" placeholder="0 if none"></div></div>
     <div class="field"><label>Commission basis</label><select class="fld" id="st_commMethod" onchange="staffCommMethodChange()">
-      <option value="fixed"${cm==='fixed'?' selected':''}>Fixed amount per garment</option>
+      <option value="fixed"${cm==='fixed'?' selected':''}>Fixed amount per ${tradeWord()}</option>
       <option value="pctValue"${cm==='pctValue'?' selected':''}>Percentage of order value</option>
       <option value="pctProfit"${cm==='pctProfit'?' selected':''}>Percentage of profit</option>
     </select></div>
     ${(cm==='pctValue'||cm==='pctProfit')?`<div class="field"><label>Percentage ${cm==='pctProfit'?'of order profit':'of order value'} (%)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_commPct" value="${s.commPct||''}" placeholder="e.g. 10"><div class="sd" style="color:var(--text-faint);margin-top:4px">Worked out automatically on each order they make, and still editable per order.</div></div>`
     :`<div class="field"><label>Default commission / item (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="st_rate" value="${s.rate?fmtNum(s.rate):''}" placeholder="0 if none"></div>
-    <div class="field"><label>Commission by garment type</label>
+    <div class="field"><label>Commission by ${tradeWord()} type</label>
       <div class="sd" style="color:var(--text-faint);margin-bottom:8px">e.g. Kaftan ${SETTINGS.currency}40,000 · Agbada ${SETTINGS.currency}65,000. Editable on each order.</div>
-      ${rateRows}<button class="btn ghost sm" style="width:100%" onclick="addStaffRate()">＋ Add garment rate</button></div>`}
+      ${rateRows}<button class="btn ghost sm" style="width:100%" onclick="addStaffRate()">＋ Add ${tradeWord()} rate</button></div>`}
+    ${payrollSetup().pension.enabled?(()=>{const pn=staffPension(s);return `<div class="field" style="margin-top:12px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="st_pension_on" ${pn.optedIn?'checked':''}> Enrolled in the pension scheme</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">Voluntary. Nothing is deducted until you tick this, and you should have their agreement on file first.</div></div>
+    <div class="row2"><div class="field"><label>Employee rate (% of basic)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_pension_rate" value="${pn.rate}"></div>
+      <div class="field"><label>Agreed on</label><input class="fld" type="date" id="st_pension_date" value="${esc(pn.agreedOn||'')}"></div></div>`;})():''}
+    ${(()=>{const opt=payrollSetup().lines.filter(l=>l.optIn);if(!opt.length)return '';const on=(s.payLines||{});return `<div class="field" style="margin-top:12px"><label>Optional pay lines</label>
+      <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Lines your studio runs for some people but not everyone. Tick the ones that apply to ${esc((s.name||'this person').split(' ')[0]||'this person')}.</div>
+      ${opt.map(l=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:6px"><input type="checkbox" id="st_pl_${l.id}" ${on[l.id]?'checked':''}> ${esc(l.name)} <span style="color:var(--text-faint)">${l.kind==='earning'?'earning':'deduction'} · ${l.basis==='fixed'?cur(l.value):((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic'))}</span></label>`).join('')}</div>`;})()}
     <div class="row2"><div class="field"><label>Bank name</label><input class="fld" id="st_bank" value="${esc(s.bankName||'')}"></div>
       <div class="field"><label>Account number</label><input class="fld" id="st_accNo" value="${esc(s.accountNo||'')}"></div></div>
     <div class="field"><label>Account name</label><input class="fld" id="st_accName" value="${esc(s.accountName||'')}"></div>`:''}
@@ -7568,6 +8029,16 @@ function syncStaffDraft(){if(!staffDraft)return;const s=staffDraft;const g=id=>f
   if(document.getElementById('st_basic'))s.basic=amt('st_basic');if(document.getElementById('st_rate'))s.rate=amt('st_rate');
   if(document.getElementById('st_commMethod'))s.commMethod=g('st_commMethod')||'fixed';
   if(document.getElementById('st_commPct'))s.commPct=Math.max(0,Math.min(100,+g('st_commPct')||0));
+  if(document.getElementById('st_pension_on')){
+    s.pension=Object.assign({},s.pension||{},{
+      optedIn:!!document.getElementById('st_pension_on').checked,
+      rate:Math.max(0,Math.min(100,+g('st_pension_rate')||0)),
+      agreedOn:g('st_pension_date')||''});
+    // an enrolment with no date recorded is dated the day it was ticked, so the payslip
+    // can always say since when
+    if(s.pension.optedIn&&!s.pension.agreedOn)s.pension.agreedOn=new Date().toISOString().slice(0,10);
+  }
+  payrollSetup().lines.filter(l=>l.optIn).forEach(l=>{const el=document.getElementById('st_pl_'+l.id);if(el){s.payLines=s.payLines||{};s.payLines[l.id]=!!el.checked;}});
   if(document.getElementById('st_bank'))s.bankName=g('st_bank')||'';if(document.getElementById('st_accNo'))s.accountNo=g('st_accNo')||'';if(document.getElementById('st_accName'))s.accountName=g('st_accName')||'';
   (s.rates||[]).forEach((r,i)=>{if(fvOther('sr_type_'+i)!==undefined)r.type=fvOther('sr_type_'+i);if(fv('sr_amt_'+i)!==undefined)r.amount=parseAmt(fv('sr_amt_'+i));});}
 function addStaffRate(){syncStaffDraft();staffDraft.rates.push({type:'Kaftan',amount:0});renderStaffModal();}
@@ -7601,10 +8072,20 @@ function saveStaff(){if(!can('editStaff'))return;syncStaffDraft();const s=staffD
 }
 function delStaff(id){if(!confirm('Remove this staff member?'))return;const list=getStaff();const gone=list.find(s=>s.id===id);const moved=reassignReportsFrom(list,id);if(moved)logAudit('Reassigned reports',moved+' report'+(moved===1?'':'s')+' moved up from '+(gone?gone.name:id));setStaff(list.filter(s=>s.id!==id));staffDraft=null;closeModal();renderPayrollView();renderTeam();}
 function salaryPaidThisMonth(id){const k=new Date().toISOString().slice(0,7);return getTxns().some(t=>t.cat==='salary'&&t.staffId===id&&String(t.at||'').slice(0,7)===k);}
+function salaryCost(st){
+  // What one month of this person costs the business, before commission: their basic
+  // plus anything paid on top of it. Deductions come out of the employee's share, not
+  // the company's, so they do not reduce the cost.
+  const f=payFigures(st.id,new Date().toISOString().slice(0,7));
+  return (+st.basic||0)+f.allowanceTotal+f.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned'&&e.label!=='Housing allowance'&&e.label!=='Transport allowance').reduce((a,e)=>a+e.amount,0);
+}
 function payBasic(id){const s=getStaff().find(x=>x.id===id);if(!s||!(+s.basic>0))return;
-  if(salaryPaidThisMonth(id)){if(!confirm(s.name+'\u2019s salary is already marked paid this month. Log another salary payment of '+cur(s.basic)+'?'))return;}
-  else if(!confirm('Log salary payment of '+cur(s.basic)+' to '+s.name+'?'))return;
-  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Salary · '+s.name,amount:+s.basic,at:new Date().toISOString().slice(0,10),cat:'salary',staffId:id,branch:branchOf(s)});setTxns(t);renderPayrollView();renderFinance();renderTeam();toast(cur(s.basic)+' salary logged for '+s.name);if(openStaffId===id){openStaffDetail(id);staffTab('payslips');}}
+  const cost=salaryCost(s);
+  const f=payFigures(id,new Date().toISOString().slice(0,7));
+  const takeHome=f.deductions.length?('\nAfter deductions '+s.name.split(' ')[0]+' receives '+cur(f.net-f.commission)+'.'):'';
+  if(salaryPaidThisMonth(id)){if(!confirm(s.name+'\u2019s salary is already marked paid this month. Log another salary payment of '+cur(cost)+'?'+takeHome))return;}
+  else if(!confirm('Log salary payment of '+cur(cost)+' to '+s.name+'?'+takeHome))return;
+  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Salary \u00b7 '+s.name,amount:cost,at:new Date().toISOString().slice(0,10),cat:'salary',staffId:id,branch:branchOf(s)});setTxns(t);renderPayrollView();renderFinance();renderTeam();toast(cur(cost)+' salary logged for '+s.name);if(openStaffId===id){openStaffDetail(id);staffTab('payslips');}}
 function payCommission(id){const s=getStaff().find(x=>x.id===id);if(!s)return;const owed=staffOwed()[id];if(!owed||!owed.commission){alert('No commission owed.');return;}
   if(!confirm('Pay '+cur(owed.commission)+' commission to '+s.name+'? This marks the related order commissions as paid.'))return;
   const _rfdPay=STAGES.indexOf('Ready for Delivery');

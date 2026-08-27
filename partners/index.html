@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0e">
+<meta name="color-scheme" content="dark light">
+<title>The Label Board — Partner Portal</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ================= SVG icon sprite ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-home"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></g>
+    <g id="i-wallet"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M17 12.5h1.5"/><path d="M2.5 10h19"/></g>
+    <g id="i-users"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 14.2A6.5 6.5 0 0 1 21.5 20"/></g>
+    <g id="i-share"><circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="6" r="2.6"/><circle cx="17.5" cy="18" r="2.6"/><path d="M8.3 10.8 15.2 7.2"/><path d="M8.3 13.2l6.9 3.6"/></g>
+    <g id="i-gear"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></g>
+    <g id="i-bell"><path d="M18 15V10a6 6 0 1 0-12 0v5l-1.5 2.5h15z"/><path d="M9.5 20.5a2.6 2.6 0 0 0 5 0"/></g>
+    <g id="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></g>
+    <g id="i-moon"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></g>
+  </defs>
+</svg>
+
+<div class="authshell" id="authShell"></div>
+
+<div class="shell" id="appShell" style="display:none">
+  <!-- ================= sidebar, a bottom bar on a phone ================= -->
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 100 100" aria-label="The Label Board">
+        <rect width="100" height="100" rx="24" fill="#0b1023"/>
+        <path d="M30 27v33a10 10 0 0 0 10 10h13" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+        <path d="M40 35h13a8.5 8.5 0 0 1 0 17H40z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
+        <path d="M40 52h15a9 9 0 0 1 0 18H40" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
+        <circle cx="72" cy="40" r="5.5" fill="#e0a94a"/>
+        <circle cx="72" cy="62" r="5.5" fill="#3f9d78"/>
+        <path d="M72 45.5v11" stroke="#e0a94a" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="brand-name">THE LABEL BOARD</div>
+        <div class="brand-sub">Partners</div>
+      </div>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <!-- ================= main ================= -->
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1 id="ttl">Home</h1>
+        <div class="top-sub" id="sub"></div>
+      </div>
+      <div class="top-act">
+        <button class="iconbtn" onclick="go('updates')" title="Updates" id="bellBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg>
+          <span class="dot" id="bellDot">0</span>
+        </button>
+        <button class="iconbtn" onclick="toggleTheme()" title="Switch theme" id="themeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon" id="themeIcon"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div class="mask" id="mask" onclick="if(event.target===this)closeModal()"></div>
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/pages2.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/auth.js"></script>
+<script>
+/* ============================================================
+   app.js — nav, render loop, boot
+
+   Five destinations. Updates hangs off the bell rather than
+   taking a sixth slot in a bar that has to fit a thumb.
+   ============================================================ */
+const NAV = [
+  ['home', 'Home', 'i-home', null],
+  ['earnings', 'Earnings', 'i-wallet', null],
+  ['referrals', 'Referrals', 'i-users', () => Q.trialing().length],
+  ['share', 'Share', 'i-share', null],
+  ['account', 'Account', 'i-gear', null]
+];
+
+const TITLES = {
+  home: ['Home', 'What you are owed, and who to nudge'],
+  earnings: ['Earnings', 'What you have been credited, and what has been sent'],
+  referrals: ['Referrals', 'Everyone you have brought in'],
+  share: ['Share', 'Your code, your links, something to send'],
+  updates: ['Updates', 'News from The Label Board'],
+  account: ['Account', 'Your details, your money, your preferences']
+};
+
+function buildNav() {
+  document.getElementById('nav').innerHTML = NAV.map(n => {
+    const c = n[3] ? n[3]() : 0;
+    return '<button class="nav" data-p="' + n[0] + '" onclick="go(\'' + n[0] + '\')" title="' + n[1] + '">' +
+      '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg>' +
+      (c ? '<span class="badge">' + c + '</span>' : '') + '</span>' +
+      '<span class="tx">' + n[1] + '</span></button>';
+  }).join('');
+
+  /* a detail view keeps its parent page lit */
+  const lit = UI.detail ? UI.back : UI.page;
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.p === lit));
+}
+
+function render() {
+  /* Nothing renders until somebody is signed in and their data is loaded.
+     This is a guard against showing an empty shell, not a security control:
+     what a signed-out browser may actually read is decided by row level
+     security in the database, never here. */
+  if (!AUTH.signedIn() || !DB) { renderAuth(); return; }
+  document.getElementById('authShell').style.display = 'none';
+  document.getElementById('appShell').style.display = '';
+
+  const t = TITLES[UI.detail ? UI.back : UI.page] || ['', ''];
+  document.getElementById('ttl').textContent = t[0];
+  document.getElementById('sub').textContent = t[1];
+
+  /* Body first, nav second. Opening an update marks it read while the body
+     renders, and the bell has to reflect that in the same pass. */
+  let html = '';
+  try {
+    if (UI.detail) {
+      const fn = DETAIL[UI.detail.type];
+      html = fn ? fn(UI.detail.id) : '<div class="pnl"><div class="empty">Nothing to show.</div></div>';
+    } else {
+      const fn = PAGES[UI.page];
+      html = fn ? fn() : '<div class="pnl"><div class="empty">That page is not built yet.</div></div>';
+    }
+  } catch (err) {
+    html = '<div class="pnl"><div class="empty">Something went wrong rendering this page.<br>' +
+      '<span class="note">' + esc(err.message) + '</span></div></div>';
+    console.error(err);
+  }
+  document.getElementById('view').innerHTML = html;
+
+  buildNav();
+
+  const dark = !document.body.classList.contains('light');
+  document.getElementById('themeIcon').setAttribute('href', dark ? '#i-moon' : '#i-sun');
+
+  const unread = Q.unreadUpdates().length;
+  const dot = document.getElementById('bellDot');
+  dot.textContent = unread;
+  dot.style.display = unread ? 'grid' : 'none';
+  document.getElementById('bellBtn').classList.toggle('on', UI.page === 'updates');
+}
+
+/* boot — the theme is the only thing we know before we know who this is */
+(function boot() {
+  try { if (localStorage.getItem('tlb_partner_theme') === 'light') document.body.classList.add('light'); } catch (e) {}
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  bootAuth();
+})();
+</script>
+</body>
+</html>

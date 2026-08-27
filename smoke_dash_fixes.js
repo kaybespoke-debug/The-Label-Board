@@ -3,7 +3,7 @@
 // then invokes each new/changed function to catch runtime reference errors.
 const fs = require('fs');
 const vm = require('vm');
-const html = fs.readFileSync(process.argv[2]||'layi_dashboard.html', 'utf8');
+const html = fs.readFileSync(process.argv[2] || 'site/layi_dashboard.html', 'utf8');
 
 // --- extract inline JS script blocks (same rule as parsecheck) ---
 const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;

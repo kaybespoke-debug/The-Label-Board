@@ -1,5 +1,35 @@
+# ============================================================================
+# CUSTOMER APP — main
+#
 # Netlify publishes the site/ folder: the app plus its PWA files, nothing else.
-# Connected to github.com/kaybespoke-debug/The-Label-Board, so a push deploys.
+# Connected to github.com/kaybespoke-debug/The-Label-Board, branch main, so a
+# push to main deploys the app every studio uses.
+#
+# Only site/ is served. The gates, the notes, the SQL and the other three apps
+# all sit outside it and are never reachable from the public URL.
+#
+# ---------------------------------------------------------------------------
+# THIS FILE IS DELIBERATELY DIFFERENT ON admin-deploy. DO NOT LET A MERGE
+# OVERWRITE IT.
+#
+# On admin-deploy it reads publish = "admin". If a merge brings that version
+# here, this site stops serving the customer app and starts serving the admin
+# console to every studio on the platform. Git will not warn you: main is an
+# ancestor of admin-deploy, so the merge is clean.
+#
+# Merging admin-deploy into main, safely:
+#
+#     git checkout main
+#     git merge --no-ff --no-commit admin-deploy
+#     git checkout HEAD -- netlify.toml      # keep this file as it is
+#     git commit
+#
+# The permanent fix is to set each site's publish directory in the Netlify
+# dashboard instead of here, and delete this file. That is a settings change
+# on four live sites, so it is Kayode's to make, not something to slip into
+# a commit.
+# ============================================================================
+
 [build]
   publish = "site"
 

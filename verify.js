@@ -3,7 +3,7 @@
  * verify.js — runs every gate against the app in one command.
  *
  *   node audit/verify.js path/to/layi_dashboard.html
- *   node audit/verify.js                 # defaults to ./layi_dashboard.html
+ *   node audit/verify.js                 # defaults to ./site/layi_dashboard.html
  *
  * Exit code 0 = all gates green. Non-zero = at least one gate failed.
  * Run this BEFORE and AFTER any change. A change that turns a gate red is a regression.
@@ -12,7 +12,7 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const app = path.resolve(process.argv[2] || 'layi_dashboard.html');
+const app = path.resolve(process.argv[2] || 'site/layi_dashboard.html');
 if (!fs.existsSync(app)) { console.error('Cannot find app file: ' + app); process.exit(2); }
 const here = __dirname;
 
@@ -40,6 +40,9 @@ const GATES = [
   ['audit_storage.js',    'Storage          ', 'Per-tenant storage is metered from image bytes only (text ignored), tiers set the limit (Free 1GB → Atelier 1TB), a Settings meter renders usage, and saveImageAsset() is the single pass-through seam that routes to cloud storage at go-live.'],
   ['audit_import.js',     'Import / migrate ', 'Six tolerant CSV importers (customers & measurements, orders, stock, staff, vendors, finances) match columns by alias so exports from other software line up; every importer is idempotent (matched records update, never duplicate); orders reuse the safe importWebOrders() path and keep the deposit as money paid; the migrate screen builds all six cards.'],
   ['audit_sort.js',       'List sorting     ', 'Six long lists share one sort control (name, newest, and each list own default); the choice is remembered per list; a brand-new client reaches the top instead of sinking to the bottom; Production stays unsortable because its order is its meaning.'],
+  ['audit_feedback.js',   'Feedback channel ', 'A studio can send a suggestion, a feature request, a complaint or a support ticket from any screen and any role. It is written to the device BEFORE any attempt to send it, so bad signal never loses a message; anything undelivered stays queued, is shown as waiting, and goes on the next connection, exactly once. The console reads the inbox only through the admin-api gateway, never the table, and says whether it is showing real studios or the worked example.'],
+  ['audit_paysetup.js',   'Pay setup        ', 'Allowances, pension and the pay lines a studio adds itself are all off until an owner switches them on, so a growing business still sees basic + commission = gross with no deductions section. Nothing is ever deducted without consent: a pension needs both the studio scheme and that person to be enrolled, and an opt-in line needs that person ticked. Take-home can never go below zero.'],
+  ['audit_trades.js',     'Multi-trade      ', 'Every trade the website sells to (bespoke, ready-to-wear, footwear, bags & leather, fabrics, haberdashery) can be selected, opens the right boards, and gets production stages, measurements and wording written in its own language. A shoemaker is never handed Fabric Received or asked for an Agbada arm-span, and a measurement already on file never disappears when a studio changes trade.'],
   ['audit_whatsapp.js',   'WhatsApp auto    ', 'The auto-WhatsApp seam exists and stays DORMANT until an endpoint is set and the app is live (today\'s manual hand-off is unchanged); milestone hooks fire on order-created and ready; the Settings panel explains the go-live requirement; and no WhatsApp API token ever ships in the client.'],
 ];
 

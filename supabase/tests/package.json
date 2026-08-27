@@ -1,0 +1,13 @@
+{
+  "name": "labelboard-db-tests",
+  "private": true,
+  "type": "module",
+  "description": "Adversarial tests for The Label Board's tenant isolation policies.",
+  "scripts": {
+    "test": "node rls_harness.mjs",
+    "mutate": "node mutation_check.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

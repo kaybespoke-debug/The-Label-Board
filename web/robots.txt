@@ -1,0 +1,6 @@
+# The Label Board — public website
+User-agent: *
+Allow: /
+Disallow: /thanks.html
+
+Sitemap: https://thelabelboard.app/sitemap.xml

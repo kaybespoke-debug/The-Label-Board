@@ -1,7 +1,7 @@
 # LAYI Studio OS — Engineering Handoff
 
 **For:** Claude Code (or any engineer) picking this up cold.
-**App:** `layi_dashboard.html` — a single-file, client-side studio-management system for a fashion house (bespoke tailoring + retail), being prepared for sale as a SaaS product to other brands.
+**App:** `site/layi_dashboard.html` — a single-file, client-side studio-management system for a fashion house (bespoke tailoring + retail), being prepared for sale as a SaaS product to other brands.
 **Size:** ~7,100 lines. No build step. No dependencies. Open the file in a browser and it runs.
 
 ---
@@ -11,7 +11,7 @@
 **Run the gates first, on the unmodified file:**
 
 ```bash
-node audit/verify.js layi_dashboard.html
+node verify.js
 ```
 
 All seven should be green. Run it again after every change. **A change that turns a gate red is a regression — fix the cause, not the test.**
@@ -80,7 +80,7 @@ The dashboard renders in **four different layouts** depending on role — this t
 
 ## 2. Conventions and hazards
 
-**Dev loop:** edit → `node audit/verify.js` → open in a real browser → ship.
+**Dev loop:** edit → `node verify.js` → open in a real browser → ship.
 
 **Parse hazards** (these have broken the file before, and `parsecheck.js` exists solely to catch them):
 - A straight apostrophe inside a single-quoted JS string (`'don't'`). Use `\u2019` or double quotes.
@@ -159,8 +159,8 @@ Honest prioritisation. The top three are the difference between "impressive prot
 
 Open-ended "what could be improved?" will produce a long, flat list where the important things are buried. Be specific:
 
-> Read `HANDOFF.md` first, then `layi_dashboard.html`.
-> Run `node audit/verify.js layi_dashboard.html` and confirm all gates pass.
+> Read `HANDOFF.md` first, then `site/layi_dashboard.html`.
+> Run `node verify.js` and confirm all gates pass.
 > Do **not** propose the known gaps in §4 — I know about them.
 >
 > Then, for **one** of these at a time:
@@ -179,17 +179,28 @@ Open-ended "what could be improved?" will produce a long, flat list where the im
 
 ## 7. Files in this package
 
+Everything below is relative to the repo root. The app and its PWA files live
+in `site/` because that folder is what Netlify publishes; the gates stay at the
+root so they are never served to the public.
+
 ```
-layi_dashboard.html      the app
-HANDOFF.md               this file
-audit/verify.js          runs all gates; exit 0 = green
-audit/parsecheck.js      syntax
-audit/smoke_dash_fixes.js runtime smoke of dashboard drills
-audit/check_sync.js      card figure == drill-down figure
-audit/audit_branches.js  per-studio parity
-audit/audit_roles.js     per-role parity
-audit/audit_perms.js     permission matrix + fallbacks + isolation
-audit/audit_cards.js     dead KPI card sweep
+site/layi_dashboard.html   the app
+site/sw.js                 service worker (bump CACHE on release)
+site/manifest.webmanifest  install metadata
+site/netlify.toml          serves the app at /
+HANDOFF.md                 this file
+verify.js                  runs all gates; exit 0 = green
+parsecheck.js              syntax
+smoke_dash_fixes.js        runtime smoke of dashboard drills
+check_sync.js              card figure == drill-down figure
+audit_branches.js          per-studio parity
+audit_roles.js             per-role parity
+audit_perms.js             permission matrix + fallbacks + isolation
+audit_cards.js             dead KPI card sweep
+audit_*.js                 fifteen more, one per subsystem — verify.js runs them all
 ```
+
+Every gate defaults to `site/layi_dashboard.html` and takes an optional path
+argument, so `node audit_cards.js some/other/copy.html` still works.
 
 Gates run on Node with no dependencies. They stub a minimal DOM and `localStorage`, load the app's real inline scripts, seed demo data through the app's own `demoLogin()`, and then call real functions. They test the actual code, not a copy of it.

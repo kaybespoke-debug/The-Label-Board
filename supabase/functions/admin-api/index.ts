@@ -22,10 +22,14 @@ const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 /* what each role is allowed to ask for. Anything not listed is refused. */
 const ALLOWED: Record<string, string[]> = {
-  owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit'],
+  owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
+              'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback'],
   finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus'],
-  support:   ['me', 'tenants', 'tenant', 'setNote'],
-  developer: ['me', 'tenants', 'tenant'],
+  support:   ['me', 'tenants', 'tenant', 'setNote',
+              'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback'],
+  // a developer reads what studios reported and can move it along, but does
+  // not write to a studio in our name
+  developer: ['me', 'tenants', 'tenant', 'feedback', 'feedbackThread', 'setFeedbackState'],
 }
 
 Deno.serve(async (req) => {
@@ -122,6 +126,70 @@ Deno.serve(async (req) => {
         .from('platform_audit').select('*').order('at', { ascending: false }).limit(200)
       if (error) return json({ error: error.message }, 500)
       return json({ ok: true, audit: data || [] })
+    }
+
+    /* ---- the inbox: what studios have told us -------------------------------
+       Read with the service role, because tenant row-level security quite
+       correctly refuses to show one studio's message to anyone but that
+       studio. This is the one audited door through that wall. */
+    if (action === 'feedback') {
+      const state = String(body.state || '')
+      const kind = String(body.kind || '')
+      let q = admin.from('feedback_inbox').select('*').order('created_at', { ascending: false }).limit(500)
+      if (state) q = q.eq('state', state)
+      if (kind) q = q.eq('kind', kind)
+      const { data, error } = await q
+      if (error) return json({ error: error.message }, 500)
+      await log({ count: (data || []).length, state: state || 'all', kind: kind || 'all' })
+      return json({ ok: true, feedback: data || [], role })
+    }
+
+    if (action === 'feedbackThread') {
+      const id = String(body.id || '')
+      if (!id) return json({ error: 'No message id' }, 400)
+      const { data: msg, error: e1 } = await admin
+        .from('feedback_inbox').select('*').eq('id', id).maybeSingle()
+      if (e1) return json({ error: e1.message }, 500)
+      if (!msg) return json({ error: 'No such message' }, 404)
+      const { data: replies, error: e2 } = await admin
+        .from('feedback_replies').select('*').eq('feedback_id', id).order('at', { ascending: true })
+      if (e2) return json({ error: e2.message }, 500)
+      await log({ viewed: id }, msg.business_id as string)
+      return json({ ok: true, message: msg, replies: replies || [] })
+    }
+
+    if (action === 'setFeedbackState') {
+      const id = String(body.id || '')
+      const value = String(body.value || '')
+      const VALID = ['new', 'open', 'in-progress', 'planned', 'resolved', 'declined']
+      if (!id) return json({ error: 'No message id' }, 400)
+      if (!VALID.includes(value)) return json({ error: `state must be one of: ${VALID.join(', ')}` }, 400)
+      const { data, error } = await admin
+        .from('feedback').update({ state: value }).eq('id', id).select('business_id').maybeSingle()
+      if (error) return json({ error: error.message }, 500)
+      await log({ state: value, id }, data?.business_id ?? null)
+      return json({ ok: true })
+    }
+
+    /* A reply is written as side 'us'. The tenant policy refuses that insert
+       from a browser, so a reply from support can only ever come from here. */
+    if (action === 'replyFeedback') {
+      const id = String(body.id || '')
+      const text = String(body.body ?? '').trim().slice(0, 4000)
+      if (!id) return json({ error: 'No message id' }, 400)
+      if (!text) return json({ error: 'Nothing to send' }, 400)
+      const { data: msg } = await admin
+        .from('feedback').select('business_id').eq('id', id).maybeSingle()
+      if (!msg) return json({ error: 'No such message' }, 404)
+      const { error } = await admin.from('feedback_replies').insert({
+        feedback_id: id, business_id: msg.business_id, side: 'us',
+        author: staff.name || user.email, body: text,
+      })
+      if (error) return json({ error: error.message }, 500)
+      // replying to something nobody has picked up yet means it is now open
+      await admin.from('feedback').update({ state: 'open' }).eq('id', id).eq('state', 'new')
+      await log({ replied: id, length: text.length }, msg.business_id as string)
+      return json({ ok: true })
     }
 
     return json({ error: 'Unknown action' }, 400)

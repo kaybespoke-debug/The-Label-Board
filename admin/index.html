@@ -1,334 +1,439 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
-<title>Label Board Ops</title>
-<style>
-  :root{
-    --navy:#010817; --navy-2:#020b1d; --panel:#0d1526; --panel-2:#111b30;
-    --line:#1e2c47; --line-soft:#16233a;
-    --text:#eef1f6; --text-dim:#a8b3c6; --text-faint:#697894;
-    --gold:#e2ad4f; --green:#3ec98a; --amber:#e0a838; --red:#e06a6a; --blue:#5b9bd8;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;min-height:100%;background:var(--navy);color:var(--text);
-    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px}
-  a{color:var(--gold)}
-  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 60px}
-
-  /* ---- sign in ---- */
-  #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);
-    border-radius:18px;padding:30px 26px;text-align:center}
-  .mark{font-size:11px;letter-spacing:5px;color:var(--text-faint);margin-bottom:6px}
-  .name{font-family:Georgia,serif;font-size:22px;letter-spacing:4px;margin-bottom:4px}
-  .sub{color:var(--text-faint);font-size:12px;margin-bottom:24px}
-  input,select,textarea{width:100%;height:46px;border-radius:11px;border:1px solid var(--line);
-    background:#0a1120;color:var(--text);padding:0 13px;outline:none;font-family:inherit;font-size:15px}
-  textarea{height:auto;min-height:92px;padding:11px 13px;resize:vertical}
-  input:focus,select:focus,textarea:focus{border-color:#3c5a8c}
-  label{display:block;text-align:left;font-size:12px;color:var(--text-dim);margin:14px 0 6px}
-  .btn{height:46px;border:0;border-radius:11px;background:var(--gold);color:#101728;
-    font-weight:700;cursor:pointer;font-family:inherit;font-size:15px;padding:0 18px}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-  .btn.sm{height:34px;font-size:13px;padding:0 12px;border-radius:9px}
-  .btn:disabled{opacity:.5;cursor:default}
-  .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px}
-
-  /* ---- shell ---- */
-  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px}
-  header h1{font-family:Georgia,serif;font-size:23px;margin:0;font-weight:500}
-  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim)}
-  .pill{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:11px;
-    text-transform:uppercase;letter-spacing:1px;color:var(--gold)}
-
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
-  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
-  .kpi b{display:block;font-size:26px;font-family:Georgia,serif;font-weight:500;margin-bottom:3px}
-  .kpi span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint)}
-
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-  .panel-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
-  .panel-head h2{margin:0;font-family:Georgia,serif;font-size:17px;font-weight:500}
-  .panel-head .grow{flex:1}
-  .panel-head input,.panel-head select{height:38px;width:auto;min-width:150px;font-size:14px}
-
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th{text-align:left;font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--text-faint);
-    font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
-  td{padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
-  tbody tr{cursor:pointer}
-  tbody tr:hover{background:var(--panel-2)}
-  tr:last-child td{border-bottom:none}
-  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .studio{font-weight:600}
-  .muted{color:var(--text-faint);font-size:12px;margin-top:2px}
-  .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
-  .t-trial{background:rgba(224,168,56,.16);color:var(--amber)}
-  .t-paid{background:rgba(62,201,138,.15);color:var(--green)}
-  .t-active{background:rgba(62,201,138,.15);color:var(--green)}
-  .t-past_due{background:rgba(224,106,106,.16);color:var(--red)}
-  .t-paused,.t-cancelled{background:rgba(105,120,148,.18);color:var(--text-faint)}
-  .t-cold{background:rgba(224,106,106,.14);color:var(--red)}
-  .t-warm{background:rgba(224,168,56,.14);color:var(--amber)}
-  .t-hot{background:rgba(62,201,138,.14);color:var(--green)}
-
-  /* ---- detail ---- */
-  .overlay{position:fixed;inset:0;background:rgba(1,6,16,.72);display:none;align-items:flex-start;
-    justify-content:center;padding:28px 16px;overflow:auto;z-index:50}
-  .overlay.show{display:flex}
-  .sheet{width:100%;max-width:620px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px}
-  .kv{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:14px}
-  .kv span{color:var(--text-faint);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-  .row > *{flex:1;min-width:130px}
-  .note{margin-top:18px}
-  .privacy{margin-top:18px;padding:13px 15px;border:1px solid var(--line);border-radius:12px;
-    background:var(--panel-2);font-size:13px;color:var(--text-dim);line-height:1.6}
-  .empty{padding:40px 20px;text-align:center;color:var(--text-faint)}
-  @media(max-width:680px){
-    .hide-sm{display:none}
-    .wrap{padding:16px 12px 50px}
-    th,td{padding:11px 9px}
-  }
-</style>
+<meta name="theme-color" content="#0a0b0e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TLB Admin">
+<meta name="application-name" content="TLB Admin">
+<meta name="color-scheme" content="dark light">
+<title>The Label Board — Admin Control Centre</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
-<!-- ============ SIGN IN ============ -->
-<section id="login">
-  <div class="card">
-    <div class="mark">THE LABEL BOARD</div>
-    <div class="name">OPS</div>
-    <div class="sub">Staff only</div>
-    <label for="em">Email</label>
-    <input id="em" type="email" autocomplete="username" placeholder="you@thelabelboard.app">
-    <label for="pw">Password</label>
-    <input id="pw" type="password" autocomplete="current-password">
-    <div style="margin-top:20px"><button class="btn" style="width:100%" id="go">Sign in</button></div>
-    <div class="err" id="err"></div>
-  </div>
-</section>
+<!-- ================= SVG icon sprite ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-home"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></g>
+    <g id="i-users"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 14.2A6.5 6.5 0 0 1 21.5 20"/></g>
+    <g id="i-arrow-up"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></g>
+    <g id="i-card"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><path d="M6 14.5h4"/></g>
+    <g id="i-receipt"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/></g>
+    <g id="i-wallet"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M17 12.5h1.5"/><path d="M2.5 10h19"/></g>
+    <g id="i-chart"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/></g>
+    <g id="i-chat"><path d="M21 12a8 8 0 0 1-8 8H8l-4 3v-4.5A8 8 0 0 1 13 4a8 8 0 0 1 8 8z"/><path d="M9 11h8"/><path d="M9 14.5h5"/></g>
+    <g id="i-star"><path d="M12 3.5l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 17.2 6.7 20l1.1-6L3.4 9.8l6-.8z"/></g>
+    <g id="i-megaphone"><path d="M3 11v3l11 5V6z"/><path d="M14 8.5h3a3.5 3.5 0 0 1 0 7h-3"/><path d="M7 15v4"/></g>
+    <g id="i-heart"><path d="M12 20s-7.5-4.6-7.5-9.8A4.2 4.2 0 0 1 12 7.5a4.2 4.2 0 0 1 7.5 2.7C19.5 15.4 12 20 12 20z"/></g>
+    <g id="i-check"><path d="M4 12.5 9 17.5 20 6.5"/></g>
+    <g id="i-shield"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></g>
+    <g id="i-list"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/></g>
+    <g id="i-gear"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></g>
+    <g id="i-bell"><path d="M18 15V10a6 6 0 1 0-12 0v5l-1.5 2.5h15z"/><path d="M9.5 20.5a2.6 2.6 0 0 0 5 0"/></g>
+    <g id="i-search"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></g>
+    <g id="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></g>
+    <g id="i-signout"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/></g>
+    <g id="i-menu"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></g>
+    <g id="i-moon"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></g>
+  </defs>
+</svg>
 
-<!-- ============ CONSOLE ============ -->
-<section id="app" style="display:none"><div class="wrap">
-  <header>
-    <h1>Studios</h1>
-    <span class="pill" id="myRole"></span>
-    <div class="who"><span id="myName"></span><button class="btn ghost sm" id="out">Sign out</button></div>
-  </header>
-
-  <div class="kpis" id="kpis"></div>
-
-  <div class="panel">
-    <div class="panel-head">
-      <h2>Every studio</h2>
-      <span class="grow"></span>
-      <input id="q" placeholder="Search studios…">
-      <select id="fPlan"><option value="">All plans</option><option>trial</option><option>studio</option><option>growth</option><option>atelier</option></select>
-      <select id="fStatus"><option value="">All statuses</option><option>active</option><option>past_due</option><option>paused</option><option>cancelled</option></select>
+<div id="splash" role="presentation">
+  <div class="sp-inner">
+    <div class="sp-mark">
+      <svg viewBox="0 0 220 220" role="img" aria-label="The Label Board"><path class="sp-draw" d="M72 28 L72 154 Q72 188 106 188 L157 188 Q187 188 187 159 Q187 132 158 132 L118 132 L118 73 L158 73 Q186 73 186 101 Q186 132 158 132"/></svg>
+      <span class="sp-dot"></span>
     </div>
-    <div id="list"></div>
+    <div class="sp-copy">
+      <div class="sp-the">THE</div>
+      <div class="sp-name">LABEL BOARD</div>
+    </div>
+    <div class="sp-tag">ADMIN CONTROL CENTRE</div>
   </div>
-</div></section>
+</div>
 
-<div class="overlay" id="sheet"><div class="sheet" id="sheetBody"></div></div>
+<div id="login"></div>
+<div id="drawerMask" onclick="closeDrawer()"></div>
+<div class="shell">
+  <!-- ================= sidebar ================= -->
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 100 100" aria-label="The Label Board">
+        <rect width="100" height="100" rx="24" fill="#0b1023"/>
+        <path d="M33 27v33a10 10 0 0 0 10 10h16" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+        <path d="M43 35h13a8.5 8.5 0 0 1 0 17H43z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
+        <path d="M43 52h15a9 9 0 0 1 0 18H43" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
+        <circle cx="74" cy="62" r="6" fill="#e0a94a"/>
+      </svg>
+      <div>
+        <div class="brand-name">THE LABEL BOARD</div>
+        <div class="brand-sub">Admin Control Centre</div>
+      </div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <div class="me" id="meRow" onclick="openDetail('staff',ME.staffId)">
+        <div class="av" id="meAv">KO</div>
+        <div style="flex:1;min-width:0"><div class="me-n" id="meName">Kayode Ojomo</div><div class="me-r" id="meRole">Super Admin</div></div>
+      </div>
+      <button class="nav" style="margin-top:2px" onclick="signOut()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-signout"/></svg></span><span class="tx">Sign out</span></button>
+    </div>
+  </aside>
+
+  <!-- ================= main ================= -->
+  <main class="main">
+    <div class="top">
+      <div class="top-head">
+        <button id="menuBtn" onclick="toggleDrawer()" aria-label="Open the menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><use href="#i-menu"/></svg></button>
+      <div style="min-width:0">
+        <!-- the badge is a sibling, not a child: render() sets textContent on #ttl -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
+          <h1 id="ttl">Dashboard</h1>
+          <button class="demo" id="demoTag" onclick="openSettingsGroup('data')" title="Invented data. Tap to load or clear it.">Demo data</button>
+        </div>
+        <div class="top-sub" id="sub">Monitor your platform at a glance</div>
+      </div>
+      </div>
+      <div class="top-act">
+        <input class="srch" id="srch" placeholder="Search subscribers, tickets, payments…" oninput="onSearch(this.value)">
+        <button class="iconbtn" onclick="openAlerts()" title="Alerts" id="bellBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg>
+          <span class="dot" id="bellDot">0</span>
+        </button>
+        <button class="iconbtn" onclick="toggleTheme()" title="Switch theme" id="themeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon" id="themeIcon"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="view"></div>
+  </main>
+  <nav class="mobbar" id="mobbar"></nav>
+</div>
+
+<div class="mask" id="mask" onclick="if(event.target===this)closeModal()"></div>
+<div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/pages2.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/metrics.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/staffforms.js"></script>
+<script src="js/credentials.js"></script>
+<script src="js/login.js"></script>
+<script src="js/live.js"></script>
+<script src="js/signin.js"></script>
 <script>
-/* ============================================================================
-   Label Board Ops — the operator console.
+/* ============================================================
+   app.js — nav, render loop, boot
+   ============================================================ */
+const NAV = [
+  ['Platform', [
+    ['dashboard', 'Dashboard', 'i-home', null]
+  ]],
+  ['Subscribers', [
+    ['subscribers', 'Subscribers', 'i-users', () => DB.subscribers.length],
+    ['onboarding', 'Onboarding', 'i-arrow-up', () => DB.onboarding.length]
+  ]],
+  ['Billing', [
+    ['billing', 'Plans & Billing', 'i-card', null],
+    ['payments', 'Payments', 'i-receipt', () => DB.payments.filter(p => p.status === 'failed' || p.status === 'overdue').length],
+    ['payroll', 'Payroll', 'i-wallet', () => DB.payslips.filter(s => s.monthKey === DB.payrollRuns[0].monthKey && s.status === 'pending').length],
+    ['revenue', 'Revenue', 'i-chart', null]
+  ]],
+  ['Engagement', [
+    ['support', 'Support & Usage', 'i-chat', () => Q.openTickets().length + DB.feedback.filter(f => f.state === 'under review' || f.state === 'pending').length],
+    ['announcements', 'Announcements', 'i-megaphone', () => DB.announcements.filter(a => a.state === 'scheduled').length]
+  ]],
+  ['Operations', [
+    ['tasks', 'Tasks', 'i-check', () => DB.tasks.filter(t => !t.done && t.dueIn <= 0).length],
+    ['staff', 'Staff & Roles', 'i-shield', null],
+    ['activity', 'Activity Log', 'i-list', null],
+    ['settings', 'Settings', 'i-gear', null]
+  ]]
+];
 
-   This app holds NO service key and queries NO table. Everything goes through
-   the admin-api Edge Function, which checks the caller is staff and logs what
-   they did. That is what lets tenant row-level security stay untouched.
 
-   It shows COUNTS, not contents. Nobody here sees a studio's client names,
-   measurements or figures. Reaching real data is a separate, logged support
-   session, which is the next thing to build.
-   ============================================================================ */
-const SUPA_URL = 'https://gcdrkoitjqwbidcfgyzl.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZHJrb2l0anF3YmlkY2ZneXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMxODcsImV4cCI6MjEwMjcxOTE4N30.XYiBkZCGgyhtRgQfmCPVErLRQY0SvmVEgHMddEpFcy8';
+/* One hue per nav item, like the customer app. Flat single-colour icons read as
+   a wall; a colour per destination makes the sidebar scannable. */
+const NAV_HUE = {
+  dashboard:'var(--gold)', subscribers:'#c04668', onboarding:'#0f8a80',
+  billing:'#2563a8', payments:'#1f9d57', payroll:'#6d5dd3', revenue:'#c47d12',
+  support:'#0f8a80', announcements:'#c2568a',
+  tasks:'#2563a8', staff:'#6d5dd3', activity:'#5b6b82', settings:'#5b6b82'
+};
+/* the five pages you actually live in, for the bottom bar */
+const MOB_BAR = ['dashboard','subscribers','payments','support','staff'];
+const MOB_LABEL = { dashboard:'Home', subscribers:'Subs', payments:'Payments',
+  support:'Support', staff:'Team' };
 
-const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-let ME = null, TENANTS = [];
+const TITLES = {
+  dashboard: ['Dashboard', 'Monitor your platform at a glance'],
+  subscribers: ['Subscribers', 'Every business using The Label Board'],
+  onboarding: ['Onboarding', 'From signup to a live, paying account'],
+  billing: ['Plans & Billing', 'Plans, pricing and the referral programme'],
+  payments: ['Payments', 'Every subscription transaction'],
+  payroll: ['Payroll', 'Salaries, deductions and payslips'],
+  revenue: ['Revenue', 'Recurring revenue and SaaS performance'],
+  support: ['Support & Usage', 'Tickets, what subscribers are asking for, and how the product is used'],
+  announcements: ['Announcements', 'Tell subscribers what changed'],
+  tasks: ['Tasks', 'Internal work, who owns it, when it is due'],
+  staff: ['Staff & Roles', 'Your team, their pay, attendance and access'],
+  activity: ['Activity Log', 'Who did what, when, and why'],
+  settings: ['Settings', 'Accounts, roles and preferences']
+};
 
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-/* the one door to the database */
-async function api(action, extra = {}) {
-  const { data: { session } } = await supa.auth.getSession();
-  if (!session) throw new Error('Signed out');
-  const res = await fetch(SUPA_URL + '/functions/v1/admin-api', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + session.access_token },
-    body: JSON.stringify({ action, ...extra })
-  });
-  const out = await res.json().catch(() => ({ error: 'Bad response from the server' }));
-  if (!res.ok || out.error) throw new Error(out.error || ('Request failed (' + res.status + ')'));
-  return out;
+function buildNav() {
+  document.getElementById('nav').innerHTML = NAV.map(g => {
+    const allowed = g[1].filter(n => canPage(n[0]));
+    if (!allowed.length) return '';           // a whole group can drop away
+    return '<div class="grp"><div class="grp-t">' + g[0] + '</div>' +
+    allowed.map(n => {
+      const c = n[3] ? n[3]() : 0;
+      return '<button class="nav" data-p="' + n[0] + '" onclick="go(\'' + n[0] + '\')">' +
+        '<span class="ic" style="color:' + (NAV_HUE[n[0]] || 'currentColor') + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
+        '<span class="tx">' + n[1] + '</span>' +
+        (c ? '<span class="badge">' + c + '</span>' : '') + '</button>';
+    }).join('') + '</div>';
+  }).join('');
 }
 
-/* ---- sign in ---- */
-async function signIn() {
-  const btn = $('go'); btn.disabled = true; $('err').textContent = 'Signing in…';
+
+/* ---------------- mobile navigation ----------------
+   A hamburger opens the full nav as a drawer, and a bottom bar carries the five
+   pages you actually live in — the same two-part pattern as the customer app.
+   Thirteen items crammed into a scrolling strip was the wrong shape. */
+function toggleDrawer() {
+  const side = document.querySelector('.side');
+  const mask = document.getElementById('drawerMask');
+  const open = side.classList.toggle('open');
+  mask.classList.toggle('on', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+function closeDrawer() {
+  document.querySelector('.side').classList.remove('open');
+  document.getElementById('drawerMask').classList.remove('on');
+  document.body.style.overflow = '';
+}
+
+function buildMobBar() {
+  const lit = UI.detail ? UI.back : UI.page;
+  const flat = {};
+  NAV.forEach(g => g[1].forEach(n => { flat[n[0]] = n; }));
+  const items = MOB_BAR.map(id => {
+    const n = flat[id];
+    if (!n || !canPage(id)) return '';
+    const count = n[3] ? n[3]() : 0;
+    return '<button class="mb' + (lit === id ? ' on' : '') + '" onclick="go(\'' + id + '\')">' +
+      '<span class="mbi" style="color:' + (lit === id ? (NAV_HUE[id] || 'currentColor') : 'currentColor') + '">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
+      '<span class="mbt">' + (MOB_LABEL[id] || n[1]) + '</span>' +
+      (count ? '<span class="mbd">' + count + '</span>' : '') + '</button>';
+  }).join('');
+  /* the fifth slot is More, which opens the drawer to reach everything else */
+  document.getElementById('mobbar').innerHTML = items +
+    '<button class="mb" onclick="toggleDrawer()">' +
+    '<span class="mbi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+    'stroke-linecap="round"><use href="#i-menu"/></svg></span><span class="mbt">More</span></button>';
+}
+
+
+/* ---------------- install as an app ----------------
+   Chrome fires beforeinstallprompt when the manifest, service worker and HTTPS
+   all check out; we hold the event so Settings can offer a real button. iOS has
+   no such event, so there it is a short instruction instead. */
+var _installEvent = null;
+function isInstalled() {
   try {
-    const { error } = await supa.auth.signInWithPassword({ email: $('em').value.trim().toLowerCase(), password: $('pw').value });
-    if (error) throw error;
-    await enter();
-  } catch (e) {
-    $('err').textContent = e.message || 'Sign-in failed';
-    try { await supa.auth.signOut(); } catch (_) {}
-  } finally { btn.disabled = false; }
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || window.navigator.standalone === true;
+  } catch (e) { return false; }
 }
-
-async function enter() {
-  try {
-    const me = await api('me');
-    ME = me.me;
-    $('login').style.display = 'none';
-    $('app').style.display = '';
-    $('myName').textContent = ME.name || ME.email;
-    $('myRole').textContent = ME.role;
-    await loadTenants();
-  } catch (e) {
-    /* a tenant CAN sign in here, since it is the same auth. They simply get
-       nothing, because this app cannot read a table without the gateway. */
-    $('err').textContent = e.message;
-    try { await supa.auth.signOut(); } catch (_) {}
-  }
-}
-
-/* ---- studios ---- */
-const fmtDate = v => v ? new Date(v).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' }) : '—';
-const daysAgo = v => { if (!v) return null; return Math.floor((Date.now() - new Date(v)) / 86400000); };
-function seenTag(v) {
-  const d = daysAgo(v);
-  if (d === null) return '<span class="tag t-cold">never</span>';
-  const t = d <= 2 ? 'hot' : d <= 14 ? 'warm' : 'cold';
-  const txt = d === 0 ? 'today' : d === 1 ? 'yesterday' : d + 'd ago';
-  return '<span class="tag t-' + t + '">' + txt + '</span>';
-}
-
-async function loadTenants() {
-  $('list').innerHTML = '<div class="empty">Loading…</div>';
-  try {
-    const r = await api('tenants');
-    TENANTS = r.tenants || [];
-    renderKpis(); renderList();
-  } catch (e) {
-    $('list').innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
-  }
-}
-
-function renderKpis() {
-  const total = TENANTS.length;
-  const active7 = TENANTS.filter(t => daysAgo(t.last_seen_at) !== null && daysAgo(t.last_seen_at) <= 7).length;
-  const trials = TENANTS.filter(t => t.plan === 'trial').length;
-  const paying = TENANTS.filter(t => t.plan !== 'trial' && t.status === 'active').length;
-  const expiring = TENANTS.filter(t => t.plan === 'trial' && t.trial_ends_at &&
-    (new Date(t.trial_ends_at) - Date.now()) / 86400000 <= 7).length;
-  const K = (n, l) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>';
-  $('kpis').innerHTML = K(total, 'studios') + K(active7, 'active this week') + K(trials, 'on trial') +
-                        K(paying, 'paying') + K(expiring, 'trials ending');
-}
-
-function renderList() {
-  const q = $('q').value.trim().toLowerCase();
-  const fp = $('fPlan').value, fs = $('fStatus').value;
-  const rows = TENANTS.filter(t =>
-    (!q || ((t.name || '') + ' ' + (t.contact_email || '') + ' ' + t.id).toLowerCase().includes(q)) &&
-    (!fp || t.plan === fp) && (!fs || t.status === fs));
-
-  if (!rows.length) {
-    $('list').innerHTML = '<div class="empty">' +
-      (TENANTS.length ? 'No studio matches that.' : 'No studios yet. The first one appears the moment someone signs in to the app.') +
-      '</div>';
+function isIOS() { try { return /iphone|ipad|ipod/i.test(navigator.userAgent || ''); } catch (e) { return false; } }
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault(); _installEvent = e;
+  if (UI.page === 'settings') render();
+});
+window.addEventListener('appinstalled', function () {
+  _installEvent = null; toast('Installed. Look for TLB Admin on your home screen.');
+  if (UI.page === 'settings') render();
+});
+function installApp() {
+  if (isInstalled()) { toast('Already installed'); return; }
+  if (_installEvent) {
+    _installEvent.prompt();
+    _installEvent.userChoice.then(function (c) {
+      if (c && c.outcome === 'accepted') toast('Installing…');
+      _installEvent = null;
+    });
     return;
   }
-  $('list').innerHTML =
-    '<table><thead><tr><th>Studio</th><th>Plan</th><th>Status</th>' +
-    '<th class="hide-sm">Signed up</th><th>Last seen</th>' +
-    '<th class="num hide-sm">Orders</th><th class="num hide-sm">Clients</th><th class="num hide-sm">Team</th>' +
-    '</tr></thead><tbody>' +
-    rows.map(t => '<tr onclick="openTenant(\'' + t.id + '\')">' +
-      '<td><div class="studio">' + esc(t.name || 'Unnamed studio') + '</div>' +
-        '<div class="muted">' + esc(t.contact_email || t.id.slice(0, 8)) + '</div></td>' +
-      '<td><span class="tag ' + (t.plan === 'trial' ? 't-trial' : 't-paid') + '">' + esc(t.plan) + '</span></td>' +
-      '<td><span class="tag t-' + esc(t.status) + '">' + esc(t.status.replace('_', ' ')) + '</span></td>' +
-      '<td class="hide-sm">' + fmtDate(t.created_at) + '</td>' +
-      '<td>' + seenTag(t.last_seen_at) + '</td>' +
-      '<td class="num hide-sm">' + t.orders + '</td>' +
-      '<td class="num hide-sm">' + t.customers + '</td>' +
-      '<td class="num hide-sm">' + t.staff + '</td>' +
-    '</tr>').join('') + '</tbody></table>';
+  modal('Add to your home screen', isIOS() ? 'On iPhone and iPad' : 'From the browser menu',
+    isIOS()
+      ? '<p class="note">Safari does not give apps an install button, so it is done from the share menu:</p>' +
+        '<div style="margin-top:12px">' +
+        '<div class="kv"><span class="k">1</span><span class="v" style="font-weight:400;text-align:right">Tap the Share button at the bottom of Safari</span></div>' +
+        '<div class="kv"><span class="k">2</span><span class="v" style="font-weight:400;text-align:right">Scroll down and tap Add to Home Screen</span></div>' +
+        '<div class="kv"><span class="k">3</span><span class="v" style="font-weight:400;text-align:right">Tap Add</span></div></div>' +
+        '<p class="hint">It then opens full screen with no address bar, like the customer app.</p>'
+      : '<p class="note">Open your browser menu and choose <b>Install app</b>, or <b>Add to Home screen</b>.</p>' +
+        '<p class="hint">If neither appears, the page may still be loading its service worker — give it a moment and try again. Chrome also only offers it over HTTPS, so it will not appear on a plain local address.</p>',
+    '<button class="btn gold" onclick="closeModal()">Got it</button>');
 }
 
-/* ---- one studio ---- */
-async function openTenant(id) {
-  $('sheet').classList.add('show');
-  $('sheetBody').innerHTML = '<div class="empty">Loading…</div>';
-  try {
-    const { tenant: t } = await api('tenant', { id });
-    const canBill = ME.role === 'owner' || ME.role === 'finance';
-    const canNote = ME.role === 'owner' || ME.role === 'support';
-    const kv = (k, v) => '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>';
-    $('sheetBody').innerHTML =
-      '<h2 style="font-family:Georgia,serif;font-weight:500;margin:0 0 4px">' + esc(t.name || 'Unnamed studio') + '</h2>' +
-      '<div class="muted" style="margin-bottom:16px">' + esc(t.contact_email || '') + ' · ' + esc(t.id) + '</div>' +
-      kv('Plan', esc(t.plan)) + kv('Status', esc(t.status.replace('_', ' '))) +
-      kv('Signed up', fmtDate(t.created_at)) +
-      kv('Trial ends', fmtDate(t.trial_ends_at)) +
-      kv('Last seen', (t.last_seen_at ? fmtDate(t.last_seen_at) : 'never') + ' ' + seenTag(t.last_seen_at)) +
-      kv('App version', esc(t.app_version || 'unknown')) +
-      kv('Logins', t.users) + kv('Orders', t.orders) + kv('Clients', t.customers) +
-      kv('Team', t.staff) + kv('Vendors', t.suppliers) + kv('Transactions', t.txns) +
-      (canBill ? '<div class="row">' +
-        '<select id="pl">' + ['trial','studio','growth','atelier'].map(p => '<option' + (p === t.plan ? ' selected' : '') + '>' + p + '</option>').join('') + '</select>' +
-        '<select id="st">' + ['active','past_due','paused','cancelled'].map(p => '<option' + (p === t.status ? ' selected' : '') + '>' + p + '</option>').join('') + '</select>' +
-        '<button class="btn" onclick="saveBilling(\'' + t.id + '\')">Save</button></div>' : '') +
-      (canNote ? '<div class="note"><label>Internal note</label>' +
-        '<textarea id="nt" placeholder="Context for whoever picks this up next…">' + esc(t.notes || '') + '</textarea>' +
-        '<div class="row"><button class="btn ghost" onclick="saveNote(\'' + t.id + '\')">Save note</button></div></div>' : '') +
-      '<div class="privacy"><b>You are seeing counts, not contents.</b> Their client names, ' +
-        'measurements and figures are not on this screen and are not sent to it. Opening a studio ' +
-        'is recorded, and reaching their real records will need a support session they can see in ' +
-        'their own audit trail.</div>' +
-      '<div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>';
-  } catch (e) {
-    $('sheetBody').innerHTML = '<div class="empty">' + esc(e.message) +
-      '</div><div class="row"><button class="btn ghost" onclick="closeSheet()">Close</button></div>';
+/* open Settings with one group already expanded */
+function openSettingsGroup(which) {
+  UI.openSettingsGroup = which;
+  go('settings');
+  setTimeout(function () {
+    var el = document.querySelector('[data-sgrp="' + which + '"]');
+    if (el) { el.open = true; el.scrollIntoView({ block: 'start' }); }
+  }, 30);
+}
+
+function render() {
+  /* Last line of defence: whatever put us on this page — a leftover session, a
+     stale link, a detail view whose parent is off-limits — the role decides. */
+  if (!UI.detail && !canPage(UI.page)) UI.page = firstAllowedPage();
+  if (UI.detail && UI.back && !canPage(UI.back)) UI.back = firstAllowedPage();
+  buildNav();
+  buildMobBar();
+  closeDrawer();
+  const page = UI.detail ? null : UI.page;
+
+  // nav highlight — a detail view keeps its parent page lit
+  const lit = UI.detail ? UI.back : UI.page;
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.p === lit));
+
+  // title
+  if (UI.detail) {
+    const t = TITLES[UI.back] || ['', ''];
+    document.getElementById('ttl').textContent = t[0];
+    document.getElementById('sub').textContent = t[1];
+  } else {
+    const t = TITLES[UI.page] || ['', ''];
+    document.getElementById('ttl').textContent = t[0];
+    document.getElementById('sub').textContent = t[1];
   }
-}
-function closeSheet() { $('sheet').classList.remove('show'); }
 
-async function saveBilling(id) {
+  // body
+  let html = '';
   try {
-    await api('setPlan', { id, value: $('pl').value });
-    await api('setStatus', { id, value: $('st').value });
-    closeSheet(); await loadTenants();
-  } catch (e) { alert(e.message); }
-}
-async function saveNote(id) {
-  try { await api('setNote', { id, notes: $('nt').value }); closeSheet(); }
-  catch (e) { alert(e.message); }
+    if (UI.detail) {
+      const fn = DETAIL[UI.detail.type];
+      html = fn ? fn(UI.detail.id) : '<div class="pnl"><div class="empty">Nothing to show.</div></div>';
+    } else {
+      const fn = PAGES[UI.page];
+      html = fn ? fn() : '<div class="pnl"><div class="empty">Page not built.</div></div>';
+    }
+  } catch (err) {
+    html = '<div class="pnl"><div class="empty">Something went wrong rendering this page.<br><span class="note">' +
+      esc(err.message) + '</span></div></div>';
+    console.error(err);
+  }
+  document.getElementById('view').innerHTML = html;
+
+  // demo-data marker — hidden the moment real data is wired in
+  const dt = document.getElementById('demoTag');
+  if (dt) dt.style.display = DB.demoData ? 'inline-block' : 'none';
+
+  // whoever is signed in shows in the footer
+  const meNow = Q.staffM(ME.staffId);
+  if (meNow) {
+    document.getElementById("meAv").textContent = initials(meNow.name);
+    document.getElementById("meName").textContent = meNow.name;
+    document.getElementById("meRole").textContent = (Q.role(meNow.roleId) || {}).name || meNow.title;
+  }
+
+  // theme icon
+  const dark = !document.body.classList.contains('light');
+  document.getElementById('themeIcon').setAttribute('href', dark ? '#i-moon' : '#i-sun');
+
+  // bell
+  const alertCount = Q.pastDue().length + Q.urgentTickets().length + DB.tasks.filter(t => !t.done && t.dueIn < 0).length;
+  const dot = document.getElementById('bellDot');
+  dot.textContent = alertCount;
+  dot.style.display = alertCount ? 'grid' : 'none';
+
+  // keep search box in sync
+  const sb = document.getElementById('srch');
+  if (sb.value !== UI.search) sb.value = UI.search;
 }
 
-/* ---- wiring ---- */
-$('go').onclick = signIn;
-$('pw').onkeydown = e => { if (e.key === 'Enter') signIn(); };
-$('em').onkeydown = e => { if (e.key === 'Enter') $('pw').focus(); };
-$('out').onclick = async () => { await supa.auth.signOut(); location.reload(); };
-$('q').oninput = renderList;
-$('fPlan').onchange = renderList;
-$('fStatus').onchange = renderList;
-$('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
+let searchT;
+function onSearch(v) {
+  UI.search = v;
+  clearTimeout(searchT);
+  searchT = setTimeout(() => {
+    if (UI.detail) { UI.detail = null; UI.page = 'subscribers'; }
+    render();
+  }, 250);
+}
 
-/* resume an existing session */
-supa.auth.getSession().then(({ data: { session } }) => { if (session) enter(); });
+function openAlerts() {
+  const pd = Q.pastDue(), urg = Q.urgentTickets(), late = DB.tasks.filter(t => !t.done && t.dueIn < 0);
+  const trialEnding = Q.trial().filter(s => s.renewIn <= 3);
+  const rows = []
+    .concat(urg.map(t => ['Urgent ticket', t.title + ' — ' + t.subscriber, "openDetail('ticket'," + t.id + ")", 'red']))
+    .concat(pd.map(s => ['Payment failed', s.name + ' — ' + money(s.mrr) + ' unpaid', "openDetail('sub'," + s.id + ")", 'red']))
+    .concat(trialEnding.map(s => ['Trial ending', s.name + ' — ' + (s.renewIn <= 0 ? 'today' : s.renewIn + ' days left'), "openDetail('sub'," + s.id + ")", 'amber']))
+    .concat(late.map(t => ['Task overdue', t.title + ' — ' + Math.abs(t.dueIn) + ' days late', "openDetail('task'," + t.id + ")", 'amber']));
+
+  modal('Alerts', rows.length + ' thing' + (rows.length === 1 ? '' : 's') + ' needing attention',
+    rows.length ? rows.map(r => '<div class="row klik" onclick="closeModal();' + r[2] + '">' +
+      '<div><b>' + esc(r[0]) + '</b><small>' + esc(r[1]) + '</small></div>' +
+      '<span class="pill ' + r[3] + '">' + (r[3] === 'red' ? 'Act now' : 'Soon') + '</span></div>').join('')
+      : '<div class="empty">Nothing needs you right now.</div>',
+    '<button class="btn" onclick="closeModal()">Close</button>');
+}
+
+/* ---- splash ----
+   The same start page the customer app opens with. It sits over whatever is
+   behind it — the sign-in screen, or the dashboard if a session is already
+   open — so the app is fully built by the time it fades. Tap to skip. */
+function hideSplash() {
+  const s = document.getElementById('splash');
+  if (!s) return;
+  s.classList.add('hide');
+  setTimeout(() => { if (s) s.style.display = 'none'; }, 600);
+}
+function startSplash() {
+  const s = document.getElementById('splash');
+  if (!s) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  s.addEventListener('click', hideSplash);
+  setTimeout(hideSplash, reduce ? 700 : 2900);
+}
+
+/* boot */
+(function boot() {
+  if (localStorage.getItem('tlb_admin_theme') === 'light') document.body.classList.add('light');
+  setPeriod('today');
+  if (initSignIn()) render();
+  startSplash();
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); document.getElementById('srch').focus(); }
+  });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
 </script>
 </body>
 </html>

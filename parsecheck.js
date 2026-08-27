@@ -2,7 +2,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const file = process.argv[2] || 'layi_dashboard.html';
+const file = process.argv[2] || 'site/layi_dashboard.html';
 const html = fs.readFileSync(file, 'utf8');
 
 // Match <script ...>...</script> but skip src-only and non-JS type scripts.

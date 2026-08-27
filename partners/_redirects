@@ -1,0 +1,8 @@
+# The Label Board — Partner Portal
+# Processed before netlify.toml and takes precedence.
+# Static files (css/, js/, icon.svg, manifest.json, sw.js) are served
+# directly by Netlify before these rules run, so the catch-all below
+# only affects paths that do not map to a real file.
+
+# Single-page app: every unmatched route renders the portal shell.
+/*    /index.html   200

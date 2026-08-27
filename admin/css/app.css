@@ -1,0 +1,642 @@
+/* The Label Board — Admin Control Centre */
+:root{
+  --bg:#0a0b0e;--bg-2:#101218;--panel:#15171f;--panel-2:#1d2029;
+  --line:rgba(255,255,255,.11);--line-soft:rgba(255,255,255,.055);
+  --text:#f3f4f7;--dim:#aab1c0;--faint:#78808f;
+  --gold:#c9a24b;--gold-2:#ddb968;--on-gold:#1a1305;
+  --green:#3f9d78;--red:#d6706f;--amber:#d3a34a;--blue:#5a9fd4;--purple:#9b7fd4;
+  --shadow:0 24px 60px -28px rgba(0,0,0,.9);--r:14px;
+}
+body.light{
+  --bg:#ffffff;--bg-2:#eef0f5;--panel:#ffffff;--panel-2:#f5f6f9;
+  --line:rgba(30,41,59,.14);--line-soft:rgba(30,41,59,.07);
+  --text:#111827;--dim:#3f4a5a;--faint:#6b7280;
+  --gold:#17385c;--gold-2:#0f2743;--on-gold:#ffffff;
+  --green:#166534;--red:#b3261e;--amber:#8a5a12;--blue:#155e75;--purple:#5b3fa8;
+  --shadow:0 18px 42px -24px rgba(15,23,42,.20);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Source Serif 4',Georgia,serif;
+  transition:background .35s ease,color .25s ease;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:'Playfair Display',Georgia,serif;font-weight:600;letter-spacing:.3px;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--gold);text-decoration:none}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+.side{background:linear-gradient(180deg,var(--bg-2),transparent);border-right:1px solid var(--line-soft);
+  padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.side::-webkit-scrollbar{width:6px}.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+.brand{display:flex;align-items:center;gap:11px;padding:4px 6px 18px}
+.brand svg{width:38px;height:38px;flex:none;border-radius:10px}
+.brand-name{font-family:'Playfair Display',serif;font-size:13.5px;font-weight:600;letter-spacing:1.4px;line-height:1.15}
+.brand-sub{font-size:9.5px;color:var(--faint);letter-spacing:1.6px;text-transform:uppercase;margin-top:3px}
+
+.grp{margin:14px 0 4px}
+.grp-t{font-size:9.5px;color:#66748b;letter-spacing:.18em;text-transform:uppercase;padding:0 10px 6px;font-weight:600}
+.nav{width:100%;background:none;border:0;text-align:left;padding:10px 12px;border-radius:9px;
+  display:flex;gap:11px;align-items:center;cursor:pointer;transition:.18s;font-size:13.5px;
+  color:var(--dim);position:relative;font-family:inherit}
+.nav:hover{background:var(--panel);color:var(--text)}
+.nav.on{background:var(--panel);color:var(--text)}
+.nav.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--gold)}
+.nav .ic{width:18px;height:18px;flex:none;display:grid;place-items:center}
+.nav .ic svg{width:17px;height:17px}
+.nav .tx{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* circular count bubble, matching the customer app rather than a gold pill */
+.badge{min-width:21px;height:21px;padding:0 5px;border-radius:50%;background:#1e3a5f;color:#fff;
+  font-size:10.5px;font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif;
+  box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+body.light .badge{background:#17385c;color:#fff}
+
+.side-foot{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:12px}
+.me{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:9px;cursor:pointer}
+.me:hover{background:var(--panel)}
+.av{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--gold) 18%,var(--panel));color:var(--gold);font-size:12px;font-weight:700;
+  font-family:'Jost',sans-serif}
+.me-n{font-size:12.5px}.me-r{font-size:10px;color:var(--faint);margin-top:1px}
+
+/* ---------- main ---------- */
+.main{min-width:0;height:100vh;overflow-y:auto;padding:26px 30px 60px}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.top h1{font-size:29px}
+.top-sub{color:var(--faint);font-size:12.5px;margin-top:4px}
+.top-act{display:flex;align-items:center;gap:9px}
+.srch{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;
+  min-width:260px;font-size:13px;outline:none}
+.srch:focus{border-color:var(--gold)}
+.srch::placeholder{color:var(--faint)}
+.iconbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel);
+  color:var(--dim);cursor:pointer;display:grid;place-items:center;transition:.2s;position:relative}
+.iconbtn:hover{border-color:var(--gold);color:var(--gold)}
+.iconbtn svg{width:17px;height:17px}
+.iconbtn .dot{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;
+  background:var(--red);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
+
+.page{display:none}.page.on{display:block;animation:rise .3s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+/* ---------- period picker ---------- */
+.periodbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.pwrap{position:relative}
+.pbtn{display:inline-flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:10px;height:38px;padding:0 13px;cursor:pointer;font-size:13px}
+.pbtn:hover{border-color:var(--gold)}
+.pbtn .cv{opacity:.6;font-size:10px}
+.ppop{position:absolute;top:44px;left:0;z-index:200;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow);padding:8px;min-width:250px;display:none;flex-direction:column;gap:2px}
+.ppop.on{display:flex}
+.popt{text-align:left;background:none;border:0;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.popt:hover{background:var(--panel-2)}
+.popt.on{background:var(--gold);color:var(--on-gold);font-weight:600}
+.psep{height:1px;background:var(--line);margin:6px 4px}
+.pfield{padding:5px 10px;display:flex;flex-direction:column;gap:5px}
+.pfield label{font-size:10px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);font-weight:600}
+.pfield input{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-size:12.5px;outline:none}
+.pfield input:focus{border-color:var(--gold)}
+.papply{margin:8px 4px 2px;background:var(--gold);color:var(--on-gold);border:0;border-radius:8px;padding:9px;
+  cursor:pointer;font-weight:600;font-size:12.5px}
+.prange{font-size:11.5px;color:var(--faint)}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:14px;margin-bottom:18px}
+.st{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 19px;
+  position:relative;transition:.22s;box-shadow:0 1px 2px rgba(17,24,39,.05),0 6px 16px -10px rgba(17,24,39,.14)}
+.st.klik{cursor:pointer}
+.st.klik:hover{transform:translateY(-2px);border-color:var(--gold)}
+.st .sl{color:var(--faint);font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;font-weight:600;
+  padding-right:22px}
+.st .sv{font-family:'Playfair Display',serif;font-size:31px;margin-top:9px;line-height:1;font-weight:600}
+.st .sd{font-size:11.5px;margin-top:7px;color:var(--faint)}
+.st .arrow{position:absolute;top:14px;right:15px;color:var(--gold);opacity:.55;font-size:15px;line-height:1}
+.sd .up{color:var(--green)}.sd .down{color:var(--red)}.sd .wn{color:var(--amber)}
+.st.good{background:color-mix(in srgb,var(--green) 26%,var(--panel));border-color:color-mix(in srgb,var(--green) 42%,var(--panel))}
+.st.good .sv{color:var(--green)}
+.st.money{background:color-mix(in srgb,var(--gold) 22%,var(--panel));border-color:color-mix(in srgb,var(--gold) 38%,var(--panel))}
+.st.money .sv{color:var(--gold)}
+.st.bad{background:color-mix(in srgb,var(--red) 26%,var(--panel));border-color:color-mix(in srgb,var(--red) 42%,var(--panel))}
+.st.bad .sv{color:var(--red)}
+.st.warn{background:color-mix(in srgb,var(--amber) 26%,var(--panel));border-color:color-mix(in srgb,var(--amber) 42%,var(--panel))}
+.st.warn .sv{color:var(--amber)}
+.st.info{background:color-mix(in srgb,var(--blue) 22%,var(--panel));border-color:color-mix(in srgb,var(--blue) 38%,var(--panel))}
+.st.info .sv{color:var(--blue)}
+
+/* ---------- panels ---------- */
+/* minmax(0,…) everywhere: a grid item defaults to min-width:auto, which lets a
+   wide table's min-width stretch the whole column instead of scrolling inside it. */
+.cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(min(310px,100%),.5fr);gap:14px;align-items:start}
+.cols>*{min-width:0}
+.cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px}
+.cols3>*{min-width:0}
+/* four across, for the dashboard row under the KPI cards */
+.cols4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}
+.cols4>*{min-width:0}
+.cols4 .pnl{margin-bottom:0}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.cols2>*{min-width:0}
+.pnl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;margin-bottom:14px;min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.pnl h3{font-size:14.5px}
+.ph-sub{font-size:11.5px;color:var(--faint);margin-top:3px}
+.lnk{color:var(--gold);font-size:11.5px;cursor:pointer;background:none;border:0;padding:0;font-family:inherit}
+.lnk:hover{text-decoration:underline}
+.empty{padding:34px 10px;text-align:center;color:var(--faint);font-size:13px}
+.note{font-size:12px;color:var(--faint);line-height:1.65}
+
+/* ---------- tables ----------
+   On a phone the table keeps being a table and sheds columns instead of
+   scrolling sideways — matching the customer app, where secondary columns carry
+   .hide-sm. Side-scrolling hides information behind a gesture nobody makes. */
+.tw{overflow-x:auto;max-width:100%;min-width:0}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line-soft);font-size:12.5px;white-space:nowrap}
+th{font-size:9.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.9px;font-weight:600;
+  font-family:'Jost',sans-serif;border-bottom:1px solid var(--line)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr.klik{cursor:pointer}
+tbody tr.klik:hover{background:var(--panel-2)}
+tbody tr:last-child td{border-bottom:0}
+.t-main{font-weight:600}
+.t-sub{font-size:10.5px;color:var(--faint);margin-top:2px;font-weight:400}
+.chev{color:var(--faint);font-size:14px}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;font-size:12px;color:var(--faint)}
+.pager-btns{display:flex;gap:6px}
+
+/* ---------- pills / chips ---------- */
+.pill{padding:3px 9px;border-radius:20px;font-size:10px;display:inline-block;font-weight:700;
+  letter-spacing:.4px;font-family:'Jost',sans-serif;white-space:nowrap}
+.pill.green{background:color-mix(in srgb,var(--green) 20%,var(--panel));color:var(--green)}
+.pill.amber{background:color-mix(in srgb,var(--amber) 20%,var(--panel));color:var(--amber)}
+.pill.red{background:color-mix(in srgb,var(--red) 20%,var(--panel));color:var(--red)}
+.pill.blue{background:color-mix(in srgb,var(--blue) 20%,var(--panel));color:var(--blue)}
+.pill.purple{background:color-mix(in srgb,var(--purple) 20%,var(--panel));color:var(--purple)}
+.pill.grey{background:var(--panel-2);color:var(--faint)}
+.tier{font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;font-weight:700;font-family:'Jost',sans-serif;
+  border:1px solid var(--line);border-radius:20px;padding:2px 8px;color:var(--gold)}
+
+/* ---------- toolbar / tabs ---------- */
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.bar .spacer{flex:1}
+.tab{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 13px;cursor:pointer;
+  font-size:12.5px;transition:.18s;white-space:nowrap;font-family:inherit}
+.tab:hover{border-color:var(--gold)}
+.tab.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold);font-weight:600}
+.tab .n{opacity:.7;margin-left:4px;font-size:11px}
+.tab.on .n{opacity:.85}
+.btn{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 13px;cursor:pointer;
+  font-size:12.5px;transition:.18s;font-family:inherit}
+.btn:hover{border-color:var(--gold)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--on-gold);font-weight:600}
+.btn.gold:hover{background:var(--gold-2)}
+.btn.danger{border-color:color-mix(in srgb,var(--red) 45%,var(--panel));color:var(--red);background:transparent}
+.btn.sm{padding:6px 10px;font-size:11.5px;border-radius:8px}
+.sel{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12.5px;
+  cursor:pointer;outline:none}
+.sel:focus{border-color:var(--gold)}
+
+.utabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.utab{background:none;border:0;border-bottom:2px solid transparent;padding:11px 0;cursor:pointer;
+  font-size:13.5px;color:var(--faint);white-space:nowrap;font-family:inherit;transition:.18s}
+.utab:hover{color:var(--text)}
+.utab.on{color:var(--text);border-bottom-color:var(--gold);font-weight:600}
+
+/* ---------- cards grid ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;cursor:pointer;transition:.2s}
+.card:hover{border-color:var(--gold);transform:translateY(-2px)}
+.card h4{font-size:13.5px;margin:9px 0 6px}
+.card p{color:var(--faint);font-size:11.5px;line-height:1.55;margin:0 0 9px}
+.card .meta{font-size:10.5px;color:#6f7b90;display:flex;justify-content:space-between;gap:8px}
+.prog{height:5px;border-radius:3px;background:var(--panel-2);overflow:hidden;margin:9px 0}
+.prog i{display:block;height:100%;background:var(--gold);border-radius:3px}
+
+/* ---------- rows / kv ---------- */
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--line-soft)}
+.row:last-child{border-bottom:0}
+.row.klik{cursor:pointer}.row.klik:hover{background:var(--panel-2);margin:0 -8px;padding:10px 8px;border-radius:8px}
+.row b{font-size:12.5px;display:block;font-weight:600}
+.row small{font-size:10.5px;color:var(--faint);display:block;margin-top:2px}
+.kv{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:10px 0;
+  border-bottom:1px solid var(--line-soft);font-size:13px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--faint)}
+.kv .v{text-align:right;font-weight:600}
+.sec-t{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);font-weight:700;
+  margin:20px 0 4px;font-family:'Jost',sans-serif}
+.sec-t:first-child{margin-top:0}
+
+/* ---------- charts ---------- */
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;overflow:visible}
+.cx-lbl{font-size:9.5px;fill:var(--faint);font-family:'Jost',sans-serif}
+.cgrid{stroke:var(--line-soft);stroke-width:1}
+.legend{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+.lg{display:flex;align-items:center;gap:9px;font-size:12.5px;cursor:pointer;padding:3px 0}
+.lg:hover{color:var(--gold)}
+.lg i{width:9px;height:9px;border-radius:50%;flex:none}
+.lg .lv{margin-left:auto;color:var(--faint);font-variant-numeric:tabular-nums}
+.donutwrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.donutwrap svg{width:150px;height:150px;flex:none}
+.hbar{display:flex;align-items:center;gap:10px;padding:7px 0}
+.hbar .hl{width:64px;font-size:12px;color:var(--dim);flex:none}
+.hbar .ht{flex:1;height:15px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+.hbar .ht i{display:block;height:100%;border-radius:4px}
+.hbar .hv{width:88px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums;flex:none}
+
+/* ---------- detail view ---------- */
+.back{background:none;border:0;color:var(--gold);cursor:pointer;font-size:13px;padding:0;margin-bottom:14px;
+  display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.back:hover{text-decoration:underline}
+.dhead{display:flex;align-items:flex-start;gap:15px;margin-bottom:6px;flex-wrap:wrap}
+.dav{width:56px;height:56px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:19px;font-weight:700;
+  background:color-mix(in srgb,var(--gold) 16%,var(--panel));color:var(--gold);border:1px solid var(--line);
+  font-family:'Jost',sans-serif}
+.dhead h2{font-size:25px}
+.dhead .dmeta{font-size:12.5px;color:var(--faint);margin-top:4px}
+.dstats{display:flex;gap:26px;flex-wrap:wrap;margin:16px 0 20px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.dstat .dv{font-family:'Playfair Display',serif;font-size:21px;font-weight:600}
+.dstat .dl{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint);margin-top:3px;font-weight:600;
+  font-family:'Jost',sans-serif}
+.dstat.g .dv{color:var(--green)}.dstat.r .dv{color:var(--red)}.dstat.a .dv{color:var(--amber)}.dstat.m .dv{color:var(--gold)}
+.dsplit{display:grid;grid-template-columns:180px minmax(0,1fr);gap:22px;align-items:start}
+.vtabs{display:flex;flex-direction:column;gap:3px}
+.vtab{background:none;border:0;text-align:left;padding:10px 13px;border-radius:9px;cursor:pointer;font-size:13px;
+  color:var(--dim);font-family:inherit;transition:.18s}
+.vtab:hover{background:var(--panel)}
+.vtab.on{background:var(--gold);color:var(--on-gold);font-weight:600}
+.actrow{display:flex;gap:14px;font-size:12.5px;margin-bottom:14px}
+
+/* ---------- modal ---------- */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:900;display:none;overflow-y:auto;padding:24px 16px}
+.mask.on{display:block}
+.modal{background:var(--bg);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+  width:100%;max-width:720px;margin:20px auto;animation:rise .25s ease both}
+.modal.wide{max-width:960px}
+.mh{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:19px 21px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);border-radius:16px 16px 0 0;z-index:2}
+.mh h3{font-size:18px}
+.mh .msub{font-size:11.5px;color:var(--faint);margin-top:3px}
+.mx{background:none;border:0;font-size:24px;line-height:1;cursor:pointer;color:var(--faint);padding:0 2px}
+.mx:hover{color:var(--red)}
+.mb{padding:19px 21px}
+.mf{padding:15px 21px;border-top:1px solid var(--line);display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ---------- forms ---------- */
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin-bottom:6px;font-family:'Jost',sans-serif}
+.fg input,.fg select,.fg textarea{width:100%;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;padding:10px 12px;font-size:13px;outline:none}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--gold)}
+.fg textarea{resize:vertical;min-height:88px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.5}
+
+/* ---------- permissions ---------- */
+.rolecard{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-bottom:12px;background:var(--panel-2)}
+.rolehead{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+.roleav{width:31px;height:31px;border-radius:50%;background:var(--line);color:var(--dim);display:grid;place-items:center;
+  font-size:12px;font-weight:700;flex:none;font-family:'Jost',sans-serif}
+.rolename{font-size:14px;font-weight:600}
+.roledesc{font-size:11px;color:var(--faint);margin-top:2px}
+.roletag{font-size:9px;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:1px 6px;
+  font-family:'Jost',sans-serif;text-transform:uppercase;letter-spacing:.5px}
+.roleacts{margin-left:auto;display:flex;gap:6px}
+.band{font-size:10.5px;color:var(--faint);margin:13px 0 7px;letter-spacing:.4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+  color:var(--dim);cursor:pointer;user-select:none;transition:.12s;font-family:inherit}
+.chip:hover{border-color:var(--gold)}
+.chip.on{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.chip.locked{opacity:.55;cursor:not-allowed}
+.chip.locked:hover{border-color:var(--line)}
+
+/* ---------- settings accordion ---------- */
+.sgrp{background:var(--panel);border:1px solid var(--line);border-radius:13px;margin-bottom:11px;overflow:hidden}
+.sgrp-h{display:flex;align-items:center;gap:13px;padding:15px 17px;cursor:pointer;list-style:none}
+.sgrp-h::-webkit-details-marker{display:none}
+.sgrp-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none}
+.sgrp-ic svg{width:17px;height:17px}
+.sgrp-t{font-size:14.5px;font-weight:600;font-family:'Playfair Display',serif}
+.sgrp-d{font-size:11.5px;color:var(--faint);margin-top:2px}
+.sgrp-cv{margin-left:auto;color:var(--faint);transition:.15s}
+.sgrp[open] .sgrp-cv{transform:rotate(90deg)}
+.sgrp-b{padding:2px 17px 19px;border-top:1px solid var(--line-soft)}
+
+/* ---------- toggles ---------- */
+.tog{width:40px;height:22px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);
+  position:relative;cursor:pointer;flex:none;transition:.18s}
+.tog i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--faint);transition:.18s}
+.tog.on{background:color-mix(in srgb,var(--green) 40%,var(--panel));border-color:var(--green)}
+.tog.on i{left:20px;background:var(--green)}
+.rng{width:100%;accent-color:var(--gold)}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);z-index:1200;
+  background:var(--panel);border:1px solid var(--gold);border-radius:11px;padding:12px 18px;font-size:13px;
+  box-shadow:var(--shadow);opacity:0;transition:.28s;pointer-events:none;max-width:90vw}
+.toast.on{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ---------- responsive ----------
+   The phone is the primary device, so the small-screen rules do real work:
+   the sidebar becomes a bottom bar, tables scroll inside their own box, and
+   every tap target stays at least 44px. */
+@media(max-width:1240px){
+  .cols4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cols4 .pnl{margin-bottom:0}
+}
+@media(max-width:1080px){
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .cols2{grid-template-columns:minmax(0,1fr)}
+  .dsplit{grid-template-columns:minmax(0,1fr)}
+  .dsplit>*{min-width:0}
+  .vtabs{flex-direction:row;overflow-x:auto;padding-bottom:6px;gap:6px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .vtabs::-webkit-scrollbar{display:none}
+  .vtab{white-space:nowrap;background:var(--panel-2);border:1px solid var(--line)}
+  .vtab.on{border-color:var(--gold)}
+}
+@media(max-width:860px){
+  .shell{grid-template-columns:66px minmax(0,1fr)}
+  .brand-name,.brand-sub,.grp-t,.nav .tx,.badge,.me-n,.me-r{display:none}
+  .nav{justify-content:center;padding:12px 0;min-height:44px}
+  .brand{justify-content:center;padding:4px 0 14px}
+  .me{justify-content:center}
+  .main{padding:20px 16px 50px}
+  .srch{min-width:0;width:100%}
+  .top-act{width:100%}
+  .modal{max-width:none;margin:0 auto}
+}
+
+/* ---- phone ---- */
+@media(max-width:680px){
+
+  .main{height:auto;min-height:100vh;padding:16px 14px 30px;overflow:visible}
+  html,body{height:auto}
+  .top{margin-bottom:16px;gap:10px}
+  .top h1{font-size:23px}
+  .top-sub{font-size:11.5px}
+  .top-act{gap:7px}
+  .iconbtn{width:40px;height:40px}
+
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+  .st{padding:14px 15px}
+  .st .sl{font-size:9.5px;letter-spacing:.9px;padding-right:16px}
+  .st .sv{font-size:23px;margin-top:7px}
+  .st .sd{font-size:10.5px;margin-top:5px}
+  .st .arrow{top:11px;right:11px;font-size:13px}
+
+  .pnl{padding:14px 14px;border-radius:12px}
+  .ph{flex-wrap:wrap;gap:8px}
+  .pnl h3{font-size:13.5px}
+  .ph-sub{font-size:11px}
+
+  /* tables shed their secondary columns and fit — no sideways scroll */
+  .tw{overflow-x:visible;max-width:100%;margin:0;padding:0}
+  table{min-width:0;width:100%}
+  th,td{white-space:normal}
+  td.num,th.num{white-space:nowrap}
+  .chartbox{min-width:0;max-width:100%}
+  .chartbox svg{max-width:100%}
+  .cols3,.cols4{grid-template-columns:minmax(0,1fr)}
+  .cols4 .pnl{margin-bottom:0}
+  th,td{padding:9px 8px;font-size:11.5px}
+  .t-sub{font-size:10px}
+
+  .cards{grid-template-columns:1fr;gap:10px}
+  .bar{gap:6px}
+  .tab,.btn,.sel{min-height:40px;font-size:12px;padding:9px 11px}
+  .btn.gold,.btn:last-child{flex:1}
+  .f2{grid-template-columns:1fr}
+  .dstats{gap:14px;row-gap:12px}
+  .dstat .dv{font-size:18px}
+  .dhead h2{font-size:21px}
+  .dav{width:46px;height:46px;font-size:16px}
+  .mask{padding:0}
+  .modal{border-radius:14px 14px 0 0;margin:auto 0 0;min-height:60vh}
+  .mh{padding:16px 16px;border-radius:14px 14px 0 0}
+  .mb{padding:16px}
+  .mf{padding:12px 16px;position:sticky;bottom:0;background:var(--bg)}
+  .mf .btn{flex:1}
+  .donutwrap{flex-direction:column;align-items:flex-start}
+  .donutwrap svg{width:130px;height:130px;margin:0 auto}
+  .hbar .hl{width:52px;font-size:11px}
+  .hbar .hv{width:74px;font-size:11px}
+  .chips{gap:5px}
+  .chip{font-size:11px;padding:7px 10px}
+  .row.klik:hover{margin:0;padding:10px 0}
+  .toast{bottom:76px;left:14px;right:14px;transform:translateY(80px);max-width:none}
+  .toast.on{transform:translateY(0)}
+  .sgrp-h{padding:13px 14px}
+  .sgrp-b{padding:2px 14px 16px}
+}
+@media(max-width:420px){
+  .stats{grid-template-columns:1fr}
+  .st .sv{font-size:25px}
+  .nav{min-width:48px;padding:6px 7px}
+}
+
+/* ---------- demo-data marker ----------
+   Every figure in this build is invented. While that is true it says so on
+   screen, so nobody reads ₦6.25M MRR as a real number. DB.demoData turns it off. */
+.demo{display:inline-block;vertical-align:middle;margin-left:9px;font-family:'Jost',sans-serif;
+  font-size:9.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  padding:4px 9px;border-radius:20px;white-space:nowrap;
+  background:color-mix(in srgb,var(--amber) 20%,var(--panel));
+  color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 42%,var(--panel))}
+@media(max-width:680px){
+  .demo{font-size:8.5px;padding:3px 7px;margin-left:6px;letter-spacing:.8px}
+}
+
+/* ============================================================
+   Mobile navigation, matching the customer app: a hamburger at the
+   top that slides the full nav in from the left, plus a bottom bar
+   carrying the five pages you actually live in.
+   ============================================================ */
+#menuBtn{display:none}
+#drawerMask{display:none}
+.mobbar{display:none}
+
+/* secondary table columns disappear on a phone rather than scrolling away */
+@media(max-width:760px){
+  .hide-sm{display:none!important}
+  th,td{padding:11px 8px}
+}
+@media(max-width:440px){
+  .hide-xs{display:none!important}
+}
+
+@media(max-width:680px){
+  /* the sidebar becomes a drawer */
+  .shell{grid-template-columns:1fr;padding-bottom:0}
+  .side{position:fixed;top:0;left:0;bottom:0;width:84%;max-width:310px;z-index:60;
+    transform:translateX(-100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);
+    background:var(--bg-2);border-right:1px solid var(--line);box-shadow:var(--shadow);
+    flex-direction:column;height:100%;overflow-y:auto;
+    padding:calc(18px + env(safe-area-inset-top)) 15px calc(20px + env(safe-area-inset-bottom))}
+  .side.open{transform:translateX(0)}
+  /* The 860px rail hides every label so only icons remain. The drawer is a
+     full sidebar again, so each of those has to be switched back on. Missing
+     brand-name/brand-sub left the drawer with a bare logo and no app name;
+     missing me-n/me-r left the footer an avatar with nobody's name on it. */
+  .brand,.grp-t,.side-foot{display:revert}
+  .brand-name,.brand-sub,.me-n,.me-r{display:revert}
+  .brand{justify-content:flex-start;padding:2px 4px 16px}
+  #nav{display:block}
+  .grp{display:block;margin:12px 0 4px}
+  .nav{width:100%;min-height:46px;justify-content:flex-start;gap:12px;
+    padding:11px 12px;font-size:14.5px}
+  .nav .tx{display:block}
+  .badge{display:grid}
+  .nav.on::before{left:0;right:auto;top:8px;bottom:8px;width:3px;height:auto}
+
+  #drawerMask{display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:55;
+    opacity:0;pointer-events:none;transition:opacity .24s}
+  #drawerMask.on{opacity:1;pointer-events:auto}
+
+  /* hamburger sits with the title */
+  #menuBtn{display:grid;place-items:center;width:40px;height:40px;flex:none;
+    border:1px solid var(--line);background:var(--panel);color:var(--dim);
+    border-radius:11px;cursor:pointer}
+  #menuBtn svg{width:19px;height:19px}
+  .top{align-items:center;gap:11px}
+  .top-head{display:flex;align-items:center;gap:11px;min-width:0;flex:1}
+
+  /* bottom bar */
+  .mobbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:var(--bg-2);border-top:1px solid var(--line);
+    padding:5px 2px calc(5px + env(safe-area-inset-bottom));
+    box-shadow:0 -8px 22px -14px rgba(0,0,0,.55)}
+  .mobbar .mb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:none;border:0;font-family:inherit;font-size:9.5px;letter-spacing:.2px;
+    color:var(--faint);cursor:pointer;padding:6px 2px;min-height:52px;position:relative}
+  .mobbar .mb .mbi{line-height:0;display:block}
+  .mobbar .mb .mbi svg{width:22px;height:22px;display:block}
+  .mobbar .mb .mbt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .mobbar .mb:not(.on){opacity:.55}
+  .mobbar .mb.on{color:var(--text);font-weight:600}
+  .mobbar .mb .mbd{position:absolute;top:3px;right:calc(50% - 20px);min-width:15px;height:15px;
+    padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;
+    font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
+
+  .main{height:auto;min-height:100vh;overflow:visible;
+    padding:max(16px,env(safe-area-inset-top)) 14px calc(74px + env(safe-area-inset-bottom))}
+  html,body{height:auto}
+
+  /* iOS zooms the page when a field under 16px gets focus */
+  .fg input,.fg select,.fg textarea,.srch,.pfield input{font-size:16px}
+  .toast{bottom:calc(78px + env(safe-area-inset-bottom))}
+  .ppop{position:fixed;left:14px;right:14px;top:auto;bottom:calc(80px + env(safe-area-inset-bottom));
+    min-width:0;max-height:70vh;overflow-y:auto}
+}
+
+/* ============================================================
+   Sign-in screen, matching the customer app's start page: pick who
+   you are, then a password field slides in.
+   ============================================================ */
+#login{position:fixed;inset:0;z-index:500;display:none;align-items:center;justify-content:center;
+  overflow-y:auto;padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+  background:radial-gradient(1000px 500px at 50% -10%, color-mix(in srgb,var(--gold) 14%,transparent), transparent 60%),var(--bg)}
+#login.on{display:flex}
+body.signed-out .shell,body.signed-out .mobbar{display:none}
+.login-card{width:100%;max-width:432px;text-align:center;margin:auto;
+  animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.login-theme{position:fixed;top:max(18px,env(safe-area-inset-top));right:18px;width:40px;height:40px;
+  border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--dim);
+  cursor:pointer;display:grid;place-items:center;z-index:2}
+.login-theme:hover{border-color:var(--gold);color:var(--gold)}
+.login-theme svg{width:17px;height:17px}
+.login-logo{width:60px;height:60px;margin:0 auto 18px;display:block;border-radius:15px}
+.login-the{font-size:9px;letter-spacing:4.5px;color:var(--faint);margin-bottom:5px;font-family:'Jost',sans-serif}
+.login-brand{font-family:'Playfair Display',serif;font-size:23px;letter-spacing:4.5px;font-weight:600;line-height:1.2}
+.login-brand .dot{color:var(--gold)}
+.login-sub{margin-top:8px;color:var(--faint);font-size:9.5px;letter-spacing:2.6px;text-transform:uppercase;
+  font-family:'Jost',sans-serif}
+.pw-wrap{margin-top:26px;display:none;text-align:left}
+.pw-wrap.on{display:block;animation:rise .3s ease both}
+.fld{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+  padding:13px 15px;border-radius:11px;font-family:inherit;font-size:16px;outline:none;transition:.2s}
+.fld:focus{border-color:var(--gold)}
+.pw-row{position:relative}
+.pw-show{position:absolute;right:13px;top:50%;transform:translateY(-50%);cursor:pointer;
+  color:var(--dim);font-size:12.5px;user-select:none;font-family:'Jost',sans-serif}
+#loginEmail{margin-bottom:10px}
+.login-err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:17px}
+.login-foot{margin-top:22px;color:var(--faint);font-size:11px;line-height:1.7}
+.login-back{background:none;border:0;color:var(--dim);font-size:12.5px;cursor:pointer;
+  margin-top:4px;font-family:inherit}
+.login-back:hover{color:var(--text)}
+@media(max-width:680px){
+  .login-card{max-width:none}
+  .login-brand{font-size:20px;letter-spacing:3.6px}
+}
+
+/* ============================================================
+   Splash — the same start page the customer app opens with: the mark
+   strokes itself in, the gold dot lands, then the wordmark rises.
+   Runs once per session, then fades into the sign-in screen.
+   ============================================================ */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 42%,rgba(8,25,52,.16),transparent 40%),
+    linear-gradient(180deg,#020b1d 0%,#010817 100%);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  transition:opacity .55s ease}
+#splash.hide{opacity:0;pointer-events:none}
+#splash .sp-inner{width:min(82vw,760px);display:flex;flex-direction:column;align-items:center;
+  text-align:center;transform:translateY(-1vh)}
+#splash .sp-mark{position:relative;width:min(34vw,150px);aspect-ratio:1/1;margin-bottom:clamp(28px,4vh,38px)}
+#splash .sp-mark svg{width:100%;height:100%;overflow:visible}
+#splash .sp-mark path{fill:none;stroke:#f4f0e8;stroke-width:13;stroke-linecap:round;stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 1px rgba(255,255,255,.22))}
+#splash .sp-draw{stroke-dasharray:1000;stroke-dashoffset:1000;
+  animation:spDraw 1.15s cubic-bezier(.65,.05,.36,1) .18s forwards}
+#splash .sp-dot{position:absolute;right:-1.5%;bottom:17%;width:clamp(15px,3vw,25px);height:clamp(15px,3vw,25px);
+  border-radius:50%;background:#e2ad4f;opacity:0;transform:scale(.5);
+  animation:spDot .32s cubic-bezier(.2,.9,.25,1.2) 1.2s forwards}
+#splash .sp-copy{opacity:0;transform:translateY(12px);animation:spUp .55s ease 1.38s forwards;color:#f4f0e8}
+#splash .sp-the{font-size:clamp(13px,1.1vw,15px);letter-spacing:.42em;margin-bottom:14px;font-weight:500;
+  font-family:'Jost',sans-serif}
+#splash .sp-name{font-family:'Playfair Display',serif;font-size:clamp(30px,3.4vw,44px);line-height:1;
+  font-weight:500;letter-spacing:.18em;white-space:nowrap}
+#splash .sp-tag{margin-top:clamp(26px,3.2vh,34px);font-size:clamp(10.5px,.85vw,13px);letter-spacing:.24em;
+  color:#e2ad4f;opacity:0;transform:translateY(10px);animation:spUp .5s ease 1.9s forwards;white-space:nowrap;
+  font-family:'Jost',sans-serif}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+@keyframes spDot{to{opacity:1;transform:scale(1)}}
+@keyframes spUp{to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){
+  #splash .sp-inner{width:90vw;transform:translateY(-3vh)}
+  #splash .sp-mark{width:min(47vw,210px);margin-bottom:42px}
+  #splash .sp-name{font-size:clamp(29px,9vw,46px);letter-spacing:.14em}
+  #splash .sp-the{font-size:13px;margin-bottom:14px}
+  #splash .sp-tag{margin-top:30px;font-size:10.5px;letter-spacing:.16em;white-space:normal;
+    line-height:1.6;max-width:88vw}
+  #splash .sp-dot{right:-2%;bottom:17.5%;width:18px;height:18px}
+}
+@media(prefers-reduced-motion:reduce){
+  #splash .sp-draw,#splash .sp-dot,#splash .sp-copy,#splash .sp-tag{
+    animation-duration:.01ms!important;animation-delay:0s!important}
+}
+
+/* ============================================================
+   Panel swap — on a phone, four stacked panels became 1,268px of scroll
+   before you reached the revenue chart. Under 760px they collapse to one
+   panel behind a tab strip. Above it, nothing changes: the strip is hidden
+   and all four sit side by side as before.
+   ============================================================ */
+.swap-tabs{display:none}
+@media(max-width:760px){
+  .swap-tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .swap-tabs::-webkit-scrollbar{display:none}
+  .swap-tabs .sw{flex:1 1 0;min-width:0;background:var(--panel);border:1px solid var(--line);
+    color:var(--dim);border-radius:9px;padding:9px 6px;font-size:12.5px;cursor:pointer;
+    white-space:nowrap;transition:.18s;font-family:inherit}
+  .swap-tabs .sw.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold);font-weight:600}
+  .cols4.swap>.pnl{display:none}
+  .cols4.swap>.pnl.on{display:block}
+}
