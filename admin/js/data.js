@@ -937,7 +937,10 @@ const DB = (function () {
       allowances: { enabled: false, housingPct: 15, transportPct: 10 },
       pensionDefaultRate: 8,
       security: {
-        minLength: 10, requireMix: true, requireSymbol: false, expiryDays: 0,
+        /* 6 is the floor Kayode asked for. Raise it in Settings ->
+           Login & passwords whenever you want; the meter and every check
+           read this value rather than a hardcoded number. */
+        minLength: 6, requireMix: true, requireSymbol: false, expiryDays: 0,
         blockReuse: 3, lockoutAfter: 5, sessionIdleMins: 720,
         twoFactorRequired: false, resetLinkHours: 24
       },
@@ -979,8 +982,25 @@ function clearAllData() {
   try {
     const r = JSON.parse(localStorage.getItem('tlb_admin_roles') || 'null');
     if (Array.isArray(r) && r.length) DB.roles = r;
+    /* One level deep, so a settings blob saved by an older release does not
+       wipe out groups added since. A flat Object.assign replaced whole
+       sub-objects, which silently dropped new fields. */
     const s = JSON.parse(localStorage.getItem('tlb_admin_settings') || 'null');
-    if (s) Object.assign(DB.settings, s);
+    if (s) Object.keys(s).forEach(k => {
+      const saved = s[k], base = DB.settings[k];
+      if (base && typeof base === 'object' && !Array.isArray(base) &&
+          saved && typeof saved === 'object' && !Array.isArray(saved)) {
+        Object.assign(base, saved);
+      } else {
+        DB.settings[k] = saved;
+      }
+    });
+    /* 10 was never a choice anyone made, it was the old default. Anyone
+       carrying it forward gets the new floor; a value they actually picked
+       is left alone. */
+    if (DB.settings.security && DB.settings.security.minLength === 10) {
+      DB.settings.security.minLength = 6;
+    }
     if (localStorage.getItem('tlb_admin_dataset') === 'example') loadExampleData();
   } catch (e) { /* a blank console is the safe fallback */ }
 })();

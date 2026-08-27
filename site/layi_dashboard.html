@@ -1187,6 +1187,7 @@ body.modal-open{overflow:hidden}
         <div id="finBody">
           <div class="stat-grid" id="finStats"></div>
           <div class="panel"><div class="panel-head"><h3>Money in by channel</h3><div style="display:flex;align-items:center;gap:10px"><span class="page-sub" id="finMoneyInSub"></span><button class="btn sm" onclick="openLogPayment()">+ Log payment</button></div></div><div id="finMoneyIn"></div></div>
+          <div class="panel"><div class="panel-head"><h3>How the money moved</h3><span class="page-sub" id="finMethodSub"></span></div><div id="finMethods"></div></div>
           <div class="cols">
             <div class="panel dash-panel"><div class="panel-head"><h3>Revenue vs Expenses</h3><span class="page-sub">last 6 months</span></div><div id="finTrend"></div></div>
             <div class="panel dash-panel"><div class="panel-head"><h3>Where the money goes</h3><span class="page-sub" id="finDonutSub"></span></div><div id="finExpDonut"></div></div>
@@ -1404,6 +1405,14 @@ body.modal-open{overflow:hidden}
             <div class="sd" style="color:var(--text-faint);margin-top:6px">A tailor makes a <b>garment</b>, a shoemaker a <b>pair</b>, a bag maker a <b>piece</b>. Leave this empty and the app picks the word from what your studio does. Fill it in to use your own.</div>
           </div>
           <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
+        </div>
+        <div class="panel" data-setperm="setWorkflow" id="payMethodPanel">
+          <div class="panel-head"><h3>How you get paid</h3></div>
+          <p class="page-sub" style="margin-bottom:12px">The ways money comes in and goes out of your studio. These are what you pick from when you record a payment, so the list should match how you actually trade &mdash; add Opay, Moniepoint, PalmPay, MoMo, a card machine, whatever you use.</p>
+          <div class="field"><label>One per line, in the order you use them most</label><textarea class="fld" id="set_paymethods" rows="7" placeholder="Bank transfer&#10;Cash&#10;POS"></textarea></div>
+          <div class="field"><label>Usual method for routine outgoings</label><select class="fld" id="set_defmethod"></select>
+            <div class="sd" style="color:var(--text-faint);margin-top:4px">Used for restocking and other regular spending, so you are not asked every time. Everything else still asks.</div></div>
+          <button class="btn" id="payMethodSaveBtn" onclick="savePayMethods()">Save payment methods</button>
         </div>
         <div class="panel" data-setperm="setWorkflow" id="payrollSetupPanel">
           <div class="panel-head"><h3>Pay, allowances &amp; deductions</h3></div>
@@ -2432,7 +2441,7 @@ function seedOwnerPay(o){const op=ownerPay();const b=op.basis;o.directorBasis=b;
 function ensureOwnerSalary(){const op=ownerPay();if(op.basis!=='salary'||!(op.amount>0))return;
   const mo=new Date().toISOString().slice(0,7);const txns=getTxns();
   if(txns.some(t=>t.cat==='ownerSalary'&&String(t.at||'').slice(0,7)===mo))return;
-  txns.push({id:uid('t'),dir:'out',label:'Owner salary',amount:op.amount,at:new Date(mo+'-01T09:00:00').toISOString(),cat:'ownerSalary',category:'Salaries',dept:'Management',recurring:true});
+  txns.push({id:uid('t'),dir:'out',label:'Owner salary',amount:op.amount,at:new Date(mo+'-01T09:00:00').toISOString(),cat:'ownerSalary',category:'Salaries',dept:'Management',recurring:true,method:(SETTINGS.defaultPayMethod||'')});
   setTxns(txns);
 }
 function directorAllocation(o){
@@ -3308,6 +3317,7 @@ function syncOrderDraft(){
   if(document.getElementById('om_0')){draft.meas=readMeas('om');draft.measFit=fv('om_fit')||'';draft.measPosture=fv('om_posture')||'';draft.measNote=fv('om_note')||'';}
   if(fv('f_discount')!==undefined)draft.discount=amt('f_discount');
   if(fv('f_paid')!==undefined)draft.paid=amt('f_paid');
+  if(document.getElementById('f_method'))draft.payMethod=readPayMethod('f_method');
   if(fv('f_currency')!==undefined)draft.currency=fv('f_currency');
   if(fv('f_fx')!==undefined)draft.fx=+fv('f_fx')||1;
   if(fv('f_due')!==undefined)draft.due=fv('f_due')||'';
@@ -3603,8 +3613,9 @@ function renderOrderModal(){
     <div id="orderTotalBase" class="sd" style="color:var(--text-faint);text-align:right;margin-bottom:8px">${ocur(draft)!==SETTINGS.currency?'≈ '+cur((total||0)*ofx(draft))+' at 1 '+ocur(draft)+' = '+fmtNum(draft.fx||1)+' '+SETTINGS.currency:''}</div>
     <div class="row2">
       <div class="field"><label>Discount (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_discount" value="${draft.discount?fmtNum(draft.discount):''}" placeholder="0" oninput="recalcProfit()"></div>
-      <div class="field"><label>Paid so far (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_paid" value="${draft.paid?fmtNum(draft.paid):'0'}">${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:4px">Enter in ${ocur(draft)}, recorded as ${cur((+draft.paid||0)*ofx(draft))} in your books.</div>`:''}</div>
+      <div class="field"><label>Paid so far (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_paid" value="${draft.paid?fmtNum(draft.paid):'0'}" oninput="onPaidChange()">${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:4px">Enter in ${ocur(draft)}, recorded as ${cur((+draft.paid||0)*ofx(draft))} in your books.</div>`:''}</div>
     </div>
+    <div id="f_methodWrap" style="${(+draft.paid>0)?'':'display:none'}">${payMethodField('f_method',draft.payMethod,'How was that paid?')}</div>
     ${moneySection}
     ${stockSection}
     ${assignSection}
@@ -3691,7 +3702,7 @@ function saveOrder(){
     save('layi_dash_orders',list);}
   // log any newly-paid amount as income
   const delta=(+draft.paid||0)-prevPaid;
-  if(delta>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:draft.client+' · '+(editingOrderId?'payment':'deposit')+(ocur(draft)!==SETTINGS.currency?' ('+curC(delta,ocur(draft))+')':''),amount:delta*ofx(draft),at:new Date().toISOString(),orderId:draft.id,branch:branchOf(draft)});setTxns(t);}
+  if(delta>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:draft.client+' · '+(editingOrderId?'payment':'deposit')+(ocur(draft)!==SETTINGS.currency?' ('+curC(delta,ocur(draft))+')':''),amount:delta*ofx(draft),at:new Date().toISOString(),orderId:draft.id,branch:branchOf(draft),method:draft.payMethod||''});setTxns(t);}
   closeModal();renderAll();
 }
 function deleteOrder(){if(!can('del')||!editingOrderId)return;if(!confirm('Delete this order permanently?'))return;logAudit('Order deleted',editingOrderId);save('layi_dash_orders',rawOrders().filter(o=>o.id!==editingOrderId));closeModal();renderAll();}
@@ -4041,7 +4052,7 @@ function renderUpdateModal(){
     <h3>Update progress</h3>
     <div class="msub">${esc(updateDraft.client)} · ${esc(updateDraft.garment)}</div>
     <div class="field"><label>Current stage</label><select class="fld" id="u_stage" onchange="syncUpdate();renderUpdateModal()">${stageOpts}</select></div>
-    ${(updateDraft.stage===_delIdx&&_uOut>0&&can('money'))?`<div class="field"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0"><input type="checkbox" id="u_collectBalance" checked style="width:16px;height:16px;flex:0 0 auto"> Collect remaining ${curO(_uOut,_uo)} now</label><div class="sd" style="color:var(--text-faint);margin-top:4px">Tick if the client paid the balance on ${_isDeliv?'delivery':'pickup'}. It'll be recorded as income and the order marked paid.</div></div>`:''}
+    ${(updateDraft.stage===_delIdx&&_uOut>0&&can('money'))?`<div class="field"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0"><input type="checkbox" id="u_collectBalance" checked style="width:16px;height:16px;flex:0 0 auto"> Collect remaining ${curO(_uOut,_uo)} now</label>${payMethodField('u_balMethod','','How was the balance paid?')}<div class="sd" style="color:var(--text-faint);margin-top:4px">Tick if the client paid the balance on ${_isDeliv?'delivery':'pickup'}. It'll be recorded as income and the order marked paid.</div></div>`:''}
     <div class="field"><label>Who did this work?</label><select class="fld" id="u_worker">${workerOpts}</select><div class="sd" style="color:var(--text-faint);margin-top:6px">Credited for traceability &amp; performance: who cut, sewed, finished, etc.</div></div>
     <div class="field"><label>Note (visible to everyone)</label><textarea class="fld" id="u_note" placeholder="e.g. First fitting done, taking in the waist 2cm">${esc(updateDraft.note)}</textarea></div>
     <div class="field"><label>Progress photos (optional)</label>${photoGrid(updateDraft.photos,'photo','addUpdatePhotos','removeUpdatePhoto')}</div>
@@ -4054,7 +4065,7 @@ function saveUpdate(){
   o.stageIndex=updateDraft.stage;o.updates=o.updates||[];
   if(o.stageIndex===STAGES.indexOf('Dispatched')&&o.delivery&&o.delivery.enabled&&o.delivery.status!=='Delivered')o.delivery.status='Dispatched';
   if(o.stageIndex>=STAGES.indexOf('Dispatched')&&o.stageIndex<STAGES.indexOf('Delivered')&&!o.dispatchedAt)o.dispatchedAt=new Date().toISOString();
-  if(o.stageIndex>=STAGES.indexOf('Delivered')){if(!o.deliveredAt)o.deliveredAt=new Date().toISOString();if(o.delivery&&o.delivery.enabled)o.delivery.status='Delivered';const _cb=document.getElementById('u_collectBalance');if(_cb&&_cb.checked){const _out=orderOutstanding(o);if(_out>0){o.paid=(+o.paid||0)+_out;try{const _t=getTxns();_t.push({id:uid('t'),dir:'in',label:(o.client||'')+' \u00b7 balance on '+((o.delivery&&o.delivery.enabled)?'delivery':'pickup')+(ocur(o)!==SETTINGS.currency?' ('+curC(_out,ocur(o))+')':''),amount:_out*ofx(o),at:new Date().toISOString().slice(0,10),orderId:o.id,branch:branchOf(o)});setTxns(_t);}catch(e){}}}}
+  if(o.stageIndex>=STAGES.indexOf('Delivered')){if(!o.deliveredAt)o.deliveredAt=new Date().toISOString();if(o.delivery&&o.delivery.enabled)o.delivery.status='Delivered';const _cb=document.getElementById('u_collectBalance');if(_cb&&_cb.checked){const _balMethod=document.getElementById('u_balMethod')?readPayMethod('u_balMethod'):'';const _out=orderOutstanding(o);if(_out>0){o.paid=(+o.paid||0)+_out;try{const _t=getTxns();_t.push({id:uid('t'),dir:'in',method:_balMethod||'',label:(o.client||'')+' \u00b7 balance on '+((o.delivery&&o.delivery.enabled)?'delivery':'pickup')+(ocur(o)!==SETTINGS.currency?' ('+curC(_out,ocur(o))+')':''),amount:_out*ofx(o),at:new Date().toISOString().slice(0,10),orderId:o.id,branch:branchOf(o)});setTxns(_t);}catch(e){}}}}
   const wname=updateDraft.worker?staffName(updateDraft.worker):'';
   o.updates.push({at:new Date().toISOString(),stage:STAGES[updateDraft.stage],note:updateDraft.note||('Moved to '+STAGES[updateDraft.stage]),by:userLabel(),workerId:updateDraft.worker||'',worker:wname,photos:updateDraft.photos});
   if(!saveSafe('layi_dash_orders',list)){alert('Storage is full. Too many photos to save. Remove a few and try again.');return;}
@@ -4091,7 +4102,100 @@ function openPayment(id){if(!can('money'))return;const o=getOrders().find(x=>x.i
 function savePayment(id){const a=amt('p_amt');if(!a){closeModal();return;}const _m=(typeof fvOther==='function'?fvOther('p_method'):'')||'';const list=rawOrders();const o=list.find(x=>x.id===id);o.paid=(o.paid||0)+a;logAudit('Payment recorded',(o.client||'')+' · '+curC(a,ocur(o))+(_m?' · '+_m:''));save('layi_dash_orders',list);const t=getTxns();t.push({id:uid('t'),dir:'in',label:o.client+' · payment'+(_m?' ('+_m+')':'')+(ocur(o)!==SETTINGS.currency?' ('+curC(a,ocur(o))+')':''),amount:a*ofx(o),at:new Date().toISOString(),orderId:id,branch:branchOf(o),method:_m});setTxns(t);closeModal();renderAll();}
 const EXPENSE_CATS=['Rent','Utilities','Materials & supplies','Marketing & advertising','Equipment','Transport & logistics','Software & subscriptions','Professional fees','Maintenance','Staff welfare','Tax','Bank charges','Other'];
 const FIN_DEPARTMENTS=['Production','Sales','Marketing','Operations','Admin'];
-const PAY_METHODS=['Bank transfer','Cash','Card','POS','Cheque','Mobile money'];
+/* ===== HOW THE MONEY MOVED ====================================================
+   Every studio settles differently, and none of it is worth automating: bank
+   APIs are complex, fragile and a liability nobody asked us to hold. What a
+   studio actually needs is to say how each payment arrived or left, and to see
+   the totals add up by method at the end of the month.
+
+   The default list is a starting point, not a rule. A Lagos studio takes Opay
+   and Moniepoint; a Ghanaian one takes MoMo; a London one takes a card machine
+   nobody here has heard of. So the list is editable in Settings and stored per
+   studio, and anything typed into a form that is not on the list is kept as
+   typed rather than silently dropped.
+
+   Money already recorded before any of this carries no method. It is counted
+   as "Not recorded" rather than guessed at, and the Money In hub says how much
+   is sitting in that bucket so it can be tidied up. */
+const PAY_METHODS=['Bank transfer','Cash','Card','POS','Transfer to staff','Cheque','Mobile money'];
+const PAY_METHOD_UNSET='Not recorded';
+/* The method question only matters once money has actually changed hands, so
+   it stays out of the way on an unpaid order and appears as soon as one is. */
+function onPaidChange(){
+  const w=document.getElementById('f_methodWrap');if(!w)return;
+  w.style.display=(amt('f_paid')>0)?'':'none';
+}
+/* What a studio usually settles with, for the routine outgoings that would be
+   tedious to answer one at a time. Set in Settings; empty means "not recorded",
+   which is honest rather than a guess. */
+function defaultPayMethod(){return (SETTINGS.defaultPayMethod||'').trim();}
+/* ---- Payment methods panel ---------------------------------------------- */
+function renderPayMethodSettings(){
+  const box=document.getElementById('set_paymethods');
+  if(box&&document.activeElement!==box)box.value=payMethods().join('\n');
+  const sel=document.getElementById('set_defmethod');
+  if(sel){
+    const cur=defaultPayMethod();
+    sel.innerHTML='<option value="">Ask me each time</option>'
+      +payMethods().map(function(m){return '<option value="'+esc(m)+'"'+(m===cur?' selected':'')+'>'+esc(m)+'</option>';}).join('');
+  }
+}
+function savePayMethods(){
+  const box=document.getElementById('set_paymethods');if(!box)return;
+  const list=box.value.split('\n').map(function(x){return x.trim();}).filter(Boolean);
+  // A studio with no way to be paid cannot record anything, so an empty list
+  // falls back to the defaults rather than leaving them stuck.
+  SETTINGS.payMethods=list.length?list:PAY_METHODS.slice();
+  const d=fv('set_defmethod')||'';
+  SETTINGS.defaultPayMethod=(SETTINGS.payMethods.indexOf(d)>=0)?d:'';
+  save('layi_dash_settings',SETTINGS);
+  if(typeof logAudit==='function')logAudit('Payment methods updated',SETTINGS.payMethods.join(', '));
+  renderPayMethodSettings();renderAll();
+  flashSaved('payMethodSaveBtn','Save payment methods');
+}
+function askPayMethod(question){
+  const list=payMethods();
+  if(typeof prompt!=='function')return '';
+  const numbered=list.map(function(m,i){return (i+1)+'. '+m;}).join('\n');
+  const raw=prompt(question+'\n\n'+numbered+'\n\nType a number, or your own answer.','1');
+  if(raw===null)return null;
+  const t=String(raw).trim();
+  if(!t)return '';
+  const idx=parseInt(t,10);
+  if(!isNaN(idx)&&idx>=1&&idx<=list.length)return list[idx-1];
+  return t;
+}
+function payMethods(){
+  const a=SETTINGS.payMethods;
+  return (Array.isArray(a)&&a.length)?a.slice():PAY_METHODS.slice();
+}
+/* The list to offer in a form: what the studio uses, plus whatever this record
+   already says, so editing an old payment never quietly rewrites its method. */
+function payMethodsFor(current){
+  const list=payMethods();
+  if(current&&list.indexOf(current)<0)list.push(current);
+  return list;
+}
+/* One control, so every form asks the same question the same way. */
+function payMethodField(id,current,label){
+  const list=payMethodsFor(current);
+  return '<div class="field"><label>'+esc(label||'How was it paid?')+'</label>'
+    +selOther(id,list,current||list[0],'How was it paid?')+'</div>';
+}
+function readPayMethod(id){
+  const v=(typeof fvOther==='function'?fvOther(id):fv(id))||'';
+  return String(v).trim();
+}
+/* What to show for a transaction whose method was never recorded. */
+function methodOf(t){return (t&&t.method&&String(t.method).trim())||PAY_METHOD_UNSET;}
+/* Totals by method, for a set of transactions already scoped to the studio and
+   period in view. Returns them largest first, because that is the order anybody
+   reading it cares about. */
+function byPayMethod(list){
+  const map={};
+  (list||[]).forEach(t=>{const k=methodOf(t);map[k]=(map[k]||0)+(+t.amount||0);});
+  return Object.keys(map).map(k=>({method:k,total:map[k]})).sort((a,b)=>b.total-a.total);
+}
 const APPROVAL_STATES=['Approved','Pending','Rejected'];
 function getBranches(){const b=SETTINGS.branches;if(Array.isArray(b)&&b.length)return b;return [{id:'main',name:'Main',location:'',active:true}];}
 function activeBranches(){return getBranches().filter(b=>b.active!==false);}
@@ -4457,7 +4561,7 @@ function logBillsThisMonth(){if(!can('money'))return;const month=new Date().toIS
   const total=due.reduce((s,b)=>s+(+b.amount||0),0);
   if(!confirm('Log '+due.length+' bill(s) for this month, totalling '+cur(total)+'? They’ll be added to overheads.'))return;
   const t=getTxns();const today=new Date().toISOString().slice(0,10);
-  due.forEach(b=>{t.push({id:uid('t'),dir:'out',label:b.label,amount:+b.amount||0,at:today,cat:'expense',recurring:true,billId:b.id});b.lastLogged=month;});
+  due.forEach(b=>{t.push({id:uid('t'),dir:'out',label:b.label,amount:+b.amount||0,at:today,cat:'expense',recurring:true,billId:b.id,method:b.method||'',branch:b.branch||''});b.lastLogged=month;});
   setTxns(t);setBills(bills);renderFinance();renderActivity();renderExpensesView();
   alert('Logged '+cur(total)+' across '+due.length+' bill(s).');}
 function renderBills(){const el=document.getElementById('billsList');if(!el)return;
@@ -4526,7 +4630,7 @@ const SET_GROUPS=[
   {key:'appearance',hue:'#6d5dd3',t:'Appearance & app',s:'Theme, accent, install',heads:['Theme & display','Theme','Settings']},
   {key:'business',hue:'#2563a8',t:'Your business',s:'Type, team, branches, your pay',heads:['What your studio does','Branches','How the owner is paid']},
   {key:'company',hue:'#0f8a80',t:'Company & invoices',s:'Details, banks, messages',heads:['Company details','Message templates']},
-  {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers, pay',heads:['Order defaults','Defaults','Loyalty tiers','Pay, allowances & deductions']},
+  {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers, pay',heads:['Order defaults','Defaults','Loyalty tiers','How you get paid','Pay, allowances & deductions']},
   {key:'rules',hue:'#c47d12',t:'Rules & inventory',s:'Workflow, quality, stock',heads:['Production workflow','Products & materials','Stock used per product','Quality control','Inventory categories']},
   {key:'team',hue:'#c04668',t:'Team & notifications',s:'Accounts, roles, alerts',heads:['Team accounts','Roles','Notifications']},
   {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Storage, backup, reset',heads:['Storage','Backup','Import old data','Data']}
@@ -4597,7 +4701,7 @@ function renderStorageMeter(){const el=document.getElementById('storageMeter');i
   const col=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
   el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(u.bytes)} used <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span></span><span style="color:var(--text-dim)">${esc(storageTierName())} · ${fmtBytes(lim)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div></div><div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
 }
-function fillSettings(){fillOwnerPay();renderPayrollSetup();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -5058,13 +5162,13 @@ const IMPORTERS=[
  {key:'fin',hue:'#1f9d57',title:'Finances & transactions',sub:'Past income and expenses for your books',preview:['date','type','amount'],
   template:'date,type,amount,category,note\n2025-01-15,income,50000,sales,"Order deposit"\n2025-01-16,expense,12000,supply,"Thread & trims"\n',
   apply:function(rows,head){var t=getTxns(),added=0,dup=0;
-   var iDate=impCol(head,['date','when','day']),iType=impCol(head,['type','direction','dir','kind','in/out']),iAmt=impCol(head,['amount','value','total','sum']),iCat=impCol(head,['category','cat','account']),iNote=impCol(head,['note','notes','label','description','details','memo']);
+   var iDate=impCol(head,['date','when','day']),iType=impCol(head,['type','direction','dir','kind','in/out']),iAmt=impCol(head,['amount','value','total','sum']),iCat=impCol(head,['category','cat','account']),iMethod=impCol(head,['method','payment method','paid by','how','mode','channel']),iNote=impCol(head,['note','notes','label','description','details','memo']);
    var seen={};t.forEach(function(x){seen[(x.at||'')+'|'+(x.amount||'')+'|'+String(x.label||'').toLowerCase()]=1;});
    for(var r=1;r<rows.length;r++){var row=rows[r];var amt=impNum(impCell(row,iAmt));if(!amt)continue;
     var typ=impCell(row,iType).toLowerCase();var dir=/in|income|credit|sale|revenue|received|deposit/.test(typ)?'in':(/out|expense|debit|cost|paid|purchase|bill/.test(typ)?'out':(amt<0?'out':'in'));
     var label=impCell(row,iNote)||impCell(row,iCat)||(dir==='in'?'Income':'Expense');var at=impDate(impCell(row,iDate));var abs=Math.abs(amt);
     var k=at+'|'+abs+'|'+label.toLowerCase();if(seen[k]){dup++;continue;}seen[k]=1;
-    t.push({id:uid('t'),dir:dir,label:label,amount:abs,at:at,cat:(impCell(row,iCat)||'other').toLowerCase()});added++;}
+    t.push({id:uid('t'),dir:dir,label:label,amount:abs,at:at,cat:(impCell(row,iCat)||'other').toLowerCase(),method:(iMethod>=0?impCell(row,iMethod):'')});added++;}
    setTxns(t);if(typeof renderFinance==='function'&&(typeof can!=='function'||can('money')))renderFinance();return {added:added,updated:0,dup:dup};}}
 ];
 function impById(key){return IMPORTERS.find(function(x){return x.key===key;});}
@@ -5253,7 +5357,8 @@ function loadExample(force){
   exOrders.forEach(o=>(o.potContribs||[]).forEach(pc=>{const p=exPots.find(x=>x.id===pc.potId);if(p){p.saved+=pc.amount;p.entries.push({at:o.createdAt,amount:pc.amount,note:p.pct+'% of '+o.id+' ('+o.client+')'});}}));
   setPots(exPots);
   // transactions: a payment for each order that has money in, plus overheads — spread across months for the chart
-  const exTxns=[];exOrders.forEach((o,i)=>{if(+o.paid>0)exTxns.push({id:uid('t'),dir:'in',label:o.client+' · payment ('+o.id+')',amount:+o.paid,at:dd(-(i*8+2)),cat:(o.kind==='sale'?'sale':'order'),orderId:o.id,branch:o.branch||'Lagos studio',channel:o.channel||''});});
+  const _exMethods=['Bank transfer','Bank transfer','POS','Cash','Bank transfer','Card','POS','Bank transfer','Cash','Mobile money'];
+  const exTxns=[];exOrders.forEach((o,i)=>{if(+o.paid>0)exTxns.push({id:uid('t'),dir:'in',label:o.client+' · payment ('+o.id+')',amount:+o.paid,at:dd(-(i*8+2)),cat:(o.kind==='sale'?'sale':'order'),orderId:o.id,branch:o.branch||'Lagos studio',channel:o.channel||'',method:(o.kind==='sale'?(i%2?'POS':'Cash'):_exMethods[i%_exMethods.length])});});
   exTxns.push({id:uid('t'),dir:'out',label:'Lagos studio rent',amount:150000,at:dd(-5),cat:'expense',recurring:true,category:'Rent',dept:'Operations',vendor:'Landlord',method:'Bank transfer',approval:'Approved',approvedBy:'Kay',branch:'Lagos studio'});
   exTxns.push({id:uid('t'),dir:'out',label:'Lagos studio rent',amount:150000,at:dd(-35),cat:'expense',recurring:true,category:'Rent',dept:'Operations',vendor:'Landlord',method:'Bank transfer',approval:'Approved',branch:'Lagos studio'});
   exTxns.push({id:uid('t'),dir:'out',label:'Electricity (NEPA)',amount:30000,at:dd(-6),cat:'expense',category:'Utilities',dept:'Operations',vendor:'NEPA',method:'Cash',approval:'Approved',branch:'Lagos studio'});
@@ -5493,7 +5598,7 @@ function saveSupply(id){
   if(id){target=list.find(x=>x.id===id);const oldQty=+target.qty||0;Object.assign(target,data);if(newQty>oldQty){purchaseQty=newQty-oldQty;logMove(target,'in',purchaseQty,'Received / restocked');}else if(newQty<oldQty){logMove(target,'out',oldQty-newQty,'Manual reduction');}}
   else{target=Object.assign({id:uid('s'),moves:[]},data);list.push(target);purchaseQty=newQty;if(newQty>0)logMove(target,'in',newQty,'Opening stock');}
   // log the purchase as an expense so it feeds Finance costs; track expensed units
-  if(unitCost>0&&purchaseQty>0){const spend=purchaseQty*unitCost;const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Stock · '+name+' ('+purchaseQty+' '+(data.unit||'')+')',amount:spend,at:new Date().toISOString().slice(0,10),cat:'supply'});setTxns(t);target.expensed=(+target.expensed||0)+purchaseQty;}
+  if(unitCost>0&&purchaseQty>0){const spend=purchaseQty*unitCost;const t=getTxns();t.push({id:uid('t'),dir:'out',method:defaultPayMethod(),label:'Stock · '+name+' ('+purchaseQty+' '+(data.unit||'')+')',amount:spend,at:new Date().toISOString().slice(0,10),cat:'supply'});setTxns(t);target.expensed=(+target.expensed||0)+purchaseQty;}
   setSupplies(list);
   closeModal();renderSupplies();renderActivity();if(can('money'))renderFinance();
 }
@@ -5545,12 +5650,12 @@ function restockSupply(id){
   const n=+add;if(!n){return;}
   adjustSupply(id,n);
   const unitCost=+it.cost||0;
-  if(unitCost>0){const spend=n*unitCost;const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Restock · '+it.name+' ('+n+' '+(it.unit||'')+')',amount:spend,at:new Date().toISOString().slice(0,10),cat:'supply'});setTxns(t);const list=getSupplies();const target=list.find(s=>s.id===id);if(target){target.expensed=(+target.expensed||0)+n;setSupplies(list);}renderFinance();}
+  if(unitCost>0){const spend=n*unitCost;const t=getTxns();t.push({id:uid('t'),dir:'out',method:defaultPayMethod(),label:'Restock · '+it.name+' ('+n+' '+(it.unit||'')+')',amount:spend,at:new Date().toISOString().slice(0,10),cat:'supply'});setTxns(t);const list=getSupplies();const target=list.find(s=>s.id===id);if(target){target.expensed=(+target.expensed||0)+n;setSupplies(list);}renderFinance();}
 }
 function logExistingStock(){
   if(!can('money'))return;
   const list=getSupplies();let count=0,total=0;const t=getTxns();
-  list.forEach(s=>{const cost=+s.cost||0;const unlogged=(+s.qty||0)-(+s.expensed||0);if(cost>0&&unlogged>0){const spend=unlogged*cost;t.push({id:uid('t'),dir:'out',label:'Opening stock · '+s.name+' ('+unlogged+' '+(s.unit||'')+')',amount:spend,at:new Date().toISOString().slice(0,10),cat:'supply'});s.expensed=(+s.qty||0);count++;total+=spend;}});
+  list.forEach(s=>{const cost=+s.cost||0;const unlogged=(+s.qty||0)-(+s.expensed||0);if(cost>0&&unlogged>0){const spend=unlogged*cost;t.push({id:uid('t'),dir:'out',method:defaultPayMethod(),label:'Opening stock · '+s.name+' ('+unlogged+' '+(s.unit||'')+')',amount:spend,at:new Date().toISOString().slice(0,10),cat:'supply'});s.expensed=(+s.qty||0);count++;total+=spend;}});
   if(!count){alert('Nothing to log. All current stock that has a unit cost is already in expenses. (Items with no cost-per-unit set are skipped.)');return;}
   if(!confirm('Log '+count+' item(s) of existing stock as expenses, totalling '+cur(total)+'? Runs once per item; it will not double-count.')){return;}
   setTxns(t);setSupplies(list);renderFinance();renderSupplies();
@@ -5998,6 +6103,7 @@ function syncSaleDraft(){const d=saleDraft;if(!d)return;
   if(document.getElementById('sale_price'))d.price=amt('sale_price');
   if(fv('sale_client')!==undefined)d.client=fv('sale_client');
   if(document.getElementById('sale_paid'))d.paid=fv('sale_paid')===''?null:amt('sale_paid');
+  if(document.getElementById('sale_method'))d.payMethod=readPayMethod('sale_method');
   if(document.getElementById('sale_branch'))d.branch=fvOther('sale_branch')||defaultBranchName();
 }
 function saleSelectProduct(){syncSaleDraft();saleProductPick(fv('sale_product'));}
@@ -6022,6 +6128,7 @@ function renderSaleModal(){
       <div class="field"><label>Quantity <span style="color:var(--text-faint);font-weight:400">(${stock} in stock)</span></label><input class="fld" type="number" id="sale_qty" min="1" max="${stock}" value="${d.qty}" oninput="saleRecalc()"></div></div>
     <div class="row2"><div class="field"><label>Unit price (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="sale_price" value="${d.price?fmtNum(d.price):''}" oninput="saleRecalc()"></div>
       <div class="field"><label>Amount paid (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="sale_paid" value="${d.paid===null?'':fmtNum(d.paid)}" placeholder="${fmtNum(lineTotal)}" oninput="saleRecalc()"></div></div>
+    ${payMethodField('sale_method',d.payMethod,'How was it paid?')}
     <div class="reinvest" id="saleSummary" style="margin:4px 0 12px">${saleSummaryHtml(lineTotal,paid,profit)}</div>
     <div class="field"><label>Customer <span style="color:var(--text-faint);font-weight:400">(optional, leave blank for a walk-in)</span></label><input class="fld" id="sale_client" list="saleClients" value="${esc(d.client)}" placeholder="Walk-in"><datalist id="saleClients">${dl}</datalist></div>
     ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('sale_branch',branchNames(),d.branch||defaultBranchName(),'Type a branch')}</div>`:''}
@@ -6091,7 +6198,7 @@ function recordSale(){
     if(touched)setPots(ps);
     order.potContribs=setA.map(s=>({potId:s.potId,amount:s.amount}));save('layi_dash_orders',orders);}
   // record the paid amount as income
-  if(paid>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:client+' · '+label,amount:paid,at:now,orderId:order.id,branch:branchOf(saleDraft)});setTxns(t);}
+  if(paid>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:client+' · '+label,amount:paid,at:now,orderId:order.id,branch:branchOf(saleDraft),method:(saleDraft&&saleDraft.payMethod)||''});setTxns(t);}
   closeModal();renderAll();
   if(typeof toast==='function')toast('Sale recorded \u00b7 '+order.id+' \u00b7 '+cur(lineTotal));
 }
@@ -7794,6 +7901,38 @@ function renderFinance(){
     stat('Outstanding',cur(T.outstanding),'owed now · all orders','warn','openBreakdown(\'outstanding\')'),
     stat('Stock on hand',cur(T.stockValue),'inventory value now','','invDrill(\'all\')'),
   ].join('');
+  // ===== How the money moved (period + branch scoped) =====
+  // Cash against the drawer, POS against the terminal, transfers against the
+  // bank statement. A studio cannot reconcile a month it cannot break down.
+  {const mEl=document.getElementById('finMethods');
+   if(mEl){
+     const inTx=pTxns.filter(t=>t.dir==='in');
+     const outTx=pTxns.filter(t=>t.dir==='out');
+     const ins=byPayMethod(inTx),outs=byPayMethod(outTx);
+     const totIn=ins.reduce((a,x)=>a+x.total,0),totOut=outs.reduce((a,x)=>a+x.total,0);
+     const sub=document.getElementById('finMethodSub');
+     if(sub)sub.textContent=plabel+(totIn||totOut?' \u00b7 '+cur(totIn)+' in \u00b7 '+cur(totOut)+' out':'');
+     if(!totIn&&!totOut){
+       mEl.innerHTML='<div class="kv" style="color:var(--text-faint);padding:12px 2px">Nothing recorded for this period yet.</div>';
+     } else {
+       const unrecordedIn=(ins.find(x=>x.method===PAY_METHOD_UNSET)||{}).total||0;
+       const unrecordedOut=(outs.find(x=>x.method===PAY_METHOD_UNSET)||{}).total||0;
+       const rows=(list,tot)=>list.length?list.map(function(x){
+         const pct=tot?Math.round(x.total/tot*100):0;
+         const unset=x.method===PAY_METHOD_UNSET;
+         return '<tr><td'+(unset?' style="color:var(--text-faint)"':'')+'>'+esc(x.method)+'</td>'
+           +'<td class="num">'+cur(x.total)+'</td><td class="num hide-sm" style="color:var(--text-faint)">'+pct+'%</td></tr>';
+       }).join(''):'<tr><td colspan="3" style="color:var(--text-faint)">Nothing yet</td></tr>';
+       mEl.innerHTML='<div class="cols">'
+         +'<div><div class="bd-sub">Money in</div><table class="oledger"><tr><th>Method</th><th class="num">Amount</th><th class="num hide-sm">Share</th></tr>'
+         +rows(ins,totIn)+'<tr><td><b>Total</b></td><td class="num"><b>'+cur(totIn)+'</b></td><td class="num hide-sm"></td></tr></table></div>'
+         +'<div><div class="bd-sub">Money out</div><table class="oledger"><tr><th>Method</th><th class="num">Amount</th><th class="num hide-sm">Share</th></tr>'
+         +rows(outs,totOut)+'<tr><td><b>Total</b></td><td class="num"><b>'+cur(totOut)+'</b></td><td class="num hide-sm"></td></tr></table></div>'
+         +'</div>'
+         +((unrecordedIn||unrecordedOut)?('<div class="kv" style="color:var(--amber);margin-top:10px">'
+            +cur(unrecordedIn+unrecordedOut)+' has no method recorded against it. That is money that cannot be matched to a drawer, a terminal or a statement \u2014 older entries mostly, from before this was asked for.</div>'):'');
+     }
+   }}
   // ===== Money in by channel (received lens, period + branch scoped) =====
   {const mi=document.getElementById('finMoneyIn');
    if(mi){const by=moneyInByChannel(finPeriod,finCustom);
@@ -8445,12 +8584,16 @@ function payBasic(id){const s=getStaff().find(x=>x.id===id);if(!s||!(+s.basic>0)
   const takeHome=f.deductions.length?('\nAfter deductions '+s.name.split(' ')[0]+' receives '+cur(f.net-f.commission)+'.'):'';
   if(salaryPaidThisMonth(id)){if(!confirm(s.name+'\u2019s salary is already marked paid this month. Log another salary payment of '+cur(cost)+'?'+takeHome))return;}
   else if(!confirm('Log salary payment of '+cur(cost)+' to '+s.name+'?'+takeHome))return;
-  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Salary \u00b7 '+s.name,amount:cost,at:new Date().toISOString().slice(0,10),cat:'salary',staffId:id,branch:branchOf(s)});setTxns(t);renderPayrollView();renderFinance();renderTeam();toast(cur(cost)+' salary logged for '+s.name);if(openStaffId===id){openStaffDetail(id);staffTab('payslips');}}
+  const _payMethod=askPayMethod('How was '+String(s.name||'this').split(' ')[0]+' paid?');
+  if(_payMethod===null)return;
+  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Salary \u00b7 '+s.name,amount:cost,at:new Date().toISOString().slice(0,10),cat:'salary',staffId:id,branch:branchOf(s),method:_payMethod||''});setTxns(t);renderPayrollView();renderFinance();renderTeam();toast(cur(cost)+' salary logged for '+s.name);if(openStaffId===id){openStaffDetail(id);staffTab('payslips');}}
 function payCommission(id){const s=getStaff().find(x=>x.id===id);if(!s)return;const owed=staffOwed()[id];if(!owed||!owed.commission){alert('No commission owed.');return;}
   if(!confirm('Pay '+cur(owed.commission)+' commission to '+s.name+'? This marks the related order commissions as paid.'))return;
+  const _commMethod=askPayMethod('How was '+String(s.name||'this').split(' ')[0]+' paid?');
+  if(_commMethod===null)return;
   const _rfdPay=STAGES.indexOf('Ready for Delivery');
   const list=rawOrders();list.forEach(o=>{const _doneP=(o.stageIndex||0)>=_rfdPay;(o.commissions||[]).forEach(c=>{if(c.staffId===id&&!c.paid&&(c.kind!=='maker'||_doneP))c.paid=true;});});save('layi_dash_orders',list);
-  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Commission · '+s.name,amount:owed.commission,at:new Date().toISOString().slice(0,10),cat:'commission',staffId:id,branch:branchOf(s)});setTxns(t);
+  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Commission · '+s.name,amount:owed.commission,at:new Date().toISOString().slice(0,10),cat:'commission',staffId:id,branch:branchOf(s),method:_commMethod||''});setTxns(t);
   renderPayrollView();renderFinance();renderTeam();toast(cur(owed.commission)+' commission paid to '+s.name);
   if(openStaffId===id){openStaffDetail(id);staffTab('commissions');}
 }
