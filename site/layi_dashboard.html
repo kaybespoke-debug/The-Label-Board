@@ -1403,6 +1403,12 @@ body.modal-open{overflow:hidden}
           </div>
           <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
         </div>
+        <div class="panel" data-setperm="setWorkflow" id="payrollSetupPanel">
+          <div class="panel-head"><h3>Pay, allowances &amp; deductions</h3></div>
+          <p class="page-sub" style="margin-bottom:12px">Everything here is off to begin with. A studio that pays a basic and nothing else never has to look at it, and payslips print exactly as they do now. Switch on only what your business actually runs.</p>
+          <div id="payrollSetupBox"></div>
+          <button class="btn" id="payrollSaveBtn" onclick="savePayrollPanel()" style="margin-top:12px">Save pay setup</button>
+        </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Products &amp; materials</h3><button class="btn sm" onclick="addCatalogProduct()">+ Add product</button></div>
           <p class="page-sub" style="margin-bottom:14px">Everything your studio makes or sells, each with the materials it can use.</p>
@@ -2118,6 +2124,101 @@ function loyaltyTier(spend){const L=tierList();let t=L[0],next=null;for(let i=0;
 /* staff + commission */
 const staffById=id=>getStaff().find(s=>s.id===id);
 const staffName=id=>{const s=staffById(id);return s?s.name:'';};
+/* ===== PAY SETUP: allowances, pension & the studio's own lines =====
+   A business that is still growing pays a basic and nothing else, and must never be
+   made to look at deductions it does not run. So everything here is off until the
+   owner turns it on, and a payslip with nothing switched on prints exactly as it
+   always did: basic + commission = gross.
+
+   Three layers, in the order they were asked for:
+     allowances — housing & transport as a percentage of basic, a whole-studio switch
+     pension    — a whole-studio switch, then opted into per person at an agreed rate
+     lines      — anything else this business runs: an earning or a deduction, a
+                  percentage or a fixed amount, for everyone or opted into per person
+
+   Percentages are of basic unless the line says gross, because that is how housing,
+   transport and pension are actually quoted. */
+const PAYROLL_DEFAULTS={
+  allowances:{enabled:false,housingPct:15,transportPct:10},
+  pension:{enabled:false,defaultRate:8},
+  lines:[]
+};
+function payrollSetup(){
+  const p=SETTINGS.payroll||{};
+  return {
+    allowances:Object.assign({},PAYROLL_DEFAULTS.allowances,p.allowances||{}),
+    pension:Object.assign({},PAYROLL_DEFAULTS.pension,p.pension||{}),
+    lines:Array.isArray(p.lines)?p.lines:[]
+  };
+}
+function savePayrollSetup(next){SETTINGS.payroll=next;save('layi_dash_settings',SETTINGS);}
+/* Is this studio running anything beyond basic + commission? Drives whether the
+   payslip grows a deductions section at all. */
+function payrollInUse(){
+  const c=payrollSetup();
+  return !!(c.allowances.enabled||c.pension.enabled||c.lines.length);
+}
+function staffPension(st){
+  const d=payrollSetup().pension;
+  const pn=(st&&st.pension)||{};
+  return {optedIn:!!pn.optedIn,rate:(pn.rate===0||pn.rate)?+pn.rate:+d.defaultRate,agreedOn:pn.agreedOn||''};
+}
+/* A line applies to someone if the studio runs it and either it is for everyone or
+   this person opted in. An opt-in that was never answered means no, never yes:
+   nothing is deducted from anyone's pay by default. */
+function lineApplies(st,ln){
+  if(!ln)return false;
+  if(!ln.optIn)return true;
+  const op=(st&&st.payLines)||{};
+  return !!op[ln.id];
+}
+function lineAmount(ln,basic,gross){
+  const base=(ln.of==='gross')?gross:basic;
+  const v=+ln.value||0;
+  return ln.basis==='fixed'?Math.max(0,Math.round(v)):Math.max(0,Math.round(base*v/100));
+}
+/* One month's pay for one person, from the same numbers the payroll table and the
+   payslip both read, so the two can never disagree. */
+function payFigures(staffId,monthKey){
+  const st=staffById(staffId)||{};
+  const cfg=payrollSetup();
+  const basic=+st.basic||0;
+  const ents=(typeof staffMonthEntries==='function')?staffMonthEntries(staffId,monthKey):[];
+  const commission=ents.reduce((a,e)=>a+(+e.amount||0),0);
+  const earnings=[];
+  if(basic>0)earnings.push({label:'Monthly basic salary',amount:basic,note:''});
+  if(cfg.allowances.enabled&&basic>0){
+    const h=Math.round(basic*(+cfg.allowances.housingPct||0)/100);
+    const t=Math.round(basic*(+cfg.allowances.transportPct||0)/100);
+    if(h>0)earnings.push({label:'Housing allowance',amount:h,note:(+cfg.allowances.housingPct||0)+'% of basic'});
+    if(t>0)earnings.push({label:'Transport allowance',amount:t,note:(+cfg.allowances.transportPct||0)+'% of basic'});
+  }
+  const allowanceTotal=earnings.reduce((a,e)=>a+e.amount,0)-basic;
+  if(commission!==0)earnings.push({label:'Commission earned',amount:commission,note:ents.length+' item'+(ents.length===1?'':'s')});
+  // custom EARNING lines sit on top of basic + allowances, before anything is taken off
+  const preGross=basic+allowanceTotal+commission;
+  cfg.lines.filter(l=>l.kind==='earning'&&lineApplies(st,l)).forEach(l=>{
+    const amt=lineAmount(l,basic,preGross);
+    if(amt>0)earnings.push({label:l.name||'Allowance',amount:amt,note:l.basis==='pct'?((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic')):''});
+  });
+  const gross=earnings.reduce((a,e)=>a+e.amount,0);
+  const deductions=[];
+  const pn=staffPension(st);
+  if(cfg.pension.enabled&&pn.optedIn&&basic>0){
+    const amt=Math.round(basic*(+pn.rate||0)/100);
+    if(amt>0)deductions.push({label:'Pension',amount:amt,note:(+pn.rate||0)+'% of basic'});
+  }
+  cfg.lines.filter(l=>l.kind==='deduction'&&lineApplies(st,l)).forEach(l=>{
+    const amt=lineAmount(l,basic,gross);
+    if(amt>0)deductions.push({label:l.name||'Deduction',amount:amt,note:l.basis==='pct'?((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic')):''});
+  });
+  const totalDeductions=deductions.reduce((a,d)=>a+d.amount,0);
+  // A deduction can never turn a wage negative — it is capped at what was earned.
+  const capped=Math.min(totalDeductions,gross);
+  return {staff:st,basic:basic,commission:commission,entries:ents,earnings:earnings,
+    allowanceTotal:allowanceTotal,gross:gross,deductions:deductions,
+    totalDeductions:capped,clipped:totalDeductions>gross,net:gross-capped};
+}
 /* ===== REPORTING LINES =====
    Single source of truth: staff.manager = the id of the person this staff reports to.
    "Direct reports" are DERIVED (never stored) as everyone whose manager points here.
@@ -4079,7 +4180,7 @@ const SET_GROUPS=[
   {key:'appearance',hue:'#6d5dd3',t:'Appearance & app',s:'Theme, accent, install',heads:['Theme & display','Theme','Settings']},
   {key:'business',hue:'#2563a8',t:'Your business',s:'Type, team, branches, your pay',heads:['What your studio does','Branches','How the owner is paid']},
   {key:'company',hue:'#0f8a80',t:'Company & invoices',s:'Details, banks, messages',heads:['Company details','Message templates']},
-  {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers',heads:['Order defaults','Defaults','Loyalty tiers']},
+  {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers, pay',heads:['Order defaults','Defaults','Loyalty tiers','Pay, allowances & deductions']},
   {key:'rules',hue:'#c47d12',t:'Rules & inventory',s:'Workflow, quality, stock',heads:['Production workflow','Products & materials','Stock used per product','Quality control','Inventory categories']},
   {key:'team',hue:'#c04668',t:'Team & notifications',s:'Accounts, roles, alerts',heads:['Team accounts','Roles','Notifications']},
   {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Storage, backup, reset',heads:['Storage','Backup','Import old data','Data']}
@@ -4150,7 +4251,7 @@ function renderStorageMeter(){const el=document.getElementById('storageMeter');i
   const col=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
   el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(u.bytes)} used <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span></span><span style="color:var(--text-dim)">${esc(storageTierName())} · ${fmtBytes(lim)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div></div><div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
 }
-function fillSettings(){fillOwnerPay();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -4196,6 +4297,87 @@ function renderStagePresetChips(){
   const chip=k=>'<button class="chip" onclick="applyStagePreset('+Q+k+Q+')">'+esc((STAGE_PRESET_META[k]||{}).label||k)+'</button>';
   box.innerHTML=(mine.length?mine.map(chip).join(''):keys.map(chip).join(''))
     +(mine.length&&rest.length?'<span style="width:100%;height:0"></span><span class="sd" style="color:var(--text-faint);align-self:center;margin-right:2px">Other trades:</span>'+rest.map(chip).join(''):'');
+}
+/* ---- Pay setup panel ---------------------------------------------------------- */
+let payLineDraft=null;
+function payLines(){if(!payLineDraft)payLineDraft=payrollSetup().lines.map(l=>Object.assign({},l));return payLineDraft;}
+function renderPayrollSetup(){
+  const box=document.getElementById('payrollSetupBox');if(!box)return;
+  const c=payrollSetup();const cur=SETTINGS.currency;
+  const lines=payLines();
+  const lineRows=lines.map((l,i)=>`<div class="row2" style="align-items:end;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin:0"><label>Name</label><input class="fld" id="pl_name_${i}" value="${esc(l.name||'')}" placeholder="e.g. Staff loan"></div>
+      <div class="field" style="margin:0"><label>Earning or deduction</label><select class="fld" id="pl_kind_${i}">
+        <option value="earning"${l.kind==='earning'?' selected':''}>Extra earning</option>
+        <option value="deduction"${l.kind!=='earning'?' selected':''}>Deduction</option></select></div>
+    </div>
+    <div class="row2" style="align-items:end;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin:0"><label>How it is worked out</label><select class="fld" id="pl_basis_${i}">
+        <option value="pct"${l.basis!=='fixed'?' selected':''}>Percentage</option>
+        <option value="fixed"${l.basis==='fixed'?' selected':''}>Fixed amount</option></select></div>
+      <div class="field" style="margin:0"><label>${l.basis==='fixed'?('Amount ('+cur+')'):'Percentage (%)'}</label><input class="fld" type="number" min="0" step="0.5" id="pl_value_${i}" value="${l.value||''}"></div>
+    </div>
+    <div class="row2" style="align-items:end;gap:8px;margin-bottom:6px">
+      <div class="field" style="margin:0"><label>Worked out on</label><select class="fld" id="pl_of_${i}">
+        <option value="basic"${l.of!=='gross'?' selected':''}>Basic salary</option>
+        <option value="gross"${l.of==='gross'?' selected':''}>Gross pay</option></select></div>
+      <div class="field" style="margin:0"><label>Applies to</label><select class="fld" id="pl_optin_${i}">
+        <option value=""${l.optIn?'':' selected'}>Everyone</option>
+        <option value="1"${l.optIn?' selected':''}>Only staff who opt in</option></select></div>
+    </div>
+    <div style="text-align:right;margin-bottom:14px"><button class="btn ghost sm" onclick="removePayLine(${i})">Remove this line</button></div>`).join('');
+  box.innerHTML=`
+    <div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="pay_allow_on" ${c.allowances.enabled?'checked':''} onchange="renderPayrollSetupLive()"> Pay housing &amp; transport allowances</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">A share of basic paid on top of it. Common once a business is established; skip it while you are growing.</div></div>
+    <div class="row2" id="pay_allow_rows" style="${c.allowances.enabled?'':'display:none'}">
+      <div class="field"><label>Housing (% of basic)</label><input class="fld" type="number" min="0" max="200" step="0.5" id="pay_housing" value="${c.allowances.housingPct}"></div>
+      <div class="field"><label>Transport (% of basic)</label><input class="fld" type="number" min="0" max="200" step="0.5" id="pay_transport" value="${c.allowances.transportPct}"></div>
+    </div>
+    <div class="field" style="margin-top:14px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="pay_pension_on" ${c.pension.enabled?'checked':''} onchange="renderPayrollSetupLive()"> Run a pension scheme</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">Voluntary per person. Nothing is deducted from anyone until you record that they agreed to it, on their own profile.</div></div>
+    <div class="field" id="pay_pension_rows" style="${c.pension.enabled?'':'display:none'}"><label>Standard employee rate (% of basic)</label>
+      <input class="fld" type="number" min="0" max="100" step="0.5" id="pay_pension_rate" value="${c.pension.defaultRate}">
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">The rate a new enrolment starts on. Each person's rate can differ.</div></div>
+    <div class="bd-sub" style="margin-top:18px">Your own pay lines</div>
+    <div class="sd" style="color:var(--text-faint);margin-bottom:10px">Anything else this business runs: a meal allowance, a staff loan repayment, a union due, a tax your country requires. Add as many as you need.</div>
+    ${lineRows||'<div class="kv" style="color:var(--text-faint);margin-bottom:10px">No lines of your own yet.</div>'}
+    <button class="btn ghost sm" style="width:100%" onclick="addPayLine()">＋ Add a pay line</button>`;
+}
+function renderPayrollSetupLive(){
+  const a=document.getElementById('pay_allow_rows'),ac=document.getElementById('pay_allow_on');
+  if(a&&ac)a.style.display=ac.checked?'':'none';
+  const q=document.getElementById('pay_pension_rows'),qc=document.getElementById('pay_pension_on');
+  if(q&&qc)q.style.display=qc.checked?'':'none';
+}
+function syncPayLines(){
+  const lines=payLines();
+  lines.forEach((l,i)=>{
+    if(document.getElementById('pl_name_'+i))l.name=fv('pl_name_'+i)||'';
+    if(document.getElementById('pl_kind_'+i))l.kind=fv('pl_kind_'+i)||'deduction';
+    if(document.getElementById('pl_basis_'+i))l.basis=fv('pl_basis_'+i)||'pct';
+    if(document.getElementById('pl_value_'+i))l.value=Math.max(0,+fv('pl_value_'+i)||0);
+    if(document.getElementById('pl_of_'+i))l.of=fv('pl_of_'+i)||'basic';
+    if(document.getElementById('pl_optin_'+i))l.optIn=!!fv('pl_optin_'+i);
+  });
+}
+function addPayLine(){syncPayLines();payLines().push({id:uid('pl'),name:'',kind:'deduction',basis:'pct',value:0,of:'basic',optIn:false});renderPayrollSetup();}
+function removePayLine(i){syncPayLines();payLines().splice(i,1);renderPayrollSetup();}
+function savePayrollPanel(){
+  syncPayLines();
+  const lines=payLines().filter(l=>(l.name||'').trim()).map(l=>({id:l.id||uid('pl'),name:l.name.trim(),kind:l.kind==='earning'?'earning':'deduction',basis:l.basis==='fixed'?'fixed':'pct',value:Math.max(0,+l.value||0),of:l.of==='gross'?'gross':'basic',optIn:!!l.optIn}));
+  const next={
+    allowances:{enabled:!!(document.getElementById('pay_allow_on')||{}).checked,
+      housingPct:Math.max(0,+fv('pay_housing')||0),transportPct:Math.max(0,+fv('pay_transport')||0)},
+    pension:{enabled:!!(document.getElementById('pay_pension_on')||{}).checked,
+      defaultRate:Math.max(0,Math.min(100,+fv('pay_pension_rate')||0))},
+    lines:lines
+  };
+  savePayrollSetup(next);
+  payLineDraft=null;
+  if(typeof logAudit==='function')logAudit('Pay setup updated',[next.allowances.enabled?'allowances on':'',next.pension.enabled?'pension on':'',lines.length?lines.length+' own line'+(lines.length===1?'':'s'):''].filter(Boolean).join(' · ')||'everything off');
+  renderPayrollSetup();
+  if(typeof renderPayrollView==='function')renderPayrollView();
+  flashSaved('payrollSaveBtn','Save pay setup');
 }
 function saveItemWord(){
   const el=document.getElementById('set_itemword');if(!el)return;
@@ -7448,11 +7630,13 @@ function renderPayrollView(){
   ].join('');
   const el=document.getElementById('payroll');
   if(!staff.length){el.innerHTML=emptyBlock('⛁','No staff yet','Add salaried staff and commission tailors. Commission is added automatically when an order names them as maker, referrer or director.','+ Add staff','openStaff()');return;}
+  const showNet=payrollInUse();const thisMonthKey=new Date().toISOString().slice(0,7);
   const pq=(document.getElementById('paySearch')?.value||'').toLowerCase();
   const staffF=staff.filter(s=>!pq||((s.name||'')+' '+(s.role||'')+' '+(s.staffId||'')).toLowerCase().includes(pq));
-  el.innerHTML=(staffF.length?(`<table class="oledger"><tr><th>Name</th><th class="hide-sm">Role</th><th class="hide-sm">Pay setup</th><th class="num">Commission owed</th><th class="num">Pay</th></tr>`+staffF.map(s=>{const o=owed[s.id]||{commission:0};
+  el.innerHTML=(staffF.length?(`<table class="oledger"><tr><th>Name</th><th class="hide-sm">Role</th><th class="hide-sm">Pay setup</th>${showNet?'<th class="num hide-sm">Take-home</th>':''}<th class="num">Commission owed</th><th class="num">Pay</th></tr>`+staffF.map(s=>{const o=owed[s.id]||{commission:0};
     const bits=[];if(+s.basic>0)bits.push(cur(s.basic)+'/mo basic');if(+s.rate>0)bits.push(cur(s.rate)+'/item');if(s.director)bits.push('Director');
-    return`<tr class="orow"><td style="cursor:pointer" onclick="openStaffDetail('${s.id}')"><div class="oref">${esc(s.name)}${branchTag(staffBranch(s))}</div></td><td class="hide-sm">${s.role?esc(s.role):'<span style="color:var(--text-faint)">—</span>'}</td><td class="hide-sm" style="color:var(--text-dim)">${bits.join(' · ')||'<span style="color:var(--text-faint)">no pay set</span>'}</td><td class="num">${o.commission?`<span style="color:var(--amber);font-weight:600">${cur(o.commission)}</span>`:'—'}</td><td class="num" style="white-space:nowrap">${+s.basic>0?(salaryPaidThisMonth(s.id)?`<button class="btn sm ghost" style="color:var(--green)" onclick="event.stopPropagation();payBasic('${s.id}')">✓ Salary</button>`:`<button class="btn sm ghost" onclick="event.stopPropagation();payBasic('${s.id}')">Pay salary</button>`):''}${o.commission>0?` <button class="btn sm" onclick="event.stopPropagation();payCommission('${s.id}')">Pay commission</button>`:''}</td></tr>`;}).join('')+`</table>`):'<div class="kv" style="color:var(--text-faint)">No staff match your search.</div>');
+    const pf=showNet?payFigures(s.id,thisMonthKey):null;
+    return`<tr class="orow"><td style="cursor:pointer" onclick="openStaffDetail('${s.id}')"><div class="oref">${esc(s.name)}${branchTag(staffBranch(s))}</div></td><td class="hide-sm">${s.role?esc(s.role):'<span style="color:var(--text-faint)">—</span>'}</td><td class="hide-sm" style="color:var(--text-dim)">${bits.join(' · ')||'<span style="color:var(--text-faint)">no pay set</span>'}</td>${showNet?`<td class="num hide-sm" style="color:var(--text-dim)">${pf&&pf.gross>0?cur(pf.net):'—'}</td>`:''}<td class="num">${o.commission?`<span style="color:var(--amber);font-weight:600">${cur(o.commission)}</span>`:'—'}</td><td class="num" style="white-space:nowrap">${+s.basic>0?(salaryPaidThisMonth(s.id)?`<button class="btn sm ghost" style="color:var(--green)" onclick="event.stopPropagation();payBasic('${s.id}')">✓ Salary</button>`:`<button class="btn sm ghost" onclick="event.stopPropagation();payBasic('${s.id}')">Pay salary</button>`):''}${o.commission>0?` <button class="btn sm" onclick="event.stopPropagation();payCommission('${s.id}')">Pay commission</button>`:''}</td></tr>`;}).join('')+`</table>`):'<div class="kv" style="color:var(--text-faint)">No staff match your search.</div>');
   const psm=document.getElementById('payslipMonth');if(psm&&(!psm.options||!psm.options.length)){const n=new Date();let html='';for(let i=0;i<12;i++){const d=new Date(n.getFullYear(),n.getMonth()-i,1);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');html+=`<option value="${k}">${monthLabel(k)}</option>`;}psm.innerHTML=html;}
 }
 function printOnePayslip(id){const k=(document.getElementById('payslipMonth')&&document.getElementById('payslipMonth').value)||new Date().toISOString().slice(0,7);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to open the payslip.');return;}w.document.write(`<!doctype html><html><head><title>Payslip · ${monthLabel(k)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:14mm}}</style></head><body>${payslipInner(id,k)}</body></html>`);w.document.close();}
@@ -7487,7 +7671,8 @@ function payslipInner(id,k){
   const ents=staffMonthEntries(id,k);
   const comm=ents.reduce((a,e)=>a+(+e.amount||0),0);
   const basic=+s.basic||0;const includeBasic=basic>0;
-  const gross=comm+(includeBasic?basic:0);
+  const fig=payFigures(id,k);
+  const gross=fig.gross;
   const paidComm=ents.filter(e=>e.paid).reduce((a,e)=>a+(+e.amount||0),0);
   const line=(l,v,strong)=>`<tr><td style="padding:7px 0;border-bottom:1px solid #eee;${strong?'font-weight:700':''}">${l}</td><td style="padding:7px 0;border-bottom:1px solid #eee;text-align:right;${strong?'font-weight:700':''}">${v}</td></tr>`;
   const commRows=ents.length?ents.map(e=>`<tr><td style="padding:6px 0;border-bottom:1px solid #f1f1f1;font-size:13px">${esc(e.work||'Commission')}${e.garment?' · '+esc(e.garment):''} <span style="color:#999">${esc(e.client||'')}${e.orderId?' · '+esc(e.orderId):''}</span></td><td style="padding:6px 0;border-bottom:1px solid #f1f1f1;text-align:right;font-size:13px;white-space:nowrap">${cur(e.amount)}${e.paid?'':' <span style="color:#b8860b">(unpaid)</span>'}</td></tr>`).join(''):`<tr><td colspan="2" style="padding:8px 0;color:#999;font-size:13px">No commission recorded this month.</td></tr>`;
@@ -7508,10 +7693,14 @@ function payslipInner(id,k){
         ${commRows}
       </tbody>
     </table>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-left:auto;max-width:300px;margin-top:12px">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-left:auto;max-width:340px;margin-top:12px">
       ${includeBasic?line('Basic salary',cur(basic)):''}
+      ${fig.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned').map(e=>line(esc(e.label),cur(e.amount))).join('')}
       ${line('Commission earned',cur(comm))}
       ${line('Gross pay',cur(gross),true)}
+      ${fig.deductions.length?fig.deductions.map(d=>line(esc(d.label)+(d.note?' <span style="color:#999;font-size:11px">'+esc(d.note)+'</span>':''),'− '+cur(d.amount))).join(''):''}
+      ${fig.deductions.length?line('Total deductions','− '+cur(fig.totalDeductions)):''}
+      ${fig.deductions.length?line('Net pay',cur(fig.net),true):''}
     </table>
     <div style="margin-top:8px;text-align:right;font-size:12px;color:#888">Commission paid so far: ${cur(paidComm)}${comm-paidComm>0?` · outstanding ${cur(comm-paidComm)}`:''}</div>
     ${(s.bankName||s.accountNo)?`<div style="margin-top:18px;padding:12px 14px;background:#faf6ee;border-radius:8px;font-size:13px"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Paid to</div>${[s.bankName,s.accountName,s.accountNo].filter(Boolean).map(esc).join(' · ')}</div>`:''}
@@ -7544,7 +7733,11 @@ function openStaffDetail(id){
   const personal=kv('Staff ID',s.staffId)+kv('Gender',s.gender)+kv('Date of birth',s.dob)+kv('Phone',s.phone)+kv('Email',s.email)+kv('Address',s.address)+kv('Nationality',s.nationality)+kv('Emergency contact',[s.emergencyName,s.emergencyPhone,s.emergencyRel].filter(Boolean).join(' · '));
   const contactRow=(s.phone||s.email)?`<div class="kv" style="margin-bottom:10px">${s.phone?`<a href="tel:${esc(s.phone)}" style="color:var(--gold)">Call</a> · <a href="https://wa.me/${String(s.phone).replace(/[^0-9]/g,'')}" target="_blank" style="color:var(--gold)">WhatsApp</a>`:''}${s.email?(s.phone?' · ':'')+`<a href="mailto:${esc(s.email)}" style="color:var(--gold)">Email</a>`:''}</div>`:'';
   const employ=kv('Job title',s.role)+kv('Department',s.department)+kv('Employment type',s.employmentType)+kv('Start date',s.startDate)+`<div class="bd-row"><span class="bl">Status</span><span class="bv" style="color:var(--${statusCls==='ok'?'green':statusCls==='out'?'red':'amber'})">${esc(st)}</span></div>`+reportingRows+kv('Work location',s.location)+kv('Specialisation',s.specialty)+kv('Skills',s.skills)+kv('Notes',s.notes);
-  const payroll=money?(kv('Salary type',s.salaryType)+kv('Commission basis',s.commMethod==='pctValue'?((+s.commPct||0)+'% of order value'):s.commMethod==='pctProfit'?((+s.commPct||0)+'% of profit'):('Fixed per '+tradeWord()))+kv('Monthly basic',+s.basic>0?cur(s.basic):'')+kv('Commission / item',(s.commMethod==='fixed'&&+s.rate>0)?cur(s.rate):'')+(s.rates&&s.rates.length?`<div class="bd-row"><span class="bl">${tradeWordCap()} rates</span><span class="bv">${s.rates.map(r=>esc(r.type)+' '+cur(r.amount)).join(', ')}</span></div>`:'')+kv('Bank',[s.bankName,s.accountNo,s.accountName].filter(Boolean).join(' · '))):'';
+  const payroll=money?(kv('Salary type',s.salaryType)+kv('Commission basis',s.commMethod==='pctValue'?((+s.commPct||0)+'% of order value'):s.commMethod==='pctProfit'?((+s.commPct||0)+'% of profit'):('Fixed per '+tradeWord()))+kv('Monthly basic',+s.basic>0?cur(s.basic):'')+kv('Commission / item',(s.commMethod==='fixed'&&+s.rate>0)?cur(s.rate):'')+(s.rates&&s.rates.length?`<div class="bd-row"><span class="bl">${tradeWordCap()} rates</span><span class="bv">${s.rates.map(r=>esc(r.type)+' '+cur(r.amount)).join(', ')}</span></div>`:'')+(()=>{if(!payrollInUse())return '';const f=payFigures(s.id,new Date().toISOString().slice(0,7));
+      const rows=f.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned').map(e=>kv(e.label,cur(e.amount)+(e.note?' <span style="color:var(--text-faint)">'+esc(e.note)+'</span>':''))).join('')
+        +(f.deductions.length?f.deductions.map(d=>kv(d.label,'− '+cur(d.amount)+(d.note?' <span style="color:var(--text-faint)">'+esc(d.note)+'</span>':''))).join(''):'')
+        +kv('Take-home this month','<b>'+cur(f.net)+'</b>');
+      return rows;})()+kv('Bank',[s.bankName,s.accountNo,s.accountName].filter(Boolean).join(' · '))):'';
   const pendingBankHtml=(money&&s.pendingBank)?`<div class="kv" style="border:1px solid var(--amber);border-radius:8px;padding:10px 12px;margin-top:8px"><b>⚠ Bank change requested by ${esc(s.name)}</b><br><span style="color:var(--text-dim)">New: ${esc(s.pendingBank.bank||'')} · ${esc(s.pendingBank.no||'')} · ${esc(s.pendingBank.name||'')}</span><br><span style="color:var(--text-faint);font-size:12px">Requested ${fmtDateShort(s.pendingBank.at)}</span><div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm" onclick="approveBankChange('${id}')">Approve</button><button class="btn sm ghost" onclick="rejectBankChange('${id}')">Reject</button></div></div>`:'';
   const docs=(s.docs||[]).length?(s.docs||[]).map(d=>`<div class="bd-row"><span class="bl">${esc(d.type)} <span style="color:var(--text-faint)">${esc(d.name||'')}</span></span><span class="bv">${d.data?`<a href="${d.data}" download="${esc(d.name||'document')}" style="color:var(--gold)">open</a>`:''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No documents uploaded. Add them via Edit profile.</div>';
   const tl=(s.timeline||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
@@ -7677,6 +7870,13 @@ function renderStaffModal(){
     <div class="field"><label>Commission by ${tradeWord()} type</label>
       <div class="sd" style="color:var(--text-faint);margin-bottom:8px">e.g. Kaftan ${SETTINGS.currency}40,000 · Agbada ${SETTINGS.currency}65,000. Editable on each order.</div>
       ${rateRows}<button class="btn ghost sm" style="width:100%" onclick="addStaffRate()">＋ Add ${tradeWord()} rate</button></div>`}
+    ${payrollSetup().pension.enabled?(()=>{const pn=staffPension(s);return `<div class="field" style="margin-top:12px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="st_pension_on" ${pn.optedIn?'checked':''}> Enrolled in the pension scheme</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">Voluntary. Nothing is deducted until you tick this, and you should have their agreement on file first.</div></div>
+    <div class="row2"><div class="field"><label>Employee rate (% of basic)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_pension_rate" value="${pn.rate}"></div>
+      <div class="field"><label>Agreed on</label><input class="fld" type="date" id="st_pension_date" value="${esc(pn.agreedOn||'')}"></div></div>`;})():''}
+    ${(()=>{const opt=payrollSetup().lines.filter(l=>l.optIn);if(!opt.length)return '';const on=(s.payLines||{});return `<div class="field" style="margin-top:12px"><label>Optional pay lines</label>
+      <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Lines your studio runs for some people but not everyone. Tick the ones that apply to ${esc((s.name||'this person').split(' ')[0]||'this person')}.</div>
+      ${opt.map(l=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:6px"><input type="checkbox" id="st_pl_${l.id}" ${on[l.id]?'checked':''}> ${esc(l.name)} <span style="color:var(--text-faint)">${l.kind==='earning'?'earning':'deduction'} · ${l.basis==='fixed'?cur(l.value):((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic'))}</span></label>`).join('')}</div>`;})()}
     <div class="row2"><div class="field"><label>Bank name</label><input class="fld" id="st_bank" value="${esc(s.bankName||'')}"></div>
       <div class="field"><label>Account number</label><input class="fld" id="st_accNo" value="${esc(s.accountNo||'')}"></div></div>
     <div class="field"><label>Account name</label><input class="fld" id="st_accName" value="${esc(s.accountName||'')}"></div>`:''}
@@ -7696,6 +7896,16 @@ function syncStaffDraft(){if(!staffDraft)return;const s=staffDraft;const g=id=>f
   if(document.getElementById('st_basic'))s.basic=amt('st_basic');if(document.getElementById('st_rate'))s.rate=amt('st_rate');
   if(document.getElementById('st_commMethod'))s.commMethod=g('st_commMethod')||'fixed';
   if(document.getElementById('st_commPct'))s.commPct=Math.max(0,Math.min(100,+g('st_commPct')||0));
+  if(document.getElementById('st_pension_on')){
+    s.pension=Object.assign({},s.pension||{},{
+      optedIn:!!document.getElementById('st_pension_on').checked,
+      rate:Math.max(0,Math.min(100,+g('st_pension_rate')||0)),
+      agreedOn:g('st_pension_date')||''});
+    // an enrolment with no date recorded is dated the day it was ticked, so the payslip
+    // can always say since when
+    if(s.pension.optedIn&&!s.pension.agreedOn)s.pension.agreedOn=new Date().toISOString().slice(0,10);
+  }
+  payrollSetup().lines.filter(l=>l.optIn).forEach(l=>{const el=document.getElementById('st_pl_'+l.id);if(el){s.payLines=s.payLines||{};s.payLines[l.id]=!!el.checked;}});
   if(document.getElementById('st_bank'))s.bankName=g('st_bank')||'';if(document.getElementById('st_accNo'))s.accountNo=g('st_accNo')||'';if(document.getElementById('st_accName'))s.accountName=g('st_accName')||'';
   (s.rates||[]).forEach((r,i)=>{if(fvOther('sr_type_'+i)!==undefined)r.type=fvOther('sr_type_'+i);if(fv('sr_amt_'+i)!==undefined)r.amount=parseAmt(fv('sr_amt_'+i));});}
 function addStaffRate(){syncStaffDraft();staffDraft.rates.push({type:'Kaftan',amount:0});renderStaffModal();}
@@ -7729,10 +7939,20 @@ function saveStaff(){if(!can('editStaff'))return;syncStaffDraft();const s=staffD
 }
 function delStaff(id){if(!confirm('Remove this staff member?'))return;const list=getStaff();const gone=list.find(s=>s.id===id);const moved=reassignReportsFrom(list,id);if(moved)logAudit('Reassigned reports',moved+' report'+(moved===1?'':'s')+' moved up from '+(gone?gone.name:id));setStaff(list.filter(s=>s.id!==id));staffDraft=null;closeModal();renderPayrollView();renderTeam();}
 function salaryPaidThisMonth(id){const k=new Date().toISOString().slice(0,7);return getTxns().some(t=>t.cat==='salary'&&t.staffId===id&&String(t.at||'').slice(0,7)===k);}
+function salaryCost(st){
+  // What one month of this person costs the business, before commission: their basic
+  // plus anything paid on top of it. Deductions come out of the employee's share, not
+  // the company's, so they do not reduce the cost.
+  const f=payFigures(st.id,new Date().toISOString().slice(0,7));
+  return (+st.basic||0)+f.allowanceTotal+f.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned'&&e.label!=='Housing allowance'&&e.label!=='Transport allowance').reduce((a,e)=>a+e.amount,0);
+}
 function payBasic(id){const s=getStaff().find(x=>x.id===id);if(!s||!(+s.basic>0))return;
-  if(salaryPaidThisMonth(id)){if(!confirm(s.name+'\u2019s salary is already marked paid this month. Log another salary payment of '+cur(s.basic)+'?'))return;}
-  else if(!confirm('Log salary payment of '+cur(s.basic)+' to '+s.name+'?'))return;
-  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Salary · '+s.name,amount:+s.basic,at:new Date().toISOString().slice(0,10),cat:'salary',staffId:id,branch:branchOf(s)});setTxns(t);renderPayrollView();renderFinance();renderTeam();toast(cur(s.basic)+' salary logged for '+s.name);if(openStaffId===id){openStaffDetail(id);staffTab('payslips');}}
+  const cost=salaryCost(s);
+  const f=payFigures(id,new Date().toISOString().slice(0,7));
+  const takeHome=f.deductions.length?('\nAfter deductions '+s.name.split(' ')[0]+' receives '+cur(f.net-f.commission)+'.'):'';
+  if(salaryPaidThisMonth(id)){if(!confirm(s.name+'\u2019s salary is already marked paid this month. Log another salary payment of '+cur(cost)+'?'+takeHome))return;}
+  else if(!confirm('Log salary payment of '+cur(cost)+' to '+s.name+'?'+takeHome))return;
+  const t=getTxns();t.push({id:uid('t'),dir:'out',label:'Salary \u00b7 '+s.name,amount:cost,at:new Date().toISOString().slice(0,10),cat:'salary',staffId:id,branch:branchOf(s)});setTxns(t);renderPayrollView();renderFinance();renderTeam();toast(cur(cost)+' salary logged for '+s.name);if(openStaffId===id){openStaffDetail(id);staffTab('payslips');}}
 function payCommission(id){const s=getStaff().find(x=>x.id===id);if(!s)return;const owed=staffOwed()[id];if(!owed||!owed.commission){alert('No commission owed.');return;}
   if(!confirm('Pay '+cur(owed.commission)+' commission to '+s.name+'? This marks the related order commissions as paid.'))return;
   const _rfdPay=STAGES.indexOf('Ready for Delivery');
