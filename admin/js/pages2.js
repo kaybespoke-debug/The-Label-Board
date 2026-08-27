@@ -7,6 +7,23 @@
    Tickets, what subscribers are asking for, how the product is used, and
    who is at risk — one nav item, four sub-tabs. Feedback & Reviews used to
    be its own page; it belongs next to the tickets it overlaps with.       */
+function supportSourceLine() {
+  const st = (typeof liveStatusLine === 'function') ? liveStatusLine() : { mode: 'demo', text: 'Example data.' };
+  const liveCount = (DB.tickets || []).filter(t => t.live).length + (DB.feedback || []).filter(f => f.live).length;
+  const tone = st.mode === 'live' ? 'green' : (st.mode === 'error' ? 'red' : 'grey');
+  return '<div class="note" style="display:flex;align-items:center;gap:8px;margin:10px 0 2px">' +
+    '<span class="pill ' + tone + '">' + (st.mode === 'live' ? 'Live' : st.mode === 'error' ? 'Not connected' : 'Example data') + '</span>' +
+    '<span>' + esc(st.text) + (st.mode === 'live' ? ' · ' + liveCount + ' from real studios' : '') + '</span>' +
+    (st.mode === 'live' ? '<button class="lnk" onclick="refreshInbox()">Refresh</button>' : '') +
+    '</div>';
+}
+function refreshInbox() {
+  if (typeof liveLoadInbox !== 'function') return;
+  liveLoadInbox().then(function (ok) {
+    render();
+    toast(ok ? 'Inbox refreshed' : (LIVE.error || 'Could not reach the inbox'));
+  });
+}
 PAGES.support = function () {
   const tab = UI.filters.support;
   const open = Q.openTickets(), urg = Q.urgentTickets();
@@ -26,7 +43,7 @@ PAGES.support = function () {
       .map(t => '<button class="utab' + (tab === t[0] ? ' on' : '') +
         '" onclick="setFilter(\'support\',\'' + t[0] + '\')">' + t[1] +
         (t[2] ? ' <span class="note">' + t[2] + '</span>' : '') + '</button>').join('') +
-    '</div>';
+    '</div>' + supportSourceLine();
 
   /* ---------- requests & reviews ---------- */
   if (tab === 'requests') {

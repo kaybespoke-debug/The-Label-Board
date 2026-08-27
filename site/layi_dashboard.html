@@ -1002,6 +1002,7 @@ body.modal-open{overflow:hidden}
       <div class="nav-item" data-view="payroll" id="navPayroll" onclick="go('payroll')"><span class="ni">⛁</span> Payroll <span class="lock" id="payLockIco">🔒</span></div>
       <div class="nav-item" data-view="pots" id="navPots" onclick="go('pots')"><span class="ni">⛃</span> Funds <span class="lock" id="potLockIco">🔒</span></div>
       <div class="nav-group">System</div>
+      <div class="nav-item" id="navFeedback" onclick="openFeedback()"><span class="ni">✎</span> Help &amp; feedback</div>
       <div class="nav-item" data-view="audit" id="navAudit" onclick="go('audit')"><span class="ni">❑</span> Audit trail</div>
       <div class="nav-item" data-view="settings" id="navSettings" onclick="go('settings')"><span class="ni">⚙</span> Settings</div>
       <div class="side-foot">
@@ -1482,6 +1483,7 @@ body.modal-open{overflow:hidden}
     <div class="ms-item" data-view="payroll" id="msPayroll" onclick="go('payroll');toggleMore()"><span>⛁</span> Payroll</div>
     <div class="ms-item" data-view="pots" id="msPots" onclick="go('pots');toggleMore()"><span>⛃</span> Funds</div>
     <div class="ms-item" data-view="settings" id="msSettings" onclick="go('settings');toggleMore()"><span>⚙</span> Settings</div>
+    <div class="ms-item" onclick="openFeedback();toggleMore()"><span>✎</span> Help &amp; feedback</div>
     <div class="ms-item" onclick="openMyAccount();toggleMore()"><span>☺</span> My account</div>
     <div class="ms-item" id="msSwitch" onclick="switchAccount()"><span>⇄</span> Switch account</div>
     <div class="ms-item" onclick="logout()"><span>⏻</span> Sign out</div>
@@ -1784,6 +1786,15 @@ const getTasks=()=>load('layi_dash_tasks',[]);
 const setTasks=v=>save('layi_dash_tasks',v);
 const getAnns=()=>load('layi_dash_anns',[]);
 const setAnns=v=>save('layi_dash_anns',v);
+/* ---- Talking to us ----------------------------------------------------------
+   A studio can send a suggestion, a feature request, a complaint or a support
+   ticket, and the operator console picks it up. It is kept on the device first
+   and pushed after, for the same reason everything else here is: a workroom with
+   no signal is the normal case, and "your message could not be sent" would mean
+   the complaint never gets made. Anything not yet delivered stays queued and
+   goes on the next connection. */
+const getFeedback=()=>load('layi_dash_feedback',[]);
+const setFeedback=v=>save('layi_dash_feedback',v);
 const getAttendance=()=>load('layi_dash_attendance',[]);
 const setAttendance=v=>save('layi_dash_attendance',v);
 const CURRENCIES=['NGN','GBP','USD','EUR'];
@@ -1819,6 +1830,29 @@ async function pullCustomers(){
 }
 let _custPushTimer=null;
 function pushCustomers(obj){if(!supa||!liveMode)return;clearTimeout(_custPushTimer);_custPushTimer=setTimeout(()=>_pushCustomersNow(obj),400);}
+let _fbPushTimer=null;
+function pushFeedback(arr){if(!supa||!liveMode)return;clearTimeout(_fbPushTimer);_fbPushTimer=setTimeout(()=>_pushFeedbackNow(arr),400);}
+async function _pushFeedbackNow(arr){
+  if(!supa||!liveMode||!myBusinessId)return;
+  try{
+    const queued=(arr||[]).filter(f=>!f.sentAt);
+    if(!queued.length)return;
+    let changed=false;
+    for(const f of queued){
+      const row={business_id:myBusinessId,kind:f.kind,title:f.title,body:f.body,
+        rating:(f.kind==='review'&&+f.rating)?+f.rating:null,
+        urgency:f.urgency==='blocking'?'blocking':'normal',
+        contact_name:f.contactName||'',contact_email:f.contactEmail||'',
+        context_page:f.page||'',app_version:f.appVersion||''};
+      const {data,error}=await supa.from('feedback').insert(row).select('id,ref').single();
+      // A failure here is not an error the owner should see. It stays queued and
+      // goes again on the next connection, which is what they would want anyway.
+      if(error){console.warn('feedback send:',error.message);continue;}
+      if(data){f.dbId=data.id;f.ref=data.ref;f.sentAt=new Date().toISOString();changed=true;}
+    }
+    if(changed){save('layi_dash_feedback',arr);if(typeof renderFeedbackList==='function')renderFeedbackList();}
+  }catch(e){console.warn('pushFeedback:',e);}
+}
 async function _pushCustomersNow(obj){
   if(!supa)return;
   try{
@@ -1841,7 +1875,8 @@ async function syncCustomersNow(){await syncNow();}
 let _hydrating=false;
 const SYNC_PUSHERS={
   'layi_dash_customers':()=>pushCustomers(getCustomers()),
-  'layi_dash_suppliers':()=>pushSuppliers(getSuppliers())
+  'layi_dash_suppliers':()=>pushSuppliers(getSuppliers()),
+  'layi_dash_feedback':()=>pushFeedback(getFeedback())
 };
 // Every other data key syncs as a JSON blob in the generic `app_state` table (one row per business + key).
 // Customers & suppliers keep their own relational tables above; everything else rides this generic path.
@@ -4379,6 +4414,103 @@ function savePayrollPanel(){
   if(typeof renderPayrollView==='function')renderPayrollView();
   flashSaved('payrollSaveBtn','Save pay setup');
 }
+/* ===== HELP & FEEDBACK =======================================================
+   The one place a studio can tell us something. Four kinds, because those are
+   the four queues the operator console sorts them into, and asking someone to
+   pick between "suggestion" and "feature request" is easier than asking us to
+   guess later.
+
+   It saves to this device first and sends after. On a device with no signal the
+   message is still written down, still visible, and marked as waiting to send.
+   Nothing is ever lost because a workroom has bad reception.
+   ========================================================================== */
+const FEEDBACK_KINDS=[
+  {k:'suggestion',label:'A suggestion',hint:'A small idea that would make the app nicer to use.'},
+  {k:'feature',label:'Something you need built',hint:'A tool or screen your business needs that is not here yet.'},
+  {k:'complaint',label:'Something went wrong',hint:'The app did something it should not have, or let you down.'},
+  {k:'support',label:'You are stuck',hint:'You cannot work out how to do something, or something is broken.'},
+  {k:'review',label:'Something you like',hint:'What is working well. We may ask if we can quote you.'}
+];
+let feedbackDraft=null,feedbackTab='new';
+function feedbackKindLabel(k){const f=FEEDBACK_KINDS.find(x=>x.k===k);return f?f.label:k;}
+function openFeedback(kind){
+  feedbackTab='new';
+  feedbackDraft={kind:kind||'suggestion',title:'',body:'',rating:0,urgency:'normal',
+    contactName:(currentUser&&currentUser.name)||userLabel()||'',
+    contactEmail:(currentUser&&currentUser.email)||''};
+  renderFeedbackModal();
+}
+function setFeedbackTab(t){feedbackTab=t;renderFeedbackModal();}
+function renderFeedbackModal(){
+  const d=feedbackDraft||{};
+  const sent=getFeedback().slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  const waiting=sent.filter(f=>!f.sentAt).length;
+  const kindOpts=FEEDBACK_KINDS.map(f=>`<option value="${f.k}"${d.kind===f.k?' selected':''}>${esc(f.label)}</option>`).join('');
+  const hint=(FEEDBACK_KINDS.find(f=>f.k===d.kind)||{}).hint||'';
+  const body=feedbackTab==='new'?`
+    <div class="field"><label>What is this about?</label>
+      <select class="fld" id="fb_kind" onchange="syncFeedbackDraft();renderFeedbackModal()">${kindOpts}</select>
+      <div class="sd" style="color:var(--text-faint);margin-top:4px">${esc(hint)}</div></div>
+    <div class="field"><label>In one line</label>
+      <input class="fld" id="fb_title" maxlength="160" value="${esc(d.title||'')}" placeholder="${d.kind==='support'?'What are you trying to do?':'Sum it up'}"></div>
+    <div class="field"><label>Tell us properly</label>
+      <textarea class="fld" id="fb_body" rows="5" maxlength="4000" placeholder="${d.kind==='complaint'||d.kind==='support'?'What happened, and what did you expect instead? If it happens on one screen, say which.':'As much or as little as you like.'}">${esc(d.body||'')}</textarea></div>
+    ${d.kind==='review'?`<div class="field"><label>Out of five</label>
+      <select class="fld" id="fb_rating">${[5,4,3,2,1].map(n=>`<option value="${n}"${(+d.rating||5)===n?' selected':''}>${'\u2605'.repeat(n)} ${n}</option>`).join('')}</select></div>`:''}
+    ${(d.kind==='complaint'||d.kind==='support')?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0">
+      <input type="checkbox" id="fb_blocking" ${d.urgency==='blocking'?'checked':''}> This is stopping me working right now</label></div>`:''}
+    <div class="row2"><div class="field"><label>Your name</label><input class="fld" id="fb_name" value="${esc(d.contactName||'')}"></div>
+      <div class="field"><label>Email to reply to</label><input class="fld" id="fb_email" type="email" value="${esc(d.contactEmail||'')}" placeholder="Optional"></div></div>
+    <div class="sd" style="color:var(--text-faint)">We see which studio this came from and what screen you were on. We do not see your clients, your orders or your figures.</div>
+  `:`
+    ${sent.length?sent.map(f=>`<div class="up-line" style="padding:10px 0;border-bottom:1px solid var(--line-soft)">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <b>${esc(f.title)}</b>
+          <span style="color:var(--text-faint);font-size:12px">${f.sentAt?esc(f.ref||'sent'):'<span style="color:var(--amber)">waiting to send</span>'}</span></div>
+        <div style="color:var(--text-dim);font-size:13px;margin-top:2px">${esc(feedbackKindLabel(f.kind))} \u00b7 ${esc(fmtDateShort(f.at))}</div>
+        <div style="color:var(--text-faint);font-size:13px;margin-top:4px;white-space:pre-wrap">${esc(f.body||'')}</div>
+      </div>`).join(''):'<div class="kv" style="color:var(--text-faint)">You have not sent us anything yet.</div>'}
+  `;
+  openModal(`<h3>Help &amp; feedback</h3>
+    <div class="msub">Tell us what would make this better, or what went wrong. A person reads every one.</div>
+    <div class="toolbar" style="gap:8px;margin:12px 0">
+      <button class="chip${feedbackTab==='new'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('new')">Send something</button>
+      <button class="chip${feedbackTab==='sent'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('sent')">What you have sent${sent.length?' ('+sent.length+')':''}</button>
+    </div>
+    ${waiting&&feedbackTab==='sent'?`<div class="kv" style="color:var(--amber);margin-bottom:8px">${waiting} message${waiting===1?'':'s'} still to send. ${waiting===1?'It goes':'They go'} automatically once you are back online.</div>`:''}
+    ${body}
+    <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Close</button>${feedbackTab==='new'?'<button class="btn" onclick="sendFeedback()">Send</button>':''}</div>`);
+}
+function syncFeedbackDraft(){
+  if(!feedbackDraft)return;
+  const d=feedbackDraft;
+  if(document.getElementById('fb_kind'))d.kind=fv('fb_kind')||'suggestion';
+  if(document.getElementById('fb_title'))d.title=fv('fb_title')||'';
+  if(document.getElementById('fb_body'))d.body=fv('fb_body')||'';
+  if(document.getElementById('fb_rating'))d.rating=+fv('fb_rating')||0;
+  const bl=document.getElementById('fb_blocking');if(bl)d.urgency=bl.checked?'blocking':'normal';
+  if(document.getElementById('fb_name'))d.contactName=fv('fb_name')||'';
+  if(document.getElementById('fb_email'))d.contactEmail=fv('fb_email')||'';
+}
+function sendFeedback(){
+  syncFeedbackDraft();
+  const d=feedbackDraft||{};
+  const title=(d.title||'').trim(),body=(d.body||'').trim();
+  if(!title){alert('Give it a one-line summary so we can find it again.');return;}
+  if(!body){alert('Tell us a little more than the title.');return;}
+  const list=getFeedback();
+  list.push({id:uid('fb'),kind:d.kind||'suggestion',title:title.slice(0,160),body:body.slice(0,4000),
+    rating:d.kind==='review'?(+d.rating||5):0,urgency:d.urgency==='blocking'?'blocking':'normal',
+    contactName:(d.contactName||'').trim(),contactEmail:(d.contactEmail||'').trim(),
+    page:activeView||'',appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),
+    at:new Date().toISOString(),by:userLabel(),sentAt:null,ref:'',dbId:''});
+  setFeedback(list);
+  if(typeof logAudit==='function')logAudit('Feedback sent','\u201c'+title+'\u201d \u00b7 '+feedbackKindLabel(d.kind));
+  feedbackTab='sent';feedbackDraft=null;
+  renderFeedbackModal();
+  toast(liveMode?'Sent. Thank you.':'Saved. It sends as soon as you are online.');
+}
+function renderFeedbackList(){if(document.getElementById('modal')&&feedbackTab==='sent')renderFeedbackModal();}
 function saveItemWord(){
   const el=document.getElementById('set_itemword');if(!el)return;
   const v=(el.value||'').trim().replace(/[^A-Za-z -]/g,'').slice(0,24);

@@ -297,9 +297,13 @@ function signInAs(s) {
   UI.page = (typeof firstAllowedPage === 'function') ? firstAllowedPage() : 'dashboard';
   render();
   toast('Signed in as ' + s.name.split(' ')[0]);
+  // If a Supabase project is configured, go and fetch what real studios have
+  // sent us. Does nothing at all when it is not, so the demo is untouched.
+  if (typeof liveStart === 'function') liveStart();
 }
 
 function signOut() {
+  if (typeof liveStopPolling === 'function') liveStopPolling();
   modal('Sign out', (Q.staffM(ME.staffId) || {}).name || '',
     '<p class="note">You will be returned to the sign-in screen. Nothing is lost: the data lives in this ' +
     'browser, not in the session.</p>',
