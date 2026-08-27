@@ -7821,6 +7821,7 @@ function payslipInner(id,k){
       <thead><tr><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #ddd;padding-bottom:6px">Earnings</th><th style="text-align:right;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #ddd;padding-bottom:6px">Amount</th></tr></thead>
       <tbody>
         ${includeBasic?line('Monthly basic salary',cur(basic)):''}
+        ${fig.earnings.filter(e=>e.label!=='Monthly basic salary'&&e.label!=='Commission earned').map(e=>line(esc(e.label)+(e.note?' <span style="color:#999;font-size:11px">'+esc(e.note)+'</span>':''),cur(e.amount))).join('')}
         <tr><td colspan="2" style="padding:12px 0 4px;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Commission · ${ents.length} item${ents.length===1?'':'s'} (how it was earned)</td></tr>
         ${commRows}
       </tbody>
