@@ -1,9 +1,9 @@
 /* ==========================================================================
    The Label Board — website behaviour
    Nothing here is required to read the site. Every page is real HTML and
-   stands on its own with JavaScript off; this file adds the menus, the theme
-   switch, the price toggle, the tabs, the reveals, and the rule that a
-   photograph which has not arrived yet leaves no broken box behind.
+   stands on its own with JavaScript off; this file adds the menu, the price
+   toggle, the tabs, the reveals, and the rule that a photograph which has not
+   arrived yet leaves no broken box behind.
    ========================================================================== */
 
 (function () {
@@ -11,33 +11,6 @@
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-
-  /* ---------------- theme ----------------
-     The head of every page applies the stored theme before first paint, so
-     this only has to handle the click and keep the icon honest. */
-  var THEME_KEY = 'tlb_site_theme';
-
-  function writeTheme(v) {
-    try { localStorage.setItem(THEME_KEY, v); } catch (e) { /* private mode, no harm */ }
-  }
-  function paintToggle() {
-    var light = document.documentElement.classList.contains('light');
-    $$('.tgl').forEach(function (b) {
-      b.setAttribute('aria-label', light ? 'Switch to dark' : 'Switch to light');
-      b.setAttribute('title', light ? 'Switch to dark' : 'Switch to light');
-      var sun = $('.i-sun', b), moon = $('.i-moon', b);
-      if (sun) sun.style.display = light ? 'none' : '';
-      if (moon) moon.style.display = light ? '' : 'none';
-    });
-  }
-  function toggleTheme() {
-    var light = !document.documentElement.classList.contains('light');
-    document.documentElement.classList.toggle('light', light);
-    writeTheme(light ? 'light' : 'dark');
-    var meta = $('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', light ? '#ffffff' : '#06101d');
-    paintToggle();
-  }
 
   /* ---------------- menus ---------------- */
   function closeMenu() { document.body.classList.remove('menu-open'); }
@@ -170,7 +143,6 @@
     window.__tlbReady = true;
     applyConfig();
     markCurrent();
-    paintToggle();
     photos();
     reveal();
 
@@ -193,7 +165,6 @@
       if (!t) return;
 
       var act = t.getAttribute('data-act');
-      if (act === 'theme') { ev.preventDefault(); toggleTheme(); return; }
       if (act === 'menu') { ev.preventDefault(); toggleMenu(); return; }
 
       if (t.getAttribute('data-cycle')) { ev.preventDefault(); setCycle(t.getAttribute('data-cycle')); return; }

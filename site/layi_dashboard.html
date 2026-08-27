@@ -1393,15 +1393,15 @@ body.modal-open{overflow:hidden}
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Production workflow</h3></div>
           <p class="page-sub" style="margin-bottom:12px">The stages every order moves through. Tailor the making stages to how your studio works. <b>Order Received</b> opens every order, and <b>Quality Check → Ready for Delivery → Dispatched → Delivered</b> close it out. Those are added automatically.</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-            <button class="chip" onclick="applyStagePreset('bespoke')">Bespoke / Tailoring</button>
-            <button class="chip" onclick="applyStagePreset('bridal')">Bridal</button>
-            <button class="chip" onclick="applyStagePreset('rtw')">Ready-to-wear</button>
-            <button class="chip" onclick="applyStagePreset('factory')">Factory / Production</button>
-          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="stagePresetChips"></div>
           <div class="field"><label>Making stages, one per line, in order</label><textarea class="fld" id="set_stages" rows="7" placeholder="Cutting&#10;Stitching&#10;Finishing" oninput="renderStagePreview()"></textarea></div>
           <div id="stagePreview" class="sd" style="color:var(--text-faint);margin-bottom:12px"></div>
           <button class="btn" id="stageSaveBtn" onclick="saveStages()">Save workflow</button>
+          <div class="field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label>What you call one piece of work</label>
+            <input type="text" class="fld" id="set_itemword" placeholder="garment" maxlength="24">
+            <div class="sd" style="color:var(--text-faint);margin-top:6px">A tailor makes a <b>garment</b>, a shoemaker a <b>pair</b>, a bag maker a <b>piece</b>. Leave this empty and the app picks the word from what your studio does. Fill it in to use your own.</div>
+          </div>
+          <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
         </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Products &amp; materials</h3><button class="btn sm" onclick="addCatalogProduct()">+ Add product</button></div>
@@ -1411,7 +1411,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Stock used per product <span class="page-sub" style="font-weight:400">(auto-deduct from inventory)</span></h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Set the materials each garment type uses, as a reference for what each piece consumes.</p>
+          <p class="page-sub" id="matPerTypeSub" style="margin-bottom:12px">Set the materials each garment type uses, as a reference for what each piece consumes.</p>
           <div id="recipeBox"></div>
         </div>
         <div class="panel" data-setperm="setCatalog">
@@ -1552,7 +1552,24 @@ const STAGE_PRESETS={
   bespoke:['Fabric Received','Cutting','Stitching','Fitting','Finishing'],
   bridal:['Design','Pattern','Cutting','First Fitting','Beading','Second Fitting','Final Fitting'],
   rtw:['Sampling','Cutting','Sewing','Finishing','Pressing'],
-  factory:['Cutting','Sewing','Assembly','Finishing','Pressing']
+  factory:['Cutting','Sewing','Assembly','Finishing','Pressing'],
+  footwear:['Last & Pattern','Clicking','Closing','Lasting','Soling','Finishing'],
+  leather:['Pattern','Cutting','Skiving','Edge Finishing','Assembly','Hardware','Stitching'],
+  fabrics:['Cloth Received','Measured & Cut','Packed'],
+  haberdashery:['Stock Received','Counted','Packed']
+};
+/* A preset only makes sense for the trade that uses those words. Each one names the
+   activities it belongs to so Settings can lead with the right suggestion instead of
+   offering a shoemaker 'Fabric Received'. */
+const STAGE_PRESET_META={
+  bespoke:{label:'Bespoke tailoring',for:['bespoke']},
+  bridal:{label:'Bridal & occasion',for:['bespoke']},
+  rtw:{label:'Ready-to-wear run',for:['rtw']},
+  factory:{label:'Factory / bulk',for:['rtw','bespoke']},
+  footwear:{label:'Shoemaking',for:['footwear']},
+  leather:{label:'Bags & leather goods',for:['leather']},
+  fabrics:{label:'Fabric cutting',for:['fabrics']},
+  haberdashery:{label:'Haberdashery',for:['haberdashery']}
 };
 function buildStages(mid){const m=(Array.isArray(mid)&&mid.length)?mid:DEFAULT_MIDDLE;return [STAGE_HEAD].concat(m,STAGE_TAIL);}
 let STAGES=buildStages(null);
@@ -1594,7 +1611,7 @@ const PERM_FUNCS=[
   {k:'del',l:'Delete orders'},
   {k:'setCatalog',l:'Settings: catalog & tiers',hint:'Loyalty tiers, inventory categories & QC checklist'},
   {k:'setCompany',l:'Settings: company details',hint:'Business name, logo, bank details & invoice info'},
-  {k:'setWorkflow',l:'Settings: workflow & recipes',hint:'Production stages, presets & materials per garment'},
+  {k:'setWorkflow',l:'Settings: workflow & recipes',hint:'Production stages, presets & materials per item type'},
   {k:'setBranches',l:'Settings: branches & outlets',hint:'Add and manage shops/outlets'},
   {k:'setData',l:'Import, backup & wipe data',hint:'CSV import, backups and clearing all data'},
 ];
@@ -2048,13 +2065,39 @@ function financeTotals(period,custom){
 /* loyalty: tier by total net spend */
 const tierList=()=>(SETTINGS.tiers&&SETTINGS.tiers.length?SETTINGS.tiers:DEFAULTS.tiers).slice().sort((a,b)=>a.min-b.min);
 const loyaltyOn=()=>SETTINGS.loyaltyEnabled!==false;
-const MEAS_FIELDS=['Neck','Shoulder','Chest / Bust','Tummy / Stomach','Waist','Hip','Sleeve length','Round sleeve','Bicep','Forearm','Wrist','Shirt / Kaftan length','Top / Jacket length','Trouser waist','Trouser length','Thigh','Knee','Calf','Ankle','Inseam','Outseam','Agbada width (arm-span)','Agbada length','Cap / Kufi size'];
-function measGrid(prefix,meas){meas=meas||{};return`<div class="meas-grid">${MEAS_FIELDS.map((f,i)=>`<div class="meas-cell"><label>${f}</label><input class="fld" id="${prefix}_${i}" value="${esc(meas[f]||'')}" placeholder="—"></div>`).join('')}</div>`;}
-function readMeas(prefix){const m={};MEAS_FIELDS.forEach((f,i)=>{const v=fv(prefix+'_'+i);if(v)m[f]=v;});return m;}
+/* Measurements are trade-specific. A tailor measures a body, a shoemaker measures a
+   foot, a bag maker measures the bag itself. MEAS_BODY is the original list and keeps
+   its name and its values, so every measurement already saved still reads back.
+   Entry shows only the sets this studio needs; display always shows every value on
+   file, so nothing a client gave you can disappear because the studio changed trade. */
+const MEAS_BODY=['Neck','Shoulder','Chest / Bust','Tummy / Stomach','Waist','Hip','Sleeve length','Round sleeve','Bicep','Forearm','Wrist','Shirt / Kaftan length','Top / Jacket length','Trouser waist','Trouser length','Thigh','Knee','Calf','Ankle','Inseam','Outseam','Agbada width (arm-span)','Agbada length','Cap / Kufi size'];
+const MEAS_FOOT=['Shoe size','Foot length (L)','Foot length (R)','Foot width (L)','Foot width (R)','Instep / girth','Heel to ball','Ankle girth','Calf girth','Last / fitting notes'];
+const MEAS_BAG=['Bag height','Bag width','Bag depth','Strap length','Strap drop','Handle length','Gusset','Hardware finish'];
+const MEAS_FIELDS=MEAS_BODY;
+const MEAS_ALL=MEAS_BODY.concat(MEAS_FOOT,MEAS_BAG);
+const MEAS_SETS={bespoke:MEAS_BODY,rtw:MEAS_BODY,footwear:MEAS_FOOT,leather:MEAS_BAG};
+/* Which sets to offer for entry, based on what the studio does. */
+function measFields(){
+  const does={};activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>does[k]=1));
+  const out=[],seen={};
+  Object.keys(does).forEach(k=>{(MEAS_SETS[k]||[]).forEach(f=>{if(!seen[f]){seen[f]=1;out.push(f);}});});
+  return out.length?out:MEAS_BODY;
+}
+/* Entry list plus anything already recorded on this client that the list would miss. */
+function measFieldsFor(meas){
+  const base=measFields(),seen={};base.forEach(f=>seen[f]=1);
+  const extra=MEAS_ALL.filter(f=>meas&&meas[f]&&!seen[f]);
+  return base.concat(extra);
+}
+/* measGrid writes inputs as prefix_index, so readMeas has to read back against the
+   very list that was rendered, not today's list. */
+const _measRendered={};
+function measGrid(prefix,meas){meas=meas||{};const F=measFieldsFor(meas);_measRendered[prefix]=F;return`<div class="meas-grid">${F.map((f,i)=>`<div class="meas-cell"><label>${f}</label><input class="fld" id="${prefix}_${i}" value="${esc(meas[f]||'')}" placeholder="—"></div>`).join('')}</div>`;}
+function readMeas(prefix){const m={};(_measRendered[prefix]||MEAS_BODY).forEach((f,i)=>{const v=fv(prefix+'_'+i);if(v)m[f]=v;});return m;}
 function measHistoryOf(key){const c=getCustomers()[key];if(!c)return [];let h=Array.isArray(c.measHistory)?c.measHistory.slice():[];if(!h.length&&c.meas&&Object.keys(c.meas).length){h=[{id:'legacy',at:'',meas:c.meas,posture:'',fit:'',note:c.measurements||''}];}return h.sort((a,b)=>(b.at||'').localeCompare(a.at||''));}
 function latestMeasOf(key){return measHistoryOf(key)[0]||null;}
-function measReadGrid(meas){meas=meas||{};const ks=MEAS_FIELDS.filter(f=>meas[f]);if(!ks.length)return '<div class="kv" style="color:var(--text-faint)">No measurement values.</div>';return `<div class="meas-grid">${ks.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)">${esc(meas[f])}</div></div>`).join('')}</div>`;}
-function measReadGridFull(meas){meas=meas||{};return `<div class="meas-grid">${MEAS_FIELDS.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);${meas[f]?'':'color:var(--text-faint)'}">${esc(meas[f]||'—')}</div></div>`).join('')}</div>`;}
+function measReadGrid(meas){meas=meas||{};const ks=MEAS_ALL.filter(f=>meas[f]);if(!ks.length)return '<div class="kv" style="color:var(--text-faint)">No measurement values.</div>';return `<div class="meas-grid">${ks.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)">${esc(meas[f])}</div></div>`).join('')}</div>`;}
+function measReadGridFull(meas){meas=meas||{};return `<div class="meas-grid">${measFieldsFor(meas).map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);${meas[f]?'':'color:var(--text-faint)'}">${esc(meas[f]||'—')}</div></div>`).join('')}</div>`;}
 function openMeasRecord(key,recId){if(!can('customers'))return;const h=measHistoryOf(key);const rec=recId?h.find(r=>r.id===recId):null;const base=rec?rec.meas:(h[0]?h[0].meas:{});
   openModal(`<h3>${rec?'Measurement record':'New measurement record'}</h3><div class="msub">${esc((getCustomers()[key]||{}).name||key)}</div>
     <div class="row2"><div class="field"><label>Date taken</label><input class="fld" type="date" id="mr_date" value="${rec&&rec.at?rec.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div>
@@ -2557,11 +2600,42 @@ function isGarmentShopType(t){return t==='rtw'||t==='both';}
 function isRetailType(t){return t==='rtw'||t==='both'||t==='haberdashery'||t==='fabrics';}
 // ---- What a studio does: a multi-select set of activities. Each maps to a capability that drives the app. ----
 const DEFAULT_ACTIVITIES=[
-  {key:'bespoke',label:'Bespoke',desc:'Made-to-order / custom tailoring',kind:'bespoke'},
-  {key:'rtw',label:'Ready-to-wear',desc:'Finished garments sold off the rack',kind:'retail',catalog:true},
-  {key:'haberdashery',label:'Haberdashery',desc:'Trims, notions & sewing bits',kind:'retail'},
-  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail'}
+  {key:'bespoke',label:'Bespoke tailoring',desc:'Clothing made to order',kind:'bespoke',stages:'bespoke'},
+  {key:'footwear',label:'Footwear',desc:'Shoes & sandals, made to order or stocked',kind:'bespoke',catalog:true,stages:'footwear'},
+  {key:'leather',label:'Bags & leather',desc:'Bags, belts & leather goods',kind:'bespoke',catalog:true,stages:'leather'},
+  {key:'rtw',label:'Ready-to-wear',desc:'Finished garments sold off the rack',kind:'retail',catalog:true,stages:'rtw'},
+  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail',stages:'fabrics'},
+  {key:'haberdashery',label:'Haberdashery',desc:'Trims, notions & sewing bits',kind:'retail',stages:'haberdashery'}
 ];
+/* What one piece of work is called in each trade. A tailor makes a garment, a
+   shoemaker makes a pair, a bag maker makes a piece. The studio can override this
+   in Settings; when a studio does more than one thing, the neutral word wins. */
+const ACTIVITY_WORDS={bespoke:'garment',rtw:'garment',footwear:'pair',leather:'piece',fabrics:'piece',haberdashery:'item'};
+function tradeWord(){
+  const set=(SETTINGS.itemWord||'').trim();
+  if(set)return set.toLowerCase();
+  const seen={};
+  activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>{seen[ACTIVITY_WORDS[k]||'item']=1;}));
+  const words=Object.keys(seen);
+  if(words.length===1)return words[0];
+  if(!words.length)return 'garment';
+  return 'piece';
+}
+function tradeWordCap(){const w=tradeWord();return w.charAt(0).toUpperCase()+w.slice(1);}
+function tradeWordPlural(){const w=tradeWord();return /s$/.test(w)?w:w+'s';}
+function tradeWordPluralCap(){const w=tradeWordPlural();return w.charAt(0).toUpperCase()+w.slice(1);}
+/* Static markup written for tailors is re-worded on render, so a shoemaker never
+   reads 'garment' in a placeholder we forgot about. */
+function applyTradeWording(){
+  const w=tradeWord();
+  renderStagePresetChips();
+  const iw=document.getElementById('set_itemword');
+  if(iw){iw.placeholder=w;if(document.activeElement!==iw)iw.value=SETTINGS.itemWord||'';}
+  const ps=document.getElementById('prodSearch');
+  if(ps)ps.placeholder='Search client or '+w+'…';
+  const mp=document.getElementById('matPerTypeSub');
+  if(mp)mp.textContent='Set the materials each '+w+' type uses, as a reference for what each piece consumes.';
+}
 function branchActivities(){const a=SETTINGS.branchActivities;return (Array.isArray(a)&&a.length)?a:DEFAULT_ACTIVITIES.slice();}
 // The chips shown for a branch = the current option list, plus any activity this branch already
 // uses that has since been removed from the list (so nothing a branch does silently vanishes).
@@ -2590,6 +2664,7 @@ function applyBizVisibility(){
   const mbProd=document.querySelector('.mob-bar .mb[data-view="production"]');if(mbProd)mbProd.style.display=bsp?'':'none';
   const sp=document.getElementById('snapPanel');if(sp)sp.style.display=bsp?'':'none';
   applyTeamVisibility();if(typeof renderMobBar==='function')renderMobBar();
+  applyTradeWording();
 }
 // Progressive disclosure: a one-person shop should not be shown the team & HR cluster.
 // Auto-reveal once there is a real team (2+ active staff) or a second studio; an explicit
@@ -2832,10 +2907,21 @@ function fvOther(id){const v=fv(id);if(v===undefined)return undefined;if(v!=='Ot
 /* ===== ORDER FORM (multi-item, photos, notes) ===== */
 const DEFAULT_PRODUCT_TYPES=['Bespoke outfit','Agbada','Kaftan','Shoes','Mules','Leather slippers','Casual set','Ankara trousers','Linen shirt','Linen shorts','Wrapper / fabric','Accessory','Other'];
 const PRODUCT_CATEGORIES=['Garment','Footwear','Bag','Accessory','Fabric','Other'];
+/* A name-only product list (an import, or an older studio) still deserves the right
+   category, or a shoemaker's whole catalogue files itself under Garment. */
+function guessCategory(n){
+  const t=String(n||'').toLowerCase();
+  if(/shoe|boot|sandal|slipper|mule|loafer|sneaker|pump|heel|brogue|espadrille/.test(t))return 'Footwear';
+  if(/bag|purse|clutch|tote|belt|wallet|satchel|backpack|holdall|luggage/.test(t))return 'Bag';
+  if(/fabric|cloth|aso.?oke|ankara|lace|brocade|wrapper|yard|damask|adire/.test(t))return 'Fabric';
+  if(/button|zip|thread|trim|notion|lining|interfacing|hook|stud|bead|ribbon|elastic/.test(t))return 'Other';
+  if(/cap|kufi|tie|scarf|gele|accessor|jewel|cuff/.test(t))return 'Accessory';
+  return 'Garment';
+}
 function productCatalog(){
   if(SETTINGS.productCatalog&&Array.isArray(SETTINGS.productCatalog)&&SETTINGS.productCatalog.length)return SETTINGS.productCatalog;
   const names=(SETTINGS.garmentTypes&&SETTINGS.garmentTypes.length)?SETTINGS.garmentTypes:DEFAULT_PRODUCT_TYPES;
-  return names.map(n=>({id:uid('pc'),name:n,category:'Garment',materials:[]}));
+  return names.map(n=>({id:uid('pc'),name:n,category:guessCategory(n),materials:[]}));
 }
 function productTypes(){return productCatalog().map(p=>p.name);}
 function productByName(n){return productCatalog().find(p=>(p.name||'').toLowerCase()===String(n||'').toLowerCase());}
@@ -2949,7 +3035,7 @@ function applyRecipesToOrder(){
   if(!draft)return;syncOrderDraft();
   const bq=(draft.batch&&draft.batch.on)?(+draft.batch.qty||1):1;
   const agg=aggregateRecipes(draft.outfits,bq);
-  if(!agg.length){toast('No materials set for these garment types yet. Add them in Settings \u2192 Materials per garment.');return;}
+  if(!agg.length){toast('No materials set for these '+tradeWord()+' types yet. Add them in Settings \u2192 Materials per '+tradeWord()+'.');return;}
   draft.stockUsed=draft.stockUsed||[];
   const byId={};draft.stockUsed.forEach(s=>{if(s.supplyId)byId[s.supplyId]=s;});
   agg.forEach(a=>{if(byId[a.supplyId])byId[a.supplyId].qty=a.qty;else draft.stockUsed.push({supplyId:a.supplyId,qty:a.qty});});
@@ -3008,7 +3094,7 @@ function syncOrderDraft(){
     if(fv('ofm_fit_'+i)!==undefined)o.measFit=fv('ofm_fit_'+i);
     if(fv('ofm_posture_'+i)!==undefined)o.measPosture=fv('ofm_posture_'+i);
     if(fv('ofm_note_'+i)!==undefined)o.measNote=fv('ofm_note_'+i);
-    if(document.getElementById('ofm'+i+'_0')!==null){o.meas=o.meas||{};MEAS_FIELDS.forEach((f,k)=>{const el=document.getElementById('ofm'+i+'_'+k);if(el)o.meas[f]=el.value;});}
+    if(document.getElementById('ofm'+i+'_0')!==null){o.meas=o.meas||{};(_measRendered['ofm'+i]||MEAS_BODY).forEach((f,k)=>{const el=document.getElementById('ofm'+i+'_'+k);if(el)o.meas[f]=el.value;});}
   });
   (draft.costs||[]).forEach((c,i)=>{
     if(fv('c_label_'+i)!==undefined)c.label=fv('c_label_'+i);
@@ -3045,7 +3131,7 @@ function openGroup(id){if(!can('update'))return;const o=getOrders().find(x=>x.id
 function renderGroupModal(){
   const o=getOrders().find(x=>x.id===groupId);if(!o)return;const dispI=STAGES.indexOf('Dispatched');
   const rows=(o.outfits||[]).map((m,i)=>{const si=+m.stageIndex||0;const pct=Math.round((si+1)/STAGES.length*100);
-    const ks=MEAS_FIELDS.filter(f=>m.meas&&m.meas[f]);const measSummary=ks.length?ks.slice(0,6).map(f=>esc(f)+' '+esc(m.meas[f])).join(' · ')+(ks.length>6?' …':''):'no measurements on file';
+    const ks=MEAS_ALL.filter(f=>m.meas&&m.meas[f]);const measSummary=ks.length?ks.slice(0,6).map(f=>esc(f)+' '+esc(m.meas[f])).join(' · ')+(ks.length>6?' …':''):'no measurements on file';
     return `<div class="srow"><div class="smain"><div class="sup-name">${esc(m.person||('Person '+(i+1)))} <span style="color:var(--text-faint);font-weight:400">· ${esc(m.name||m.type||'piece')}</span></div>
       <div class="sup-meta"><b style="color:var(--gold)">${esc(STAGES[si])}</b> · ${pct}%</div>
       <div class="sup-meta" style="color:var(--text-faint)">${measSummary}</div>
@@ -3105,7 +3191,7 @@ function addOutfit(){syncOrderDraft();draft.outfits.push(blankOutfit());reRender
 function removeOutfit(i){syncOrderDraft();draft.outfits.splice(i,1);if(!draft.outfits.length)draft.outfits.push(blankOutfit());reRenderOrder();}
 async function addClientPhotos(files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.clientPhotos.push(await compressImage(f));}reRenderOrder();}
 function removeClientPhoto(idx){syncOrderDraft();draft.clientPhotos.splice(idx,1);reRenderOrder();}
-function orderMeasRefHtml(client){const key=nameKey(client||'');if(!key)return '';const latest=latestMeasOf(key);if(!latest)return '';const ks=MEAS_FIELDS.filter(f=>latest.meas&&latest.meas[f]);if(!ks.length&&!latest.fit&&!latest.posture)return '';
+function orderMeasRefHtml(client){const key=nameKey(client||'');if(!key)return '';const latest=latestMeasOf(key);if(!latest)return '';const ks=MEAS_ALL.filter(f=>latest.meas&&latest.meas[f]);if(!ks.length&&!latest.fit&&!latest.posture)return '';
   return `<div class="kv" style="margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-2)"><b>📐 Measurements on file</b>${latest.at&&latest.at>new Date(1).toISOString()?' <span style="color:var(--text-faint)">('+new Date(latest.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+')</span>':''}${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}<br><span style="color:var(--text-faint);font-size:12px">${ks.slice(0,8).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')}${ks.length>8?' …':''}</span></div>`;}
 function refreshOrderMeas(){const el=document.getElementById('orderMeasRef');if(el)el.innerHTML=orderMeasRefHtml(fv('f_client')||'');}
 let orderMeasOpen=false;
@@ -3428,7 +3514,7 @@ function openDetail(id){
       ${(of.materials&&of.materials.length)?`<div class="kv"><b>Materials:</b> ${of.materials.map(m=>esc(m)).join(' · ')}</div>`:''}
       ${of.style?`<div class="kv"><b>Styling:</b> ${esc(of.style)}</div>`:''}
       ${of.finish?`<div class="kv"><b>Finishing:</b> ${esc(of.finish)}</div>`:''}
-      ${isGroup(o)&&of.meas&&MEAS_FIELDS.some(f=>of.meas[f])?`<div class="kv"><b>📐 Measurements:</b> ${MEAS_FIELDS.filter(f=>of.meas[f]).map(f=>esc(f)+' '+esc(of.meas[f])).join(' · ')}</div>`:''}
+      ${isGroup(o)&&of.meas&&MEAS_ALL.some(f=>of.meas[f])?`<div class="kv"><b>📐 Measurements:</b> ${MEAS_ALL.filter(f=>of.meas[f]).map(f=>esc(f)+' '+esc(of.meas[f])).join(' · ')}</div>`:''}
       ${isGroup(o)&&(of.measFit||of.measNote)?`<div class="kv">${of.measFit?'<b>Fit:</b> '+esc(of.measFit):''}${of.measNote?(of.measFit?' · ':'')+esc(of.measNote):''}</div>`:''}
     </div>`).join('');
   const ups=(o.updates||[]).slice().reverse().map(u=>`<div class="up-line"><b>${esc(u.by)}</b> · ${esc(u.stage)}${u.worker?' · <span style="color:var(--gold)">'+esc(u.worker)+'</span>':''} <span style="color:var(--text-faint)">· ${timeAgo(u.at)}</span><br>${esc(u.note)}
@@ -3520,7 +3606,7 @@ function openDetail(id){
       ${commInfo}
     </div>
     <div class="opane" data-pane="measurements" style="display:none">
-      ${(()=>{const latest=latestMeasOf(nameKey(o.client));if(!latest){return '<div class="kv" style="color:var(--text-faint)">No measurements on file for this client yet.</div>';}const full=can('update');return `<div class="kv" style="font-weight:600;margin-bottom:8px">📐 Measurements on file${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}</div>${latest.note?'<div style="color:var(--text-faint);font-size:12.5px;margin-bottom:8px">'+esc(latest.note)+'</div>':''}${full?measReadGridFull(latest.meas):`<div style="color:var(--text-dim);font-size:13px">${MEAS_FIELDS.filter(f=>latest.meas&&latest.meas[f]).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')||'—'}</div>`}`;})()}
+      ${(()=>{const latest=latestMeasOf(nameKey(o.client));if(!latest){return '<div class="kv" style="color:var(--text-faint)">No measurements on file for this client yet.</div>';}const full=can('update');return `<div class="kv" style="font-weight:600;margin-bottom:8px">📐 Measurements on file${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}</div>${latest.note?'<div style="color:var(--text-faint);font-size:12.5px;margin-bottom:8px">'+esc(latest.note)+'</div>':''}${full?measReadGridFull(latest.meas):`<div style="color:var(--text-dim);font-size:13px">${MEAS_ALL.filter(f=>latest.meas&&latest.meas[f]).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')||'—'}</div>`}`;})()}
       ${isGroup(o)?`<div class="kv" style="margin-top:10px;color:var(--text-faint)">This is a group order. Per-person measurements show under each person in the Overview tab.</div>`:''}
     </div>
   `);
@@ -3600,7 +3686,7 @@ function docHeader(label){const co=SETTINGS.company||{};
     <div style="text-align:right"><div style="font-size:16px;letter-spacing:2px;color:#c9a86a">${esc(label)}</div><div style="font-size:12px;color:#888">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div></div>
   </div>`;
 }
-function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?MEAS_FIELDS.filter(f=>meas[f]):MEAS_FIELDS;
+function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?MEAS_ALL.filter(f=>meas[f]):measFieldsFor(meas);
   if(onlyFilled&&!fields.length)return '<div style="color:#888;font-size:13px">No measurements on file for this client.</div>';
   return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 18px">'+fields.map(f=>`<div style="border-bottom:1px solid #eee;padding:5px 0;display:flex;justify-content:space-between;font-size:13px"><span style="color:#666">${esc(f)}</span><span style="font-weight:600">${esc(meas[f]||'')||'&nbsp;'}</span></div>`).join('')+'</div>';
 }
@@ -4097,6 +4183,27 @@ function syncBanks(){companyBanks.forEach((bk,i)=>{const g=id=>{const e=document
 function addBankRow(){syncBanks();companyBanks.push({currency:'NGN',bank:'',name:'',no:''});renderBankRows();}
 function removeBankRow(i){syncBanks();companyBanks.splice(i,1);renderBankRows();}
 function saveQCChecklist(){const raw=fv('set_qc')||'';SETTINGS.qcChecklist=raw.split('\n').map(s=>s.trim()).filter(Boolean);if(!SETTINGS.qcChecklist.length)SETTINGS.qcChecklist=DEFAULTS.qcChecklist.slice();save('layi_dash_settings',SETTINGS);flashSaved('qcSaveBtn','Save checklist');}
+/* Only offer the presets that belong to what this studio actually does, so a
+   shoemaker is led to Lasting and Soling rather than Fabric Received. Presets for
+   other trades stay available under "Other trades" instead of disappearing. */
+function renderStagePresetChips(){
+  const box=document.getElementById('stagePresetChips');if(!box)return;
+  const does={};activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>does[k]=1));
+  const keys=Object.keys(STAGE_PRESETS);
+  const mine=keys.filter(k=>((STAGE_PRESET_META[k]||{}).for||[]).some(a=>does[a]));
+  const rest=keys.filter(k=>mine.indexOf(k)<0);
+  const Q=String.fromCharCode(39);
+  const chip=k=>'<button class="chip" onclick="applyStagePreset('+Q+k+Q+')">'+esc((STAGE_PRESET_META[k]||{}).label||k)+'</button>';
+  box.innerHTML=(mine.length?mine.map(chip).join(''):keys.map(chip).join(''))
+    +(mine.length&&rest.length?'<span style="width:100%;height:0"></span><span class="sd" style="color:var(--text-faint);align-self:center;margin-right:2px">Other trades:</span>'+rest.map(chip).join(''):'');
+}
+function saveItemWord(){
+  const el=document.getElementById('set_itemword');if(!el)return;
+  const v=(el.value||'').trim().replace(/[^A-Za-z -]/g,'').slice(0,24);
+  SETTINGS.itemWord=v;save('layi_dash_settings',SETTINGS);
+  if(typeof logAudit==='function')logAudit('Wording updated',v?('one piece of work is a "'+v+'"'):'back to the automatic word');
+  applyTradeWording();renderAll();flashSaved('itemWordSaveBtn','Save wording');
+}
 function applyStagePreset(key){const el=document.getElementById('set_stages');if(el)el.value=(STAGE_PRESETS[key]||DEFAULT_MIDDLE).join('\n');renderStagePreview();}
 function renderStagePreview(){const el=document.getElementById('stagePreview');if(!el)return;const mid=(fv('set_stages')||'').split('\n').map(s=>s.trim()).filter(Boolean);const full=buildStages(mid.length?mid:null);el.innerHTML='<b>Full pipeline:</b> '+full.map(s=>esc(s)).join(' \u2192 ');}
 function renderStagesSettings(){const el=document.getElementById('set_stages');if(!el)return;const mid=(SETTINGS.productionStages&&SETTINGS.productionStages.length)?SETTINGS.productionStages:DEFAULT_MIDDLE;el.value=mid.join('\n');renderStagePreview();}
@@ -4117,10 +4224,10 @@ function renderRecipesSettings(){
   if(!recipeDraft)recipeDraft=(getRecipes()[recipeType]||[]).map(r=>({supplyId:r.supplyId,qty:r.qty}));
   const sup=getSupplies();
   const typeSel=`<select class="fld" id="rcp_type" onchange="setRecipeType(this.value)" style="max-width:260px">${productTypes().map(t=>`<option ${t===recipeType?'selected':''}>${esc(t)}</option>`).join('')}</select>`;
-  if(!sup.length){box.innerHTML=`<div class="field"><label>Garment type</label>${typeSel}</div><div class="kv" style="color:var(--text-faint);margin-top:6px">Add inventory items first (Inventory tab), then build recipes here.</div>`;return;}
+  if(!sup.length){box.innerHTML=`<div class="field"><label>${tradeWordCap()} type</label>${typeSel}</div><div class="kv" style="color:var(--text-faint);margin-top:6px">Add inventory items first (Inventory tab), then build recipes here.</div>`;return;}
   const rows=recipeDraft.map((r,i)=>`<div class="cost-line"><select class="fld" id="rcp_item_${i}"><option value="">Material</option>${sup.map(s=>`<option value="${s.id}" ${r.supplyId===s.id?'selected':''}>${esc(s.name)} (${esc(s.unit||'unit')})</option>`).join('')}</select><input class="fld price" type="number" min="0" step="0.01" id="rcp_qty_${i}" value="${r.qty||''}" placeholder="qty" style="max-width:90px"><span class="rm" onclick="removeRecipeRow(${i})">✕</span></div>`).join('');
   const have=Object.keys(getRecipes()).filter(t=>recipeFor(t).length);
-  box.innerHTML=`<div class="field"><label>Garment type</label>${typeSel}</div>
+  box.innerHTML=`<div class="field"><label>${tradeWordCap()} type</label>${typeSel}</div>
     <div class="bd-sub">Materials to make one ${esc(recipeType)}</div>
     ${rows||'<div class="kv" style="color:var(--text-faint)">No materials yet for this type.</div>'}
     <button class="btn ghost sm" style="width:100%;margin:6px 0" onclick="addRecipeRow()">＋ Add material</button>
@@ -4165,7 +4272,7 @@ function toast(msg){var t=document.getElementById('layiToast');if(!t){t=document
 function renderLogoPreview(){const el=document.getElementById('logoPreview');if(!el)return;const logo=(SETTINGS.company||{}).logo;el.innerHTML=logo?`<img src="${logo}" style="width:100%;height:100%;object-fit:contain">`:'none';}
 async function uploadLogo(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
 function clearLogo(){SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
-function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one garment type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit('Garment types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save garment types');}
+function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one '+tradeWord()+' type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit(tradeWordCap()+' types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save '+tradeWord()+' types');}
 function saveCompany(){syncBanks();SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,banks:companyBanks.filter(b=>b.bank||b.name||b.no)});save('layi_dash_settings',SETTINGS);applyBranding();if(typeof renderActivity==='function')renderActivity();flashSaved('coSaveBtn','Update company details');}
 /* The studio's own name and logo, saved in Settings, drive every in-app surface.
    The login screen is deliberately NOT one of them: no tenant is known yet. */
@@ -4231,7 +4338,28 @@ function impDate(v){v=(v||'').trim();if(!v)return new Date().toISOString().slice
   m=v.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);if(m){var y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);}
   var d=new Date(v);return isNaN(d.getTime())?new Date().toISOString().slice(0,10):d.toISOString().slice(0,10);}
 const IMP_MEAS={'Neck':['neck'],'Shoulder':['shoulder','shoulders'],'Chest / Bust':['chest','bust','chest/bust'],'Tummy / Stomach':['tummy','stomach','belly'],'Waist':['waist'],'Hip':['hip','hips'],'Sleeve length':['sleeve','sleeve length','sleeve len'],'Round sleeve':['round sleeve'],'Bicep':['bicep','biceps'],'Forearm':['forearm'],'Wrist':['wrist'],'Shirt / Kaftan length':['shirt length','kaftan length','top length'],'Top / Jacket length':['jacket length'],'Trouser waist':['trouser waist','pant waist'],'Trouser length':['trouser length','pant length','trouser'],'Thigh':['thigh'],'Knee':['knee'],'Calf':['calf'],'Ankle':['ankle'],'Inseam':['inseam'],'Outseam':['outseam'],'Agbada width (arm-span)':['agbada width','arm span','arm-span','armspan'],'Agbada length':['agbada length'],'Cap / Kufi size':['cap size','kufi']};
-function impMeasFromRow(head,row){var m={};MEAS_FIELDS.forEach(function(f){var al=(IMP_MEAS[f]||[]).concat([f.toLowerCase()]);var idx=impCol(head,al);if(idx>=0){var v=impCell(row,idx);if(v)m[f]=v;}});return m;}
+/* Foot and bag aliases, so a shoemaker's or bag maker's spreadsheet imports too. */
+Object.assign(IMP_MEAS,{
+  'Shoe size':['shoe size','size','uk size','eu size'],
+  'Foot length (L)':['foot length left','left foot length','foot length (l)','left length'],
+  'Foot length (R)':['foot length right','right foot length','foot length (r)','right length'],
+  'Foot width (L)':['foot width left','left foot width','foot width (l)','left width'],
+  'Foot width (R)':['foot width right','right foot width','foot width (r)','right width'],
+  'Instep / girth':['instep','instep girth','girth'],
+  'Heel to ball':['heel to ball','ball length'],
+  'Ankle girth':['ankle girth','ankle circumference'],
+  'Calf girth':['calf girth','calf circumference'],
+  'Last / fitting notes':['last','last notes','fitting notes'],
+  'Bag height':['bag height','height'],
+  'Bag width':['bag width','width'],
+  'Bag depth':['bag depth','depth'],
+  'Strap length':['strap length','strap'],
+  'Strap drop':['strap drop','drop'],
+  'Handle length':['handle length','handle'],
+  'Gusset':['gusset','gusset width'],
+  'Hardware finish':['hardware','hardware finish','fittings']
+});
+function impMeasFromRow(head,row){var m={};MEAS_ALL.forEach(function(f){var al=(IMP_MEAS[f]||[]).concat([f.toLowerCase()]);var idx=impCol(head,al);if(idx>=0){var v=impCell(row,idx);if(v)m[f]=v;}});return m;}
 const IMP_ICO={
   cust:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.8 20c.5-3.1 2.7-5.2 5.2-5.2s4.7 2.1 5.2 5.2"/><circle cx="17.2" cy="9.5" r="2.3"/><path d="M16 14.9c2.2.2 3.9 1.9 4.3 4.4"/></svg>',
   orders:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4.5"/></svg>',
@@ -6401,7 +6529,7 @@ function renderDashSalesTrio(){
     bs=Object.keys(prod).map(k=>{const p=getProducts().find(x=>x.id===k);return {id:k,hasP:!!p,name:p?p.name:'Item',qty:prod[k].qty,rev:prod[k].rev};}).sort((a,b)=>b.qty-a.qty).slice(0,3);bsLabel='Best sellers';
   }else{
     const g={};getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)).forEach(o=>{const t=((o.garment||orderItems(o)||'Order')+'').split(',')[0].trim()||'Order';if(!g[t])g[t]={qty:0,rev:0};g[t].qty++;g[t].rev+=orderNetBase(o);});
-    bs=Object.keys(g).map(k=>({id:'',hasP:false,name:k,qty:g[k].qty,rev:g[k].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);bsLabel='Top garments';
+    bs=Object.keys(g).map(k=>({id:'',hasP:false,name:k,qty:g[k].qty,rev:g[k].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);bsLabel='Top '+tradeWordPlural();
   }
   const cust={};allO.forEach(o=>{const c=o.client||'Walk-in';if(!cust[c])cust[c]={n:0,rev:0};cust[c].n++;cust[c].rev+=(o.kind==='sale'?(+o.value||0):orderNetBase(o));});
   const tc=Object.keys(cust).map(c=>({name:c,n:cust[c].n,rev:cust[c].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);
@@ -6829,7 +6957,7 @@ function renderOrders(){
   let head,body;
   if(bespokeView){
     // Bespoke branch: measurements-forward, production-focused — no retail/financial clutter
-    head=`<tr><th>Client</th><th class="hide-sm">Garment</th><th>Measurements</th><th>Due</th><th>Stage</th></tr>`;
+    head=`<tr><th>Client</th><th class="hide-sm">${tradeWordCap()}</th><th>Measurements</th><th>Due</th><th>Stage</th></tr>`;
     body=rows.map(o=>{
       const du=daysUntil(o.due);const _deliv=o.stageIndex>=DELI;const _disp=o.stageIndex>=DIS&&!_deliv;const overdue=du!==null&&du<0&&o.stageIndex<DIS;
       const dueTxt=_deliv?'<span style="color:var(--green);font-weight:600">delivered ✓</span>':_disp?'<span style="color:#2bb0a6;font-weight:600">pending delivery</span>':overdue?'<span style="color:var(--red);font-weight:600">overdue</span>':(o.due?new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'<span style="color:var(--text-faint)">—</span>');
@@ -7416,7 +7544,7 @@ function openStaffDetail(id){
   const personal=kv('Staff ID',s.staffId)+kv('Gender',s.gender)+kv('Date of birth',s.dob)+kv('Phone',s.phone)+kv('Email',s.email)+kv('Address',s.address)+kv('Nationality',s.nationality)+kv('Emergency contact',[s.emergencyName,s.emergencyPhone,s.emergencyRel].filter(Boolean).join(' · '));
   const contactRow=(s.phone||s.email)?`<div class="kv" style="margin-bottom:10px">${s.phone?`<a href="tel:${esc(s.phone)}" style="color:var(--gold)">Call</a> · <a href="https://wa.me/${String(s.phone).replace(/[^0-9]/g,'')}" target="_blank" style="color:var(--gold)">WhatsApp</a>`:''}${s.email?(s.phone?' · ':'')+`<a href="mailto:${esc(s.email)}" style="color:var(--gold)">Email</a>`:''}</div>`:'';
   const employ=kv('Job title',s.role)+kv('Department',s.department)+kv('Employment type',s.employmentType)+kv('Start date',s.startDate)+`<div class="bd-row"><span class="bl">Status</span><span class="bv" style="color:var(--${statusCls==='ok'?'green':statusCls==='out'?'red':'amber'})">${esc(st)}</span></div>`+reportingRows+kv('Work location',s.location)+kv('Specialisation',s.specialty)+kv('Skills',s.skills)+kv('Notes',s.notes);
-  const payroll=money?(kv('Salary type',s.salaryType)+kv('Commission basis',s.commMethod==='pctValue'?((+s.commPct||0)+'% of order value'):s.commMethod==='pctProfit'?((+s.commPct||0)+'% of profit'):'Fixed per garment')+kv('Monthly basic',+s.basic>0?cur(s.basic):'')+kv('Commission / item',(s.commMethod==='fixed'&&+s.rate>0)?cur(s.rate):'')+(s.rates&&s.rates.length?`<div class="bd-row"><span class="bl">Garment rates</span><span class="bv">${s.rates.map(r=>esc(r.type)+' '+cur(r.amount)).join(', ')}</span></div>`:'')+kv('Bank',[s.bankName,s.accountNo,s.accountName].filter(Boolean).join(' · '))):'';
+  const payroll=money?(kv('Salary type',s.salaryType)+kv('Commission basis',s.commMethod==='pctValue'?((+s.commPct||0)+'% of order value'):s.commMethod==='pctProfit'?((+s.commPct||0)+'% of profit'):('Fixed per '+tradeWord()))+kv('Monthly basic',+s.basic>0?cur(s.basic):'')+kv('Commission / item',(s.commMethod==='fixed'&&+s.rate>0)?cur(s.rate):'')+(s.rates&&s.rates.length?`<div class="bd-row"><span class="bl">${tradeWordCap()} rates</span><span class="bv">${s.rates.map(r=>esc(r.type)+' '+cur(r.amount)).join(', ')}</span></div>`:'')+kv('Bank',[s.bankName,s.accountNo,s.accountName].filter(Boolean).join(' · '))):'';
   const pendingBankHtml=(money&&s.pendingBank)?`<div class="kv" style="border:1px solid var(--amber);border-radius:8px;padding:10px 12px;margin-top:8px"><b>⚠ Bank change requested by ${esc(s.name)}</b><br><span style="color:var(--text-dim)">New: ${esc(s.pendingBank.bank||'')} · ${esc(s.pendingBank.no||'')} · ${esc(s.pendingBank.name||'')}</span><br><span style="color:var(--text-faint);font-size:12px">Requested ${fmtDateShort(s.pendingBank.at)}</span><div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm" onclick="approveBankChange('${id}')">Approve</button><button class="btn sm ghost" onclick="rejectBankChange('${id}')">Reject</button></div></div>`:'';
   const docs=(s.docs||[]).length?(s.docs||[]).map(d=>`<div class="bd-row"><span class="bl">${esc(d.type)} <span style="color:var(--text-faint)">${esc(d.name||'')}</span></span><span class="bv">${d.data?`<a href="${d.data}" download="${esc(d.name||'document')}" style="color:var(--gold)">open</a>`:''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No documents uploaded. Add them via Edit profile.</div>';
   const tl=(s.timeline||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
@@ -7540,15 +7668,15 @@ function renderStaffModal(){
     <div class="row2"><div class="field"><label>Payment method</label><select class="fld" id="st_salType">${opts(SALARY_TYPES,({'Per Piece':'Commission','Hybrid':'Salary + Commission'}[s.salaryType])||s.salaryType||'Monthly Salary')}</select></div>
       <div class="field"><label>Monthly basic (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="st_basic" value="${s.basic?fmtNum(s.basic):''}" placeholder="0 if none"></div></div>
     <div class="field"><label>Commission basis</label><select class="fld" id="st_commMethod" onchange="staffCommMethodChange()">
-      <option value="fixed"${cm==='fixed'?' selected':''}>Fixed amount per garment</option>
+      <option value="fixed"${cm==='fixed'?' selected':''}>Fixed amount per ${tradeWord()}</option>
       <option value="pctValue"${cm==='pctValue'?' selected':''}>Percentage of order value</option>
       <option value="pctProfit"${cm==='pctProfit'?' selected':''}>Percentage of profit</option>
     </select></div>
     ${(cm==='pctValue'||cm==='pctProfit')?`<div class="field"><label>Percentage ${cm==='pctProfit'?'of order profit':'of order value'} (%)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_commPct" value="${s.commPct||''}" placeholder="e.g. 10"><div class="sd" style="color:var(--text-faint);margin-top:4px">Worked out automatically on each order they make, and still editable per order.</div></div>`
     :`<div class="field"><label>Default commission / item (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="st_rate" value="${s.rate?fmtNum(s.rate):''}" placeholder="0 if none"></div>
-    <div class="field"><label>Commission by garment type</label>
+    <div class="field"><label>Commission by ${tradeWord()} type</label>
       <div class="sd" style="color:var(--text-faint);margin-bottom:8px">e.g. Kaftan ${SETTINGS.currency}40,000 · Agbada ${SETTINGS.currency}65,000. Editable on each order.</div>
-      ${rateRows}<button class="btn ghost sm" style="width:100%" onclick="addStaffRate()">＋ Add garment rate</button></div>`}
+      ${rateRows}<button class="btn ghost sm" style="width:100%" onclick="addStaffRate()">＋ Add ${tradeWord()} rate</button></div>`}
     <div class="row2"><div class="field"><label>Bank name</label><input class="fld" id="st_bank" value="${esc(s.bankName||'')}"></div>
       <div class="field"><label>Account number</label><input class="fld" id="st_accNo" value="${esc(s.accountNo||'')}"></div></div>
     <div class="field"><label>Account name</label><input class="fld" id="st_accName" value="${esc(s.accountName||'')}"></div>`:''}

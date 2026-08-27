@@ -43,13 +43,27 @@ is worse than one that takes a second longer.
 ## The design
 
 Rebuilt 2026-08-27 against a reference Kayode brought: a darker navy ground,
-gold, serif headlines over an Inter interface face, a proper software header
-with dropdown menus, and photography of the trade beside the product itself.
+gold, serif headlines over an Inter interface face, a plain tab header, and
+photography of the trade beside the product itself.
 
-- **Tokens** live at the top of `web/css/site.css`. Ground `#06101d`, panels
-  `#0d1725`, hairline `#223149`, gold `#e0aa3f`. Headings are Georgia, which is
-  already on the device, so the only web font is Inter and the page still reads
-  correctly before it arrives.
+- **One theme, two grounds.** There is no light and dark switch any more. The
+  page is dark navy by default, and any section can stand on the light ground
+  by taking `class="on-light"`, which swaps the tokens for everything inside
+  it. No component needs to know: they all read the same variables.
+
+  The rhythm is deliberate rather than alternating for its own sake. **Dark**
+  carries the hero, the product screens, the closing call and the footer.
+  **Light** carries the parts people actually read: the trade strip, the plans,
+  the steps, the forms, the privacy notice and the terms. A photograph on the
+  light ground drops its dark wash, because it is no longer sitting under white
+  text.
+
+- **Tokens** live at the top of `web/css/site.css`, with the light ground under
+  `.on-light` at the bottom. Dark: ground `#06101d`, panels `#0d1725`, hairline
+  `#223149`, gold `#e0aa3f`. Light: cream `#f7f4ef`, ink `#0d1726`, and a deeper
+  gold for anything that has to be legible as text rather than as a button.
+  Headings are Georgia, which is already on the device, so the only web font is
+  Inter.
 - **The header is plain tabs**, no dropdowns: Product, Solutions, Pricing,
   Demo, Our story, Help, then Log in and the gold Book a demo. Dropdowns were
   removed on 2026-08-27 (a hover menu that also toggles on click reads as
@@ -63,15 +77,19 @@ with dropdown menus, and photography of the trade beside the product itself.
 
 ### Photography
 
-The seven trade tiles, the hero composite and the About picture were cut out of
-the reference board Kayode generated, using a small dependency free PNG cropper
-(source image in his Downloads, 1536x1024). They are correct pictures at the
-size that image allowed, so they are soft on a high resolution screen and PNG is
-a heavy format for photographs. `web/img/README.txt` says what to replace them
-with.
+The trade tiles and the hero are high resolution photographs from Pexels, free
+for commercial use with no attribution required, each one looked at before it
+was used. They were the second attempt: the first set was cut out of the
+reference board Kayode generated, and at 192px a tile it looked blurry the
+moment it was stretched across a wide screen. `tools_pngcrop.js` is the
+dependency free PNG cropper written for that attempt, kept because it is useful.
 
-Every slot still degrades on purpose, because the replacements will arrive one
-at a time:
+Because the photographs come from a dozen different rooms, the stylesheet puts
+**one treatment over all of them** (brightness .86, saturation .82, and a navy
+wash), which is what makes a bright studio and a dark workshop read as one set.
+Change it in `site.css` under "photographs, once they arrive".
+
+Every slot still degrades on purpose, so a missing file never leaves a hole:
 
 - **Trade tiles** hold an icon with an `<img>` over it. If the file is missing
   the image removes itself and the icon shows.
@@ -82,9 +100,40 @@ at a time:
 
 A note worth keeping: the Unsplash ids in the reference HTML do not resolve to
 the pictures in the reference image, which was generated rather than built. Two
-came back as a corporate stock photo and a carpenter. Photographs of the real
-workroom, stock and team beat both, and they are the one thing a competitor
-cannot copy.
+came back as a corporate stock photo and a carpenter. Do not trust them.
+
+Photographs of the real workroom, the real stock and the real team beat all of
+this, and they are the one thing a competitor cannot copy. When they exist, drop
+them into `web/img/` with the same filenames and nothing else changes.
+
+## Shipped like a real site
+
+The build pass on 2026-08-27 added the things nobody notices until they are
+missing, and the gate now holds each of them:
+
+- **A sharing picture.** Every indexable page carries `og:image`, so a link
+  pasted into WhatsApp or Instagram shows a photograph rather than bare text.
+  It points at `img/hero.jpg`. A purpose made 1200x630 card would be better
+  when there is one.
+- **Structured data** on the home page: Organization, founder, Lagos, and the
+  three plans with their Naira prices, so a search engine reads the facts
+  rather than guessing them.
+- **Pictures load late** (`loading="lazy" decoding="async"`) and sit inside
+  fixed height boxes, so they never block the first paint and never shift the
+  layout as they arrive.
+- **Images are cached for a year** in `netlify.toml`, while pages, CSS and JS
+  are revalidated every time. A photograph never changes under the same name.
+- **Line length is capped** even though the container is 1680px wide. Text
+  keeps a 56 to 62 character measure; only grids and panels stretch.
+- **Photographs adapt to the ground they sit on.** The dark wash that lets a
+  photo carry white text is dropped on the light sections, where it would only
+  make the page look grey.
+
+The one piece of debt worth naming: the product screens on the Product and Demo
+pages still use the older `.mock` component while the hero and the showcase use
+`.screen`. They are styled from the same tokens and look the same, but they are
+two components doing one job. Worth merging the day either one needs a real
+change.
 
 ## Length is a feature
 
@@ -99,7 +148,6 @@ scrolling. Where it is today, at 375px wide:
 | Solutions | 2.9 |
 | Pricing | 5.8 |
 | Demo | 5.2 |
-| Support | 4.9 |
 | Partners | 6.2 |
 | Referrals | 5.7 |
 | About | 5.4 |
@@ -242,7 +290,7 @@ references listed above.
 node audit_web.js
 ```
 
-1278 checks. It reads every page and asserts the things a person stops noticing
+1332 checks. It reads every page and asserts the things a person stops noticing
 after the third read: that every internal link and anchor resolves, that the
 header and footer are identical everywhere, that every form will actually reach
 Netlify and every input has a label, that the prices match the console and the

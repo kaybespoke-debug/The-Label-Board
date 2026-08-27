@@ -18,18 +18,6 @@
   --sans:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
   --serif:Georgia,'Times New Roman',serif;
 }
-/* The light tokens sit on the ROOT element rather than on body, so the canvas
-   behind the page switches with everything else. */
-html.light{
-  --bg:#ffffff;--bg-2:#f4f6fa;--panel:#ffffff;--panel-2:#f6f8fb;
-  --line:rgba(13,23,37,.16);--line-soft:rgba(13,23,37,.10);
-  --text:#0b1523;--dim:#33445b;--faint:#63738a;
-  --gold:#14304f;--gold-2:#0b2039;--on-gold:#ffffff;
-  --green:#166534;--red:#b3261e;--amber:#8a5a12;--blue:#155e75;--purple:#5b3fa8;
-  --shadow:0 22px 44px -26px rgba(11,21,35,.25);
-  --shadow-soft:0 12px 28px -20px rgba(11,21,35,.2);
-}
-
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 html,body{margin:0;padding:0}
@@ -129,10 +117,6 @@ section:last-of-type{border-bottom:0}
 .hdr-act{display:flex;align-items:center;gap:9px;flex:none;margin-left:auto}
 .hdr-act .login{font-size:14px;font-weight:500;color:var(--dim);padding:9px 8px}
 .hdr-act .login:hover{color:var(--text)}
-.tgl{width:36px;height:36px;border-radius:6px;border:1px solid var(--line);background:transparent;
-  color:var(--faint);cursor:pointer;display:grid;place-items:center;transition:.2s;flex:none}
-.tgl:hover{border-color:var(--gold);color:var(--gold)}
-.tgl svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
 .burger{display:none;width:38px;height:38px;border-radius:6px;border:1px solid var(--line);
   background:transparent;color:var(--text);cursor:pointer;position:relative;padding:0}
 .burger span{position:absolute;left:50%;width:17px;margin-left:-8.5px;height:1.6px;
@@ -190,12 +174,12 @@ body.menu-open .drawer{display:flex}
 .screen-side i::before{content:"";width:5px;height:5px;border-radius:2px;background:currentColor;opacity:.7}
 .screen-main{padding:13px}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.k{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px}
-.k small{display:block;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.k b{display:block;font-family:var(--serif);font-size:18px;margin-top:5px;font-variant-numeric:tabular-nums}
-.k.gold b{color:var(--gold-2)}
-.k.green b{color:var(--green)}
-.k.red b{color:var(--red)}
+.kpis .k{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px}
+.kpis .k small{display:block;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.kpis .k b{display:block;font-family:var(--serif);font-size:18px;margin-top:5px;font-variant-numeric:tabular-nums}
+.kpis .k.gold b{color:var(--gold-2)}
+.kpis .k.green b{color:var(--green)}
+.kpis .k.red b{color:var(--red)}
 .rows{margin-top:10px;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
 .rows .rh{display:flex;justify-content:space-between;padding:8px 11px;background:var(--panel-2);
   font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
@@ -454,7 +438,6 @@ html.js-on .pane.on{display:block;animation:rise .28s ease both}
 .cta{background:var(--bg-2)}
 .cta h2{margin-bottom:14px}
 .ftr{padding:clamp(38px,4.4vw,56px) 0 30px;background:#050b13;border-top:1px solid var(--line)}
-html.light .ftr{background:var(--bg-2)}
 .ftr-top{display:grid;grid-template-columns:1.6fr repeat(3,minmax(0,1fr));gap:30px;
   padding-bottom:30px;border-bottom:1px solid var(--line-soft)}
 .ftr-about p{color:var(--faint);font-size:13.5px;margin-top:15px;max-width:34ch;line-height:1.7}
@@ -499,7 +482,8 @@ html.js-on .reveal{opacity:0;transform:translateY(14px)}
 html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,transform .4s ease}
 
 /* ---------- long form pages ---------- */
-.prose{max-width:74ch}
+/* a long read sits in the middle of a wide screen rather than hugging the left */
+.prose{max-width:74ch;margin:0 auto}
 .prose h2{font-size:clamp(22px,2.6vw,28px);margin-top:44px}
 .prose h2:first-child{margin-top:0}
 .prose h3{font-size:18px;margin-top:28px}
@@ -632,7 +616,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   background:color-mix(in srgb,var(--green) 13%,transparent)}
 .pill.late{color:var(--red);border-color:color-mix(in srgb,var(--red) 42%,transparent);
   background:color-mix(in srgb,var(--red) 13%,transparent)}
-.tgl .i-sun,.tgl .i-moon{display:block}
 @media (max-width:680px){.mock-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* the hero composite, which carries its own dark ground */
@@ -697,3 +680,48 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 45%,transparent))}
 .industry .pic svg{position:relative;z-index:0}
 
+
+/* ---------- line length ----------
+   The container got wider so the page uses the screen, but a paragraph that
+   runs the full half of a 1680px layout is about ninety characters a line and
+   nobody reads that comfortably. Text keeps its own measure. */
+.row2-text p,.row2-text .checks,.callout p{max-width:62ch}
+.card p,.card ul{max-width:56ch}
+.step p{max-width:74ch}
+
+
+/* ==========================================================================
+   ONE THEME, TWO GROUNDS
+   The page is dark by default. A section can stand on the light ground by
+   taking the class, which swaps the tokens for everything inside it. Nothing
+   else in the stylesheet needs to know: every component already reads these.
+
+   The rhythm is deliberate. Dark carries the hero, the product screens, the
+   closing call and the footer. Light carries the parts people actually read.
+   ========================================================================== */
+.on-light{
+  --bg:#f7f4ef;--bg-2:#efe9e0;--panel:#ffffff;--panel-2:#f4f0ea;
+  --line:rgba(12,22,36,.15);--line-soft:rgba(12,22,36,.10);
+  --text:#0d1726;--dim:#3a4657;--faint:#6a7587;
+  --gold:#a9761f;--gold-2:#7a5514;--on-gold:#ffffff;
+  --green:#1c7a52;--red:#a63b3f;--amber:#8a5f14;--blue:#1b5f86;--purple:#5b45a0;
+  --shadow:0 24px 46px -28px rgba(12,22,36,.28);
+  --shadow-soft:0 12px 28px -20px rgba(12,22,36,.2);
+  background:var(--bg);
+  color:var(--text);
+  border-bottom-color:var(--line-soft);
+}
+/* the gold button keeps its warmth on the light ground rather than going brown */
+.on-light .btn-gold{background:#d99b2c;border-color:#d99b2c;color:#17120a}
+.on-light .btn-gold:hover{background:#c98a1f;border-color:#c98a1f;color:#17120a}
+.on-light .btn{border-color:rgba(12,22,36,.28);color:var(--text)}
+.on-light .btn:hover{border-color:var(--gold);color:var(--gold-2)}
+/* a photograph on the light ground is not fighting white text any more */
+.on-light .industry .pic img,.on-light .pic-panel img{filter:none}
+.on-light .industry .pic::after{background:linear-gradient(180deg,transparent,rgba(12,22,36,.10))}
+.on-light .industry .pic{background:linear-gradient(150deg,#e8e1d6,#f2ece3)}
+.on-light .step::before{background:rgba(169,118,31,.15);color:var(--gold-2)}
+.on-light .checks li::before{border-color:rgba(169,118,31,.5);background:rgba(169,118,31,.14)}
+.on-light .checks li::after{border-left-color:var(--gold);border-bottom-color:var(--gold)}
+/* where a light section meets a dark one, the seam is a hairline of neither */
+.on-light + section,section + .on-light{border-top:0}

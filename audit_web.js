@@ -321,6 +321,31 @@ check(/coming|on the way|being finished|shipping soon|Built and shipping soon/i.
   check(html['features.html'].includes(t), 'the product page lists "' + t + '" as still to come rather than as a feature');
 });
 
+/* ================= shipped like a real site ================= */
+/* Things nobody notices until they are missing: a picture when the link is
+   pasted into WhatsApp, images that do not block the first paint, and the
+   plain facts in a form a search engine can read. */
+INDEXABLE.forEach(p => {
+  check(/<meta property="og:image" content="https:\/\/[^"]+">/.test(html[p]),
+    p + ' has a sharing picture for when the link is pasted somewhere');
+  check(/<meta property="og:title"/.test(html[p]), p + ' has a sharing title');
+});
+built.forEach(p => {
+  all(html[p], /<img[^>]*>/g).forEach(m => {
+    check(/loading="lazy"/.test(m[0]), p + ' loads its pictures late: ' + (attrs(m[0], 'src') || ''));
+    check(/alt="/.test(m[0]), p + ' gives every picture an alt: ' + (attrs(m[0], 'src') || ''));
+  });
+});
+check(html['index.html'].includes('application/ld+json'), 'the home page carries the plain facts for search engines');
+check(/"priceCurrency": "NGN"/.test(html['index.html']), 'the structured data prices are in Naira');
+
+/* every picture the pages ask for is actually in the folder */
+built.forEach(p => {
+  const wanted = new Set();
+  all(html[p], /(?:src|data-photo)="(img\/[^"]+)"/g).forEach(m => wanted.add(m[1]));
+  wanted.forEach(f => check(fs.existsSync(path.join(dir, f)), p + ' asks for a picture that exists: ' + f));
+});
+
 /* ================= photography ================= */
 /* The site is designed to carry photographs it does not have yet. Every slot
    has to hold a drawn fallback, or the first deploy ships holes. */
@@ -378,10 +403,15 @@ built.forEach(p => all(html[p], /class="([^"]+)"/g).forEach(m =>
   m[1].split(/\s+/).forEach(c => c && usedClasses.add(c))));
 const missing = [...usedClasses].filter(c => !css.includes('.' + c));
 check(missing.length === 0, 'every class the pages use is styled (' + (missing.join(', ') || 'none missing') + ')');
-check(css.includes('html.light'), 'the stylesheet has a light theme, like the rest of the family');
-check(!/\bbody\.light\b/.test(css) && !/document\.body\.classList\.(add|toggle)\('light'/.test(
-  read('js/site.js') + built.map(p => html[p]).join('')),
-  'the theme is switched on the root element only, so nothing is left half switched');
+check(css.includes('.on-light{'), 'the stylesheet carries the light ground as a section surface');
+/* one theme now, so there is no switch left to leave anything half applied */
+check(!/tlb_site_theme/.test(read('js/site.js') + built.map(p => html[p]).join('')),
+  'there is no theme switch left anywhere');
+check(!/html\.light|body\.light/.test(css), 'no switchable theme remains in the stylesheet');
+built.forEach(p => check(!html[p].includes('class="tgl"'), p + ' has no theme toggle button'));
+check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
+  'the light ground is used across the site (' +
+  all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length + ' sections)');
 check(css.includes('@media (prefers-reduced-motion:reduce)'), 'the stylesheet respects reduced motion');
 check(css.includes('@media (max-width:680px)'), 'the stylesheet has a phone breakpoint, which is the primary device');
 
@@ -399,7 +429,8 @@ const js = read('js/site.js');
 check(js.includes('window.__tlbReady = true'), 'the script tells the page it arrived');
 check(js.includes('window.scrollTo'), 'in page links use window.scrollTo, which is the one that works everywhere');
 check(!/\.scrollIntoView\s*\(/.test(js), 'nothing relies on scrollIntoView');
-check(js.includes('tlb_site_theme'), 'the theme choice is remembered under its own key');
+check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
+  'the light ground is actually used across the site');
 check(!/layi_/.test(js), 'the website never touches the studio app storage keys');
 
 /* ---------- report ---------- */
