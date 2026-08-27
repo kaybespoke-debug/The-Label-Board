@@ -38,16 +38,34 @@ explains what each gate exists to catch.
 ## Branches and deploys
 
 - `main` publishes `site/` — **the customer app ships from here**
-- `admin-deploy` publishes `admin/`
-- `partners/` and `web/` have their own Netlify sites
+- `admin-deploy` publishes `admin/` — the operator console, and where the
+  partner portal lives
+- `web/` is not connected to Netlify yet. It still carries placeholders and an
+  unsettled domain, so pushing it publishes nothing.
 
-`admin-deploy` currently contains everything on `main` plus 20 commits.
+Day-to-day work happens on `admin-deploy`. Releasing the customer app means
+merging it into `main`.
 
-**Careful:** the root `netlify.toml` is deliberately different on the two
-branches — `publish = "site"` on `main`, `publish = "admin"` on `admin-deploy`.
-Merging `admin-deploy` into `main` as-is would point the customer app's site at
-the admin console. Merge the folders you mean, not the branch, until that is
-fixed with Netlify branch contexts.
+**The one thing to get right when you do.** The root `netlify.toml` is
+deliberately different on the two branches: `publish = "site"` on `main`,
+`publish = "admin"` on `admin-deploy`. Git will not warn you, because `main`
+is an ancestor of `admin-deploy` and the merge is clean — it simply
+fast-forwards the admin config over main's, and the customer app's site starts
+serving the admin console to every studio.
+
+So merge like this:
+
+```bash
+git checkout main && git merge --no-ff --no-commit admin-deploy && git checkout HEAD -- netlify.toml && git commit
+```
+
+Both copies of the file carry the same warning and the same recipe, so you do
+not have to remember it. The permanent fix is to set each site's publish
+directory in the Netlify dashboard and delete the file — a settings change on
+live sites, so it is Kayode's call, not a commit.
+
+Bump `CACHE` in `site/sw.js` before every release, or installed phones keep
+serving the old version.
 
 ## Storage keys
 
