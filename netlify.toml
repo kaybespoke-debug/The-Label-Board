@@ -1,5 +1,30 @@
-# ADMIN DEPLOYMENT BRANCH
-# Netlify publishes the admin/ folder for the admin dashboard
-# Connected to github.com/kaybespoke-debug/The-Label-Board admin-deploy branch
+# ============================================================================
+# ADMIN DEPLOYMENT BRANCH — admin-deploy
+#
+# Netlify publishes the admin/ folder for the Admin Control Centre.
+# Connected to github.com/kaybespoke-debug/The-Label-Board, branch admin-deploy.
+#
+# ---------------------------------------------------------------------------
+# THIS FILE IS DELIBERATELY DIFFERENT ON main. DO NOT LET A MERGE OVERWRITE IT.
+#
+# On main it reads publish = "site" and serves the customer app. If a merge
+# brings this version across, the customer app's Netlify site starts serving
+# the admin console to every studio on the platform. It is not a conflict git
+# will warn you about, because main is an ancestor of this branch and the
+# merge fast-forwards cleanly.
+#
+# Merging admin-deploy into main, safely:
+#
+#     git checkout main
+#     git merge --no-ff --no-commit admin-deploy
+#     git checkout HEAD -- netlify.toml      # keep main's own publish path
+#     git commit
+#
+# The permanent fix is to set each site's publish directory in the Netlify
+# dashboard instead of here, and delete this file. That is a settings change
+# on four live sites, so it is Kayode's to make, not something to slip into
+# a commit.
+# ============================================================================
+
 [build]
   publish = "admin"
