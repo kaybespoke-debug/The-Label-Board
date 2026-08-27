@@ -4002,9 +4002,106 @@ function defaultBranchName(){const b=getBranches();return (b[0]&&b[0].name)||'Ma
 function multiBranch(){return activeBranches().length>1;}
 // A small studio badge for list rows — only shown when viewing All studios (so a user can see where each record belongs).
 function branchTag(name){if(activeBranchView!=='all'||!multiBranch()||!name)return '';return `<span class="branch-tag">${esc(String(name))}</span>`;}
-function branchOf(rec){return (rec&&rec.branch)?rec.branch:defaultBranchName();}
+/* ===== BRANCH SCOPE ==========================================================
+   A branch is an operational dimension, not a data silo. Three tiers, and
+   which tier a record sits in is a decision about the business, not a
+   technicality:
+
+     branch-owned    it happened somewhere. An order, a sale, a stock
+                     movement, an appointment, a shift. Filtering these is
+                     strict: an Abuja order is not Lagos's business.
+
+     company         it belongs to the label. A supplier, a campaign, a
+                     savings pot, the catalogue itself. These show in every
+                     branch, because they are the company's.
+
+     company, assigned   a company record that names the branches it applies
+                     to. Still the company's, but filterable — a campaign run
+                     only in Lagos, a supplier only the Abuja outlet uses.
+                     Naming no branches means it applies to all of them.
+
+   What this replaces: branchOf() used to answer "no branch recorded" with
+   defaultBranchName(), so every untagged record was silently attributed to
+   whichever branch happened to be FIRST in the list. That is how one branch
+   came to show everybody's data while a newly added branch showed nothing.
+   A guess that looks like an answer is worse than no answer.
+   ========================================================================= */
+
+/* The record's own branch, or '' when it does not have one. Never a guess. */
+function branchOf(rec){return (rec&&rec.branch)?String(rec.branch):'';}
+
+/* For stamping and for labels, where a concrete name is genuinely needed.
+   Kept separate from branchOf on purpose: filtering must never fall back. */
+function branchOfOr(rec,fallback){return branchOf(rec)||fallback||defaultBranchName();}
+
 var activeBranchView='all';
-function inBranch(rec){return activeBranchView==='all'||branchOf(rec)===activeBranchView;}
+
+/* Branch-owned records. After the one-off migration in init() every one of
+   these carries a branch, so the unassigned case should never arise. If it
+   ever does, the row is shown in every branch rather than filed under the
+   first one — a visible symptom the branch-scope gate will catch, instead of
+   an invisible one nobody notices until a customer does. */
+function inBranch(rec){
+  if(activeBranchView==='all')return true;
+  const b=branchOf(rec);
+  if(!b)return true;
+  return b===activeBranchView;
+}
+
+/* Company records. They belong to the label, so they show everywhere, unless
+   they name the branches they apply to. */
+function branchesOf(rec){
+  const a=rec&&rec.branches;
+  return Array.isArray(a)?a.filter(Boolean):[];
+}
+function inCompanyScope(rec){
+  if(activeBranchView==='all')return true;
+  const a=branchesOf(rec);
+  if(!a.length)return true;
+  return a.indexOf(activeBranchView)>=0;
+}
+/* Does this company record apply everywhere, or only somewhere? Used to say
+   so on screen, so a shared row never reads as a leak. */
+function companyScopeLabel(rec){
+  const a=branchesOf(rec);
+  if(!a.length)return multiBranch()?'All studios':'';
+  return a.join(', ');
+}
+/* One-off: give every branch-owned record a branch.
+
+   Records made before this existed have no branch on them. Until now they
+   were shown under whichever branch sorted first, which is why one studio
+   appeared to hold everybody's data. We cannot know retroactively where an
+   untagged record happened — but we do know that a studio which had one
+   branch when it was created can only have meant that one. So they are
+   stamped with the first branch, which for the overwhelming majority of
+   studios is simply the truth, and for the rest is the same answer they were
+   already being shown, now written down where it can be corrected.
+
+   Runs once. Records created afterwards carry their branch from the start. */
+function migrateBranchOwnership(){
+  const home=defaultBranchName();
+  if(!home)return;
+  let touched=0;
+  const stamp=(get,set,key)=>{
+    const list=get();if(!Array.isArray(list)||!list.length)return;
+    let changed=false;
+    list.forEach(r=>{if(r&&!r[key]){r[key]=home;changed=true;touched++;}});
+    if(changed)set(list);
+  };
+  stamp(getOrders,v=>save('layi_dash_orders',v),'branch');
+  stamp(getTxns,setTxns,'branch');
+  stamp(getSupplies,setSupplies,'branch');
+  stamp(getAppts,setAppts,'branch');
+  stamp(getBills,setBills,'branch');
+  if(typeof getAttendance==='function'&&typeof setAttendance==='function')stamp(getAttendance,setAttendance,'branch');
+  // Only worth telling the owner about the first time. After that this is
+  // housekeeping that runs on every load and finds nothing.
+  if(touched&&!SETTINGS.branchScopeV1&&typeof logAudit==='function')
+    logAudit('Branch scope migration',touched+' record'+(touched===1?'':'s')+' assigned to '+home);
+  if(!SETTINGS.branchScopeV1){SETTINGS.branchScopeV1=true;save('layi_dash_settings',SETTINGS);}
+  return touched;
+}
 function setBranchView(v){activeBranchView=v;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();try{renderAll();}catch(e){}const _t=document.getElementById('pgTitle'),_d=TITLES[activeView];if(_t&&_d)_t.textContent=typeof _d[0]==='function'?_d[0]():_d[0];if((activeView==='production'&&!showsBespoke())||(activeView==='products'&&!showsRTW())||(activeView==='sales'&&!salesVisible()))go('activity');}
 function userBranch(){try{const u=currentUser;if(u&&u.branch)return u.branch;if(u&&u.staffId){const st=getStaff().find(x=>x.id===u.staffId||x.staffId===u.staffId);if(st&&st.location)return st.location;}}catch(e){}return defaultBranchName();}
 function canSwitchBranch(){const r=currentRole();if(!r)return false;if(r.id==='owner')return true;return !!(r.perms&&r.perms.branchSwitch);}
@@ -5031,10 +5128,10 @@ function loadExample(force){
     {id:'s-12',branch:'Lagos studio',name:'Woven brand labels',cat:'Components',subcat:'Woven Tags',qty:8,unit:'packs',reorder:10,cost:3000,supplierId:'sp-7',note:'LAYI sewn-in labels',updatedAt:new Date().toISOString(),moves:[{at:dago(28),type:'in',qty:12,note:'Opening stock',ref:''},{at:dago(4),type:'out',qty:4,note:'Used',ref:''}]},
     {id:'s-13',branch:'Lagos studio',name:'Hang tags',cat:'Components',subcat:'Hang Tags',qty:60,unit:'pcs',reorder:30,cost:90,supplierId:'sp-7',note:'Printed card tags',updatedAt:new Date().toISOString(),moves:[{at:dago(25),type:'in',qty:80,note:'Opening stock',ref:''},{at:dago(3),type:'out',qty:20,note:'Used',ref:''}]},
     {id:'s-14',name:'Thank-you cards',cat:'Packaging',subcat:'Thank You Cards',qty:36,unit:'pcs',reorder:20,cost:150,supplierId:'sp-7',note:'',updatedAt:new Date().toISOString(),moves:[{at:dago(26),type:'in',qty:50,note:'Opening stock',ref:''},{at:dago(8),type:'out',qty:14,note:'Used',ref:''}]},
-    {id:'s-15',name:'Hand-sewing needles',cat:'Tools & Equipment',subcat:'Needles & Notions',qty:8,unit:'packs',reorder:10,cost:600,supplierId:'',note:'Assorted sizes',updatedAt:new Date().toISOString(),moves:[{at:dago(35),type:'in',qty:12,note:'Opening stock',ref:''},{at:dago(7),type:'out',qty:4,note:'Workroom use',ref:''}]},
+    {id:'s-15',branch:'Lagos studio',name:'Hand-sewing needles',cat:'Tools & Equipment',subcat:'Needles & Notions',qty:8,unit:'packs',reorder:10,cost:600,supplierId:'',note:'Assorted sizes',updatedAt:new Date().toISOString(),moves:[{at:dago(35),type:'in',qty:12,note:'Opening stock',ref:''},{at:dago(7),type:'out',qty:4,note:'Workroom use',ref:''}]},
     {id:'s-16',name:'Tailoring shears',cat:'Tools & Equipment',subcat:'Scissors & Cutting Tools',qty:3,unit:'pairs',reorder:2,cost:8500,supplierId:'',note:'Workroom pairs',updatedAt:new Date().toISOString(),moves:[{at:dago(60),type:'in',qty:3,note:'Opening stock',ref:''}]},
     {id:'s-17',name:'Measuring tapes',cat:'Tools & Equipment',subcat:'Measuring Tools',qty:6,unit:'pcs',reorder:4,cost:500,supplierId:'',note:'',updatedAt:new Date().toISOString(),moves:[{at:dago(50),type:'in',qty:6,note:'Opening stock',ref:''}]},
-    {id:'s-18',name:'A4 printer paper',cat:'Operations',subcat:'Paper',qty:3,unit:'reams',reorder:4,cost:6500,supplierId:'',note:'Invoices & care cards',updatedAt:new Date().toISOString(),moves:[{at:dago(22),type:'in',qty:5,note:'Opening stock',ref:''},{at:dago(4),type:'out',qty:2,note:'Used',ref:''}]},
+    {id:'s-18',branch:'Lagos studio',name:'A4 printer paper',cat:'Operations',subcat:'Paper',qty:3,unit:'reams',reorder:4,cost:6500,supplierId:'',note:'Invoices & care cards',updatedAt:new Date().toISOString(),moves:[{at:dago(22),type:'in',qty:5,note:'Opening stock',ref:''},{at:dago(4),type:'out',qty:2,note:'Used',ref:''}]},
     {id:'s-ib1',branch:'Ibadan branch',name:"G\u00fctermann thread (assorted)",cat:'Raw Materials',subcat:'Threads',qty:240,unit:'spools',reorder:60,cost:600,supplierId:'',note:'For sale, haberdashery',updatedAt:new Date().toISOString(),moves:[{at:dago(20),type:'in',qty:300,note:'Opening stock',ref:''},{at:dago(5),type:'out',qty:60,note:'Sold',ref:''}]},
     {id:'s-ib2',branch:'Ibadan branch',name:'YKK zips (retail packs)',cat:'Components',subcat:'Zips',qty:300,unit:'pcs',reorder:80,cost:200,supplierId:'',note:'For sale, haberdashery',updatedAt:new Date().toISOString(),moves:[{at:dago(20),type:'in',qty:360,note:'Opening stock',ref:''},{at:dago(4),type:'out',qty:60,note:'Sold',ref:''}]},
     {id:'s-ib3',branch:'Ibadan branch',name:'Assorted buttons (cards)',cat:'Components',subcat:'Buttons & Fasteners',qty:130,unit:'cards',reorder:40,cost:450,supplierId:'',note:'For sale, haberdashery',updatedAt:new Date().toISOString(),moves:[{at:dago(18),type:'in',qty:160,note:'Opening stock',ref:''},{at:dago(3),type:'out',qty:30,note:'Sold',ref:''}]},
@@ -5067,6 +5164,9 @@ function loadExample(force){
     'adaeze (london)':{name:'Adaeze (London)',email:'adaeze@example.com',whatsapp:'+44 7700 900222',address:'London, UK',note:'International · pays in GBP',meas:{'Neck':'15.5','Chest / Bust':'40','Agbada length':'56'},measHistory:[{id:'mr-ad1',at:dago(15),fit:'Slim',posture:'Upright',note:'Sent measurements by video call',meas:{'Neck':'15.5','Chest / Bust':'40','Agbada length':'56'}}]},
     'marcus (new york)':{name:'Marcus (New York)',email:'marcus@example.com',whatsapp:'+1 212 555 0199',address:'New York, USA',note:'International · pays in USD',meas:{},measHistory:[]}
   });
+  // Example data goes through the same branch stamping as real data, so a
+  // demo studio never shows one branch holding everybody's stock.
+  try{migrateBranchOwnership();}catch(e){}
   renderAll();go('activity');
 }
 
@@ -6559,6 +6659,13 @@ function renameBranchRefs(oldName,newName){
   const orders=getOrders();let oc=false;orders.forEach(o=>{if(o.branch===oldName){o.branch=newName;oc=true;}});if(oc)save('layi_dash_orders',orders);
   const doArr=(get,set,key)=>{const a=get();let ch=false;a.forEach(r=>{if(r&&r[key]===oldName){r[key]=newName;ch=true;}});if(ch)set(a);};
   doArr(getTxns,setTxns,'branch');doArr(getSupplies,setSupplies,'branch');doArr(getAppts,setAppts,'branch');
+  doArr(getBills,setBills,'branch');doArr(getTasks,setTasks,'branch');
+  if(typeof getAttendance==='function'&&typeof setAttendance==='function')doArr(getAttendance,setAttendance,'branch');
+  // company records name the branches they apply to, so those names move too
+  const doList=(get,set)=>{const a=get();let ch=false;a.forEach(r=>{if(r&&Array.isArray(r.branches)){r.branches=r.branches.map(n=>n===oldName?newName:n);ch=true;}});if(ch)set(a);};
+  doList(getSuppliers,setSuppliers);
+  if(typeof getCampaigns==='function'&&typeof setCampaigns==='function')doList(getCampaigns,setCampaigns);
+  if(typeof getAnns==='function'&&typeof setAnns==='function')doList(getAnns,setAnns);
   if(typeof getProducts==='function'&&typeof setProducts==='function')doArr(getProducts,setProducts,'branch');
   doArr(getStaff,setStaff,'location');
 }
@@ -9136,6 +9243,7 @@ function addRole(){if(!can('users'))return;const name=(prompt('New role name (e.
 (function init(){const s=load('layi_dash_settings',null);if(s)SETTINGS=Object.assign({},DEFAULTS,s);
   applyStages();
   getRoles();getUsers();migrateRoles();
+  try{migrateBranchOwnership();}catch(e){console.warn('branch migration:',e);}
   // one-time migration: old free-text fabric supplier names -> supplier records
   if((SETTINGS.suppliers||[]).length&&!getSuppliers().length){const recs=SETTINGS.suppliers.map(name=>({id:uid('sp'),business:name,type:'Fabric Supplier',contact:'',phone:'',whatsapp:'',email:'',location:'',notes:'',preferred:false}));setSuppliers(recs);}
   // one-time migration: remap old 8-stage indices to the new 9-stage scheme
