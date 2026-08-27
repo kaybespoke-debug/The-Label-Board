@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://thelabelboard.app/</loc><priority>1.0</priority><changefreq>weekly</changefreq></url>
+  <url><loc>https://thelabelboard.app/features.html</loc><priority>0.9</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/solutions.html</loc><priority>0.9</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/pricing.html</loc><priority>0.9</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/demo.html</loc><priority>0.9</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/partners.html</loc><priority>0.8</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/referrals.html</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/about.html</loc><priority>0.6</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/contact.html</loc><priority>0.6</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://thelabelboard.app/privacy.html</loc><priority>0.3</priority><changefreq>yearly</changefreq></url>
+  <url><loc>https://thelabelboard.app/terms.html</loc><priority>0.3</priority><changefreq>yearly</changefreq></url>
+</urlset>

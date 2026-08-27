@@ -1,0 +1,20 @@
+# The Label Board — public website
+# Netlify serves /features from features.html on its own, so these only cover
+# the shorter names people actually type or that we print on things.
+/product       /features.html   301
+/features      /features.html   301
+/price         /pricing.html    301
+/plans         /pricing.html    301
+/book          /demo.html#book  301
+/trial         /demo.html#book  301
+/partner       /partners.html   301
+/refer         /referrals.html  301
+/app           https://app.thelabelboard.app   302
+/portal        https://partners.thelabelboard.app  302
+
+/support      /contact.html   301
+/support.html /contact.html   301
+
+# Anything else falls through to Netlify's own 404 handling, which serves
+# 404.html. Do NOT add a catch-all 200 rule here: this is a real multi page
+# site, not a single page app, and a catch-all would hide broken links.
