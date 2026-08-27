@@ -158,7 +158,9 @@ PAGES.account = function () {
   return '<div class="pnl acctop">' +
     '<div class="dav">' + initials(me.name) + '</div>' +
     '<div style="flex:1;min-width:150px"><h3 style="font-size:16px">' + esc(me.name) + '</h3>' +
-    '<div class="ph-sub">' + esc(me.business) + ' · ' + tier.name + ' partner</div></div></div>' +
+    '<div class="ph-sub">' + esc(AUTH.session ? AUTH.session.email : me.email) + '</div>' +
+    '<div class="ph-sub">' + esc(me.business) + ' · ' + tier.name + ' partner</div></div>' +
+    '<button class="btn sm" onclick="signOut()">Sign out</button></div>' +
 
     grp(ic('color-mix(in srgb,var(--gold) 22%,var(--panel))', '<circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>'),
       'Your details', 'Name, business, how we reach you', profile) +

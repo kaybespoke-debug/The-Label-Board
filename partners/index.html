@@ -29,7 +29,9 @@
   </defs>
 </svg>
 
-<div class="shell">
+<div class="authshell" id="authShell"></div>
+
+<div class="shell" id="appShell" style="display:none">
   <!-- ================= sidebar, a bottom bar on a phone ================= -->
   <aside class="side">
     <div class="brand">
@@ -74,12 +76,14 @@
 <div class="mask" id="mask" onclick="if(event.target===this)closeModal()"></div>
 <div class="toast" id="toast"></div>
 
+<script src="js/config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/core.js"></script>
 <script src="js/pages.js"></script>
 <script src="js/pages2.js"></script>
 <script src="js/detail.js"></script>
 <script src="js/actions.js"></script>
+<script src="js/auth.js"></script>
 <script>
 /* ============================================================
    app.js — nav, render loop, boot
@@ -119,6 +123,14 @@ function buildNav() {
 }
 
 function render() {
+  /* Nothing renders until somebody is signed in and their data is loaded.
+     This is a guard against showing an empty shell, not a security control:
+     what a signed-out browser may actually read is decided by row level
+     security in the database, never here. */
+  if (!AUTH.signedIn() || !DB) { renderAuth(); return; }
+  document.getElementById('authShell').style.display = 'none';
+  document.getElementById('appShell').style.display = '';
+
   const t = TITLES[UI.detail ? UI.back : UI.page] || ['', ''];
   document.getElementById('ttl').textContent = t[0];
   document.getElementById('sub').textContent = t[1];
@@ -153,12 +165,12 @@ function render() {
   document.getElementById('bellBtn').classList.toggle('on', UI.page === 'updates');
 }
 
-/* boot */
+/* boot — the theme is the only thing we know before we know who this is */
 (function boot() {
   try { if (localStorage.getItem('tlb_partner_theme') === 'light') document.body.classList.add('light'); } catch (e) {}
-  render();
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  bootAuth();
 })();
 </script>
 </body>

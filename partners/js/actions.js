@@ -111,7 +111,7 @@ function formNewLink() {
     '<input id="nlLabel" placeholder="e.g. TikTok bio"></div>' +
     '<div class="fg"><label>Code ending</label>' +
     '<input id="nlCode" placeholder="e.g. TIKTOK" maxlength="16">' +
-    '<div class="hint">Your link becomes ' + BASE_URL + DB.links[0].code + '-YOURENDING. ' +
+    '<div class="hint">Your link becomes ' + CONFIG.joinUrl + DB.links[0].code + '-YOURENDING. ' +
     'Leave it blank and we will make one from the name.</div></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doNewLink()">Create</button>');
@@ -128,7 +128,7 @@ function doNewLink() {
 
   DB.links.push({
     id: Math.max.apply(null, DB.links.map(l => l.id)) + 1,
-    label, code, url: BASE_URL + code,
+    label, code, url: CONFIG.joinUrl + code,
     clicks: 0, signups: 0, converted: 0, earned: 0,
     active: true, isDefault: false, custom: true,
     note: 'Made in the portal on ' + fmtD(DB.today),
@@ -388,8 +388,9 @@ function resetLocal() {
     '<button class="btn danger" onclick="doResetLocal()">Reset</button>');
 }
 function doResetLocal() {
-  try {
-    ['tlb_partner_settings', 'tlb_partner_links', 'tlb_partner_accounts'].forEach(k => localStorage.removeItem(k));
-  } catch (e) {}
+  /* Only this partner's own local changes. Signing out is a separate button,
+     because "reset" and "log me out of everything" are different intentions
+     and merging them surprises people. */
+  clearPartnerStorage(DB.key);
   location.reload();
 }

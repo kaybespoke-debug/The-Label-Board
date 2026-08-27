@@ -244,9 +244,16 @@ section('1. Structure: nothing is left unprotected');
   const sd = await asAdmin(`
     select p.proname, p.proconfig from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='app' and p.prosecdef`);
-  ok('scope helpers are SECURITY DEFINER with a pinned search_path',
-    sd.length === 3 && sd.every(r => (r.proconfig || []).some(c => c.startsWith('search_path='))),
-    JSON.stringify(sd.map(r => r.proname)));
+  // Every one of them, not a fixed count of them. Pinning the number at 3
+  // made this fail the moment the partner portal added its own helpers,
+  // which is a false alarm dressed as a security failure. The property
+  // worth holding is that no SECURITY DEFINER function in app is ever left
+  // with a mutable search_path; the floor keeps the check from passing
+  // vacuously if the helpers were dropped altogether.
+  const unpinned = sd.filter(r => !(r.proconfig || []).some(c => c.startsWith('search_path=')));
+  ok('every SECURITY DEFINER function in app pins its search_path',
+    sd.length >= 3 && unpinned.length === 0,
+    unpinned.length ? unpinned.map(r => r.proname).join(', ') : 'only ' + sd.length + ' found');
 
   const vw = await asAdmin(`
     select c.relname, c.reloptions from pg_class c join pg_namespace n on n.oid=c.relnamespace

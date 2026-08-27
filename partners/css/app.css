@@ -355,3 +355,46 @@ tbody tr:last-child td{border-bottom:0}
   .stats{grid-template-columns:1fr}
   .nav .tx{font-size:9px}
 }
+
+/* ============================================================
+   the sign-in screen
+   One column, centred, thumb-reachable. It is the first thing a
+   partner ever sees, so it carries the brand and nothing else.
+   ============================================================ */
+.authshell{display:none;min-height:100vh;align-items:center;justify-content:center;padding:24px 16px}
+.authbox{width:100%;max-width:380px}
+.authbrand{display:flex;align-items:center;gap:11px;margin-bottom:28px}
+.authbrand svg{width:40px;height:40px;flex:none;border-radius:11px}
+.authname{font-family:'Playfair Display',serif;font-size:13px;font-weight:600;letter-spacing:1.3px}
+.authsub{font-size:9.5px;color:var(--faint);letter-spacing:1.6px;text-transform:uppercase;margin-top:3px}
+.autht{font-size:26px;margin-bottom:8px}
+.authp{font-size:13px;color:var(--dim);line-height:1.65;margin:0 0 18px}
+.authgo{width:100%;justify-content:center;text-align:center;display:block;min-height:48px;font-size:14px;
+  text-decoration:none}
+.autherr{background:color-mix(in srgb,var(--red) 16%,var(--panel));
+  border:1px solid color-mix(in srgb,var(--red) 40%,var(--panel));color:var(--red);
+  border-radius:9px;padding:11px 13px;font-size:12.5px;margin-bottom:14px;line-height:1.5}
+.authalt{display:flex;justify-content:space-between;gap:12px;margin-top:16px}
+.authfoot{font-size:11.5px;color:var(--faint);line-height:1.6;margin:20px 0 0;text-align:center}
+
+/* A six digit code is easier to check when it is spaced like one. */
+.authcode{font-family:'Jost',sans-serif;font-size:24px;letter-spacing:10px;text-align:center;
+  padding:14px 12px 14px 22px}
+
+/* Demo mode says so, in as many words. Nobody should ever wonder whether
+   the code on their screen was supposed to arrive by email. */
+.authdemo{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:color-mix(in srgb,var(--blue) 14%,var(--panel));
+  border:1px dashed color-mix(in srgb,var(--blue) 45%,var(--panel));
+  border-radius:10px;padding:12px 14px;margin-bottom:16px}
+.authdemo span{font-size:11px;color:var(--faint);line-height:1.45}
+.authdemo b{font-family:'Jost',sans-serif;font-size:21px;letter-spacing:3px;color:var(--blue);flex:none}
+
+.authpick{margin-top:22px;border-top:1px solid var(--line-soft);padding-top:16px}
+.authpick-t{font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--faint);
+  font-weight:700;font-family:'Jost',sans-serif;margin-bottom:9px}
+.authpick-b{display:block;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;min-height:48px}
+.authpick-b:hover{border-color:var(--gold)}
+.authpick-b span{display:block;font-size:12.5px;font-weight:600}
+.authpick-b small{display:block;font-size:10.5px;color:var(--faint);margin-top:2px}
