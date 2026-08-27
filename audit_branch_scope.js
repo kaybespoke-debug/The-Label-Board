@@ -23,9 +23,9 @@ const fs=require('fs'),vm=require('vm');
 const appPath=process.argv[2] || 'site/layi_dashboard.html';
 const html=fs.readFileSync(appPath,'utf8');
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
-const mkEl=()=>({innerHTML:'',value:'',checked:false,placeholder:'',textContent:'',style:{},dataset:{},options:[],classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
+const mkEl=(id)=>({_id:id,innerHTML:'',value:'',checked:false,placeholder:'',textContent:'',style:{},dataset:{},options:[],classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
 const cache={};const _ls={};
-const sb={console,document:{getElementById(i){return cache[i]||(cache[i]=mkEl())},querySelector(){return mkEl()},querySelectorAll(){return[]},createElement(){return mkEl()},addEventListener(){},removeEventListener(){},body:mkEl(),documentElement:mkEl(),head:mkEl()},localStorage:{getItem(k){return k in _ls?_ls[k]:null},setItem(k,v){_ls[k]=String(v)},removeItem(k){delete _ls[k]}},setTimeout:f=>{try{f&&f()}catch(e){}},clearTimeout(){},requestAnimationFrame:f=>{try{f&&f()}catch(e){}},navigator:{userAgent:'n'},location:{href:''},alert(){},confirm(){return true},Math,Date,JSON,Object,Array,String,Number,Boolean,RegExp,Map,Set,parseInt,parseFloat,isNaN,isFinite,encodeURIComponent,decodeURIComponent,Intl};
+const sb={console,document:{getElementById(i){return cache[i]||(cache[i]=mkEl(i))},querySelector(){return mkEl()},querySelectorAll(){return[]},createElement(){return mkEl()},addEventListener(){},removeEventListener(){},body:mkEl(),documentElement:mkEl(),head:mkEl()},localStorage:{getItem(k){return k in _ls?_ls[k]:null},setItem(k,v){_ls[k]=String(v)},removeItem(k){delete _ls[k]}},setTimeout:f=>{try{f&&f()}catch(e){}},clearTimeout(){},requestAnimationFrame:f=>{try{f&&f()}catch(e){}},navigator:{userAgent:'n'},location:{href:''},alert(){},confirm(){return true},Math,Date,JSON,Object,Array,String,Number,Boolean,RegExp,Map,Set,parseInt,parseFloat,isNaN,isFinite,encodeURIComponent,decodeURIComponent,Intl};
 sb.window=sb;sb.globalThis=sb;vm.createContext(sb);vm.runInContext(code,sb,{filename:'x'});sb.demoLogin();
 const run=e=>vm.runInContext(e,sb);
 run("currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
@@ -210,6 +210,63 @@ run("activeBranchView='all';");
   const shown=run("(document.getElementById('unplacedNotice')||{}).innerHTML")||'';
   if(!/not assigned to a studio/.test(shown))F('the Branches page does not tell the owner about unplaced records');
   if(!/Somewhere that closed/.test(shown))F('the notice does not say which studio the record is pointing at');
+}
+
+/* 9) The whole app, rendered once per studio, compared element by element. ----
+   Checks 3 to 8 look at the data. This one looks at what actually reaches the
+   screen, and it is here because the data checks all passed while the sidebar
+   badges sat there counting whole stores: "9 customers owe you money" in every
+   studio, on every page. A number that never moves when you switch studios is
+   the bug, whatever the store underneath it says.
+
+   Anything identical across studios AND carrying a number must be named in
+   SHARED_PANELS with a reason. That makes a genuinely shared panel a decision
+   somebody made, and an accidentally shared one a build failure. */
+{
+  run("activeBranchView='all';");
+  const shared=run("typeof SHARED_PANELS!=='undefined'?SHARED_PANELS:null");
+  if(!shared)F('SHARED_PANELS is missing, so nothing declares which panels are shared on purpose');
+  else{
+    const snaps={};
+    names.forEach(n=>{
+      Object.keys(cache).forEach(k=>{cache[k].innerHTML='';cache[k].textContent='';});
+      run("activeBranchView="+JSON.stringify(n)+";");
+      try{run("applyBizVisibility();");}catch(e){}
+      try{run("renderAll();");}catch(e){F('rendering the app for '+n+' threw: '+e.message);}
+      try{run("updateNavBadges();");}catch(e){F('updating the badges for '+n+' threw: '+e.message);}
+      const out={};
+      Object.keys(cache).forEach(k=>{
+        const v=(cache[k].innerHTML||'')+'||'+(cache[k].textContent||'');
+        if(v!=='||')out[k]=v;
+      });
+      snaps[n]=out;
+    });
+    const ids=new Set();
+    names.forEach(n=>Object.keys(snaps[n]).forEach(id=>ids.add(id)));
+    const strays=[];
+    ids.forEach(id=>{
+      const vals=names.map(n=>snaps[n][id]||'');
+      if(vals.filter(v=>v&&v!=='||').length<2)return;
+      if(!vals.every(v=>v===vals[0]))return;          // it responds; nothing to answer for
+      if(!/\d/.test(vals[0]))return;                  // no number in it; not interesting
+      if(Object.prototype.hasOwnProperty.call(shared,id))return;  // shared on purpose
+      strays.push(id);
+    });
+    strays.sort().forEach(id=>{
+      const v=(snaps[names[0]][id]||'').replace(/\s+/g,' ').replace(/^\|\|/,'').slice(0,70);
+      F('"'+id+'" shows the same number in every studio and is not declared shared — '+v);
+    });
+    // and the declaration must not rot: a panel listed as shared that now
+    // responds per studio is a stale entry somebody should remove
+    Object.keys(shared).forEach(id=>{
+      if(!ids.has(id))return;
+      const vals=names.map(n=>snaps[n][id]||'');
+      if(vals.filter(v=>v&&v!=='||').length<2)return;
+      if(!vals.every(v=>v===vals[0]))
+        F('"'+id+'" is declared shared in SHARED_PANELS but now differs per studio — remove it from the list');
+    });
+    console.log('  swept '+ids.size+' rendered elements across '+names.length+' studios');
+  }
 }
 
 console.log('Branch scope audit:');

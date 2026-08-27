@@ -4173,6 +4173,40 @@ const VIEW_SCOPE={
   rota:'branch',       attendance:'branch', leave:'branch',      tasks:'company',
   companylog:'branch', audit:'company',     settings:'company',  mywork:'person'
 };
+/* Screen elements that are the SAME in every studio on purpose.
+
+   The branch-scope gate renders the whole app once per studio and compares
+   every element it wrote to. Anything carrying a number that comes out
+   byte-identical across studios is a screen ignoring the switcher — unless it
+   is named here, with a reason.
+
+   This list is the reason the sidebar badges were caught: they were counting
+   whole stores and saying "9 customers owe you" in every studio, and no test
+   looked at them because the tests checked data rather than what reached the
+   screen. Adding an element here is a decision somebody has to make on
+   purpose, which is the point. */
+const SHARED_PANELS={
+  // company-tier records: they belong to the label, so every studio sees them
+  annList:'announcements are the label\u2019s',
+  auditList:'the audit trail is a company record and must not hide entries',
+  auditSub:'count of the same audit trail',
+  potMoves:'funds and reserves are held at business level',
+  suprList:'vendors serve the whole label',
+  suprStats:'counts of the same vendors',
+  suprSub:'count of the same vendors',
+  // whoever is signed in, the same wherever they stand
+  attMe:'my own attendance, not the studio\u2019s',
+  // deliberately shows every studio at once — that is what it is for
+  branchCardBody:'the studio comparison card comparing studios',
+  // fixed controls with numbers in them: months, years, period choices
+  calTitle:'the calendar month being viewed',
+  calMonthSel:'a list of months',
+  calYearSel:'a list of years',
+  expPeriodBar:'a period selector',
+  finPeriodBar:'a period selector',
+  ordersPeriodBar:'a period selector',
+  salesPeriodBar:'a period selector'
+};
 /* The stores that belong to a branch, and the key each one keeps it under.
    The gate checks these partition cleanly: every record in exactly one studio. */
 const BRANCH_OWNED_STORES=[
@@ -5636,7 +5670,7 @@ function openSupplierDetail(id){
       ${can('supplies')?`<button class="btn danger sm" onclick="delSupplier('${s.id}')">Delete</button>`:''}
     </div>`);
 }
-function deliveries(){return getOrders().filter(o=>o.delivery&&o.delivery.enabled);}
+function deliveries(){return getOrders().filter(inBranch).filter(o=>o.delivery&&o.delivery.enabled);}
 function setLogFilter(f,el){logFilter=f;document.querySelectorAll('#view-logistics .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderLogistics();}
 var logPeriod='all';var logCustom='';
 function setLogPeriod(p){logPeriod=p;renderLogistics();}
@@ -6384,15 +6418,24 @@ function renderSupplies(){
 }
 
 /* ===== RENDER ===== */
-function setNavBadge(id,n){const el=document.getElementById(id);if(!el)return;if(n>0){el.textContent=n>99?'99+':n;el.classList.add('on');}else{el.classList.remove('on');}}
+// A badge that drops to zero is hidden by CSS, but it used to keep its old
+// number in the element. Invisible, and still wrong: anything reading the page
+// saw a count from the studio before this one. Clear it.
+function setNavBadge(id,n){const el=document.getElementById(id);if(!el)return;if(n>0){el.textContent=n>99?'99+':n;el.classList.add('on');}else{el.textContent='';el.classList.remove('on');}}
+/* A badge is the first number an owner reads on every screen, so it has to
+   answer the studio switcher like everything else. These were counting whole
+   stores: the sidebar said nine customers owed money whichever studio you were
+   standing in. Every count here is now scoped the same way its page is. */
 function updateNavBadges(){
-  const orders=getOrders();
+  const orders=getOrders().filter(inBranch);
   setNavBadge('badgeProduction',prodOrders().filter(o=>o.stageIndex<7).length);
   setNavBadge('badgeCustomers',new Set(orders.filter(o=>orderOutstanding(o)>0).map(o=>nameKey(o.client))).size);
-  setNavBadge('badgeLogistics',orders.filter(o=>o.delivery&&o.delivery.enabled&&o.delivery.status!=='Delivered').length);
-  setNavBadge('badgeSupplies',getSupplies().filter(s=>supStatus(s)!=='ok').length);
+  setNavBadge('badgeLogistics',deliveries().filter(o=>o.delivery.status!=='Delivered').length);
+  setNavBadge('badgeSupplies',getSupplies().filter(inBranch).filter(s=>supStatus(s)!=='ok').length);
+  // The catalogue is the label's, but "low" means low HERE, so this follows the
+  // studio in view through productLow().
   setNavBadge('badgeProducts',getProducts().filter(p=>productLow(p)!=='ok').length);
-  setNavBadge('badgeLeave',getLeave().filter(leaveActiveNow).length);
+  setNavBadge('badgeLeave',getLeave().filter(leaveInView).filter(leaveActiveNow).length);
 }
 function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();}
 function statTone(label,val){
@@ -7910,7 +7953,7 @@ function getLog(){return load('layi_dash_log',[]);}
 function setLog(v){save('layi_dash_log',v);}
 function getAudit(){return load('layi_dash_audit',[]);}
 function setAudit(v){save('layi_dash_audit',v);}
-function logAudit(action,detail){try{const list=getAudit();list.push({id:uid('au'),at:new Date().toISOString(),by:(currentUser?currentUser.name:'System'),role:(currentRole()?currentRole().name:''),action:action,detail:detail||''});if(list.length>600)list.splice(0,list.length-600);setAudit(list);}catch(e){}}
+function logAudit(action,detail){try{const list=getAudit();list.push({id:uid('au'),at:new Date().toISOString(),by:(currentUser?currentUser.name:'System'),role:(currentRole()?currentRole().name:''),action:action,detail:detail||'',branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:''});if(list.length>600)list.splice(0,list.length-600);setAudit(list);}catch(e){}}
 function openLogEntry(id){if(!can('team'))return;const e=id?getLog().find(x=>x.id===id):null;
   openModal(`<h3>${e?'Edit entry':'New log entry'}</h3><div class="msub">Note something worth remembering about the business</div>
     <div class="row2">
