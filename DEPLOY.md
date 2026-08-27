@@ -1,24 +1,39 @@
-# Deploy — get a public link
+# Deploy — the customer app
 
-The app is one file (`layi_dashboard.html`), so hosting is trivial and the public URL runs the **full live Supabase stack** (cloud sync, realtime, team auth) — unlike a local preview.
+The app is one file, `site/layi_dashboard.html`. There is no build step. The
+public URL runs the full live Supabase stack (cloud sync, realtime, team auth),
+which a local preview does not.
 
-## Fastest: Netlify Drop (no account setup, ~30 seconds)
-1. Go to **https://app.netlify.com/drop**
-2. Drag this whole folder onto the page.
-3. You get a public URL (e.g. `https://your-name.netlify.app`). The included `netlify.toml` serves the app at the root.
+## How it ships today
 
-Re-drag the folder any time to publish an update.
+Netlify is connected to `github.com/kaybespoke-debug/The-Label-Board` and
+watches the **`main`** branch. The root `netlify.toml` on `main` publishes the
+`site/` folder and serves the app at `/`. Push to `main` and it redeploys.
 
-## Auto-deploy on every change: connect a repo
-1. Push this folder to a GitHub repo.
-2. Netlify → **Add new site → Import from Git** → pick the repo. Leave build command empty; publish directory `.`.
-3. Every `git push` now redeploys automatically.
+`site/` holds the app plus its PWA files and nothing else, so nothing internal —
+gates, notes, SQL, the other three apps — is ever served to the public.
 
-## Before the live features work on the deployed site
-Run these once (see `supabase_setup.sql` and `supabase/functions/team-admin/`):
-1. **SQL Editor** → run `supabase_setup.sql` (creates tables + RLS + realtime, adds `profiles.staff_id`).
-2. **Deploy the function**: `supabase functions deploy team-admin`.
-3. **Auth → Users → Add user** (your email + password), then run the `insert into profiles …` at the bottom of the SQL with that user's UUID.
-4. Open the deployed URL and sign in with your **email** — an email (not a username) triggers the cloud path.
+The admin console, the partner portal and the public website are three separate
+Netlify sites from the same repo. See `CLAUDE.md` for which folder and branch
+each one uses.
 
-Offline/demo (username `owner` / `layi2025`) keeps working with no setup, fully local.
+## Before you push
+
+```bash
+node verify.js
+```
+
+Twenty-three gates, exit 0 means green. Then bump `CACHE` in `site/sw.js`, or
+installed phones will keep serving the old version.
+
+## Before the live features work on a fresh deployment
+
+Run these once — see `SUPABASE_SETUP.md` and `supabase/`:
+
+1. **SQL Editor** → run the migrations in `supabase/migrations/` in filename order.
+2. **Deploy the functions**: `supabase functions deploy team-admin` and `supabase functions deploy admin-api`.
+3. **Auth → Users → Add user** (your email and password), then insert the matching `profiles` row with that user's UUID.
+4. Open the deployed URL and sign in with your **email** — an email, rather than a username, is what triggers the cloud path.
+
+Offline demo mode (username `owner` / `layi2025`) keeps working with no setup at
+all, entirely on the device.

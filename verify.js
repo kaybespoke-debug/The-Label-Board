@@ -3,7 +3,7 @@
  * verify.js — runs every gate against the app in one command.
  *
  *   node audit/verify.js path/to/layi_dashboard.html
- *   node audit/verify.js                 # defaults to ./layi_dashboard.html
+ *   node audit/verify.js                 # defaults to ./site/layi_dashboard.html
  *
  * Exit code 0 = all gates green. Non-zero = at least one gate failed.
  * Run this BEFORE and AFTER any change. A change that turns a gate red is a regression.
@@ -12,7 +12,7 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const app = path.resolve(process.argv[2] || 'layi_dashboard.html');
+const app = path.resolve(process.argv[2] || 'site/layi_dashboard.html');
 if (!fs.existsSync(app)) { console.error('Cannot find app file: ' + app); process.exit(2); }
 const here = __dirname;
 

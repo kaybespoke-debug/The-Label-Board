@@ -292,7 +292,7 @@ check(html['index.html'].includes('THE LABEL BOARD'), 'the brand mark is spelled
 /* ================= 10. claims we can stand behind ================= */
 /* Numbers on the home page strip are product facts, so they have to be true of
    the product. The nav of the studio app is the source for both. */
-const app = fs.readFileSync(path.join(__dirname, 'layi_dashboard.html'), 'utf8');
+const app = fs.readFileSync(path.join(__dirname, 'site', 'layi_dashboard.html'), 'utf8');
 const views = new Set(all(app, /class="nav-item[^"]*"[^>]*data-view="([a-z]+)"/g).map(m => m[1]));
 check(views.size >= 20, 'the studio app really does have that many screens (' + views.size + ')');
 check(html['index.html'].includes('<div class="v num">' + views.size + '</div>'),

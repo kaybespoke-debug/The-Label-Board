@@ -3,7 +3,7 @@
 // then flags any clickable card that (a) jumps to a tab or (b) opens the OLD
 // appointment form instead of the new detail view.
 const fs=require('fs'),vm=require('vm');
-const html=fs.readFileSync(process.argv[2]||'layi_dashboard.html','utf8');
+const html=fs.readFileSync(process.argv[2] || 'site/layi_dashboard.html','utf8');
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';
 while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const el=()=>({innerHTML:'',style:{},dataset:{},options:[],classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){},scrollTop:0,value:''});

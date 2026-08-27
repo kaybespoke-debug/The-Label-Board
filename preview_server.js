@@ -1,6 +1,6 @@
 // Tiny static server for previewing the app live in the Browser pane.
 const http=require('http'),fs=require('fs'),path=require('path');
-const ROOT=__dirname, PORT=8000;
+const ROOT=path.join(__dirname,'site'), PORT=8000;
 const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
 http.createServer((req,res)=>{
   let rel=decodeURIComponent(req.url.split('?')[0]);

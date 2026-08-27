@@ -2,7 +2,7 @@
 // Local actions (sale/payment/status) alert now; other devices' actions alert via realtime once
 // live. A Daylies-style Settings panel controls sound, chime voice, volume, per-event toggles and
 // pop-ups. Web Push stays scaffolded/dormant with the SW handlers ready for go-live.
-const fs=require('fs'),vm=require('vm');const html=fs.readFileSync((process.argv[2]||'layi_dashboard.html'),'utf8');
+const fs=require('fs'),vm=require('vm');const html=fs.readFileSync((process.argv[2] || 'site/layi_dashboard.html'),'utf8');
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const mkEl=()=>({innerHTML:'',value:'',checked:false,style:{},dataset:{},options:[],classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){},contains(){return false}});
 const cache={};const _ls={};
@@ -56,7 +56,7 @@ if(run("PUSH_PUBLIC_KEY")!=='') F('a push key is hard-coded — should be blank 
 try{run("subscribeToPush();");}catch(e){F('subscribeToPush threw → '+e.message);}
 
 // 9) The service worker carries push + click handlers.
-const sw=fs.readFileSync('sw.js','utf8');
+const sw=fs.readFileSync('site/sw.js','utf8');
 if(!/addEventListener\(\s*['"]push['"]/.test(sw)) F('service worker has no push handler');
 if(!/addEventListener\(\s*['"]notificationclick['"]/.test(sw)) F('service worker has no notificationclick handler');
 
