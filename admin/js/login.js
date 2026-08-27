@@ -123,7 +123,7 @@ function formChangePassword() {
     '<button class="btn gold" onclick="doChangePassword()">Change password</button>');
 }
 
-function doChangePassword() {
+async function doChangePassword() {
   const me = Q.staffM(ME.staffId);
   const cur = (document.getElementById('pwCurrent') || {}).value || '';
   const pw = (document.getElementById('pwNew') || {}).value || '';
@@ -141,7 +141,17 @@ function doChangePassword() {
     return;
   }
 
-  /* Nothing about the password is kept. Only the date it changed. */
+  /* The current password is genuinely verified, and the new one genuinely
+     stored, by credentials.js. Without this the form was theatre. */
+  const target = credEmailFor(me);
+  if (!credFor(target)) { toast('No password is set on this account yet'); return; }
+  if (!await verifyPassword(target, cur)) {
+    toast('That is not your current password');
+    return;
+  }
+  await setPassword(target, pw);
+  clearFailures(target);
+
   const revoke = document.getElementById('pwRevoke').classList.contains('on');
   const dropped = revoke ? authOf(me).sessions.filter(s => !s.current).length : 0;
   if (revoke) authOf(me).sessions = authOf(me).sessions.filter(s => s.current);
