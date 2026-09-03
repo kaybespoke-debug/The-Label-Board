@@ -44,7 +44,11 @@ function compose(title,type,opts){
 }
 
 /* 1) It is called a planner, and it plans more than fittings. ---------------- */
-if(run("TITLES.calendar[0]")!=='Planner')F('the tab is still called something other than Planner');
+// Kayode asked for the visible name to stay Calendar. The machinery is still
+// called the planner because that is what it does, but the tab a studio sees
+// says Calendar, and the subtitle carries the rest.
+if(run("TITLES.calendar[0]")!=='Calendar')F('the tab is no longer called Calendar');
+if(!/meetings/.test(run("TITLES.calendar[1]")))F('the subtitle does not say the calendar carries meetings now');
 const types=run("PLANNER_TYPES.map(t=>t.k)");
 ['task','meeting','reminder','content','fitting','order'].forEach(k=>{
   if(types.indexOf(k)<0)F('the planner has no "'+k+'" entries');

@@ -15,8 +15,17 @@ let fails=[];const F=x=>fails.push(x);
 const tiers=J("STORAGE_TIERS");
 if(!Array.isArray(tiers)||tiers.length<4) F('storage tiers are missing');
 if(!tiers.some(t=>t.name==='Free')) F('there is no Free tier');
-run("delete SETTINGS.storageTier;");
-if(N("storageLimitBytes()")!==1e9) F('default (Free) limit should be 1 GB');
+// Storage now follows the PLAN rather than being a second number that can
+// disagree with it. A studio on the smallest plan still gets the smallest
+// allowance, which is what this always meant to check.
+run("delete SETTINGS.storageTier;SETTINGS.plan='trial';");
+if(N("storageLimitBytes()")!==1e9) F('a trial studio should get the 1 GB Free allowance');
+run("SETTINGS.plan='premium';");
+if(N("storageLimitBytes()")<=1e9) F('a Premium studio is still on the Free allowance, so storage does not follow the plan');
+// an explicit tier still wins, so nothing already configured changes
+run("SETTINGS.storageTier='Free';");
+if(N("storageLimitBytes()")!==1e9) F('an explicitly set tier is being overridden by the plan');
+run("delete SETTINGS.storageTier;SETTINGS.plan='trial';");
 run("SETTINGS.storageTier='Studio';");
 if(N("storageLimitBytes()")!==20e9) F('Studio tier limit should be 20 GB');
 run("delete SETTINGS.storageTier;");
