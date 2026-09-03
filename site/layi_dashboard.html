@@ -1471,7 +1471,7 @@ body.modal-open{overflow:hidden}
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Data</h3></div>
           <p class="page-sub" style="margin-bottom:16px">Load a quick example to explore, or clear everything to start fresh.</p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" onclick="loadExample()">Load example data</button><button class="btn danger" onclick="clearAll()">Clear all data</button></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" onclick="openExamplePicker()">Load example studio…</button><button class="btn danger" onclick="clearAll()">Clear all data</button></div>
         </div>
       </section>
     </main>
@@ -1573,8 +1573,7 @@ const STAGE_PRESETS={
   factory:['Cutting','Sewing','Assembly','Finishing','Pressing'],
   footwear:['Last & Pattern','Clicking','Closing','Lasting','Soling','Finishing'],
   leather:['Pattern','Cutting','Skiving','Edge Finishing','Assembly','Hardware','Stitching'],
-  fabrics:['Cloth Received','Measured & Cut','Packed'],
-  haberdashery:['Stock Received','Counted','Packed']
+  fabrics:['Cloth Received','Measured & Cut','Packed']
 };
 /* A preset only makes sense for the trade that uses those words. Each one names the
    activities it belongs to so Settings can lead with the right suggestion instead of
@@ -1586,8 +1585,7 @@ const STAGE_PRESET_META={
   factory:{label:'Factory / bulk',for:['rtw','bespoke']},
   footwear:{label:'Shoemaking',for:['footwear']},
   leather:{label:'Bags & leather goods',for:['leather']},
-  fabrics:{label:'Fabric cutting',for:['fabrics']},
-  haberdashery:{label:'Haberdashery',for:['haberdashery']}
+  fabrics:{label:'Fabric cutting',for:['fabrics']}
 };
 function buildStages(mid){const m=(Array.isArray(mid)&&mid.length)?mid:DEFAULT_MIDDLE;return [STAGE_HEAD].concat(m,STAGE_TAIL);}
 let STAGES=buildStages(null);
@@ -2840,20 +2838,25 @@ const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantNam
 function branchTypeOf(name){const b=getBranches().find(x=>x.name===name);if(!b)return SETTINGS.businessType||'both';const bk=branchIsBespoke(b),rt=branchIsRetail(b);return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
 function isBespokeType(t){return t==='bespoke'||t==='both';}
 function isGarmentShopType(t){return t==='rtw'||t==='both';}
-function isRetailType(t){return t==='rtw'||t==='both'||t==='haberdashery'||t==='fabrics';}
+function isRetailType(t){return t==='rtw'||t==='both'||t==='fabrics';}
 // ---- What a studio does: a multi-select set of activities. Each maps to a capability that drives the app. ----
 const DEFAULT_ACTIVITIES=[
   {key:'bespoke',label:'Bespoke tailoring',desc:'Clothing made to order',kind:'bespoke',stages:'bespoke'},
   {key:'footwear',label:'Footwear',desc:'Shoes & sandals, made to order or stocked',kind:'bespoke',catalog:true,stages:'footwear'},
   {key:'leather',label:'Bags & leather',desc:'Bags, belts & leather goods',kind:'bespoke',catalog:true,stages:'leather'},
   {key:'rtw',label:'Ready-to-wear',desc:'Finished garments sold off the rack',kind:'retail',catalog:true,stages:'rtw'},
-  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail',stages:'fabrics'},
-  {key:'haberdashery',label:'Haberdashery',desc:'Trims, notions & sewing bits',kind:'retail',stages:'haberdashery'}
+  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail',stages:'fabrics'}
 ];
+/* Haberdashery was once a sixth trade here. It was dropped as a business type
+   we sell to — the shops are small, the workflow is a subset of a fabric shop's,
+   and it muddied the trade list. It survives as an inventory CATEGORY, which is
+   a different thing entirely: every tailor stocks threads, buttons and zips.
+   A studio that already selected it keeps it, because activitiesForDraft()
+   carries forward any activity a branch already uses. */
 /* What one piece of work is called in each trade. A tailor makes a garment, a
    shoemaker makes a pair, a bag maker makes a piece. The studio can override this
    in Settings; when a studio does more than one thing, the neutral word wins. */
-const ACTIVITY_WORDS={bespoke:'garment',rtw:'garment',footwear:'pair',leather:'piece',fabrics:'piece',haberdashery:'item'};
+const ACTIVITY_WORDS={bespoke:'garment',rtw:'garment',footwear:'pair',leather:'piece',fabrics:'piece'};
 function tradeWord(){
   const set=(SETTINGS.itemWord||'').trim();
   if(set)return set.toLowerCase();
@@ -4965,7 +4968,7 @@ function renderRecipesSettings(){
 }
 function saveRecipe(){syncRecipeDraft();const clean=(recipeDraft||[]).filter(r=>r.supplyId&&+r.qty>0).map(r=>({supplyId:r.supplyId,qty:+r.qty}));const all=getRecipes();if(clean.length)all[recipeType]=clean;else delete all[recipeType];SETTINGS.recipes=all;save('layi_dash_settings',SETTINGS);logAudit('Material recipe saved',recipeType);recipeDraft=null;renderRecipesSettings();flashSaved('recipeSaveBtn','Save '+recipeType+' recipe');}
 let branchDraft=null;
-const BRANCH_TYPES=[['bespoke','Bespoke / made-to-order'],['rtw','Ready-to-wear / retail'],['both','Both'],['haberdashery','Haberdashery (materials & notions)'],['fabrics','Fabrics (sold by length)']];
+const BRANCH_TYPES=[['bespoke','Bespoke / made-to-order'],['rtw','Ready-to-wear / retail'],['both','Both'],['fabrics','Fabrics (sold by length)']];
 function renderBranchesSettings(){const box=document.getElementById('branchBox');if(!box)return;
   renderUnplacedNotice();
   if(!branchDraft)branchDraft=getBranches().map(b=>({id:b.id||uid('br'),name:b.name,location:b.location||'',does:branchDoes(b),channels:Array.isArray(b.channels)&&b.channels.length?b.channels.slice():['showroom']}));
@@ -5253,6 +5256,141 @@ function importData(input){
   };
   reader.readAsText(file);
 }
+/* ===== EXAMPLE STUDIOS ========================================================
+   Six worked examples, one per kind of business we sell to, plus the
+   multi-studio label.
+
+   They are not six datasets. Writing the 235 lines of loadExample() six times
+   would mean six things to keep in step, and five of them would rot. Instead
+   the rich example is seeded once and then re-skinned: the studio is renamed,
+   its activities and production stages are swapped for the trade's, the
+   catalogue is replaced, every order is relabelled with something that trade
+   actually makes, and the records are moved onto the preset's branches.
+
+   That matters for testing because every tab still has real data in it. A
+   shoemaker's Finance, Production, Sales, Payroll and Inventory are all
+   populated, so you can see how each tab reacts to the trade rather than
+   looking at five empty screens.
+
+   It is also the honest demo: a shoemaker who opens this sees lasts and pairs,
+   not agbadas.
+   ========================================================================= */
+const EXAMPLE_STUDIOS=[
+  {key:'multi',    label:'Multi-studio label',   blurb:'Four studios, bespoke and ready-to-wear',
+   solo:false},
+  {key:'bespoke',  label:'Bespoke tailor',        blurb:'One workroom, made to order',
+   solo:true, company:'Adé Bespoke', does:['bespoke'], stages:'bespoke',
+   branch:{name:'The workroom',location:'Yaba, Lagos'},
+   items:['Three-piece suit','Agbada','Kaftan','Wedding gown','Senator set','Linen shirt'],
+   catalogue:[['Three-piece suit','Garment'],['Agbada','Garment'],['Kaftan','Garment'],['Wedding gown','Garment'],['Senator set','Garment']]},
+
+  {key:'footwear', label:'Shoemaker',             blurb:'Bench-made shoes, plus a stocked rail',
+   solo:true, company:'Okoro & Sons Shoes', does:['footwear'], stages:'footwear',
+   branch:{name:'The bench',location:'Aba, Abia'},
+   items:['Oxford brogues','Leather sandals','Chelsea boots','Loafers','Bridal mules','Derby shoes'],
+   catalogue:[['Oxford brogues','Footwear'],['Chelsea boots','Footwear'],['Loafers','Footwear'],['Leather sandals','Footwear'],['Bridal mules','Footwear']]},
+
+  {key:'leather',  label:'Bag & leather maker',   blurb:'Bags, belts and small leather goods',
+   solo:true, company:'Ìfé Leather', does:['leather'], stages:'leather',
+   branch:{name:'The studio',location:'Lekki, Lagos'},
+   items:['Tote bag','Weekender holdall','Belt','Card wallet','Laptop sleeve','Crossbody bag'],
+   catalogue:[['Tote bag','Bag'],['Weekender holdall','Bag'],['Crossbody bag','Bag'],['Belt','Accessory'],['Card wallet','Accessory']]},
+
+  {key:'rtw',      label:'Ready-to-wear boutique',blurb:'A rail, sizes and colours, sold off the shelf',
+   solo:true, company:'House of Nneka', does:['rtw'], stages:'rtw',
+   branch:{name:'The boutique',location:'Ikoyi, Lagos'},
+   items:['Ankara bomber','Linen co-ord','Silk slip dress','Cotton shirt dress','Wide-leg trousers','Wrap skirt'],
+   catalogue:[['Ankara bomber','Garment'],['Linen co-ord','Garment'],['Silk slip dress','Garment'],['Cotton shirt dress','Garment'],['Wide-leg trousers','Garment']]},
+
+  {key:'fabrics',  label:'Fabric shop',           blurb:'Cloth sold by the yard, over a counter',
+   solo:true, company:'Balogun Fabrics', does:['fabrics'], stages:'fabrics',
+   branch:{name:'The shop',location:'Balogun Market, Lagos'},
+   items:['Aso-oke (5 yards)','Swiss lace (5 yards)','Ankara (6 yards)','Guinea brocade (4 yards)','Silk georgette (3 yards)','Atiku (5 yards)'],
+   catalogue:[['Aso-oke','Fabric'],['Swiss lace','Fabric'],['Ankara','Fabric'],['Guinea brocade','Fabric'],['Silk georgette','Fabric']]}
+];
+function exampleStudio(key){return EXAMPLE_STUDIOS.find(x=>x.key===key)||EXAMPLE_STUDIOS[0];}
+
+/* Re-skin the seeded example as one trade, on one studio. */
+function applyExampleStudio(key){
+  const preset=exampleStudio(key);
+  if(!preset||preset.key==='multi')return;
+
+  const home=preset.branch.name;
+
+  // one studio, doing one thing
+  SETTINGS.branches=[{id:'br-solo',name:home,location:preset.branch.location,active:true,
+    does:preset.does.slice(),type:summaryType(preset.does),channels:['showroom']}];
+  SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:preset.company});
+  SETTINGS.itemWord='';                       // let the trade choose the word
+  SETTINGS.productionStages=(STAGE_PRESETS[preset.stages]||DEFAULT_MIDDLE).slice();
+  applyStages();
+
+  // the catalogue this trade actually sells
+  SETTINGS.productCatalog=preset.catalogue.map(c=>({id:uid('pc'),name:c[0],category:c[1],materials:[]}));
+  SETTINGS.garmentTypes=preset.catalogue.map(c=>c[0]);
+
+  // everything the studio owns moves to the one studio, and every order is
+  // relabelled as something this trade makes
+  const pick=i=>preset.items[i%preset.items.length];
+  const orders=getOrders();
+  orders.forEach((o,i)=>{
+    o.branch=home;
+    const name=pick(i);
+    o.garment=name;
+    (o.outfits||[]).forEach((of,j)=>{of.name=pick(i+j);of.type=pick(i+j);});
+    o.stageIndex=Math.min(o.stageIndex||0,STAGES.length-1);
+  });
+  save('layi_dash_orders',orders);
+
+  const moveAll=(get,set,keyName)=>{const l=get();if(!Array.isArray(l))return;l.forEach(r=>{if(r)r[keyName]=home;});set(l);};
+  moveAll(getTxns,setTxns,'branch');
+  moveAll(getSupplies,setSupplies,'branch');
+  moveAll(getAppts,setAppts,'branch');
+  moveAll(getBills,setBills,'branch');
+  moveAll(getStaff,setStaff,'location');
+
+  // the shop rail, named for the trade, with its stock on the one shelf
+  const prods=getProducts();
+  prods.forEach((pr,i)=>{
+    const c=preset.catalogue[i%preset.catalogue.length];
+    pr.name=c[0];pr.category=c[1];
+    (pr.variants||[]).forEach(v=>{const had=variantQty(v,'all');v.stock={};setVariantQty(v,home,had);});
+  });
+  setProducts(prods);
+
+  save('layi_dash_settings',SETTINGS);
+  if(typeof migrateBranchOwnership==='function'){try{migrateBranchOwnership();}catch(e){}}
+}
+
+/* Load one of the worked examples. Same warning as loadExample(): this
+   REPLACES whatever is in the app. */
+function loadExampleAs(key){
+  loadExample(true);
+  applyExampleStudio(key);
+  if(typeof applyBizVisibility==='function')applyBizVisibility();
+  renderAll();go('activity');
+  const p=exampleStudio(key);
+  if(typeof toast==='function')toast('Loaded: '+p.label);
+}
+/* The picker. Offered wherever the example is offered, because "show me one
+   like mine" is the first thing anybody asks. */
+function openExamplePicker(){
+  const rows=EXAMPLE_STUDIOS.map(function(x){
+    return '<div class="up-line" style="cursor:pointer;padding:11px 0;border-bottom:1px solid var(--line-soft)" onclick="pickExample(\''+x.key+'\')">'
+      +'<b>'+esc(x.label)+'</b><div style="color:var(--text-dim);font-size:13px">'+esc(x.blurb)+'</div></div>';
+  }).join('');
+  openModal('<h3>Load an example studio</h3>'
+    +'<div class="msub">Pick the kind of business you want to look at. Every tab is filled in, so you can see how the app reads for that trade.</div>'
+    +'<div style="margin:12px 0">'+rows+'</div>'
+    +'<div class="kv" style="color:var(--amber)">This replaces everything currently in the app.</div>'
+    +'<div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button></div>');
+}
+function pickExample(key){
+  if(typeof hasOwnData==='function'&&hasOwnData()
+     &&!confirm('This REPLACES everything in the app with the example studio.\n\nYour orders, customers, payments, staff and stock will be wiped. Continue?'))return;
+  closeModal();
+  loadExampleAs(key);
+}
 function loadExample(force){
   if(!force && hasOwnData()){
     if(!confirm('This REPLACES everything in the app with the example studio.\n\nYour orders, customers, payments, staff and stock will be wiped and cannot be recovered unless you exported a backup.\n\nContinue?'))return;
@@ -5372,7 +5510,7 @@ function loadExample(force){
   exTxns.push({id:uid('t'),dir:'out',label:'Kano fabric restock · aso-oke rolls',amount:240000,at:dd(-16),cat:'supply',category:'Materials & supplies',dept:'Sales',vendor:'Aso-oke weaver',method:'Bank transfer',approval:'Approved',branch:'Kano store'});
   setTxns(exTxns);
   SETTINGS.budgets={Production:600000,Marketing:150000,Operations:400000,Sales:120000};
-  SETTINGS.branches=[{id:'br-lag',name:'Lagos studio',location:'Surulere, Lagos',active:true,type:'bespoke',channels:['showroom']},{id:'br-abj',name:'Abuja outlet',location:'Wuse, Abuja',active:true,type:'rtw',channels:['showroom','online']},{id:'br-ib',name:'Ibadan branch',location:'Bodija, Ibadan',active:true,type:'haberdashery',channels:['showroom']},{id:'br-kan',name:'Kano store',location:'Nassarawa, Kano',active:true,type:'fabrics',channels:['showroom','online']}];
+  SETTINGS.branches=[{id:'br-lag',name:'Lagos studio',location:'Surulere, Lagos',active:true,type:'bespoke',channels:['showroom']},{id:'br-abj',name:'Abuja outlet',location:'Wuse, Abuja',active:true,type:'rtw',channels:['showroom','online']},{id:'br-ib',name:'Ibadan branch',location:'Bodija, Ibadan',active:true,type:'rtw',does:['rtw','leather'],channels:['showroom']},{id:'br-kan',name:'Kano store',location:'Nassarawa, Kano',active:true,type:'fabrics',channels:['showroom','online']}];
   setCampaigns([
     {id:uid('cmp'),at:dd(-4)+'T10:00:00.000Z',by:'Kay Ojomo',subject:'Festive agbada collection is here',message:'Our new festive pieces just dropped.',type:'Launch',channel:'whatsapp',segment:'all',segmentName:'All reachable',recipients:6},
     {id:uid('cmp'),at:dd(-18)+'T10:00:00.000Z',by:'Kay Ojomo',subject:'10% off for our VIP clients',message:'A thank-you to our top clients.',type:'Promotion',channel:'email',segment:'vip',segmentName:'VIP, top tier',recipients:2}

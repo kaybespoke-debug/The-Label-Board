@@ -7,20 +7,20 @@ const fs=require('fs'),vm=require('vm');const html=fs.readFileSync((process.argv
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const mkEl=()=>({innerHTML:'',value:'',checked:false,placeholder:'',textContent:'',style:{},dataset:{},options:[],classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
 const cache={};const _ls={};
-const sb={console,document:{getElementById(i){return cache[i]||(cache[i]=mkEl())},querySelector(){return mkEl()},querySelectorAll(){return[]},createElement(){return mkEl()},addEventListener(){},removeEventListener(){},body:mkEl(),documentElement:mkEl(),head:mkEl()},localStorage:{getItem(k){return k in _ls?_ls[k]:null},setItem(k,v){_ls[k]=String(v)},removeItem(k){delete _ls[k]}},setTimeout:f=>{try{f&&f()}catch(e){}},navigator:{userAgent:'n'},location:{href:''},alert(){},confirm(){return true},Math,Date,JSON,Object,Array,String,Number,Boolean,RegExp,Map,Set,parseInt,parseFloat,isNaN,isFinite,encodeURIComponent,decodeURIComponent,Intl};
+const sb={console,document:{getElementById(i){return cache[i]||(cache[i]=mkEl())},querySelector(){return mkEl()},querySelectorAll(){return[]},createElement(){return mkEl()},addEventListener(){},removeEventListener(){},body:mkEl(),documentElement:mkEl(),head:mkEl()},localStorage:{getItem(k){return k in _ls?_ls[k]:null},setItem(k,v){_ls[k]=String(v)},removeItem(k){delete _ls[k]}},setTimeout:f=>{try{f&&f()}catch(e){}},clearTimeout(){},requestAnimationFrame:f=>{try{f&&f()}catch(e){}},navigator:{userAgent:'n'},location:{href:''},alert(){},confirm(){return true},Math,Date,JSON,Object,Array,String,Number,Boolean,RegExp,Map,Set,parseInt,parseFloat,isNaN,isFinite,encodeURIComponent,decodeURIComponent,Intl};
 sb.window=sb;sb.globalThis=sb;vm.createContext(sb);vm.runInContext(code,sb,{filename:'x'});sb.demoLogin();
 const run=e=>vm.runInContext(e,sb);
 run("currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
 let fails=[];const F=x=>fails.push(x);
 
 /* 1) Every trade we advertise can actually be chosen. --------------------------------- */
-const SOLD=['bespoke','rtw','footwear','leather','fabrics','haberdashery'];
+const SOLD=['bespoke','rtw','footwear','leather','fabrics'];
 const keys=run("DEFAULT_ACTIVITIES.map(a=>a.key)");
 SOLD.forEach(k=>{if(keys.indexOf(k)<0)F('the website sells to "'+k+'" but a studio cannot select it');});
 
 /* 2) A trade that MAKES things must open Production; one that SELLS must open Sales. --- */
 ['bespoke','footwear','leather'].forEach(k=>{if(run("activityKind('"+k+"')")!=='bespoke')F(k+' makes things to order but does not open the Production board');});
-['rtw','fabrics','haberdashery'].forEach(k=>{if(run("activityKind('"+k+"')")!=='retail')F(k+' sells stock but does not open Sales');});
+['rtw','fabrics'].forEach(k=>{if(run("activityKind('"+k+"')")!=='retail')F(k+' sells stock but does not open Sales');});
 // shoes and bags are also stocked and sold, so they need a catalogue
 ['footwear','leather','rtw'].forEach(k=>{if(run("activityHasCatalog('"+k+"')")!==true)F(k+' has no product catalogue, so nothing can be stocked or priced');});
 
@@ -94,6 +94,61 @@ if(run("showsRTW()")!==true)F('a shoemaker gets no Shop, so cannot stock ready p
 setDoes(['fabrics']);
 if(run("showsRetail()")!==true)F('a fabric seller gets no Sales');
 if(run("showsBespoke()")!==false)F('a fabric seller is shown a Production board they do not need');
+
+/* 8) Every example studio loads, and reads as its own trade. -------------------
+   These are what a prospect opens first and what Kayode tests each tab
+   against. An example that still says "Fabric Received" to a shoemaker is
+   worse than no example, because it tells them the app is not for them. */
+const EX=run("EXAMPLE_STUDIOS.map(x=>x.key)");
+['multi','bespoke','footwear','leather','rtw','fabrics'].forEach(k=>{
+  if(EX.indexOf(k)<0)F('there is no example studio for '+k);
+});
+const EXPECT={
+  bespoke: {word:'garment',stage:/fabric|cutting|stitch/i, prod:true,  retail:false},
+  footwear:{word:'pair',   stage:/last|clicking|closing/i, prod:true,  retail:false},
+  leather: {word:'piece',  stage:/pattern|cutting|skiv/i,  prod:true,  retail:false},
+  rtw:     {word:'garment',stage:/sampl|cutting|sew/i,     prod:false, retail:true},
+  fabrics: {word:'piece',  stage:/cloth|measured|packed/i, prod:false, retail:true}
+};
+Object.keys(EXPECT).forEach(k=>{
+  const want=EXPECT[k];
+  let threw='';
+  try{ run("loadExampleAs("+JSON.stringify(k)+");"); }catch(e){ threw=e.message; }
+  if(threw){F('the '+k+' example studio failed to load: '+threw);return;}
+  run("currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
+  const word=run("tradeWord()");
+  if(word!==want.word)F(k+' example calls one piece of work a "'+word+'", expected "'+want.word+'"');
+  const stages=run("STAGES.join(' | ')");
+  if(!want.stage.test(stages))F(k+' example has the wrong production stages: '+stages);
+  if(run("showsBespoke()")!==want.prod)F(k+' example '+(want.prod?'should':'should not')+' show a Production board');
+  if(run("showsRetail()")!==want.retail)F(k+' example '+(want.retail?'should':'should not')+' show Sales');
+  // and it must have data, or there is nothing to look at
+  if(!run("getOrders().length"))F(k+' example has no orders, so every tab is empty');
+  if(!run("getTxns().length"))F(k+' example has no money recorded');
+  // one studio, and everything in it
+  const brs=run("getBranches().length");
+  if(brs!==1)F(k+' example should be a single studio, got '+brs);
+  const stray=run("getOrders().filter(o=>o.branch!==getBranches()[0].name).length");
+  if(stray)F(k+' example leaves '+stray+' order(s) pointing at a studio that no longer exists');
+  // money, stock and people too: a record pointing at a studio that is gone is
+  // invisible in every studio view, which is how an example looks half-empty
+  [['payment','getTxns','branch'],['stock item','getSupplies','branch'],['staff member','getStaff','location']].forEach(function(e){
+    const n2=run(e[1]+"().filter(r=>r."+e[2]+"!==getBranches()[0].name).length");
+    if(n2)F(k+' example leaves '+n2+' '+e[0]+'(s) pointing at a studio that no longer exists');
+  });
+  // the orders must be things this trade actually makes
+  const items=run("EXAMPLE_STUDIOS.find(x=>x.key==="+JSON.stringify(k)+").items");
+  const first=run("getOrders()[0].garment");
+  if(items.indexOf(first)<0)F(k+' example order is a "'+first+'", which is not something that trade makes');
+});
+// haberdashery is gone as a trade, but must survive as an inventory category:
+// every tailor stocks threads, buttons and zips
+if(run("typeof invCatMatch")==='function'){
+  if(run("invCatMatch('Threads','haberdashery')")!==true||run("invCatMatch('Needles & notions','haberdashery')")!==true)
+    F('haberdashery was removed as an inventory category too, which breaks stock for every tailor');
+}
+if(run("DEFAULT_ACTIVITIES.some(a=>a.key==='haberdashery')"))
+  F('haberdashery is still offered as a trade a studio can be');
 
 console.log('Multi-trade audit:');
 console.log('  trades: '+keys.join(' · '));
