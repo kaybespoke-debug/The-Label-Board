@@ -1,165 +1,255 @@
-# The Label Board — backend setup
+# Going live — a fresh Supabase project, then Netlify, then the domain
 
-Everything on this list is yours to do in the Supabase dashboard. The app side is
-already finished and waiting. Budget about 30 minutes.
+This is the runbook for standing the whole thing up properly, in the order
+that costs least. Follow it top to bottom; each step says how to check it
+worked before you move on, because a wrong step here fails quietly rather
+than loudly.
 
-**Before you start, one thing to know:** the app used to point at a Supabase
-project (`knrqlocxtrmpvwaplffq`) that no longer exists and is unreachable. That is
-why nothing was syncing. The config is now blank on purpose, so the app runs
-safely on-device until you fill it in at step 4.
+**Do the database first.** It is the cheapest thing to get right today and
+the most expensive to change once real studios have data in it.
 
-Your account currently has exactly one project, `Layi-website`. That is the
-**website** backend. Do not reuse it. You decided early on to keep the studio app
-on its own project, and that decision still holds: different data, different
-users, different blast radius.
+---
+
+## Before you touch anything: what runs without a backend
+
+The customer app is local-first. Most of what you want to test needs none of
+this and can be tested right now on the live URL:
+
+- branch and studio scoping, the studio switcher
+- payment methods and the money-moved breakdown
+- trades, production stages, measurements
+- pay setup, allowances, pension, payslips
+- everything in Settings
+
+What genuinely needs the steps below: tenant isolation with real logins, team
+sign-in, feedback reaching the operator console, cloud sync and realtime, and
+PWA install over HTTPS on a real phone.
+
+So do not hold up your testing for this. Run them in parallel.
+
+---
+
+## 0. Prove the migrations still build a working database
+
+Before creating anything, run the three suites. They build a database from
+`supabase/migrations/` **alone**, in filename order, and attack it.
+
+```bash
+node supabase/tests/app_schema_harness.mjs
+```
+
+```bash
+node supabase/tests/rls_harness.mjs
+```
+
+```bash
+node supabase/tests/feedback_rls_harness.mjs
+```
+
+All three must be green. The first one is the one that matters most here: it
+checks that every table and function the shipped code names is actually
+created by a migration, and that every column the app writes exists on the
+table it writes to. It exists because five objects the app uses every day
+(`app_state`, `profiles`, `suppliers`, `platform_audit` and
+`platform_tenant_summary()`) were once created by hand and were missing from
+the migrations entirely — a fresh project would have failed silently.
 
 ---
 
 ## 1. Create the project
 
-Supabase dashboard → **New project**.
+Supabase → **New project**. Region closest to your customers (Europe West or
+Africa, not US). Save the database password somewhere real.
 
-| Field | Use |
-|---|---|
-| Name | `label-board` |
-| Region | **eu-west-2 (London)** — same as Layi-website, and closest to Lagos of the EU regions |
-| Password | Generate a strong one and save it in your password manager. You will rarely need it, and it is painful to rotate. |
+Then from **Project Settings → API**, copy:
 
-Wait for it to finish provisioning before step 2.
-
----
-
-## 2. Create the tables
-
-Dashboard → **SQL Editor** → **New query**.
-
-Open `supabase_setup.sql` from this folder, paste the whole file, press **Run**.
-
-It is idempotent, so running it twice is harmless. It creates:
-
-- `profiles` — one row per login, tying a user to a business and a role
-- `customers` and `suppliers` — relational, because the app queries their columns
-- `app_state` — one row per business per data key, holding everything else
-  (orders, transactions, staff, roles, products, supplies, bills, pots, tasks,
-  attendance, leave, campaigns, the company log and the audit trail)
-
-It also switches on row-level security keyed on `business_id`, so one studio can
-never read another's data, and enables realtime on all three data tables.
-
-**Check it worked:** Table Editor should now list four tables, each showing
-"RLS enabled".
+- the **Project URL**
+- the **anon / public** key — safe to ship in a browser, it is designed for it
+- the **service_role** key — never put this in any file in this repo
 
 ---
 
-## 3. Create your own login
+## 2. Run the migrations
 
-**3a.** Authentication → **Users** → **Add user**.
-Use a real email and a real password, and tick **Auto Confirm User**. Without
-that tick you cannot sign in.
-
-**3b.** Copy the new user's UUID, then SQL Editor → New query:
-
-```sql
-insert into public.profiles (id, name, role_id, business_id)
-values (
-  'PASTE-THE-AUTH-USER-UUID',
-  'Kay Ojomo',
-  'owner',
-  '11111111-1111-1111-1111-111111111111'
-);
-```
-
-That `business_id` is arbitrary but must be **identical for everyone in your
-studio**. Keep this one, it matches the app's built-in default.
-
----
-
-## 4. Point the app at the project
-
-Project Settings → **API**. Copy the **Project URL** and the **anon / publishable**
-key.
-
-Open `layi_dashboard.html` and fill in the two blank strings near line 1513:
-
-```js
-const SUPA_URL='https://YOUR-PROJECT.supabase.co';
-const SUPA_KEY='eyJhbGciOi...';
-```
-
-The anon key is designed to be public and is safe in the file. The **service role**
-key is not, and must never appear here.
-
----
-
-## 5. Auth URLs
-
-Authentication → **URL Configuration**:
-
-- **Site URL:** `https://thelabelboard.netlify.app`
-- **Redirect URLs:** add `https://thelabelboard.netlify.app/**`
-
-Skip this and password reset emails will bounce users to the wrong place.
-
----
-
-## 6. Deploy the team-admin function
-
-This is what lets you create team logins from inside the app. The service-role key
-lives only here on the server, never in the browser.
+From the repo root, with the Supabase CLI linked to the new project:
 
 ```bash
-supabase functions deploy team-admin --project-ref YOUR-PROJECT-REF
+supabase db push
 ```
 
-The source is at `supabase/functions/team-admin/index.ts`. `SUPABASE_URL`,
-`SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically, so
-there is nothing to configure.
+If you would rather paste SQL by hand, run the files in
+`supabase/migrations/` in **filename order**, all seven, without skipping:
 
-If you have not used the CLI before: `npm i -g supabase`, then `supabase login`.
+```
+20260827090000_tenant_isolation.sql     the tenant spine + row-level security
+20260827090100_saas_admin.sql           the console's own subscriber tables
+20260827090200_staff_management.sql     our staff, tickets, tasks
+20260827090300_rls_hardening.sql        tightens the above
+20260827090400_partner_portal.sql       partners, referrals, payouts
+20260827090500_feedback.sql             studios talking to us
+20260828090000_app_runtime.sql          what the running apps talk to
+```
+
+**Do not run any loose .sql from the repo root.** There aren't any any more,
+and that is deliberate: the old ones created `businesses`, `platform_admins`
+and `customers` with older shapes, and because they used
+`create table if not exists`, whichever ran first would win and the security
+policies would land on the wrong columns.
+
+**Check it worked.** In the SQL editor:
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' order by table_name;
+```
+
+You should see `app_state`, `businesses`, `branches`, `customers`,
+`feedback`, `feedback_replies`, `memberships`, `orders`, `partners`,
+`platform_admins`, `platform_audit`, `products`, `profiles`, `staff`,
+`suppliers`, `transactions` and the `tlb_*` set. If `memberships` is missing,
+stop — every security policy calls `app.in_scope()`, which reads it, and
+nothing is isolated without it.
 
 ---
 
-## 7. Ship and test
+## 3. Deploy the two Edge Functions
 
-Drag the `site/` folder to Netlify, then:
+```bash
+supabase functions deploy admin-api
+```
 
-1. Open the site and sign in with the **email address** from step 3, not a username.
-   The `@` is what tells the app to use the cloud rather than the local demo login.
-2. Watch for "Loading your studio…" — that is the cloud hydrate running.
-3. Add a test order, then open the project's Table Editor and confirm a row
-   appeared in `app_state` under key `layi_dash_orders`.
-4. Sign in on a second device. The same data should appear. **That is the moment
-   the phone and the laptop stop being separate sets of books.**
+```bash
+supabase functions deploy team-admin
+```
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
+injected by Supabase; you do not set them.
+
+`admin-api` is the operator console's only door to the database. It checks
+`platform_admins` server side and logs every read to `platform_audit`. That
+is why the console never queries a table directly, and why the service_role
+key never leaves the server.
 
 ---
 
-## What switches on by itself once this is done
+## 4. Make yourself a platform admin
 
-You do not need to flip a flag. `liveMode` turns on the moment an email login
-succeeds and a matching profile row is found. From there:
+Auth → Users → **Add user** with your own email and a password. Copy the
+UUID, then:
 
-- Cloud sync starts, and the ↻ Sync button pulls the latest
-- Realtime kicks in, so another device's changes chime and appear
-- The storage note stops saying "this device only"
-- Web Push and auto-WhatsApp become deployable, since both were waiting on a
-  backend
+```sql
+insert into public.platform_admins (id, name, role, active)
+values ('<your-uuid>', 'Kayode', 'owner', true);
+```
+
+**Check it worked:** sign in to the console once step 6 is done and the
+support page should say **Live**, not **Example data**.
+
+---
+
+## 5. Auth URLs — do this before testing sign-in
+
+Authentication → URL Configuration:
+
+- **Site URL:** the app's real address
+- **Redirect URLs:** add the app, the console and the partner portal, each
+  with `/**` on the end
+
+Get this wrong and sign-in appears to work, then bounces the user back to the
+login screen with no error. It is the single most common cause of "the login
+loops".
+
+While you are here: Authentication → Emails. The default Supabase sender goes
+to spam often enough to matter. Point it at your own SMTP before you invite
+anybody real.
+
+---
+
+## 6. Point the apps at the project
+
+Three files, three edits.
+
+**Customer app** — `site/layi_dashboard.html`, near the top:
+
+```js
+const SUPA_URL='https://<your-project>.supabase.co';
+const SUPA_KEY='<anon key>';
+```
+
+**Admin console** — `admin/js/config.js`:
+
+```js
+SUPA_URL: 'https://<your-project>.supabase.co',
+SUPA_KEY: '<anon key>',
+```
+
+**Partner portal** — `partners/js/config.js`: the same two lines.
+
+The console and the portal ship blank on purpose: with these empty they run a
+self-contained worked example, which is what you want for a demo. Filling
+them in is what switches them to real data. Nothing else changes.
+
+---
+
+## 7. Deploy
+
+Bump the service worker first, or installed phones keep serving the old
+version:
+
+```bash
+node verify.js
+```
+
+Then bump `CACHE` in `site/sw.js`, commit, and merge to `main` using the
+recipe in `netlify.toml` — the one that keeps main's own publish path. See
+`CLAUDE.md`.
+
+The customer app and the console already deploy from this repo. The partner
+portal needs a Netlify site if it does not have one; the public website
+should **not** be connected yet — it still carries placeholders and an
+unsettled domain, and it is the only one of the four meant to be indexed.
+
+---
+
+## 8. The domain
+
+Start this early: DNS takes hours, and the auth URLs in step 5, the PWA
+install prompt and the email confirmation links all key off it.
+
+Netlify → Domain settings → add the domain, follow the DNS records, wait for
+the certificate. Then go back to step 5 and update the Site URL and redirect
+URLs to the real domain, and update `web/js/config.js` and the `canonical` /
+`og:url` tags on the website when that goes live.
+
+---
+
+## What to test once, in this order
+
+1. **Sign in** on the app with an email and password. An email address is
+   what triggers the cloud path; a username stays local.
+2. **Create an order**, then check `app_state` has a row for that business
+   and key.
+3. **Sign in as a second business** and confirm you cannot see the first
+   one's anything. This is the one worth doing by hand even though 71
+   automated checks already cover it.
+4. **Send feedback** from the app, then open the console's support page and
+   confirm it arrives and says Live.
+5. **Install on a phone** over HTTPS, go offline, create an order, come back
+   online and confirm it syncs.
+
+---
+
+## Use a throwaway studio
+
+Sign up a test business, not your real label, and plan to delete it. Once
+there is real data, schema changes stop being edits and start being
+migrations — so do your shaking-out on a tenant you are happy to drop.
 
 ---
 
 ## Rolling back
 
-Blank `SUPA_URL` and `SUPA_KEY` again and redeploy. The app returns to
-device-only, and your local data is untouched. Nothing about this is one-way.
-
----
-
-## Still needs a decision, not today
-
-- **Payments.** Model A first, each studio bringing its own Paystack, Flutterwave
-  or Monnify account. Provider still unchosen. Tenant payment secrets live only in
-  an Edge Function, never in the client.
-- **Auto WhatsApp.** The client side is built and dormant. It needs a provider
-  (Meta Cloud API is cheapest), Meta-approved templates, and a `send-whatsapp`
-  function. See `WHATSAPP.md`.
-- **Per-tenant image storage.** `saveImageAsset()` is the single seam that routes
-  to Supabase Storage when you are ready. See `STORAGE.md`.
+Nothing here touches a device's local data. If the project is wrong, blank
+the three config files and every app falls back to local-only and the worked
+example, exactly as it behaves today. That is the whole point of them
+shipping blank.

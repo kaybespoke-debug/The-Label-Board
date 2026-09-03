@@ -212,6 +212,10 @@ run("activeBranchView='all';");
   if(!/Somewhere that closed/.test(shown))F('the notice does not say which studio the record is pointing at');
 }
 
+// The example studio's data is seeded relative to today, so pin the period to
+// one that contains it. Rendering on the default month means these checks
+// quietly start failing whenever the calendar moves past the seeded range.
+run("finPeriod='year';expPeriod='all';ordersPeriod='all';salesPeriod='year';dashApptPeriod='year';potPeriod='year';branchPeriod='year';");
 /* 9) The whole app, rendered once per studio, compared element by element. ----
    Checks 3 to 8 look at the data. This one looks at what actually reaches the
    screen, and it is here because the data checks all passed while the sidebar
@@ -224,6 +228,24 @@ run("activeBranchView='all';");
    somebody made, and an accidentally shared one a build failure. */
 {
   run("activeBranchView='all';");
+  /* Give every studio its own money, dated today.
+
+     Comparing renders while every studio has nothing is how this check cries
+     wolf: a panel showing "no spending" in four studios looks identical to one
+     ignoring the switcher, and panels that pin themselves to the current
+     calendar month (Budget vs actual) go empty the moment the seeded example
+     data drifts into the past. With one distinct amount per studio, an
+     identical render means the panel really is ignoring the studio. */
+  {
+    const today=new Date().toISOString().slice(0,10);
+    names.forEach((n,i)=>{
+      run("(function(){var t=getTxns();t.push({id:'gate-in-"+i+"',dir:'in',label:'Gate probe',amount:"+((i+1)*11000)+",at:"+JSON.stringify(today)+",branch:"+JSON.stringify(n)+",method:'Cash',cat:'order'});"
+         +"t.push({id:'gate-out-"+i+"',dir:'out',label:'Gate probe spend',amount:"+((i+1)*3000)+",at:"+JSON.stringify(today)+",branch:"+JSON.stringify(n)+",method:'Cash',cat:'expense',category:'Marketing & advertising',dept:'Marketing'});"
+         +"setTxns(t);})();");
+    });
+    // and a budget to measure that spend against, or the panel stays empty
+    run("SETTINGS.budgets=Object.assign({},SETTINGS.budgets||{},{Marketing:50000});");
+  }
   const shared=run("typeof SHARED_PANELS!=='undefined'?SHARED_PANELS:null");
   if(!shared)F('SHARED_PANELS is missing, so nothing declares which panels are shared on purpose');
   else{
