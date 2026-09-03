@@ -640,3 +640,53 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
   .cols4.swap>.pnl{display:none}
   .cols4.swap>.pnl.on{display:block}
 }
+
+/* ============================================================
+   Calendar — a month grid that has to fit a 375px phone without
+   scrolling sideways. Seven columns of minmax(0,1fr) rather than a
+   min-width, because a grid item defaults to min-width:auto and will
+   happily push the whole page wider than the screen.
+   ============================================================ */
+.cal-head{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:6px}
+.cal-head span{text-align:center;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);font-weight:600;font-family:'Jost',sans-serif}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal-cell{min-width:0;aspect-ratio:1/1;background:var(--panel-2);border:1px solid var(--line-soft);
+  border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  cursor:pointer;transition:.15s;font-family:inherit;color:var(--text);padding:0}
+.cal-cell:hover{border-color:var(--gold)}
+.cal-cell.out{background:none;border-color:transparent;cursor:default}
+.cal-cell.today{border-color:var(--gold)}
+.cal-cell.today .cal-n{color:var(--gold);font-weight:700}
+.cal-cell.on{background:var(--gold);border-color:var(--gold)}
+.cal-cell.on .cal-n{color:var(--on-gold);font-weight:700}
+.cal-n{font-size:13px;line-height:1;font-family:'Jost',sans-serif}
+.cal-dots{display:flex;gap:2px;align-items:center;min-height:5px}
+.cal-dots i{width:5px;height:5px;border-radius:50%;display:block}
+.cal-dots i.blue{background:var(--blue)}.cal-dots i.amber{background:var(--amber)}
+.cal-dots i.red{background:var(--red)}.cal-dots i.green{background:var(--green)}
+.cal-dots i.purple{background:var(--purple)}.cal-dots i.gold{background:var(--gold)}
+.cal-dots i.grey{background:var(--faint)}
+.cal-cell.on .cal-dots i{box-shadow:0 0 0 1px var(--on-gold)}
+
+.cal-key{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:14px;padding-top:12px;
+  border-top:1px solid var(--line-soft)}
+.cal-key span{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--faint)}
+.cal-key i{width:6px;height:6px;border-radius:50%;display:block}
+.cal-key i.blue{background:var(--blue)}.cal-key i.amber{background:var(--amber)}
+.cal-key i.red{background:var(--red)}.cal-key i.green{background:var(--green)}
+.cal-key i.purple{background:var(--purple)}.cal-key i.gold{background:var(--gold)}
+
+/* Invitee picker: staff only, so a short row of chips is enough. */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--panel-2);border:1px solid var(--line);color:var(--dim);border-radius:20px;
+  padding:6px 12px;font-size:12.5px;cursor:pointer;transition:.15s;font-family:inherit}
+.chip:hover{border-color:var(--gold)}
+.chip.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold);font-weight:600}
+
+@media(max-width:440px){
+  .cal-grid,.cal-head{gap:3px}
+  .cal-n{font-size:11.5px}
+  .cal-dots i{width:4px;height:4px}
+  .cal-key{gap:8px 10px}
+}
