@@ -5137,7 +5137,7 @@ function renderRecipesSettings(){
 }
 function saveRecipe(){syncRecipeDraft();const clean=(recipeDraft||[]).filter(r=>r.supplyId&&+r.qty>0).map(r=>({supplyId:r.supplyId,qty:+r.qty}));const all=getRecipes();if(clean.length)all[recipeType]=clean;else delete all[recipeType];SETTINGS.recipes=all;save('layi_dash_settings',SETTINGS);logAudit('Material recipe saved',recipeType);recipeDraft=null;renderRecipesSettings();flashSaved('recipeSaveBtn','Save '+recipeType+' recipe');}
 let branchDraft=null;
-const BRANCH_TYPES=[['bespoke','Bespoke / made-to-order'],['rtw','Ready-to-wear / retail'],['both','Both'],['fabrics','Fabrics (sold by length)']];
+
 function renderBranchesSettings(){const box=document.getElementById('branchBox');if(!box)return;
   renderUnplacedNotice();
   if(!branchDraft)branchDraft=getBranches().map(b=>({id:b.id||uid('br'),name:b.name,location:b.location||'',does:branchDoes(b),channels:Array.isArray(b.channels)&&b.channels.length?b.channels.slice():['showroom']}));
