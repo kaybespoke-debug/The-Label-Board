@@ -1175,6 +1175,9 @@ body.modal-open{overflow:hidden}
         <div class="toolbar"><span style="flex:1"></span><button class="btn sm" onclick="openCampaign('all')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>New campaign</button></div>
         <div class="cols">
           <div class="panel"><div class="panel-head"><h3>Customer segments</h3><span class="page-sub">tap to message a group</span></div><div id="mktSegments"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Ready to post</h3><span class="page-sub" id="postSub"></span></div>
+            <p class="page-sub" style="margin-bottom:10px">Work you have finished, with the photos already on it. The caption is a starting point — change it to sound like you, then copy it and post.</p>
+            <div id="postIdeas"></div></div>
           <div class="panel"><div class="panel-head"><h3>Campaign history</h3><span class="page-sub" id="mktHistSub"></span></div><div id="mktHistory"></div></div>
         </div>
       </section>
@@ -9247,8 +9250,55 @@ function marketingSegments(){
     {key:'vip',name:'VIP, top tier',desc:topTier||'Highest loyalty tier',list:data.filter(c=>loyaltyTier(c.spend).tier===topTier&&(c.email||c.whatsapp))},
     {key:'owing',name:'Owing a balance',desc:'Have an outstanding balance',list:data.filter(c=>c.outstanding>0&&(c.email||c.whatsapp))},
     {key:'new',name:'New this month',desc:'First order this month',list:data.filter(c=>{const f=firstAt(c);return f!==Infinity&&new Date(f).toISOString().slice(0,7)===thisMo&&(c.email||c.whatsapp);})},
-    {key:'lapsed',name:'Lapsed (90+ days)',desc:'No order in over 90 days',list:data.filter(c=>{const l=lastAt(c);return l&&(now-l)>90*864e5&&(c.email||c.whatsapp);})}
-  ];
+    {key:'lapsed',name:'Lapsed (90+ days)',desc:'No order in over 90 days',list:data.filter(c=>{const l=lastAt(c);return l&&(now-l)>90*864e5&&(c.email||c.whatsapp);})},
+    /* The two below are the point of this whole tab: they are made of what the
+       studio already recorded, so they cost nobody any extra work.
+
+       "This time last year" is the one that earns its keep. A tailor's year
+       repeats — weddings in December, Sallah, back-to-school — and the people
+       who ordered last November are the people most likely to order this
+       November. Nobody keeps that list by hand. */
+    {key:'season',name:'Ordered this time last year',desc:'Same six weeks, twelve months ago \u2014 the people whose year repeats',
+     list:data.filter(c=>c.orders.some(function(od){
+       const t=od.createdAt?new Date(od.createdAt).getTime():0;if(!t)return false;
+       const ago=now-t;
+       // a six-week window centred on twelve months ago
+       return ago>(365-21)*864e5&&ago<(365+21)*864e5;
+     })&&(c.email||c.whatsapp))},
+    {key:'quiet6',name:'Not seen in six months',desc:'Further gone than lapsed, and worth a personal note',
+     list:data.filter(c=>{const l=lastAt(c);return l&&(now-l)>182*864e5&&(c.email||c.whatsapp);})}
+  ]
+  .concat(itemSegments(data))
+  // A segment with nobody in it is a row that goes nowhere. It was always
+  // possible to see "Lapsed (90+ days)" with nothing behind it, which teaches
+  // somebody the tab is not worth opening. "All reachable" is kept whatever,
+  // because it is the baseline the campaign screen starts from.
+  .filter(function(seg){return seg.key==='all'||seg.list.length>0;});
+}
+/* One segment per popular item. "Everyone who bought a kaftan" is a real
+   marketing list and the studio has always had the data for it; it just had no
+   way to ask. Capped at the top three so the segment list stays readable —
+   beyond that it stops being a list and becomes a database query. */
+function itemSegments(data){
+  const counts={};
+  data.forEach(function(c){
+    (c.orders||[]).forEach(function(od){
+      const n=String(od.garment||'').trim();
+      if(!n)return;
+      (counts[n]=counts[n]||{n:0,keys:{}}).n++;
+      counts[n].keys[c.key]=1;
+    });
+  });
+  return Object.keys(counts)
+    .sort(function(a,b){return counts[b].n-counts[a].n;})
+    .slice(0,3)
+    .filter(function(n){return counts[n].n>1;})
+    .map(function(n){
+      return {key:'item:'+n,name:'Bought '+n,desc:counts[n].n+' order'+(counts[n].n===1?'':'s')+' of this',
+        list:data.filter(function(c){return counts[n].keys[c.key]&&(c.email||c.whatsapp);})};
+    })
+    // a segment with nobody reachable in it is a row that wastes a tap
+    .filter(function(seg){return seg.list.length>0;});
 }
 function segmentByKey(k){const segs=marketingSegments();return segs.find(s=>s.key===k)||segs[0];}
 function mktDrill(){
@@ -9256,6 +9306,125 @@ function mktDrill(){
   const list=getCampaigns().filter(c=>String(c.at||'').slice(0,7)===mo).sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   const rows=list.map(c=>`<div class="bd-row"><span class="bl"><b>${esc(c.subject||'(no subject)')}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(c.segmentName||'')} · ${c.recipients||0} recipient${c.recipients===1?'':'s'}</span></span><span class="bv">${c.channel==='whatsapp'?'WhatsApp':'Email'}</span></div>`).join('');
   openListModal('Campaigns this month',list.length+' sent',list.length?rows:'<div class="kv" style="color:var(--text-faint)">No campaigns logged this month.</div>');
+}
+/* ===== READY TO POST =========================================================
+   The best marketing a small studio has is the work it just finished, and it
+   is already in the app: a completed order, the client's name, what it was,
+   and photos somebody took at the fitting.
+
+   What this does NOT do is post anything. Posting means Meta app review,
+   tokens that expire, and a breakage every few months for a feature nobody
+   asked to be automatic. Writing the caption and handing it over is most of
+   the value for a tenth of the work, and it is the same shape as the WhatsApp
+   hand-off that already works here.
+   ========================================================================= */
+function postIdeas(){
+  const DEL=STAGES.indexOf('Delivered'),RFD=STAGES.indexOf('Ready for Delivery');
+  const out=[];
+  getOrders().filter(inBranch).forEach(function(o){
+    if(o.kind==='sale')return;
+    if((o.stageIndex||0)<Math.min(RFD,DEL))return;         // not finished yet
+    // every photo attached to the job, wherever it was taken
+    const photos=[].concat(o.clientPhotos||[]);
+    (o.outfits||[]).forEach(function(of){[].push.apply(photos,of.photos||[]);});
+    (o.updates||[]).forEach(function(u){[].push.apply(photos,u.photos||[]);});
+    if(!photos.length)return;                               // nothing to show
+    const when=o.deliveredAt||o.due||o.createdAt||'';
+    out.push({id:o.id,client:o.client||'',item:o.garment||tradeWord(),
+      photos:photos.slice(0,4),at:when,posted:!!o.postedAt});
+  });
+  // newest finished work first: that is what somebody wants to post today
+  return out.sort(function(a,b){return String(b.at||'').localeCompare(String(a.at||''));}).slice(0,8);
+}
+/* A caption a person would actually send, not a template with holes in it.
+   No client name: posting a customer's name without asking is a good way to
+   lose them, and the studio can add it themselves if they have permission. */
+function postCaption(idea){
+  const co=(SETTINGS.company&&SETTINGS.company.name)||tenantName()||'the studio';
+  const w=tradeWord();
+  const lines=[
+    'Finished this week: '+(idea.item||w)+'.',
+    '',
+    'Made at '+co+(SETTINGS.company&&SETTINGS.company.address?', '+String(SETTINGS.company.address).split('\n')[0]:'')+'.',
+    'Taking orders now \u2014 send us a message to start yours.'
+  ];
+  return lines.join('\n');
+}
+function renderPostIdeas(){
+  const box=document.getElementById('postIdeas');if(!box)return;
+  const ideas=postIdeas();
+  const sub=document.getElementById('postSub');
+  if(sub)sub.textContent=ideas.length?ideas.length+' ready':'';
+  if(!ideas.length){
+    box.innerHTML='<div class="kv" style="color:var(--text-faint);padding:8px 2px">Nothing to post yet. Finished orders with photos on them show up here \u2014 take a picture at the last fitting and it will appear.</div>';
+    return;
+  }
+  box.innerHTML=ideas.map(function(x,i){
+    const thumbs=x.photos.slice(0,3).map(function(ph){
+      return '<img src="'+ph+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">';
+    }).join('');
+    return '<div class="up-line" style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line-soft)">'
+      +'<div style="display:flex;gap:5px;flex:0 0 auto">'+thumbs+'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<b>'+esc(x.item)+'</b>'
+        +'<div style="color:var(--text-faint);font-size:12.5px">'+esc(x.id)+(x.at?' \u00b7 '+esc(fmtDateShort(x.at)):'')+(x.posted?' \u00b7 posted':'')+'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px">'
+          +'<button class="btn sm ghost" onclick="openPostDraft(\''+x.id+'\')">Write the post</button>'
+        +'</div>'
+      +'</div></div>';
+  }).join('');
+}
+function openPostDraft(orderId){
+  const idea=postIdeas().find(function(x){return x.id===orderId;});
+  if(!idea){if(typeof toast==='function')toast('That job is no longer in the list.');return;}
+  const cap=postCaption(idea);
+  openModal('<h3>Write the post</h3><div class="msub">'+esc(idea.item)+' \u00b7 '+esc(idea.id)+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      +idea.photos.map(function(ph){return '<img src="'+ph+'" style="width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">';}).join('')
+    +'</div>'
+    +'<div class="field"><label>Caption</label><textarea class="fld" id="pi_cap" rows="6">'+esc(cap)+'</textarea>'
+      +'<div class="sd" style="color:var(--text-faint);margin-top:5px">We have left the client\u2019s name out on purpose. Add it only if they are happy to be named.</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<button class="btn sm ghost" onclick="copyPostCaption()">Copy caption</button>'
+      +'<button class="btn sm ghost" onclick="planThisPost(\''+idea.id+'\')">Plan it in the calendar</button>'
+      +'<button class="btn sm ghost" onclick="markPosted(\''+idea.id+'\')">Mark as posted</button>'
+    +'</div>'
+    +'<div class="sd" style="color:var(--text-faint)">Save the photos from the job, paste the caption, and post it wherever you post. Nothing here posts on your behalf.</div>'
+    +'<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>');
+}
+function copyPostCaption(){
+  const el=document.getElementById('pi_cap');if(!el)return;
+  const txt=el.value||'';
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt);}
+    else{el.select&&el.select();document.execCommand&&document.execCommand('copy');}
+    if(typeof toast==='function')toast('Caption copied');
+  }catch(e){if(typeof toast==='function')toast('Select the caption and copy it');}
+}
+/* Straight into the calendar as a content entry, which is what the content
+   type was added for. */
+function planThisPost(orderId){
+  const idea=postIdeas().find(function(x){return x.id===orderId;});
+  // Fall back to the caption we generated if the field reads back empty, so a
+  // planned post is never an empty note somebody has to rewrite from scratch.
+  const el=document.getElementById('pi_cap');
+  const cap=(el&&el.value)||(idea?postCaption(idea):'');
+  const list=getPlanner();
+  list.push({id:uid('pn'),title:'Post: '+((idea&&idea.item)||'finished work'),
+    date:new Date(Date.now()+2*864e5).toISOString().slice(0,10),time:'',
+    type:'content',link:'',repeat:'',invitees:[],notes:cap,
+    branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName(),
+    staffId:'',by:userLabel(),at:new Date().toISOString(),done:false});
+  setPlanner(list);
+  if(typeof logAudit==='function')logAudit('Post planned',(idea&&idea.item)||orderId);
+  closeModal();renderAll();
+  if(typeof toast==='function')toast('Added to the calendar in two days');
+}
+function markPosted(orderId){
+  const list=rawOrders();const o=list.find(function(x){return x.id===orderId;});
+  if(o){o.postedAt=new Date().toISOString();save('layi_dash_orders',list);}
+  closeModal();renderAll();
+  if(typeof toast==='function')toast('Marked as posted');
 }
 function renderMarketing(){
   if(!can('customers'))return;
@@ -9269,6 +9438,7 @@ function renderMarketing(){
     stat('Campaigns this month',sentMo,'logged as sent','','mktDrill()')
   ].join('');
   document.getElementById('mktSegments').innerHTML=segs.map(s=>`<div class="bd-row" style="cursor:pointer" onclick="openCampaign('${s.key}')"><span class="bl"><b>${esc(s.name)}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(s.desc)}</span></span><span class="bv"><span class="badge">${s.list.length}</span> <span style="color:var(--gold)">›</span></span></div>`).join('');
+  renderPostIdeas();
   const hist=camps.slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   const hs=document.getElementById('mktHistSub');if(hs)hs.textContent=camps.length?camps.length+' sent':'';
   document.getElementById('mktHistory').innerHTML=hist.length?hist.map(c=>`<div class="up-line"><b>${esc(c.subject||'(no subject)')}</b> <span class="badge" style="font-size:10px">${esc(c.type||'Newsletter')}</span> <span class="sup-status" style="font-size:10px">${c.channel==='whatsapp'?'WhatsApp':'Email'}</span><br><span style="color:var(--text-faint);font-size:12px">${esc(c.segmentName||'')} · ${c.recipients||0} recipients · ${c.at?new Date(c.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}${c.by?' · '+esc(c.by):''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No campaigns logged yet. Create one and tap “Mark as sent” to keep a record here.</div>';
