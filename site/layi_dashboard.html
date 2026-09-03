@@ -437,6 +437,13 @@ span.sup-itemthumb.ph{display:grid;place-items:center;background:var(--panel-2);
 .cal-cell.today .cal-daynum{color:var(--gold)}
 .cal-ev{font-size:10.5px;line-height:1.3;padding:3px 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;border:1px solid transparent;color:var(--text-dim);background:var(--panel-2)}
 .cal-ev.fit{background:rgba(60,125,225,.16);color:var(--blue);border-color:rgba(60,125,225,.30)}
+.cal-ev.task{background:rgba(37,99,168,.14);color:#2563a8;border-color:rgba(37,99,168,.28)}
+.cal-ev.note{background:rgba(91,107,130,.14);color:#5b6b82;border-color:rgba(91,107,130,.26)}
+.cal-ev.pn-meeting{background:rgba(109,93,211,.16);color:#6d5dd3;border-color:rgba(109,93,211,.30)}
+.cal-ev.pn-reminder{background:rgba(196,125,18,.15);color:#c47d12;border-color:rgba(196,125,18,.30)}
+.cal-ev.pn-content{background:rgba(194,86,138,.15);color:#c2568a;border-color:rgba(194,86,138,.30)}
+.cal-ev.pn-task{background:rgba(37,99,168,.14);color:#2563a8;border-color:rgba(37,99,168,.28)}
+.pl-lens{display:flex;gap:6px;align-items:center}
 .cal-ev.done{background:rgba(40,165,95,.16);color:var(--green);border-color:rgba(40,165,95,.30)}
 .cal-ev.late{background:rgba(212,72,72,.18);color:var(--red);border-color:rgba(212,72,72,.34)}
 .cal-ev.soon{background:rgba(214,150,32,.18);color:var(--amber);border-color:rgba(214,150,32,.32)}
@@ -978,7 +985,7 @@ body.modal-open{overflow:hidden}
       <div class="side-tag">Studio Dashboard</div>
       <div class="nav-group">Overview</div>
       <div class="nav-item active" data-view="activity" onclick="go('activity')"><span class="ni">◫</span> Dashboard</div>
-      <div class="nav-item" data-view="calendar" id="navCalendar" onclick="go('calendar')"><span class="ni">📅</span> Calendar</div>
+      <div class="nav-item" data-view="calendar" id="navCalendar" onclick="go('calendar')"><span class="ni">📅</span> Planner</div>
       <div class="nav-item" data-view="mywork" id="navMywork" onclick="go('mywork')" style="display:none"><span class="ni">👤</span> My Profile</div>
       <div class="nav-group">Orders &amp; Clients</div>
       <div class="nav-item" data-view="orders" id="navOrders" onclick="go('orders')"><span class="ni">🧾</span> Orders <span class="nav-badge" id="badgeOrders"></span></div>
@@ -1101,6 +1108,8 @@ body.modal-open{overflow:hidden}
           <button class="btn sm ghost" onclick="calNext()">›</button>
           <button class="btn sm ghost" onclick="calTodayBtn()">Today</button>
           <input type="date" class="cal-jump" id="calJumpDate" onchange="calJumpTo(this.value)" title="Jump to a specific date">
+          <button class="btn sm" onclick="openPlannerEntry()">＋ Add</button>
+          <span class="pl-lens" id="plLens"></span>
           <span class="cal-title" id="calTitle" style="display:none"></span>
           <span style="flex:1"></span>
           <span class="page-sub" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--blue);display:inline-block"></span>Fitting</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--amber);display:inline-block"></span>Due soon</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--red);display:inline-block"></span>Overdue</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--gold);display:inline-block"></span>Ready</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--green);display:inline-block"></span>Delivered</span></span>
@@ -1480,7 +1489,7 @@ body.modal-open{overflow:hidden}
   <div id="moreSheet" class="more-sheet">
     <div class="ms-item" data-view="team" id="msTeam" onclick="go('team');toggleMore()"><span>☷</span> Team</div>
     <div class="ms-item" data-view="rota" id="msRota" onclick="go('rota');toggleMore()"><span>🗓</span> Rota</div>
-    <div class="ms-item" data-view="calendar" id="msCalendar" onclick="go('calendar');toggleMore()"><span>📅</span> Calendar</div>
+    <div class="ms-item" data-view="calendar" id="msCalendar" onclick="go('calendar');toggleMore()"><span>📅</span> Planner</div>
     <div class="ms-item" data-view="attendance" id="msAttendance" onclick="go('attendance');toggleMore()"><span>◷</span> Attendance</div>
     <div class="ms-item" data-view="leave" id="msLeave" onclick="go('leave');toggleMore()"><span>⎙</span> Leave</div>
     <div class="ms-item" data-view="companylog" id="msCompanylog" onclick="go('companylog');toggleMore()"><span>❏</span> Company log</div>
@@ -1849,6 +1858,15 @@ const setAnns=v=>save('layi_dash_anns',v);
    no signal is the normal case, and "your message could not be sent" would mean
    the complaint never gets made. Anything not yet delivered stays queued and
    goes on the next connection. */
+/* ---- The planner ------------------------------------------------------------
+   Entries the studio makes for itself: a meeting, a reminder, a piece of
+   content to post. Deliberately NOT everything the planner shows — fittings
+   are appointments, deadlines are orders, and jobs are tasks, and all three
+   already exist. Duplicating them here would mean two records for one thing
+   and an argument about which is right. The planner reads them all and adds
+   only what had nowhere to live. */
+const getPlanner=()=>load('layi_dash_planner',[]);
+const setPlanner=v=>save('layi_dash_planner',v);
 const getFeedback=()=>load('layi_dash_feedback',[]);
 const setFeedback=v=>save('layi_dash_feedback',v);
 const getAttendance=()=>load('layi_dash_attendance',[]);
@@ -1936,7 +1954,7 @@ const SYNC_PUSHERS={
 };
 // Every other data key syncs as a JSON blob in the generic `app_state` table (one row per business + key).
 // Customers & suppliers keep their own relational tables above; everything else rides this generic path.
-const STATE_KEYS=['layi_dash_orders','layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings'];
+const STATE_KEYS=['layi_dash_orders','layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
 const _statePushTimers={};
 function pushState(key){
   if(!supa||!liveMode)return;
@@ -2834,7 +2852,7 @@ async function saveMyAccount(){
 const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantName():'';
     if(multiBranch()&&activeBranchView==='all')return 'Today across your studios';
     if(multiBranch()&&activeBranchView&&activeBranchView!=='all')return 'Today at '+activeBranchView;
-    return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Calendar','Fittings, deliveries & order due dates'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
+    return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Planner','Tasks, fittings, meetings, content & what is due'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
 function branchTypeOf(name){const b=getBranches().find(x=>x.name===name);if(!b)return SETTINGS.businessType||'both';const bk=branchIsBespoke(b),rt=branchIsRetail(b);return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
 function isBespokeType(t){return t==='bespoke'||t==='both';}
 function isGarmentShopType(t){return t==='rtw'||t==='both';}
@@ -9368,15 +9386,245 @@ function calJumpTo(d){if(!d)return;const dt=new Date(d);if(isNaN(dt))return;calM
 function calPrev(){if(!calMonth)calMonth=new Date();calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()-1,1);renderCalendar();}
 function calNext(){if(!calMonth)calMonth=new Date();calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,1);renderCalendar();}
 function calTodayBtn(){const n=new Date();calMonth=new Date(n.getFullYear(),n.getMonth(),1);calJumpDay=null;renderCalendar();}
+/* ===== THE PLANNER ============================================================
+   The calendar showed two things: appointments and order due dates. A studio
+   runs on more than that, and each person needs to see the part that is theirs.
+
+   Six kinds of entry, from five sources. Only three of them are new records —
+   the rest the app already keeps, and the planner reads them where they live:
+
+     fitting     an appointment            (already exists)
+     order       a due date                (already exists)
+     task        a job assigned to someone (already exists)
+     meeting     new — with a link, and people invited
+     reminder    new — a nudge, for you or for somebody
+     content     new — something to post, which is the content calendar
+
+   Two lenses. "Mine" is what this person has to do: their tasks, the meetings
+   they were invited to, the orders they are making. "Everyone" is the studio's
+   week. A tailor opening the planner should see their own bench, not the
+   owner's diary.
+   ========================================================================= */
+const PLANNER_TYPES=[
+  {k:'task',    label:'Task',     hue:'#2563a8', icon:'\u2713'},
+  {k:'meeting', label:'Meeting',  hue:'#6d5dd3', icon:'\u25CF'},
+  {k:'reminder',label:'Reminder', hue:'#c47d12', icon:'\u25CB'},
+  {k:'content', label:'Content',  hue:'#c2568a', icon:'\u25C6'},
+  {k:'fitting', label:'Fitting',  hue:'#0f8a80', icon:'\u25B2'},
+  {k:'order',   label:'Order due',hue:'#c04668', icon:'\u25A0'}
+];
+const PLANNER_REPEATS=[['','Does not repeat'],['daily','Every day'],['weekly','Every week'],['fortnightly','Every two weeks'],['monthly','Every month']];
+function plannerTypeMeta(k){return PLANNER_TYPES.find(t=>t.k===k)||PLANNER_TYPES[0];}
+
+/* A free video room. No account, no server, no bill: a Jitsi room name nobody
+   else will guess. The host may be asked to sign in once by Jitsi itself as
+   their anti-abuse check; everyone invited just opens the link. */
+function makeVideoLink(title){
+  const slug=String(title||'meeting').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,28)||'meeting';
+  const salt=Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6);
+  return 'https://meet.jit.si/TheLabelBoard-'+slug+'-'+salt;
+}
+
+/* Does a repeating entry fall on this day? Kept simple on purpose: a studio
+   plans in days and weeks, not in RFC 5545. */
+function plannerHitsDay(e,key){
+  const start=String(e.date||'').slice(0,10);
+  if(!start)return false;
+  if(start===key)return true;
+  if(!e.repeat)return false;
+  const a=new Date(start+'T00:00:00'),b=new Date(key+'T00:00:00');
+  if(isNaN(a)||isNaN(b)||b<a)return false;
+  const days=Math.round((b-a)/86400000);
+  if(e.repeat==='daily')return true;
+  if(e.repeat==='weekly')return days%7===0;
+  if(e.repeat==='fortnightly')return days%14===0;
+  if(e.repeat==='monthly')return a.getDate()===b.getDate();
+  return false;
+}
+
+/* Is this entry mine? Assigned to me, or I was invited, or I am making it. */
+function plannerIsMine(e){
+  const sid=(currentUser&&currentUser.staffId)||'';
+  if(!sid)return true;                       // no linked staff record: show everything
+  if(e.staffId&&e.staffId===sid)return true;
+  if(Array.isArray(e.invitees)&&e.invitees.indexOf(sid)>=0)return true;
+  if(e.by&&currentUser&&e.by===currentUser.name)return true;
+  return false;
+}
+var plannerLens='all';   // 'all' | 'mine'
+function setPlannerLens(v){plannerLens=v;renderCalendar();}
+/* ---- The entry form -------------------------------------------------------- */
+let plannerDraft=null;
+function openPlannerEntry(id,dayKey){
+  if(!can('appts')&&!can('tasks')){if(typeof toast==='function')toast('You do not have permission to add to the planner.');return;}
+  const e=id?getPlanner().find(x=>x.id===id):null;
+  plannerDraft=e?JSON.parse(JSON.stringify(e)):{
+    id:'',title:'',date:dayKey||new Date().toISOString().slice(0,10),time:'',
+    type:'task',link:'',repeat:'',invitees:[],notes:'',
+    branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName()
+  };
+  renderPlannerEntry();
+}
+function renderPlannerEntry(){
+  const d=plannerDraft;if(!d)return;
+  const isMeeting=d.type==='meeting';
+  const team=getStaff().filter(staffActive).filter(staffInView);
+  const typeOpts=PLANNER_TYPES.filter(t=>t.k!=='order'&&t.k!=='fitting')
+    .map(t=>'<option value="'+t.k+'"'+(d.type===t.k?' selected':'')+'>'+esc(t.label)+'</option>').join('')
+    +'<option value="fitting"'+(d.type==='fitting'?' selected':'')+'>Fitting or appointment</option>';
+  const repeatOpts=PLANNER_REPEATS.map(r=>'<option value="'+r[0]+'"'+(d.repeat===r[0]?' selected':'')+'>'+esc(r[1])+'</option>').join('');
+  const invitees=team.length?team.map(function(st){
+      const on=(d.invitees||[]).indexOf(st.id)>=0;
+      return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;padding:5px 0;justify-content:space-between">'
+        +'<span style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="pl_inv_'+st.id+'"'+(on?' checked':'')+'> '+esc(st.name)+'</span>'
+        +'<span style="color:var(--text-faint);font-size:12px">'+esc(st.role||'')+'</span></label>';
+    }).join(''):'<div class="kv" style="color:var(--text-faint)">Nobody on the team yet.</div>';
+
+  openModal('<h3>'+(d.id?'Edit planner entry':'New planner entry')+'</h3>'
+    +'<div class="field"><label>Title</label><input class="fld" id="pl_title" value="'+esc(d.title||'')+'" placeholder="e.g. Call the Aso-oke supplier"></div>'
+    +'<div class="row2"><div class="field"><label>Date</label><input class="fld" type="date" id="pl_date" value="'+esc(d.date||'')+'"></div>'
+      +'<div class="field"><label>Time (optional)</label><input class="fld" type="time" id="pl_time" value="'+esc(d.time||'')+'"></div></div>'
+    +'<div class="field"><label>Type</label><select class="fld" id="pl_type" onchange="syncPlannerDraft();renderPlannerEntry()">'+typeOpts+'</select></div>'
+    +(isMeeting?(
+       '<div class="field"><label>Meeting link</label><input class="fld" id="pl_link" value="'+esc(d.link||'')+'" placeholder="Paste a link, or make a free one below"></div>'
+      +'<button class="btn ghost sm" onclick="addVideoLink()">＋ Free video call</button>'
+      +'<div class="sd" style="color:var(--text-faint);margin:6px 0 4px">A free Jitsi room. Everyone you invite just opens the link. Jitsi may ask whoever starts the call to sign in once, as their own anti-spam check.</div>'
+     ):'')
+    +'<div class="field"><label>Repeats</label><select class="fld" id="pl_repeat">'+repeatOpts+'</select></div>'
+    +'<div class="field"><label>'+(isMeeting?'Invite team members':'Who is this for')+'</label>'
+      +'<div class="sd" style="color:var(--text-faint);margin-bottom:6px">'+(isMeeting?'They will see it in their own planner.':'Leave everybody unticked to keep it for the whole studio.')+'</div>'
+      +invitees+'</div>'
+    +'<div class="field"><label>Notes (optional)</label><textarea class="fld" id="pl_notes" rows="3">'+esc(d.notes||'')+'</textarea></div>'
+    +'<div class="modal-foot">'+(d.id?'<button class="btn danger sm" onclick="delPlannerEntry(\''+d.id+'\')">Delete</button>':'')
+      +'<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button>'
+      +'<button class="btn" onclick="savePlannerEntry()">Add to planner</button></div>');
+}
+function syncPlannerDraft(){
+  const d=plannerDraft;if(!d)return;
+  if(document.getElementById('pl_title'))d.title=fv('pl_title')||'';
+  if(document.getElementById('pl_date'))d.date=fv('pl_date')||'';
+  if(document.getElementById('pl_time'))d.time=fv('pl_time')||'';
+  if(document.getElementById('pl_type'))d.type=fv('pl_type')||'task';
+  if(document.getElementById('pl_link'))d.link=fv('pl_link')||'';
+  if(document.getElementById('pl_repeat'))d.repeat=fv('pl_repeat')||'';
+  if(document.getElementById('pl_notes'))d.notes=fv('pl_notes')||'';
+  const inv=[];getStaff().filter(staffActive).forEach(function(st){
+    const el=document.getElementById('pl_inv_'+st.id);if(el&&el.checked)inv.push(st.id);
+  });
+  if(document.querySelector&&document.getElementById('pl_title'))d.invitees=inv;
+}
+function addVideoLink(){
+  syncPlannerDraft();
+  plannerDraft.link=makeVideoLink(plannerDraft.title);
+  renderPlannerEntry();
+  if(typeof toast==='function')toast('Video room created');
+}
+function savePlannerEntry(){
+  syncPlannerDraft();
+  const d=plannerDraft;
+  const title=(d.title||'').trim();
+  if(!title){alert('Give it a title so you know what it is.');return;}
+  if(!d.date){alert('Pick a date.');return;}
+  const list=getPlanner();
+  // A fitting is an appointment, not a planner entry. Writing it here would
+  // create a second record for the same thing, and the two would disagree.
+  if(d.type==='fitting'){
+    const appts=getAppts();
+    appts.push({id:uid('a'),type:'Fitting',status:'Booked',date:d.date,time:d.time||'',
+      client:title,phone:'',location:'',note:d.notes||'',outcome:'',adjust:'',feedback:'',
+      branch:d.branch||defaultBranchName()});
+    setAppts(appts);
+    if(typeof logAudit==='function')logAudit('Appointment booked',title+' \u00b7 '+d.date);
+  } else {
+    const rec={id:d.id||uid('pn'),title:title.slice(0,160),date:d.date,time:d.time||'',
+      type:d.type||'task',link:(d.link||'').trim(),repeat:d.repeat||'',
+      invitees:(d.invitees||[]).slice(),notes:(d.notes||'').slice(0,2000),
+      branch:d.branch||defaultBranchName(),
+      staffId:(d.invitees&&d.invitees.length===1)?d.invitees[0]:'',
+      by:userLabel(),at:new Date().toISOString(),done:!!d.done};
+    if(d.id){const i=list.findIndex(x=>x.id===d.id);if(i>=0)list[i]=rec;else list.push(rec);}
+    else list.push(rec);
+    setPlanner(list);
+    if(typeof logAudit==='function')logAudit('Planner entry saved',title+' \u00b7 '+plannerTypeMeta(rec.type).label);
+  }
+  plannerDraft=null;closeModal();renderAll();
+  if(typeof toast==='function')toast('Added to the planner');
+}
+function delPlannerEntry(id){
+  if(!confirm('Remove this from the planner?'))return;
+  setPlanner(getPlanner().filter(x=>x.id!==id));
+  plannerDraft=null;closeModal();renderAll();
+}
+function togglePlannerDone(id){
+  const l=getPlanner();const e=l.find(x=>x.id===id);if(!e)return;
+  e.done=!e.done;setPlanner(l);renderAll();
+}
+
 function calEventsByDay(){
   const map={};const add=(k,ev)=>{if(!k)return;(map[k]=map[k]||[]).push(ev);};
   getAppts().forEach(a=>{if(!a.date||!apptInBranch(a))return;const st=apptStatus(a);const done=st==='Completed';add(String(a.date).slice(0,10),{type:apptTypeOf(a),label:(a.time?a.time+' ':'')+(a.client||'Client')+(a.note?' · '+a.note:''),color:done?'var(--green)':(st==='No-show'?'var(--red)':'var(--blue)'),cls:'fit',onclick:`openApptDetail('${a.id}')`});});
   const DEL=STAGES.indexOf('Delivered'),RFD=STAGES.indexOf('Ready for Delivery'),DISP=STAGES.indexOf('Dispatched');
   getOrders().forEach(o=>{if(o.kind==='sale'||!o.due||!inBranch(o))return;const k=String(o.due).slice(0,10);const du=daysUntil(o.due);const delivered=o.stageIndex>=DEL;const dispatched=o.stageIndex>=DISP&&!delivered;const ready=o.stageIndex>=RFD&&!dispatched;let cls,col,tag;if(delivered){cls='done';col='var(--green)';tag='Delivered';}else if(dispatched){cls='pending';col='#2bb0a6';tag='Pending delivery';}else if(du!=null&&du<0){cls='late';col='var(--red)';tag='Overdue';}else if(ready){cls='ready';col='var(--gold)';tag='Ready';}else if(du!=null&&du<=3){cls='soon';col='var(--amber)';tag='Due soon';}else{cls='due';col='var(--text-dim)';tag=(o.delivery&&o.delivery.enabled)?'Delivery':'Due';}add(k,{type:tag,label:(o.client||'')+' · '+(o.garment||''),color:col,cls:cls,onclick:`openDetail('${o.id}')`});});
+  // ---- tasks: a job somebody has to do, on the day it is due ----
+  if(typeof getTasks==='function')getTasks().forEach(function(t){
+    if(!t||!t.due||t.done)return;
+    const st=t.who?staffById(t.who):null;
+    if(st&&!staffInView(st))return;
+    add(String(t.due).slice(0,10),{type:'task',cls:'task',
+      label:(t.title||'Task')+(st?' \u00b7 '+String(st.name||'').split(' ')[0]:''),
+      staffId:t.who||'',color:'#2563a8',onclick:"go('tasks')"});
+  });
+
+  // ---- announcements: what the studio told everybody, on the day it lands ----
+  if(typeof getAnns==='function')getAnns().forEach(function(a){
+    if(!a)return;const k=String(a.at||a.date||'').slice(0,10);if(!k)return;
+    add(k,{type:'note',cls:'note',color:'#5b6b82',label:'\uD83D\uDCE3 '+(a.title||a.text||'Announcement'),onclick:"go('tasks')"});
+  });
+
+  // ---- the planner's own entries: meetings, reminders, content ----
+  getPlanner().forEach(function(e){
+    if(!e||!e.date)return;
+    if(e.branch&&activeBranchView!=='all'&&e.branch!==activeBranchView)return;
+    // a repeating entry lands on more than one day of the month in view
+    const y=calMonth?calMonth.getFullYear():new Date().getFullYear();
+    const m=calMonth?calMonth.getMonth():new Date().getMonth();
+    const last=new Date(y,m+1,0).getDate();
+    for(let d=1;d<=last;d++){
+      const k=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      if(!plannerHitsDay(e,k))continue;
+      const meta=plannerTypeMeta(e.type);
+      add(k,{type:e.type,cls:'pn-'+e.type,id:e.id,
+        label:(e.time?e.time+' ':'')+meta.icon+' '+(e.title||meta.label)+(e.done?' \u2713':''),
+        staffId:e.staffId||'',invitees:e.invitees||[],by:e.by||'',color:meta.hue,
+        link:e.link||'',onclick:"openPlannerEntry('"+e.id+"')"});
+    }
+  });
+
+  // ---- the lens: mine, or the whole studio ----
+  // A tailor opening the planner should see their own bench, not the owner's
+  // diary. Entries with nobody attached are the studio's and show either way.
+  if(plannerLens==='mine'){
+    Object.keys(map).forEach(function(k){
+      map[k]=map[k].filter(function(ev){
+        if(ev.type==='order'||ev.type==='note')return true;   // the studio's, always
+        if(!ev.staffId&&!(ev.invitees||[]).length)return true; // nobody named
+        return plannerIsMine(ev);
+      });
+      if(!map[k].length)delete map[k];
+    });
+  }
   return map;
 }
 function renderCalendar(){
   if(!document.getElementById('calGrid'))return;
+  {const lens=document.getElementById('plLens');
+   if(lens){
+     // a one-person studio has nothing to filter, so do not offer the choice
+     const team=getStaff().filter(staffActive).filter(staffInView).length;
+     if(team<2){lens.innerHTML='';plannerLens='all';}
+     else lens.innerHTML='<button class="chip'+(plannerLens==='all'?' active':'')+'" onclick="setPlannerLens(\'all\')">Everyone</button>'
+       +'<button class="chip'+(plannerLens==='mine'?' active':'')+'" onclick="setPlannerLens(\'mine\')">Mine</button>';
+   }}
   if(!(can('orders')||can('appts')||can('logistics')))return;
   if(!calMonth){const n=new Date();calMonth=new Date(n.getFullYear(),n.getMonth(),1);}
   const y=calMonth.getFullYear(),m=calMonth.getMonth();
@@ -9403,8 +9651,8 @@ function renderCalendar(){
 function openCalDay(k){
   const evs=(calEventsByDay()[k]||[]);
   const dlabel=new Date(k+'T00:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const rows=evs.length?evs.map(e=>`<div class="bd-row" style="cursor:pointer" onclick="closeModal();${e.onclick}"><span class="bl"><span class="sup-status" style="border-color:${e.color};color:${e.color}">${e.type}</span> ${esc(e.label)}</span><span class="bv" style="color:var(--gold)">›</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing scheduled this day.</div>';
-  openModal(`<h3>${dlabel}</h3><div class="msub">${evs.length} item${evs.length===1?'':'s'}</div>${rows}${can('appts')?`<div class="modal-foot"><button class="btn sm" onclick="closeModal();openApptOn('${k}')">+ Add fitting</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`:`<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`}`);
+  const rows=evs.length?evs.map(e=>`<div class="bd-row" style="cursor:pointer" onclick="closeModal();${e.onclick}"><span class="bl"><span class="sup-status" style="border-color:${e.color};color:${e.color}">${e.type}</span> ${esc(e.label)}</span><span class="bv">${e.link?`<a href="${esc(e.link)}" target="_blank" rel="noopener" class="btn sm" onclick="event.stopPropagation()">Join</a> `:''}<span style="color:var(--gold)">›</span></span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing scheduled this day.</div>';
+  openModal(`<h3>${dlabel}</h3><div class="msub">${evs.length} item${evs.length===1?'':'s'}</div>${rows}${can('appts')?`<div class="modal-foot"><button class="btn sm ghost" onclick="closeModal();openPlannerEntry('','${k}')">＋ Add to planner</button><button class="btn sm" onclick="closeModal();openApptOn('${k}')">+ Add fitting</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`:`<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`}`);
 }
 function openApptOn(d){openAppt();const el=document.getElementById('a_date');if(el)el.value=d;}
 function staffShiftToday(id){const sh=(typeof getShifts==='function')?getShifts():{};const d=(new Date().getDay()+6)%7;return (sh[id]&&sh[id][d])||'';}
