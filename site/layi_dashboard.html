@@ -9502,10 +9502,15 @@ function renderPlannerEntry(){
 function syncPlannerDraft(){
   const d=plannerDraft;if(!d)return;
   if(document.getElementById('pl_title'))d.title=fv('pl_title')||'';
-  if(document.getElementById('pl_date'))d.date=fv('pl_date')||'';
+  // Keep a date we already have if the field reads back empty. Changing Type
+  // re-renders this form, and a browser that returns '' for a partial date
+  // would otherwise silently wipe the day the entry was for.
+  if(document.getElementById('pl_date'))d.date=fv('pl_date')||d.date||'';
   if(document.getElementById('pl_time'))d.time=fv('pl_time')||'';
   if(document.getElementById('pl_type'))d.type=fv('pl_type')||'task';
-  if(document.getElementById('pl_link'))d.link=fv('pl_link')||'';
+  // Same reason as the date: a field that reads back empty must not erase a
+  // link the person deliberately made.
+  if(document.getElementById('pl_link'))d.link=fv('pl_link')||d.link||'';
   if(document.getElementById('pl_repeat'))d.repeat=fv('pl_repeat')||'';
   if(document.getElementById('pl_notes'))d.notes=fv('pl_notes')||'';
   const inv=[];getStaff().filter(staffActive).forEach(function(st){
@@ -9516,7 +9521,11 @@ function syncPlannerDraft(){
 function addVideoLink(){
   syncPlannerDraft();
   plannerDraft.link=makeVideoLink(plannerDraft.title);
-  renderPlannerEntry();
+  // Write it straight into the field rather than re-rendering the whole form.
+  // A re-render round-trips every value back through the DOM, and anything that
+  // reads back empty would silently wipe the room we just made.
+  const el=document.getElementById('pl_link');
+  if(el)el.value=plannerDraft.link; else renderPlannerEntry();
   if(typeof toast==='function')toast('Video room created');
 }
 function savePlannerEntry(){
