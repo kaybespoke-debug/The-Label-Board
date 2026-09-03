@@ -108,6 +108,11 @@ if(run("methodOf({method:'  '})")!==run("PAY_METHOD_UNSET"))
 if(run("methodOf({method:'Opay'})")!=='Opay')F('a recorded method is not read back correctly');
 
 /* 6) It reaches the screen, per studio and per period. ------------------------ */
+// The example studio's data is seeded relative to today, so pin the period to
+// one that contains it. Rendering on the default month means these checks
+// quietly start failing whenever the calendar moves past the seeded range.
+run("finPeriod='year';expPeriod='all';ordersPeriod='all';salesPeriod='year';dashApptPeriod='year';potPeriod='year';branchPeriod='year';");
+
 run("activeBranchView='all';");
 try{run("renderFinance();");}catch(e){F('the finance page threw: '+e.message);}
 const panel=run("(document.getElementById('finMethods')||{}).innerHTML")||'';

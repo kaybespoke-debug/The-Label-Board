@@ -13,7 +13,7 @@ four you are in, and read that app's doc first.
 | **Admin console** — our operator control centre | `admin/` | `SUPABASE_SETUP.md` | — |
 | **Partner portal** — referral partners | `partners/` | `PARTNERS.md` | `node audit_partners.js` |
 | **Public website** — marketing, the only one meant to be found by Google | `web/` | `WEBSITE.md` | `node audit_web.js` |
-| **Database** — schema, row-level security, edge functions | `supabase/` | `SUPABASE_SETUP.md` | `node supabase/tests/rls_harness.mjs` |
+| **Database** — schema, row-level security, edge functions | `supabase/` | `SUPABASE_SETUP.md` | `node supabase/tests/app_schema_harness.mjs` |
 
 The gate scripts and preview servers live at the repo root, never inside an
 app folder, because every app folder is published to the public web.
@@ -66,6 +66,24 @@ live sites, so it is Kayode's call, not a commit.
 
 Bump `CACHE` in `site/sw.js` before every release, or installed phones keep
 serving the old version.
+
+## The database
+
+Every object the apps talk to is created by a migration in
+`supabase/migrations/`, applied in filename order. Nothing is created by hand
+any more: five objects once were, and were missing from the migrations
+entirely, so a fresh project would have run none of it. Three suites guard it:
+
+```bash
+node supabase/tests/app_schema_harness.mjs    # a fresh DB actually runs the app
+node supabase/tests/rls_harness.mjs           # no tenant can reach another
+node supabase/tests/feedback_rls_harness.mjs  # what studios tell us stays theirs
+```
+
+The first reads the shipped code for every table, function and column it
+names, so a new table the app starts using is checked the day it is used.
+
+`SUPABASE_SETUP.md` is the go-live runbook.
 
 ## Storage keys
 
