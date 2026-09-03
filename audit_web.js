@@ -23,7 +23,7 @@ const fail = [];
 const ok = [];
 const check = (cond, msg) => (cond ? ok : fail).push(msg);
 
-const PAGES = ['index.html', 'features.html', 'solutions.html', 'pricing.html', 'demo.html',
+const PAGES = ['index.html', 'features.html', 'pricing.html', 'book.html',
   'partners.html', 'referrals.html', 'about.html', 'contact.html',
   'privacy.html', 'terms.html', 'thanks.html', '404.html'];
 /* the pages search engines should be offered, which is everything except the
@@ -125,7 +125,7 @@ built.forEach(p => {
 check(internal > 100, 'the pages are actually linked together (' + internal + ' internal links)');
 
 /* every page is reachable from the header or the footer of every other page */
-['features.html', 'pricing.html', 'demo.html', 'partners.html', 'referrals.html', 'about.html',
+['features.html', 'pricing.html', 'book.html', 'partners.html', 'referrals.html', 'about.html',
   'contact.html', 'privacy.html', 'terms.html'].forEach(p => {
   check(refHeader.includes(p) || refFooter.includes(p), p + ' is reachable from the shared navigation');
 });
@@ -149,7 +149,7 @@ built.forEach(p => {
     check(html[p].includes('href="privacy.html"'), p + ' form "' + name + '" points at the privacy notice');
   });
 });
-check(forms.length === 4, 'there are four forms, one each for the demo, partners, referrals and contact');
+check(forms.length === 4, 'there are four forms, one each for the booking, partners, referrals and contact');
 check(new Set(forms.map(f => f.name)).size === forms.length, 'no two forms share a name, which would merge their submissions');
 
 /* every field a person types into has a label tied to it */
@@ -204,7 +204,7 @@ check(plans.length === 3, 'the three paid plans were read out of the admin conso
 
 const naira = n => n.toLocaleString('en-US');
 plans.forEach(pl => {
-  ['pricing.html', 'index.html'].forEach(p => {
+  ['pricing.html'].forEach(p => {
     check(html[p].includes('data-monthly="' + naira(pl.monthly) + '"'),
       p + ' prints the ' + pl.name + ' monthly price the console bills (' + naira(pl.monthly) + ')');
     check(html[p].includes('data-annual="' + naira(pl.annual) + '"'),
@@ -215,12 +215,13 @@ plans.forEach(pl => {
     'the comparison table shows the ' + pl.name + ' seat count (' + pl.seats + ')');
   check(html['pricing.html'].includes('<h3>' + pl.name + '</h3>'), 'the pricing page offers the ' + pl.name + ' plan');
 });
-/* the two pages that show prices must not disagree with each other */
-plans.forEach(pl => {
-  const onHome = html['index.html'].includes('data-monthly="' + naira(pl.monthly) + '"');
-  const onPricing = html['pricing.html'].includes('data-monthly="' + naira(pl.monthly) + '"');
-  check(onHome === onPricing, 'the home page and the pricing page agree about ' + pl.name);
+/* Pricing lives on the Pricing tab and nowhere else. Two pages printing the
+   same figure is how one of them ends up stale, so rather than checking that
+   they agree, the gate now checks there is only ever one of them. */
+built.filter(p => p !== 'pricing.html').forEach(p => {
+  check(!/data-monthly=/.test(html[p]), p + ' leaves the prices to the pricing page');
 });
+check(/data-monthly=/.test(html['pricing.html']), 'the pricing page does print the prices');
 /* nothing anywhere may quote a price we do not charge */
 const knownPrices = new Set(plans.flatMap(pl => [naira(pl.monthly), naira(pl.annual)]));
 built.forEach(p => {
@@ -268,7 +269,16 @@ check(/never rewrites the past|already been credited/.test(pp), 'the partner pag
 /* ================= 8. the trial is stated consistently ================= */
 const trial = S.trialDays;
 check(String(trial) === '14', 'the trial length in the configuration is the one the console offers');
-['index.html', 'pricing.html', 'demo.html'].forEach(p => {
+/* Premium is shorter on purpose, and both numbers come from the configuration
+   rather than being typed into the page, so they cannot drift apart. */
+const trialTop = S.trialDaysPremium;
+check(typeof trialTop === 'number' && trialTop > 0, 'there is a trial length for Premium (' + trialTop + ')');
+check(trialTop <= trial, 'the Premium trial is not longer than the standard one');
+check(html['pricing.html'].indexOf('data-cfg="trialDaysPremium"') !== -1,
+  'Premium has a trial of its own, taken from the configuration');
+check(html['pricing.html'].indexOf('Talk to us first') === -1,
+  'no plan sends a ready buyer away to a conversation instead of a trial');
+['pricing.html', 'book.html'].forEach(p => {
   check(html[p].includes('data-cfg="trialDays"'), p + ' takes the trial length from the configuration');
 });
 /* nobody may hard code a different number of days next to the word "free" */
@@ -301,17 +311,24 @@ check(/six roles|Six roles|6<\/div>/.test(html['index.html']), 'the home page cl
 
 /* The app serves five kinds of business, not only tailors. The site has to say
    so, because a shoemaker or a fabric seller who reads it as tailoring software
-   never gets as far as the demo. Read out of the app so the two cannot drift. */
-const kindsBlock = (app.match(/const BRANCH_TYPES=\[[^;]+\];/) || [''])[0];
-const kinds = all(kindsBlock, /\['(\w+)','([^']+)'\]/g).map(m => m[1]);
+   never gets as far as booking. Read out of the app so the two cannot drift. */
+// Read DEFAULT_ACTIVITIES, which is what actually decides what a studio can be.
+// This used to read BRANCH_TYPES, a legacy list that never contained footwear
+// or leather at all — so it was already promising the wrong trades before
+// haberdashery was dropped, and nobody noticed because the count happened to
+// come to five. BRANCH_TYPES has since been deleted; it was dead code.
+const kindsBlock = (app.match(/const DEFAULT_ACTIVITIES=\[[\s\S]*?\n\];/) || [''])[0];
+const kinds = all(kindsBlock, /\{key:'(\w+)'/g).map(m => m[1]);
 check(kinds.length === 5, 'the app really does offer five kinds of business (' + kinds.length + ')');
-const SAYS = { bespoke: 'made to order', rtw: 'ready to wear', both: 'both',
-  haberdashery: 'haberdashery', fabrics: 'fabrics' };
+const SAYS = { bespoke: 'made to order', rtw: 'ready to wear',
+  footwear: 'shoe', leather: 'bag', fabrics: 'fabric' };
 const productCopy = visible(html['features.html']).toLowerCase();
 kinds.forEach(k => check(productCopy.includes(SAYS[k]),
   'the product page names the "' + SAYS[k] + '" business the app supports'));
 const homeCopy = visible(html['index.html']).toLowerCase();
-['ready to wear', 'boutique', 'shoe maker', 'fabric', 'haberdashery'].forEach(w =>
+// haberdashery was dropped as a business type we sell to. Requiring the site to
+// keep advertising it would have this gate enforcing the opposite of the truth.
+['ready to wear', 'boutique', 'shoe maker', 'fabric', 'leather'].forEach(w =>
   check(homeCopy.includes(w), 'the home page speaks to more than tailors: "' + w + '"'));
 
 /* anything we say is not built yet must be marked as not built yet */
@@ -330,14 +347,40 @@ INDEXABLE.forEach(p => {
     p + ' has a sharing picture for when the link is pasted somewhere');
   check(/<meta property="og:title"/.test(html[p]), p + ' has a sharing title');
 });
+/* Every picture waits its turn except the one above the fold, which is the
+   largest thing painted and has to be asked for first. Written with split
+   rather than a word boundary, because this file has been through a shell
+   heredoc before and a mangled \b silently matches nothing, which turns a
+   loop of real checks into a loop that runs zero times and still passes. */
+function imgTags(src) {
+  return src.split('<img').slice(1).map(part => '<img' + part.split('>')[0] + '>');
+}
 built.forEach(p => {
-  all(html[p], /<img[^>]*>/g).forEach(m => {
-    check(/loading="lazy"/.test(m[0]), p + ' loads its pictures late: ' + (attrs(m[0], 'src') || ''));
-    check(/alt="/.test(m[0]), p + ' gives every picture an alt: ' + (attrs(m[0], 'src') || ''));
+  imgTags(html[p]).forEach(tag => {
+    const src = attrs(tag, 'src') || '';
+    const eager = /loading="eager"/.test(tag);
+    check(/loading="lazy"/.test(tag) || eager, p + ' says when its picture loads: ' + src);
+    check(!/fetchpriority="high"/.test(tag) || eager,
+      p + ' only hurries a picture it also loads eagerly: ' + src);
+    check(/alt="/.test(tag), p + ' gives every picture an alt: ' + src);
+    check(/decoding="async"/.test(tag), p + ' decodes its pictures off the main thread: ' + src);
   });
+  /* eager is fine for anything above the fold, but only one picture on a page
+     may jump the queue, or nothing has actually been prioritised */
+  const hurried = imgTags(html[p]).filter(t => /fetchpriority="high"/.test(t)).length;
+  check(hurried <= 1, p + ' hurries at most one picture (' + hurried + ')');
 });
 check(html['index.html'].includes('application/ld+json'), 'the home page carries the plain facts for search engines');
-check(/"priceCurrency": "NGN"/.test(html['index.html']), 'the structured data prices are in Naira');
+check(/"@type": "Organization"/.test(html['index.html']), 'the home page describes the company to search engines');
+check(!/"priceCurrency"/.test(html['index.html']),
+  'the home page does not describe prices it no longer shows');
+/* structured data has to describe what is actually on the page it sits on */
+check(html['pricing.html'].includes('application/ld+json'), 'the pricing page carries the offers for search engines');
+check(/"priceCurrency": "NGN"/.test(html['pricing.html']), 'the structured data prices are in Naira');
+plans.forEach(pl => {
+  check(html['pricing.html'].includes('"price": "' + pl.monthly + '"'),
+    'the structured data quotes the ' + pl.name + ' price the console bills (' + pl.monthly + ')');
+});
 
 /* every picture the pages ask for is actually in the folder */
 built.forEach(p => {
@@ -432,6 +475,211 @@ check(!/\.scrollIntoView\s*\(/.test(js), 'nothing relies on scrollIntoView');
 check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
   'the light ground is actually used across the site');
 check(!/layi_/.test(js), 'the website never touches the studio app storage keys');
+
+/* ---------- the product is shown, not drawn ----------
+   Every screen on this site is a capture of the running app, taken through
+   capture/shot.html and scaled by tools_pngcrop.js. Two ways that rots: a
+   capture is deleted and a page points at nothing, or somebody quietly puts a
+   hand drawn mockup back, which is a picture of a promise rather than of the
+   product. Both fail the build. */
+const shotDir = path.join(dir, 'img', 'screens');
+const shotFiles = fs.existsSync(shotDir) ? fs.readdirSync(shotDir).filter(f => f.endsWith('.png')) : [];
+check(shotFiles.length >= 5, 'the site carries real screenshots of the app (' + shotFiles.length + ')');
+
+const everyPage = built.map(k => html[k]).join('');
+const shotTags = imgTags(everyPage).filter(t => / class="shot/.test(t) || /class="shot"/.test(t));
+check(shotTags.length >= 8, 'the product is shown as a screenshot in several places (' + shotTags.length + ')');
+shotTags.forEach(tag => {
+  const src = attrs(tag, 'src') || '';
+  const name = src.split('/').pop();
+  check(src.indexOf('img/screens/') === 0, 'the screenshot comes out of img/screens: ' + src);
+  check(fs.existsSync(path.join(dir, src)), 'the screenshot file is really there: ' + src);
+  check((attrs(tag, 'alt') || '').length >= 20, 'the screenshot says what it shows: ' + name);
+  check(attrs(tag, 'width') && attrs(tag, 'height'), 'the screenshot reserves its space: ' + name);
+});
+
+/* a capture nobody points at is a capture nobody maintains */
+shotFiles.forEach(f => {
+  check(everyPage.indexOf('img/screens/' + f) !== -1, 'the capture is actually used on a page: ' + f);
+});
+
+/* the hero screenshot is the largest thing above the fold */
+const heroShot = imgTags(html['index.html']).filter(t => /class="shot"/.test(t))[0] || '';
+check(/loading="eager"/.test(heroShot), 'the hero screenshot loads eagerly, it is the largest paint');
+check(/fetchpriority="high"/.test(heroShot), 'the hero screenshot is the one picture that jumps the queue');
+
+/* the drawn mockups these replaced must not creep back */
+['.mock{', '.screen-body', '.screen-side', '.kpis'].forEach(sel => {
+  check(css.indexOf(sel) === -1, 'no hand drawn product mockup returned to the stylesheet: ' + sel);
+});
+check(everyPage.indexOf('class="mock') === -1, 'no page draws a fake screen instead of showing a real one');
+check(everyPage.indexOf('class="screen"') === -1, 'no page draws a fake screen in the hero either');
+
+/* ---------- nobody outside gets into the demo account ----------
+   Kayode's call on 2026-08-27: the website used to print the demo sign in
+   details and invite strangers to open the live app. It does not any more.
+   "Book a demo" lands on a form we receive, and we set the session up with
+   them. The details themselves are the thing that must never come back, so
+   they are asserted against here by value as well as by name. */
+const everyFile = built.map(k => html[k]).join('') + read('js/config.js') + read('js/site.js');
+['layi2025', 'demoUser', 'demoPass', 'Demo sign in', 'Open the live demo'].forEach(t => {
+  check(everyFile.indexOf(t) === -1, 'the demo sign in details are nowhere on the site: ' + t);
+});
+check(!fs.existsSync(path.join(dir, 'demo.html')), 'the self serve demo page is gone');
+check(built.indexOf('book.html') !== -1, 'the booking page exists');
+
+/* the booking page is a form first, not a page with a form at the bottom */
+const bookMain = html['book.html'].slice(html['book.html'].indexOf('<main id="main">'));
+check(bookMain.indexOf('<form') < bookMain.indexOf('class="shot"'),
+  'the booking form comes before anything else on the page');
+check(attrs((html['book.html'].match(/<form[^>]*>/) || [''])[0], 'name') === 'demo',
+  'the booking form is the one Netlify already knows by name');
+
+/* every route that used to open the app now lands on the form */
+['/demo ', '/demo.html', '/book ', '/trial '].forEach(r => {
+  check(redirects.indexOf(r) !== -1, 'the short route still resolves: ' + r.trim());
+});
+check(redirects.indexOf('/demo.html    /book.html') !== -1,
+  'anyone holding the old demo url is sent to the booking form');
+check(read('sitemap.xml').indexOf('demo.html') === -1, 'the sitemap no longer offers the demo page');
+
+/* the Demo tab is off the navigation, and Book a demo points at the form */
+check(refHeader.indexOf('>Demo<') === -1, 'there is no Demo tab in the header');
+check(refHeader.indexOf('href="book.html"') !== -1, 'the header CTA goes to the booking form');
+built.forEach(p => {
+  check(html[p].indexOf('href="demo.html"') === -1, p + ' has no link left to the retired demo page');
+});
+
+/* ---------- the seven trades, and the eighth shape, live on the home page ----
+   The Solutions page is gone. Its panes moved onto the home page under the
+   tiles, so a tile is now the thing that opens the detail rather than a link to
+   somewhere else. What has to keep working: every tile has a panel, every
+   panel has a tile, and the ids came across unchanged so that every link
+   written as solutions.html#shoes still finds the shoe maker's panel. */
+check(!fs.existsSync(path.join(dir, 'solutions.html')), 'the separate Solutions page is gone');
+const home = html['index.html'];
+const tileTrades = all(home, /class="industry[^"]*"[^>]*data-tab="([a-z]+)"/g).map(m => m[1]);
+const paneTrades = all(home, /class="pane[^"]*"[^>]*data-pane="([a-z]+)"/g).map(m => m[1]);
+check(tileTrades.length === 8, 'the home page shows eight kinds of business (' + tileTrades.length + ')');
+check(paneTrades.length === 8, 'each of them has a panel behind it (' + paneTrades.length + ')');
+tileTrades.forEach(t => {
+  check(paneTrades.indexOf(t) !== -1, 'the tile opens a panel that exists: ' + t);
+  check(home.indexOf('id="' + t + '"') !== -1, 'the panel keeps its own address: index.html#' + t);
+});
+paneTrades.forEach(t => check(tileTrades.indexOf(t) !== -1, 'the panel has a tile to open it: ' + t));
+/* and every one of them is inside the detail block. A panel that lands
+   somewhere else on the page still answers its tile and still carries its id,
+   so all of the checks above pass while it renders in the middle of the hero.
+   That is not a hypothetical: it is where the eighth one first landed. */
+const detailStart = home.indexOf('<div class="trade-detail">');
+const detailEndAt = home.indexOf('inside the product', detailStart);
+check(detailStart > 0 && detailEndAt > detailStart, 'the detail block is where it should be');
+const detailBlock = home.slice(detailStart, detailEndAt);
+check(all(detailBlock, /class="pane/g).length === 8, 'all eight panels sit inside the detail block');
+/* the section already has its own h2, so the panels head at h3 */
+check(all(detailBlock, /<h2[ >]/g).length === 0, 'no panel outranks the heading of the section it sits in');
+check(all(detailBlock, /<h3 class="trade-h">/g).length === 8, 'every panel has its heading');
+/* exactly one open to begin with, or the section reads as empty or as noise */
+check(all(home, /class="industry on"/g).length === 1, 'one tile starts open');
+check(all(home, /class="pane on anchor"/g).length === 1, 'one panel starts open');
+
+/* the tiles are controls, not links: a link would leave the page */
+check(!/class="industry"[^>]*href=/.test(home), 'the tiles are controls rather than links away');
+built.forEach(p => {
+  check(html[p].indexOf('solutions.html') === -1, p + ' has no link left to the retired Solutions page');
+  check(html[p].indexOf('>Solutions<') === -1, p + ' has no Solutions tab');
+});
+const solRedirects = read('_redirects');
+check(solRedirects.indexOf('/solutions') !== -1, 'anyone holding the old Solutions url is sent to the trades');
+check(read('sitemap.xml').indexOf('solutions.html') === -1, 'the sitemap no longer offers the Solutions page');
+
+/* every trade names a picture, and every picture is on disk */
+tileTrades.forEach(t => {
+  const want = 'img/' + t + '.jpg';
+  check(home.indexOf(want) !== -1, 'the ' + t + ' tile carries its photograph');
+  check(fs.existsSync(path.join(dir, want)), 'the photograph is on disk: ' + want);
+});
+
+/* ---------- what each market pays ----------
+   The page is written in naira and JavaScript swaps in another currency the
+   configuration already holds. Two things have to stay true: naira is still
+   what the console bills, and no price is ever worked out from a live rate,
+   because a rate that moved would quote a shop two different numbers on two
+   days without anybody having decided anything. */
+const ccyBlock = (cfgSrc.match(/currencies:\s*\[[\s\S]*?\n  \]/) || [''])[0];
+const markets = all(ccyBlock, /\{\s*code:\s*'([A-Z]{3})'[^}]*starter:\s*(\d+),\s*pro:\s*(\d+),\s*premium:\s*(\d+)/g)
+  .map(m => ({ code: m[1], starter: +m[2], pro: +m[3], premium: +m[4] }));
+check(markets.length >= 2, 'the site quotes more than one currency (' + markets.length + ')');
+markets.forEach(m => {
+  check(m.starter > 0 && m.pro > 0 && m.premium > 0, 'every market has a price for every plan: ' + m.code);
+  check(m.starter < m.pro && m.pro < m.premium, 'the plans go up in price in ' + m.code);
+});
+
+/* naira is the real one, and it is the one the console bills */
+const ngn = markets.filter(m => m.code === 'NGN')[0];
+check(!!ngn, 'naira is one of the currencies');
+if (ngn) {
+  const byName = {};
+  plans.forEach(pl => { byName[pl.name.toLowerCase()] = pl.monthly; });
+  ['starter', 'pro', 'premium'].forEach(k => {
+    check(ngn[k] === byName[k], 'the naira ' + k + ' price is the one the console bills (' +
+      ngn[k] + ' against ' + byName[k] + ')');
+  });
+}
+
+/* the page still reads correctly with no JavaScript at all */
+const pr = html['pricing.html'];
+check(pr.indexOf('data-plan="starter"') !== -1, 'each plan tells the currency table which one it is');
+check(pr.indexOf('id="ccy-slot"') !== -1, 'there is somewhere for the currency picker to go');
+plans.forEach(pl => {
+  check(pr.indexOf('data-monthly="' + pl.monthly.toLocaleString('en-US') + '"') !== -1,
+    'the page still carries the naira price as plain text: ' + pl.name);
+});
+check(pr.indexOf('\u20a6') !== -1, 'the page still shows naira before any script runs');
+
+/* no live rate, and nothing asked of a third party to guess where a reader is */
+const siteJs = read('js/site.js');
+['fetch(', 'XMLHttpRequest', 'ipapi', 'geoip', 'exchangerate', 'openexchange'].forEach(t => {
+  check(siteJs.indexOf(t) === -1, 'no price or location is fetched from anywhere: ' + t);
+});
+check(siteJs.indexOf('resolvedOptions().timeZone') !== -1,
+  'the currency guess comes from the browser rather than an IP lookup');
+check(siteJs.indexOf("'tlb_ccy'") !== -1, 'the chosen currency is remembered under our own key');
+check(!/layi_/.test(siteJs), 'the website still never touches the app storage keys');
+
+/* structured data stays in one currency, the one we actually bill */
+check(/"priceCurrency": "NGN"/.test(pr), 'the structured data is in the currency the console bills');
+check(all(pr, /"priceCurrency"/g).length === 3, 'the structured data quotes one currency for three plans');
+
+/* ---------- what a plan is missing ----------
+   A list of only good news makes three tiers look interchangeable. Each plan
+   below the top says what it does not include, because the gap is the thing
+   that makes somebody move up. Premium says nothing of the kind: there is
+   nothing above it to be missing, and crosses there would read as the product
+   being unfinished rather than as a reason to upgrade. */
+/* the middle one carries an extra class for its badge, so the split has to
+   allow for that rather than matching the bare attribute */
+const prPlans = html['pricing.html'].split(/<div class="plan(?: [a-z]+)?">/).slice(1)
+  /* each block is cut at the end of its own feature list. Without this the
+     last one runs to the end of the page and picks up the comparison table,
+     which marks its cells "no" as well. */
+  .map(b => b.slice(0, b.indexOf(String.fromCharCode(60)+"/ul>") + 5));
+check(prPlans.length === 3, 'there are three self serve plans (' + prPlans.length + ')');
+prPlans.forEach((block, i) => {
+  const name = (block.match(/<h3>([^<]+)<\/h3>/) || [])[1] || ('plan ' + i);
+  const gaps = (block.match(/class="no"/g) || []).length;
+  if (i < prPlans.length - 1) {
+    check(gaps >= 2, 'the ' + name + ' plan says what you would gain by moving up (' + gaps + ')');
+    check(gaps <= 4, 'the ' + name + ' plan does not read as a list of complaints (' + gaps + ')');
+  } else {
+    check(gaps === 0, 'the top plan has nothing crossed off it, because nothing is above it');
+  }
+});
+
+/* the fourth offer is a band, not a fourth column: it has no price and no self
+   serve sign up, so in the grid it would look like the top of a ladder */
+check(html['pricing.html'].indexOf('None of these three fit?') !== -1, 'there is somewhere to go when no plan fits');
+check(html['pricing.html'].indexOf('callout-row') !== -1, 'the fourth offer is a band rather than a priced column');
 
 /* ---------- report ---------- */
 function report() {

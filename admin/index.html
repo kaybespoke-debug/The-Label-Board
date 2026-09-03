@@ -37,6 +37,7 @@
     <g id="i-star"><path d="M12 3.5l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 17.2 6.7 20l1.1-6L3.4 9.8l6-.8z"/></g>
     <g id="i-megaphone"><path d="M3 11v3l11 5V6z"/><path d="M14 8.5h3a3.5 3.5 0 0 1 0 7h-3"/><path d="M7 15v4"/></g>
     <g id="i-heart"><path d="M12 20s-7.5-4.6-7.5-9.8A4.2 4.2 0 0 1 12 7.5a4.2 4.2 0 0 1 7.5 2.7C19.5 15.4 12 20 12 20z"/></g>
+    <g id="i-cal"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3.5v3M16 3.5v3"/><path d="M7.5 13h3v3h-3z"/></g>
     <g id="i-check"><path d="M4 12.5 9 17.5 20 6.5"/></g>
     <g id="i-shield"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></g>
     <g id="i-list"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/></g>
@@ -131,6 +132,7 @@
 <script src="js/core.js"></script>
 <script src="js/pages.js"></script>
 <script src="js/pages2.js"></script>
+<script src="js/calendar.js"></script>
 <script src="js/detail.js"></script>
 <script src="js/metrics.js"></script>
 <script src="js/actions.js"></script>
@@ -162,6 +164,7 @@ const NAV = [
     ['announcements', 'Announcements', 'i-megaphone', () => DB.announcements.filter(a => a.state === 'scheduled').length]
   ]],
   ['Operations', [
+    ['calendar', 'Calendar', 'i-cal', () => { const t = iso(DB.today); return calForDay(t).filter(e => !e.done).length; }],
     ['tasks', 'Tasks', 'i-check', () => DB.tasks.filter(t => !t.done && t.dueIn <= 0).length],
     ['staff', 'Staff & Roles', 'i-shield', null],
     ['activity', 'Activity Log', 'i-list', null],
@@ -193,6 +196,7 @@ const TITLES = {
   revenue: ['Revenue', 'Recurring revenue and SaaS performance'],
   support: ['Support & Usage', 'Tickets, what subscribers are asking for, and how the product is used'],
   announcements: ['Announcements', 'Tell subscribers what changed'],
+  calendar: ['Calendar', 'Meetings, deadlines and what lands when'],
   tasks: ['Tasks', 'Internal work, who owns it, when it is due'],
   staff: ['Staff & Roles', 'Your team, their pay, attendance and access'],
   activity: ['Activity Log', 'Who did what, when, and why'],

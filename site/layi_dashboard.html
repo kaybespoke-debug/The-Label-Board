@@ -985,7 +985,7 @@ body.modal-open{overflow:hidden}
       <div class="side-tag">Studio Dashboard</div>
       <div class="nav-group">Overview</div>
       <div class="nav-item active" data-view="activity" onclick="go('activity')"><span class="ni">◫</span> Dashboard</div>
-      <div class="nav-item" data-view="calendar" id="navCalendar" onclick="go('calendar')"><span class="ni">📅</span> Planner</div>
+      <div class="nav-item" data-view="calendar" id="navCalendar" onclick="go('calendar')"><span class="ni">📅</span> Calendar</div>
       <div class="nav-item" data-view="mywork" id="navMywork" onclick="go('mywork')" style="display:none"><span class="ni">👤</span> My Profile</div>
       <div class="nav-group">Orders &amp; Clients</div>
       <div class="nav-item" data-view="orders" id="navOrders" onclick="go('orders')"><span class="ni">🧾</span> Orders <span class="nav-badge" id="badgeOrders"></span></div>
@@ -1175,6 +1175,9 @@ body.modal-open{overflow:hidden}
         <div class="toolbar"><span style="flex:1"></span><button class="btn sm" onclick="openCampaign('all')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>New campaign</button></div>
         <div class="cols">
           <div class="panel"><div class="panel-head"><h3>Customer segments</h3><span class="page-sub">tap to message a group</span></div><div id="mktSegments"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Ready to post</h3><span class="page-sub" id="postSub"></span></div>
+            <p class="page-sub" style="margin-bottom:10px">Work you have finished, with the photos already on it. The caption is a starting point — change it to sound like you, then copy it and post.</p>
+            <div id="postIdeas"></div></div>
           <div class="panel"><div class="panel-head"><h3>Campaign history</h3><span class="page-sub" id="mktHistSub"></span></div><div id="mktHistory"></div></div>
         </div>
       </section>
@@ -1415,6 +1418,10 @@ body.modal-open{overflow:hidden}
           </div>
           <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
         </div>
+        <div class="panel" data-setperm="setData" id="planPanel">
+          <div class="panel-head"><h3>Your plan</h3></div>
+          <div id="planBox"></div>
+        </div>
         <div class="panel" data-setperm="setWorkflow" id="payMethodPanel">
           <div class="panel-head"><h3>How you get paid</h3></div>
           <p class="page-sub" style="margin-bottom:12px">The ways money comes in and goes out of your studio. These are what you pick from when you record a payment, so the list should match how you actually trade &mdash; add Opay, Moniepoint, PalmPay, MoMo, a card machine, whatever you use.</p>
@@ -1489,7 +1496,7 @@ body.modal-open{overflow:hidden}
   <div id="moreSheet" class="more-sheet">
     <div class="ms-item" data-view="team" id="msTeam" onclick="go('team');toggleMore()"><span>☷</span> Team</div>
     <div class="ms-item" data-view="rota" id="msRota" onclick="go('rota');toggleMore()"><span>🗓</span> Rota</div>
-    <div class="ms-item" data-view="calendar" id="msCalendar" onclick="go('calendar');toggleMore()"><span>📅</span> Planner</div>
+    <div class="ms-item" data-view="calendar" id="msCalendar" onclick="go('calendar');toggleMore()"><span>📅</span> Calendar</div>
     <div class="ms-item" data-view="attendance" id="msAttendance" onclick="go('attendance');toggleMore()"><span>◷</span> Attendance</div>
     <div class="ms-item" data-view="leave" id="msLeave" onclick="go('leave');toggleMore()"><span>⎙</span> Leave</div>
     <div class="ms-item" data-view="companylog" id="msCompanylog" onclick="go('companylog');toggleMore()"><span>❏</span> Company log</div>
@@ -2852,7 +2859,7 @@ async function saveMyAccount(){
 const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantName():'';
     if(multiBranch()&&activeBranchView==='all')return 'Today across your studios';
     if(multiBranch()&&activeBranchView&&activeBranchView!=='all')return 'Today at '+activeBranchView;
-    return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Planner','Tasks, fittings, meetings, content & what is due'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
+    return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Calendar','Tasks, fittings, meetings, content & what is due'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
 function branchTypeOf(name){const b=getBranches().find(x=>x.name===name);if(!b)return SETTINGS.businessType||'both';const bk=branchIsBespoke(b),rt=branchIsRetail(b);return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
 function isBespokeType(t){return t==='bespoke'||t==='both';}
 function isGarmentShopType(t){return t==='rtw'||t==='both';}
@@ -4151,6 +4158,30 @@ function onPaidChange(){
    which is honest rather than a guess. */
 function defaultPayMethod(){return (SETTINGS.defaultPayMethod||'').trim();}
 /* ---- Payment methods panel ---------------------------------------------- */
+function renderPlanPanel(){
+  const box=document.getElementById('planBox');if(!box)return;
+  const cur=currentPlan(),use=planUsage();
+  const row=function(label,used,lim,noun){
+    const unlimited=lim===PLAN_UNLIMITED;
+    const over=!unlimited&&used>lim;
+    const pct=unlimited?0:Math.min(100,Math.round(used/lim*100));
+    const col=over?'var(--red)':pct>=80?'var(--amber)':'var(--green)';
+    return '<div class="bd-row"><span class="bl">'+esc(label)+'</span><span class="bv" style="color:'+col+'">'
+      +used+(unlimited?' <span style="color:var(--text-faint)">of as many as you need</span>':' of '+lim)
+      +(over?' <span style="color:var(--red)">over</span>':'')+'</span></div>';
+  };
+  const next=nextPlanFor('studios')||nextPlanFor('seats');
+  box.innerHTML='<div class="kv" style="margin-bottom:10px"><b>'+esc(cur.name)+'</b>'
+      +(cur.monthly?' \u00b7 '+cur2(cur.monthly)+' a month':' \u00b7 free')
+      +'<div style="color:var(--text-dim);font-size:13px">'+esc(cur.blurb)+'</div></div>'
+    +row('Studios',use.studios,cur.studios)
+    +row('Team accounts',use.seats,cur.seats)
+    +'<div class="bd-row"><span class="bl">Storage</span><span class="bv">'+fmtBytes(storageUsage().bytes)+' of '+cur.storageGb+' GB</span></div>'
+    +(next?'<div class="sd" style="color:var(--text-faint);margin-top:10px">'+esc(next.name)+' gives you '
+      +(next.studios===PLAN_UNLIMITED?'as many studios as you need':next.studios+' studios')+' and '+next.seats
+      +' team accounts for '+cur2(next.monthly)+' a month. Talk to us when you are ready.</div>':'')
+    +'<div class="sd" style="color:var(--text-faint);margin-top:8px">Going over a limit never hides anything you already have. It only stops you adding more.</div>';
+}
 function renderPayMethodSettings(){
   const box=document.getElementById('set_paymethods');
   if(box&&document.activeElement!==box)box.value=payMethods().join('\n');
@@ -4654,7 +4685,7 @@ const SET_GROUPS=[
   {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers, pay',heads:['Order defaults','Defaults','Loyalty tiers','How you get paid','Pay, allowances & deductions']},
   {key:'rules',hue:'#c47d12',t:'Rules & inventory',s:'Workflow, quality, stock',heads:['Production workflow','Products & materials','Stock used per product','Quality control','Inventory categories']},
   {key:'team',hue:'#c04668',t:'Team & notifications',s:'Accounts, roles, alerts',heads:['Team accounts','Roles','Notifications']},
-  {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Storage, backup, reset',heads:['Storage','Backup','Import old data','Data']}
+  {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Plan, storage, backup, reset',heads:['Your plan','Storage','Backup','Import old data','Data']}
 ];
 function groupSettings(){
   const sec=document.getElementById('view-settings');if(!sec)return;
@@ -4683,8 +4714,128 @@ function initSettingsCollapse(){groupSettings();}
    Text (measurements, records) is tiny; photos are the whole cost. This meters image usage and
    tiers it. saveImageAsset() is the ONE seam every image save will route through at go-live to
    upload into per-business cloud storage (Supabase Storage) instead of inlining base64. */
+/* ===== PLANS =================================================================
+   What a studio pays for, and the four rules that decide what a plan may gate.
+
+   1. Tier on SCALE, never on whether the product works.
+      Studios, team seats and storage. Never the production board, never
+      Finance, never recording a payment. A solo tailor and a four-studio
+      label get the same product; one of them uses more of it.
+
+   2. Progressive disclosure is NOT a plan.
+      teamToolsOn() hides Team, Rota, Attendance and Payroll from a one-person
+      shop because they do not need them yet, and reveals them the moment they
+      hire somebody. That is free and stays free. Gating it behind a plan would
+      put a paywall in front of a studio at the exact moment it grows, which is
+      the worst possible moment and the fastest way to be resented.
+
+   3. Being over the limit never hides what is already there.
+      A studio that drops from Pro to Starter keeps its three studios, all its
+      staff and all its data. It simply cannot add a fourth. Hiding an outlet
+      somebody is trading from would be data loss from their chair, whatever
+      the billing system thinks.
+
+   4. This is a nudge, not a control.
+      Everything here runs in a browser on the customer's own device, and the
+      figures live in localStorage. Anybody determined can edit them. That is
+      fine: a plan limit is a commercial boundary, not a security one. The
+      boundary that matters is tenant isolation, and that is enforced by the
+      database. Real billing enforcement arrives server-side at go-live; until
+      then this exists so the product tells the truth about what a plan means.
+
+   The numbers match the operator console's PLANS (admin/js/data.js) on
+   purpose. If they ever disagree, the console is right — it is what actually
+   bills — and the audit_tiers gate says so.
+   ========================================================================= */
+const PLANS=[
+  {id:'trial',   name:'Trial',   monthly:0,     studios:1, seats:3,  storageGb:1,
+   blurb:'14 days, everything in Pro'},
+  {id:'starter', name:'Starter', monthly:29000, studios:1, seats:3,  storageGb:20,
+   blurb:'One studio, three people'},
+  {id:'pro',     name:'Pro',     monthly:49000, studios:3, seats:10, storageGb:100,
+   blurb:'Three studios, ten people'},
+  {id:'premium', name:'Premium', monthly:79000, studios:0, seats:30, storageGb:1024,
+   blurb:'As many studios as you run'}
+];
+const PLAN_UNLIMITED=0;
+function smallestPlanFitting(studios,seats){
+  for(let i=0;i<PLANS.length;i++){
+    const p=PLANS[i];
+    const roomStudios=(p.studios===PLAN_UNLIMITED)||studios<=p.studios;
+    const roomSeats=(p.seats===PLAN_UNLIMITED)||seats<=p.seats;
+    if(roomStudios&&roomSeats)return p;
+  }
+  return PLANS[PLANS.length-1];
+}
+/* Runs once. After that the plan is whatever the studio is actually paying
+   for, and only billing changes it. */
+function ensurePlan(){
+  if(SETTINGS.plan)return;
+  const studios=getBranches().filter(b=>b.active!==false).length;
+  const seats=getUsers().length;
+  SETTINGS.plan=smallestPlanFitting(studios,seats).id;
+  save('layi_dash_settings',SETTINGS);
+}
+function currentPlan(){
+  const id=SETTINGS.plan||'trial';
+  return PLANS.find(p=>p.id===id)||PLANS[0];
+}
+function planById(id){return PLANS.find(p=>p.id===id)||PLANS[0];}
+/* The next plan up that actually raises the limit somebody just hit. Naming it
+   is the difference between "you cannot do that" and "here is what it costs". */
+function nextPlanFor(what){
+  const cur=currentPlan();
+  const i=PLANS.findIndex(p=>p.id===cur.id);
+  for(let j=i+1;j<PLANS.length;j++){
+    const lim=PLANS[j][what];
+    if(lim===PLAN_UNLIMITED)return PLANS[j];
+    if(lim>(cur[what]||0))return PLANS[j];
+  }
+  return null;
+}
+function planUsage(){
+  return {
+    studios:getBranches().filter(b=>b.active!==false).length,
+    seats:getUsers().length,
+    storageGb:(storageUsage().bytes/1e9)
+  };
+}
+/* Is there room for one more? Unlimited is 0, and a studio already over its
+   limit is left alone — see rule 3. */
+function planHasRoom(what){
+  const lim=currentPlan()[what];
+  if(lim===PLAN_UNLIMITED)return true;
+  return planUsage()[what]<lim;
+}
+/* The moment somebody hits a ceiling. Returns false when they may proceed, so
+   the caller reads "if(planStop('studios'))return;". */
+function planStop(what,noun){
+  if(planHasRoom(what))return false;
+  const cur=currentPlan(),next=nextPlanFor(what),lim=cur[what];
+  const nice=noun||what;
+  let msg=cur.name+' includes '+lim+' '+(lim===1?nice.replace(/s$/,''):nice)+'.';
+  if(next){
+    const nl=next[what]===PLAN_UNLIMITED?'as many as you need':next[what]+' '+nice;
+    msg+='\n\n'+next.name+' gives you '+nl+' for '+cur2(next.monthly)+' a month.';
+    msg+='\n\nNothing you already have is affected.';
+  }
+  alert(msg);
+  return true;
+}
+/* Currency for a price we quote, which is always in the plan's own currency
+   rather than the studio's. A London studio still pays in naira today. */
+function cur2(n){return '\u20a6'+fmtNum(n||0);}
 const STORAGE_TIERS=[{name:'Free',gb:1},{name:'Studio',gb:20},{name:'Growth',gb:100},{name:'Atelier',gb:1024}];
-function storageTierName(){return SETTINGS.storageTier||'Free';}
+/* Storage comes from the plan. It used to be its own setting, which meant a
+   studio could be on Starter with an Atelier allowance and nobody would notice
+   until the bill did not match. An explicit storageTier still wins if one was
+   set, so nothing already configured changes under anybody. */
+function storageTierName(){
+  if(SETTINGS.storageTier)return SETTINGS.storageTier;
+  const gb=currentPlan().storageGb;
+  const t=STORAGE_TIERS.slice().reverse().find(x=>x.gb<=gb);
+  return (t&&t.name)||'Free';
+}
 function storageLimitBytes(){const t=STORAGE_TIERS.find(x=>x.name===storageTierName())||STORAGE_TIERS[0];return t.gb*1e9;}
 function storageUsage(){
   let bytes=0,photos=0;const add=s=>{if(typeof s==='string'&&s.slice(0,5)==='data:'){bytes+=Math.floor(s.length*0.75);photos++;}};
@@ -4722,7 +4873,7 @@ function renderStorageMeter(){const el=document.getElementById('storageMeter');i
   const col=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
   el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(u.bytes)} used <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span></span><span style="color:var(--text-dim)">${esc(storageTierName())} · ${fmtBytes(lim)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div></div><div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
 }
-function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -4986,7 +5137,7 @@ function renderRecipesSettings(){
 }
 function saveRecipe(){syncRecipeDraft();const clean=(recipeDraft||[]).filter(r=>r.supplyId&&+r.qty>0).map(r=>({supplyId:r.supplyId,qty:+r.qty}));const all=getRecipes();if(clean.length)all[recipeType]=clean;else delete all[recipeType];SETTINGS.recipes=all;save('layi_dash_settings',SETTINGS);logAudit('Material recipe saved',recipeType);recipeDraft=null;renderRecipesSettings();flashSaved('recipeSaveBtn','Save '+recipeType+' recipe');}
 let branchDraft=null;
-const BRANCH_TYPES=[['bespoke','Bespoke / made-to-order'],['rtw','Ready-to-wear / retail'],['both','Both'],['fabrics','Fabrics (sold by length)']];
+
 function renderBranchesSettings(){const box=document.getElementById('branchBox');if(!box)return;
   renderUnplacedNotice();
   if(!branchDraft)branchDraft=getBranches().map(b=>({id:b.id||uid('br'),name:b.name,location:b.location||'',does:branchDoes(b),channels:Array.isArray(b.channels)&&b.channels.length?b.channels.slice():['showroom']}));
@@ -5007,7 +5158,14 @@ function branchDraftToggle(i,key){syncBranchDraft();const b=branchDraft[i];if(!b
 function bsAddType(i){const label=(prompt('New type name (e.g. Alterations, Uniforms, Rentals):','')||'').trim();if(!label)return;const kind=((prompt('Is it Making (like bespoke) or Selling (like retail)? Type M or S:','S')||'S').trim().toUpperCase().indexOf('M')===0)?'bespoke':'retail';const key=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('type-'+Date.now());const acts=branchActivities().slice();if(acts.find(a=>a.key===key||(a.label||'').toLowerCase()===label.toLowerCase())){alert('You already have a type called '+label+'.');return;}acts.push({key,label,kind,custom:true});SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);syncBranchDraft();if(branchDraft[i]){branchDraft[i].does=branchDraft[i].does||[];if(!branchDraft[i].does.includes(key))branchDraft[i].does.push(key);}logAudit('Studio activity added',label+' ('+kind+')');renderBranchesSettings();}
 function bsRemoveType(key){if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>k!==key);});renderBranchesSettings();}
 function syncBranchDraft(){if(!branchDraft)return;branchDraft.forEach((b,i)=>{const n=document.getElementById('br_name_'+i),l=document.getElementById('br_loc_'+i);if(n)b.name=n.value;if(l)b.location=l.value;const sh=document.getElementById('br_ch_show_'+i),on=document.getElementById('br_ch_onl_'+i);if(sh||on){const cs=[];if(sh&&sh.checked)cs.push('showroom');if(on&&on.checked)cs.push('online');b.channels=cs.length?cs:['showroom'];}});}
-function addBranchRow(){syncBranchDraft();branchDraft=branchDraft||[];branchDraft.push({id:uid('br'),name:'',location:'',does:[],channels:['showroom']});renderBranchesSettings();}
+function addBranchRow(){
+  syncBranchDraft();branchDraft=branchDraft||[];
+  // Count what is drafted, not just what is saved: three rows on screen is
+  // three studios whether or not Save has been pressed yet.
+  const drafted=branchDraft.filter(b=>b&&(b.name||'').trim()).length;
+  const lim=currentPlan().studios;
+  if(lim!==PLAN_UNLIMITED&&Math.max(drafted,planUsage().studios)>=lim){if(planStop('studios','studios'))return;}
+  branchDraft.push({id:uid('br'),name:'',location:'',does:[],channels:['showroom']});renderBranchesSettings();}
 function removeBranchRow(i){syncBranchDraft();branchDraft.splice(i,1);renderBranchesSettings();}
 function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim());
   const missing=named.find(b=>!(b.does&&b.does.length));
@@ -5339,6 +5497,8 @@ function applyExampleStudio(key){
   SETTINGS.branches=[{id:'br-solo',name:home,location:preset.branch.location,active:true,
     does:preset.does.slice(),type:summaryType(preset.does),channels:['showroom']}];
   SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:preset.company});
+  // one studio, a small team: this is what Starter looks like
+  SETTINGS.plan='starter';
   SETTINGS.itemWord='';                       // let the trade choose the word
   SETTINGS.productionStages=(STAGE_PRESETS[preset.stages]||DEFAULT_MIDDLE).slice();
   applyStages();
@@ -5640,6 +5800,7 @@ function loadExample(force){
     'adaeze (london)':{name:'Adaeze (London)',email:'adaeze@example.com',whatsapp:'+44 7700 900222',address:'London, UK',note:'International · pays in GBP',meas:{'Neck':'15.5','Chest / Bust':'40','Agbada length':'56'},measHistory:[{id:'mr-ad1',at:dago(15),fit:'Slim',posture:'Upright',note:'Sent measurements by video call',meas:{'Neck':'15.5','Chest / Bust':'40','Agbada length':'56'}}]},
     'marcus (new york)':{name:'Marcus (New York)',email:'marcus@example.com',whatsapp:'+1 212 555 0199',address:'New York, USA',note:'International · pays in USD',meas:{},measHistory:[]}
   });
+  SETTINGS.plan='premium';
   // Example data goes through the same branch stamping as real data, so a
   // demo studio never shows one branch holding everybody's stock.
   try{migrateBranchOwnership();}catch(e){}
@@ -9089,8 +9250,55 @@ function marketingSegments(){
     {key:'vip',name:'VIP, top tier',desc:topTier||'Highest loyalty tier',list:data.filter(c=>loyaltyTier(c.spend).tier===topTier&&(c.email||c.whatsapp))},
     {key:'owing',name:'Owing a balance',desc:'Have an outstanding balance',list:data.filter(c=>c.outstanding>0&&(c.email||c.whatsapp))},
     {key:'new',name:'New this month',desc:'First order this month',list:data.filter(c=>{const f=firstAt(c);return f!==Infinity&&new Date(f).toISOString().slice(0,7)===thisMo&&(c.email||c.whatsapp);})},
-    {key:'lapsed',name:'Lapsed (90+ days)',desc:'No order in over 90 days',list:data.filter(c=>{const l=lastAt(c);return l&&(now-l)>90*864e5&&(c.email||c.whatsapp);})}
-  ];
+    {key:'lapsed',name:'Lapsed (90+ days)',desc:'No order in over 90 days',list:data.filter(c=>{const l=lastAt(c);return l&&(now-l)>90*864e5&&(c.email||c.whatsapp);})},
+    /* The two below are the point of this whole tab: they are made of what the
+       studio already recorded, so they cost nobody any extra work.
+
+       "This time last year" is the one that earns its keep. A tailor's year
+       repeats — weddings in December, Sallah, back-to-school — and the people
+       who ordered last November are the people most likely to order this
+       November. Nobody keeps that list by hand. */
+    {key:'season',name:'Ordered this time last year',desc:'Same six weeks, twelve months ago \u2014 the people whose year repeats',
+     list:data.filter(c=>c.orders.some(function(od){
+       const t=od.createdAt?new Date(od.createdAt).getTime():0;if(!t)return false;
+       const ago=now-t;
+       // a six-week window centred on twelve months ago
+       return ago>(365-21)*864e5&&ago<(365+21)*864e5;
+     })&&(c.email||c.whatsapp))},
+    {key:'quiet6',name:'Not seen in six months',desc:'Further gone than lapsed, and worth a personal note',
+     list:data.filter(c=>{const l=lastAt(c);return l&&(now-l)>182*864e5&&(c.email||c.whatsapp);})}
+  ]
+  .concat(itemSegments(data))
+  // A segment with nobody in it is a row that goes nowhere. It was always
+  // possible to see "Lapsed (90+ days)" with nothing behind it, which teaches
+  // somebody the tab is not worth opening. "All reachable" is kept whatever,
+  // because it is the baseline the campaign screen starts from.
+  .filter(function(seg){return seg.key==='all'||seg.list.length>0;});
+}
+/* One segment per popular item. "Everyone who bought a kaftan" is a real
+   marketing list and the studio has always had the data for it; it just had no
+   way to ask. Capped at the top three so the segment list stays readable —
+   beyond that it stops being a list and becomes a database query. */
+function itemSegments(data){
+  const counts={};
+  data.forEach(function(c){
+    (c.orders||[]).forEach(function(od){
+      const n=String(od.garment||'').trim();
+      if(!n)return;
+      (counts[n]=counts[n]||{n:0,keys:{}}).n++;
+      counts[n].keys[c.key]=1;
+    });
+  });
+  return Object.keys(counts)
+    .sort(function(a,b){return counts[b].n-counts[a].n;})
+    .slice(0,3)
+    .filter(function(n){return counts[n].n>1;})
+    .map(function(n){
+      return {key:'item:'+n,name:'Bought '+n,desc:counts[n].n+' order'+(counts[n].n===1?'':'s')+' of this',
+        list:data.filter(function(c){return counts[n].keys[c.key]&&(c.email||c.whatsapp);})};
+    })
+    // a segment with nobody reachable in it is a row that wastes a tap
+    .filter(function(seg){return seg.list.length>0;});
 }
 function segmentByKey(k){const segs=marketingSegments();return segs.find(s=>s.key===k)||segs[0];}
 function mktDrill(){
@@ -9098,6 +9306,125 @@ function mktDrill(){
   const list=getCampaigns().filter(c=>String(c.at||'').slice(0,7)===mo).sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   const rows=list.map(c=>`<div class="bd-row"><span class="bl"><b>${esc(c.subject||'(no subject)')}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(c.segmentName||'')} · ${c.recipients||0} recipient${c.recipients===1?'':'s'}</span></span><span class="bv">${c.channel==='whatsapp'?'WhatsApp':'Email'}</span></div>`).join('');
   openListModal('Campaigns this month',list.length+' sent',list.length?rows:'<div class="kv" style="color:var(--text-faint)">No campaigns logged this month.</div>');
+}
+/* ===== READY TO POST =========================================================
+   The best marketing a small studio has is the work it just finished, and it
+   is already in the app: a completed order, the client's name, what it was,
+   and photos somebody took at the fitting.
+
+   What this does NOT do is post anything. Posting means Meta app review,
+   tokens that expire, and a breakage every few months for a feature nobody
+   asked to be automatic. Writing the caption and handing it over is most of
+   the value for a tenth of the work, and it is the same shape as the WhatsApp
+   hand-off that already works here.
+   ========================================================================= */
+function postIdeas(){
+  const DEL=STAGES.indexOf('Delivered'),RFD=STAGES.indexOf('Ready for Delivery');
+  const out=[];
+  getOrders().filter(inBranch).forEach(function(o){
+    if(o.kind==='sale')return;
+    if((o.stageIndex||0)<Math.min(RFD,DEL))return;         // not finished yet
+    // every photo attached to the job, wherever it was taken
+    const photos=[].concat(o.clientPhotos||[]);
+    (o.outfits||[]).forEach(function(of){[].push.apply(photos,of.photos||[]);});
+    (o.updates||[]).forEach(function(u){[].push.apply(photos,u.photos||[]);});
+    if(!photos.length)return;                               // nothing to show
+    const when=o.deliveredAt||o.due||o.createdAt||'';
+    out.push({id:o.id,client:o.client||'',item:o.garment||tradeWord(),
+      photos:photos.slice(0,4),at:when,posted:!!o.postedAt});
+  });
+  // newest finished work first: that is what somebody wants to post today
+  return out.sort(function(a,b){return String(b.at||'').localeCompare(String(a.at||''));}).slice(0,8);
+}
+/* A caption a person would actually send, not a template with holes in it.
+   No client name: posting a customer's name without asking is a good way to
+   lose them, and the studio can add it themselves if they have permission. */
+function postCaption(idea){
+  const co=(SETTINGS.company&&SETTINGS.company.name)||tenantName()||'the studio';
+  const w=tradeWord();
+  const lines=[
+    'Finished this week: '+(idea.item||w)+'.',
+    '',
+    'Made at '+co+(SETTINGS.company&&SETTINGS.company.address?', '+String(SETTINGS.company.address).split('\n')[0]:'')+'.',
+    'Taking orders now \u2014 send us a message to start yours.'
+  ];
+  return lines.join('\n');
+}
+function renderPostIdeas(){
+  const box=document.getElementById('postIdeas');if(!box)return;
+  const ideas=postIdeas();
+  const sub=document.getElementById('postSub');
+  if(sub)sub.textContent=ideas.length?ideas.length+' ready':'';
+  if(!ideas.length){
+    box.innerHTML='<div class="kv" style="color:var(--text-faint);padding:8px 2px">Nothing to post yet. Finished orders with photos on them show up here \u2014 take a picture at the last fitting and it will appear.</div>';
+    return;
+  }
+  box.innerHTML=ideas.map(function(x,i){
+    const thumbs=x.photos.slice(0,3).map(function(ph){
+      return '<img src="'+ph+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">';
+    }).join('');
+    return '<div class="up-line" style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line-soft)">'
+      +'<div style="display:flex;gap:5px;flex:0 0 auto">'+thumbs+'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<b>'+esc(x.item)+'</b>'
+        +'<div style="color:var(--text-faint);font-size:12.5px">'+esc(x.id)+(x.at?' \u00b7 '+esc(fmtDateShort(x.at)):'')+(x.posted?' \u00b7 posted':'')+'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px">'
+          +'<button class="btn sm ghost" onclick="openPostDraft(\''+x.id+'\')">Write the post</button>'
+        +'</div>'
+      +'</div></div>';
+  }).join('');
+}
+function openPostDraft(orderId){
+  const idea=postIdeas().find(function(x){return x.id===orderId;});
+  if(!idea){if(typeof toast==='function')toast('That job is no longer in the list.');return;}
+  const cap=postCaption(idea);
+  openModal('<h3>Write the post</h3><div class="msub">'+esc(idea.item)+' \u00b7 '+esc(idea.id)+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      +idea.photos.map(function(ph){return '<img src="'+ph+'" style="width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">';}).join('')
+    +'</div>'
+    +'<div class="field"><label>Caption</label><textarea class="fld" id="pi_cap" rows="6">'+esc(cap)+'</textarea>'
+      +'<div class="sd" style="color:var(--text-faint);margin-top:5px">We have left the client\u2019s name out on purpose. Add it only if they are happy to be named.</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<button class="btn sm ghost" onclick="copyPostCaption()">Copy caption</button>'
+      +'<button class="btn sm ghost" onclick="planThisPost(\''+idea.id+'\')">Plan it in the calendar</button>'
+      +'<button class="btn sm ghost" onclick="markPosted(\''+idea.id+'\')">Mark as posted</button>'
+    +'</div>'
+    +'<div class="sd" style="color:var(--text-faint)">Save the photos from the job, paste the caption, and post it wherever you post. Nothing here posts on your behalf.</div>'
+    +'<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>');
+}
+function copyPostCaption(){
+  const el=document.getElementById('pi_cap');if(!el)return;
+  const txt=el.value||'';
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt);}
+    else{el.select&&el.select();document.execCommand&&document.execCommand('copy');}
+    if(typeof toast==='function')toast('Caption copied');
+  }catch(e){if(typeof toast==='function')toast('Select the caption and copy it');}
+}
+/* Straight into the calendar as a content entry, which is what the content
+   type was added for. */
+function planThisPost(orderId){
+  const idea=postIdeas().find(function(x){return x.id===orderId;});
+  // Fall back to the caption we generated if the field reads back empty, so a
+  // planned post is never an empty note somebody has to rewrite from scratch.
+  const el=document.getElementById('pi_cap');
+  const cap=(el&&el.value)||(idea?postCaption(idea):'');
+  const list=getPlanner();
+  list.push({id:uid('pn'),title:'Post: '+((idea&&idea.item)||'finished work'),
+    date:new Date(Date.now()+2*864e5).toISOString().slice(0,10),time:'',
+    type:'content',link:'',repeat:'',invitees:[],notes:cap,
+    branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName(),
+    staffId:'',by:userLabel(),at:new Date().toISOString(),done:false});
+  setPlanner(list);
+  if(typeof logAudit==='function')logAudit('Post planned',(idea&&idea.item)||orderId);
+  closeModal();renderAll();
+  if(typeof toast==='function')toast('Added to the calendar in two days');
+}
+function markPosted(orderId){
+  const list=rawOrders();const o=list.find(function(x){return x.id===orderId;});
+  if(o){o.postedAt=new Date().toISOString();save('layi_dash_orders',list);}
+  closeModal();renderAll();
+  if(typeof toast==='function')toast('Marked as posted');
 }
 function renderMarketing(){
   if(!can('customers'))return;
@@ -9111,6 +9438,7 @@ function renderMarketing(){
     stat('Campaigns this month',sentMo,'logged as sent','','mktDrill()')
   ].join('');
   document.getElementById('mktSegments').innerHTML=segs.map(s=>`<div class="bd-row" style="cursor:pointer" onclick="openCampaign('${s.key}')"><span class="bl"><b>${esc(s.name)}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(s.desc)}</span></span><span class="bv"><span class="badge">${s.list.length}</span> <span style="color:var(--gold)">›</span></span></div>`).join('');
+  renderPostIdeas();
   const hist=camps.slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   const hs=document.getElementById('mktHistSub');if(hs)hs.textContent=camps.length?camps.length+' sent':'';
   document.getElementById('mktHistory').innerHTML=hist.length?hist.map(c=>`<div class="up-line"><b>${esc(c.subject||'(no subject)')}</b> <span class="badge" style="font-size:10px">${esc(c.type||'Newsletter')}</span> <span class="sup-status" style="font-size:10px">${c.channel==='whatsapp'?'WhatsApp':'Email'}</span><br><span style="color:var(--text-faint);font-size:12px">${esc(c.segmentName||'')} · ${c.recipients||0} recipients · ${c.at?new Date(c.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}${c.by?' · '+esc(c.by):''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No campaigns logged yet. Create one and tap “Mark as sent” to keep a record here.</div>';
@@ -9502,10 +9830,15 @@ function renderPlannerEntry(){
 function syncPlannerDraft(){
   const d=plannerDraft;if(!d)return;
   if(document.getElementById('pl_title'))d.title=fv('pl_title')||'';
-  if(document.getElementById('pl_date'))d.date=fv('pl_date')||'';
+  // Keep a date we already have if the field reads back empty. Changing Type
+  // re-renders this form, and a browser that returns '' for a partial date
+  // would otherwise silently wipe the day the entry was for.
+  if(document.getElementById('pl_date'))d.date=fv('pl_date')||d.date||'';
   if(document.getElementById('pl_time'))d.time=fv('pl_time')||'';
   if(document.getElementById('pl_type'))d.type=fv('pl_type')||'task';
-  if(document.getElementById('pl_link'))d.link=fv('pl_link')||'';
+  // Same reason as the date: a field that reads back empty must not erase a
+  // link the person deliberately made.
+  if(document.getElementById('pl_link'))d.link=fv('pl_link')||d.link||'';
   if(document.getElementById('pl_repeat'))d.repeat=fv('pl_repeat')||'';
   if(document.getElementById('pl_notes'))d.notes=fv('pl_notes')||'';
   const inv=[];getStaff().filter(staffActive).forEach(function(st){
@@ -9516,7 +9849,11 @@ function syncPlannerDraft(){
 function addVideoLink(){
   syncPlannerDraft();
   plannerDraft.link=makeVideoLink(plannerDraft.title);
-  renderPlannerEntry();
+  // Write it straight into the field rather than re-rendering the whole form.
+  // A re-render round-trips every value back through the DOM, and anything that
+  // reads back empty would silently wipe the room we just made.
+  const el=document.getElementById('pl_link');
+  if(el)el.value=plannerDraft.link; else renderPlannerEntry();
   if(typeof toast==='function')toast('Video room created');
 }
 function savePlannerEntry(){
@@ -9934,7 +10271,11 @@ function openUser(id){if(!can('users'))return;if(liveMode)return openUserCloud(i
     <div class="modal-foot">${u&&u.id!=='u-owner'?`<button class="btn danger sm" onclick="delUser('${u.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveUser('${u?u.id:''}')">${u?'Update':'Create'}</button></div>`);}
 function acctNameSync(){const n=(fv('us_name')||'').trim();const el=document.getElementById('us_makeStaffName');if(el)el.textContent=n||'this person';}
 function acctStaffSync(){const wrap=document.getElementById('us_makeStaffWrap');if(!wrap)return;const linked=!!fv('us_staff');wrap.style.display=linked?'none':'';const cb=document.getElementById('us_makeStaff');if(linked&&cb)cb.checked=false;}
-function saveUser(id){const name=(fv('us_name')||'').trim();const username=(fv('us_username')||'').trim();const pin=fv('us_pin')||'';if(!name||!username||!pin){alert('Name, username and password are all required.');return;}
+function saveUser(id){
+  // Only a NEW account counts against the seats. Editing somebody who is
+  // already there must never be blocked, even if the studio is over its limit.
+  if(!id&&planStop('seats','team seats'))return;
+  const name=(fv('us_name')||'').trim();const username=(fv('us_username')||'').trim();const pin=fv('us_pin')||'';if(!name||!username||!pin){alert('Name, username and password are all required.');return;}
   const list=getUsers();const dupe=list.find(x=>x.username.toLowerCase()===username.toLowerCase()&&x.id!==id);if(dupe){alert('That username is taken.');return;}
   let staffId=fv('us_staff')||'';
   if(staffId&&list.some(x=>x.staffId===staffId&&x.id!==id)){alert('That staff record is already linked to another account. Each staff record maps to one login.');return;}
@@ -10028,6 +10369,7 @@ function addRole(){if(!can('users'))return;const name=(prompt('New role name (e.
   applyStages();
   getRoles();getUsers();migrateRoles();
   try{migrateBranchOwnership();}catch(e){console.warn('branch migration:',e);}
+  try{ensurePlan();}catch(e){console.warn('plan:',e);}
   // one-time migration: old free-text fabric supplier names -> supplier records
   if((SETTINGS.suppliers||[]).length&&!getSuppliers().length){const recs=SETTINGS.suppliers.map(name=>({id:uid('sp'),business:name,type:'Fabric Supplier',contact:'',phone:'',whatsapp:'',email:'',location:'',notes:'',preferred:false}));setSuppliers(recs);}
   // one-time migration: remap old 8-stage indices to the new 9-stage scheme

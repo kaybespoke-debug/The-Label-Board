@@ -688,7 +688,7 @@ const ADMIN_PAGES = [
   ['dashboard', 'Dashboard'], ['subscribers', 'Subscribers'], ['onboarding', 'Onboarding'],
   ['billing', 'Plans & Billing'], ['payments', 'Payments'], ['payroll', 'Payroll'],
   ['revenue', 'Revenue'], ['support', 'Support & Usage'],
-  ['announcements', 'Announcements'], ['tasks', 'Tasks'],
+  ['announcements', 'Announcements'], ['calendar', 'Calendar'], ['tasks', 'Tasks'],
   ['staff', 'Staff & Roles'], ['activity', 'Activity Log'], ['settings', 'Settings']
 ];
 const ADMIN_CAPS = [
@@ -716,23 +716,23 @@ function defaultRoles() {
       desc: 'Full access, always on and cannot be limited.', pages: all.slice(), caps: allCaps.slice() },
     { id: 'ops', name: 'Operations Lead', builtin: true, locked: false,
       desc: 'Runs the day to day across every team.',
-      pages: ['dashboard', 'subscribers', 'onboarding', 'billing', 'payments', 'revenue', 'support', 'announcements', 'tasks', 'staff', 'activity'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'billing', 'payments', 'revenue', 'support', 'announcements', 'calendar', 'tasks', 'staff', 'activity'],
       caps: ['see_money', 'edit_sub', 'change_plan', 'manage_staff', 'send_announce', 'close_ticket', 'export', 'see_audit'] },
     { id: 'finance', name: 'Finance', builtin: true, locked: false,
       desc: 'Billing, payments, payroll and revenue.',
-      pages: ['dashboard', 'subscribers', 'billing', 'payments', 'payroll', 'revenue', 'activity'],
+      pages: ['dashboard', 'subscribers', 'billing', 'payments', 'payroll', 'revenue', 'calendar', 'activity'],
       caps: ['see_money', 'change_plan', 'refund', 'run_payroll', 'publish_slips', 'export', 'see_audit'] },
     { id: 'support_mgr', name: 'Support Manager', builtin: true, locked: false,
       desc: 'Owns the support queue and the team on it.',
-      pages: ['dashboard', 'subscribers', 'onboarding', 'support', 'announcements', 'tasks', 'activity'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'support', 'announcements', 'calendar', 'tasks', 'activity'],
       caps: ['edit_sub', 'close_ticket', 'send_announce', 'impersonate', 'export'] },
     { id: 'support', name: 'Support Agent', builtin: true, locked: false,
       desc: 'Answers tickets. No money, no staff records.',
-      pages: ['dashboard', 'subscribers', 'onboarding', 'support', 'tasks'],
+      pages: ['dashboard', 'subscribers', 'onboarding', 'support', 'calendar', 'tasks'],
       caps: ['close_ticket', 'impersonate'] },
     { id: 'product', name: 'Product', builtin: true, locked: false,
       desc: 'Usage, feedback and what ships next.',
-      pages: ['dashboard', 'support', 'announcements', 'tasks'],
+      pages: ['dashboard', 'support', 'announcements', 'calendar', 'tasks'],
       caps: ['send_announce', 'export'] }
   ];
 }
@@ -870,7 +870,7 @@ function emptyData() {
       { id: 1, staffId: 1, kind: 'Employment contract', status: 'missing', pages: 0,
         addedOn: iso(TODAY), body: [['Status', 'Not uploaded']], note: 'Nothing on file yet.' }
     ],
-    tickets: [], feedback: [], tasks: [], announcements: [], onboarding: [],
+    tickets: [], feedback: [], tasks: [], announcements: [], onboarding: [], calendar: [],
     activity: [{
       id: 1, kind: 'login', action: 'Console opened', detail: 'Kayode Ojomo opened the Admin Control Centre',
       actorId: 1, actor: 'Kayode Ojomo', actorRole: 'Super Admin',
@@ -899,6 +899,7 @@ function demoData() {
     feedback: buildFeedback(subscribers),
     tasks: buildTasks(staff),
     announcements: buildAnnouncements(),
+    calendar: buildCalendar(staff),
     onboarding: buildOnboarding(subscribers),
     activity: buildActivity(subscribers, staff, buildTickets(subscribers, staff)),
     usage: buildUsage(subscribers)
@@ -960,10 +961,38 @@ const DB = (function () {
 })();
 
 /* swap the whole dataset in or out, keeping settings and roles */
+/* The only calendar records the console owns: meetings, reminders and
+   content. Everything else on the calendar is read from records that
+   already exist, so there is nothing to seed for those. */
+function buildCalendar(staff) {
+  const ids = staff.map(s => s.id);
+  const some = n => ids.slice(1, 1 + n);
+  const seed = [
+    ['Weekly platform standup', 0, '09:30', 'meeting', 'weekly', 3, 'Numbers, blockers, what ships this week.'],
+    ['Onboarding call — Crown Collective', 1, '14:00', 'meeting', '', 2, 'Walk through the production board and add their first staff.'],
+    ['September price review sign-off', 4, '11:00', 'meeting', '', 2, 'Starter moves to ₦31,000. Confirm the wording before it sends.'],
+    ['Publish August payroll payslips', 0, '', 'reminder', '', 0, 'Staff cannot see them until they are published.'],
+    ['Chase the five past-due accounts', 1, '', 'reminder', 'weekly', 0, ''],
+    ['Instagram: behind the seams', 2, '10:00', 'content', 'fortnightly', 0, 'Short clip from a studio floor. Ask permission first.'],
+    ['Newsletter — what shipped in August', 6, '08:00', 'content', 'monthly', 0, ''],
+    ['Concierge beta check-in', 9, '15:30', 'meeting', '', 3, 'Twenty Premium studios. What is working, what is not.']
+  ];
+  return seed.map((s, i) => ({
+    id: i + 1, title: s[0], date: iso(dAgo(-s[1])), time: s[2], type: s[3],
+    /* Seeded links carry the same random salt rule: no two rooms alike. */
+    link: s[3] === 'meeting'
+      ? 'https://meet.jit.si/TheLabelBoard-' + s[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24) +
+        '-' + Math.floor(rnd() * 1e10).toString(36) + i
+      : '',
+    repeat: s[4], invitees: s[3] === 'meeting' ? some(s[5]) : [],
+    notes: s[6], staffId: 1, by: staff[0].name, at: iso(dAgo(int(1, 9))), done: false
+  }));
+}
+
 function applyDataset(next) {
   ['demoData', 'subscribers', 'staff', 'payments', 'payrollRuns', 'payslips', 'attendance',
    'leave', 'docs', 'tickets', 'feedback', 'tasks', 'announcements', 'onboarding',
-   'activity', 'usage'].forEach(k => { DB[k] = next[k]; });
+   'calendar', 'activity', 'usage'].forEach(k => { DB[k] = next[k]; });
 }
 function loadExampleData() {
   applyDataset(demoData());
@@ -977,11 +1006,63 @@ function clearAllData() {
   try { localStorage.setItem('tlb_admin_dataset', 'empty'); } catch (e) {}
 }
 
+/* ---------------- role migration ----------------
+   Saved roles replace DB.roles wholesale, so a role stored before a page
+   existed has no opinion about that page. Page access is now genuinely
+   enforced, which means the new page would appear for the Owner alone
+   (that role is locked and bypasses the list) and look broken for
+   everyone else. It is not broken; the stored roles are stale.
+
+   So each new page key is introduced with the access it would have had if
+   it had always been there. `calendar` sits beside Tasks and shows the
+   team's own week, so any role that could already see Tasks gets it. A
+   role that never had Tasks does not suddenly gain a page.
+
+   Each page is introduced ONCE per browser, and the fact that it ran is
+   recorded. Without that marker a later deliberate revoke would be undone
+   on the next reload, and an owner who took the page away from a role
+   would watch it come back.
+
+   Add to NEW_PAGES when you add a page. Never remove an entry: someone's
+   browser may still be carrying roles from before it. */
+const ROLE_MIGRATIONS_KEY = 'tlb_admin_role_migrations';
+const NEW_PAGES = [
+  /* Calendar shows the team's own week beside Tasks, and payroll dates,
+     which is why Finance qualifies without having Tasks. This mirrors the
+     default roles exactly: every non-owner role holds one or the other. */
+  { page: 'calendar', grantIf: r => ['tasks', 'payroll'].some(p => (r.pages || []).indexOf(p) >= 0) }
+];
+
+function migrateRoles(saved) {
+  const all = ADMIN_PAGES.map(p => p[0]);
+  let done = [];
+  try { done = JSON.parse(localStorage.getItem(ROLE_MIGRATIONS_KEY) || '[]'); } catch (e) {}
+  const ran = [];
+
+  saved.forEach(r => {
+    /* The Owner is locked and cannot be limited, so it simply holds
+       everything that exists today. */
+    if (r.locked) { r.pages = all.slice(); return; }
+    r.pages = r.pages || [];
+    NEW_PAGES.forEach(n => {
+      if (done.indexOf(n.page) >= 0) return;      // already introduced here
+      if (r.pages.indexOf(n.page) >= 0) return;   // already granted
+      if (n.grantIf(r)) r.pages.push(n.page);
+      if (ran.indexOf(n.page) < 0) ran.push(n.page);
+    });
+  });
+
+  if (ran.length) {
+    try { localStorage.setItem(ROLE_MIGRATIONS_KEY, JSON.stringify(done.concat(ran))); } catch (e) {}
+  }
+  return saved;
+}
+
 /* restore settings, role edits, and which dataset was last chosen */
 (function restore() {
   try {
     const r = JSON.parse(localStorage.getItem('tlb_admin_roles') || 'null');
-    if (Array.isArray(r) && r.length) DB.roles = r;
+    if (Array.isArray(r) && r.length) DB.roles = migrateRoles(r);
     /* One level deep, so a settings blob saved by an older release does not
        wipe out groups added since. A flat Object.assign replaced whole
        sub-objects, which silently dropped new fields. */
