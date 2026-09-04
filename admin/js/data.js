@@ -4,7 +4,20 @@
    is DERIVED from here, so no two screens can disagree.
    ============================================================ */
 
-const TODAY = new Date(2026, 7, 25); // 25 Aug 2026 — "now" for this prototype
+/* "Now".
+
+   This was pinned to 25 Aug 2026 so the prototype's worked example was
+   identical on every reload. It made every period filter end in August, and
+   PERIOD.to for "All time" was a date in the past — so a studio that signed up
+   in September was filtered out of the subscriber list, the dashboard, revenue
+   and renewals, while the sidebar badge counted it. Present in the data and
+   invisible on every page, which is the hardest kind of bug to report.
+
+   Nothing needed the pin. The example is generated relative to this date
+   (dAgo, dd, iso) so it is just as coherent against the real one, and the
+   seeded PRNG below is what actually makes it reproducible. A demo still
+   showing August in December would have looked broken regardless. */
+const TODAY = (function () { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
 
 /* seeded PRNG so the dataset is identical on every reload */
 function mkRng(seed) {
