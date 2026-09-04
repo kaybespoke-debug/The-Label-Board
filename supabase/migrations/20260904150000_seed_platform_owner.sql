@@ -27,12 +27,26 @@
 -- actions. owner is the only one that can read the audit log.
 -- =====================================================================
 
-insert into public.platform_admins (id, name, role, active, email)
-select u.id, 'Kayode', 'owner', true, u.email
-from auth.users u
-where u.email = 'layiojomo@gmail.com'
-on conflict (id) do update
-  set name   = excluded.name,
-      role   = excluded.role,
-      active = excluded.active,
-      email  = excluded.email;
+-- Guarded on auth.users existing at all, not just on the row existing. The
+-- test harnesses build this schema on a bare Postgres with only auth.uid()
+-- stubbed, and a migration that cannot run there is a migration the suites
+-- cannot check anything else through.
+do $$
+begin
+  if to_regclass('auth.users') is null then
+    raise notice 'no auth schema here — skipping the platform owner seed';
+    return;
+  end if;
+
+  execute $seed$
+    insert into public.platform_admins (id, name, role, active, email)
+    select u.id, 'Kayode', 'owner', true, u.email
+    from auth.users u
+    where u.email = 'layiojomo@gmail.com'
+    on conflict (id) do update
+      set name   = excluded.name,
+          role   = excluded.role,
+          active = excluded.active,
+          email  = excluded.email
+  $seed$;
+end $$;
