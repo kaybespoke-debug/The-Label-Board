@@ -1834,7 +1834,7 @@ async function pullSuppliers(){
   if(!supa)return false;
   try{const {data,error}=await supa.from('suppliers').select('*').order('created_at',{ascending:true});
     if(error){console.warn('pullSuppliers:',error.message);return false;}
-    if(!(data||[]).length){const localArr=getSuppliers();if(localArr.length){await _pushSuppliersNow(localArr);}return true;}
+    if(!(data||[]).length){const localArr=getSuppliers();if(localArr.length&&maySeedCloudFromDevice()){await _pushSuppliersNow(localArr);}else{saveLocal('layi_dash_suppliers',[]);}return true;}
     saveLocal('layi_dash_suppliers',(data||[]).map(rowToSup));return true;
   }catch(e){console.warn('pullSuppliers:',e);return false;}
 }
@@ -1904,7 +1904,7 @@ async function pullCustomers(){
   try{
     const {data,error}=await supa.from('customers').select('*').order('created_at',{ascending:true});
     if(error){console.warn('pullCustomers:',error.message);return false;}
-    if(!(data||[]).length){const localObj=getCustomers();if(Object.keys(localObj).length){await _pushCustomersNow(localObj);}return true;}
+    if(!(data||[]).length){const localObj=getCustomers();if(Object.keys(localObj).length&&maySeedCloudFromDevice()){await _pushCustomersNow(localObj);}else{saveLocal('layi_dash_customers',{});}return true;}
     const obj={};(data||[]).forEach(r=>{obj[nameKey(r.name)]=rowToCust(r);});
     saveLocal('layi_dash_customers',obj);return true;
   }catch(e){console.warn('pullCustomers:',e);return false;}
@@ -2013,14 +2013,81 @@ async function reportTenantPresence(){
     return true;
   }catch(e){return false;}
 }
+/* ===== WHOSE DATA IS ALREADY ON THIS DEVICE? =====================================
+   The app is local-first, so localStorage holds a whole studio. Signing in as a
+   different studio used to leave all of it in place: hydrate overwrote only the
+   keys the cloud actually returned, and everything else — orders, products,
+   staff, branches — stayed as the last studio's. Sign in as a client on your own
+   laptop and you would be looking at your own orders under their name.
+
+   Worse in the other direction. Both hydrate and pullCustomers treated an empty
+   cloud as "this must be a new studio's first device" and pushed whatever was
+   local up as theirs. So the client's empty business would have been filled with
+   your studio's data, written by you, and correctly stored by a database doing
+   exactly as it was told. Row level security never saw a thing wrong, because
+   nothing was wrong at the database: the wrong data arrived with the right
+   credentials.
+
+   So the device records whose studio its data belongs to, and that marker decides:
+
+     same studio    keep what is here; the cloud is a sync, not a reset
+     other studio   wipe it, then hydrate. Nothing local is theirs
+     no marker      this is a device that has only ever run locally. If the
+                    cloud is empty it really is a first sync and the local work
+                    is pushed up. If the cloud has anything, the cloud wins.
+
+   Keys are removed rather than blanked, so every loader falls back to its own
+   defaults exactly as on a fresh install. getUsers() and getRoles() rebuild
+   themselves, so nobody is locked out of a device by this.
+   ================================================================================ */
+const BIZ_OWNER_KEY='layi_dash_biz_owner';
+const TENANT_KEYS=STATE_KEYS.concat(['layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
+let _deviceWiped=false;   // this device held another studio, so it may not seed the cloud
+function deviceOwner(){try{return store.get(BIZ_OWNER_KEY)||'';}catch(e){return '';}}
+function wipeTenantData(){TENANT_KEYS.forEach(function(k){try{store.del(k);}catch(e){}});}
+/* Settings live in a module-level object built once at boot, so writing the key
+   is not enough — without this the studio's own name, trade, stages and branch
+   list stay as whoever was signed in before. */
+function reloadSettingsFromStorage(){
+  const s=load('layi_dash_settings',null);
+  SETTINGS=s?Object.assign({},DEFAULTS,s):Object.assign({},DEFAULTS);
+  if(typeof applyStages==='function'){try{applyStages();}catch(e){}}
+}
+function claimDeviceFor(bizId,cloudHasData){
+  const had=deviceOwner();
+  if(had===bizId){_deviceWiped=false;return false;}          // same studio, carry on
+  const unmarked=!had;
+  // An unmarked device with an empty cloud is a genuine first sync: this is
+  // somebody who used the app offline and has just signed up.
+  if(unmarked&&!cloudHasData){store.set(BIZ_OWNER_KEY,bizId);_deviceWiped=false;return false;}
+  wipeTenantData();
+  store.set(BIZ_OWNER_KEY,bizId);
+  reloadSettingsFromStorage();
+  _deviceWiped=true;
+  return true;
+}
+function maySeedCloudFromDevice(){return !_deviceWiped;}
+
 async function hydrateFromCloud(){
   if(!supa||!liveMode)return false;
+  /* Never fall back to LAYI_BIZ here. It is the demo tenant's id, and a signed
+     in studio whose business could not be read would otherwise be pointed at a
+     business it shares with everybody else who hit the same fallback. */
+  if(!myBusinessId){console.warn('hydrate: no business on this account');return false;}
   _hydrating=true;let ok=true;
-  try{const a=await pullCustomers();const b=await pullSuppliers();
-    const {data,error}=await supa.from('app_state').select('key,data').eq('business_id',myBusinessId||LAYI_BIZ);
+  try{
+    const {data,error}=await supa.from('app_state').select('key,data').eq('business_id',myBusinessId);
     if(error){console.warn('state pull:',error.message);ok=false;}
-    else{const rows=data||[];rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key))saveLocal(r.key,r.data);}); // cloud → local
-      if(!rows.length)await pushAllState();} // empty cloud → seed it from this device
+    const rows=(data||[]);
+    // Decided before anything is written, and before the customers and suppliers
+    // pulls run, because those seed the cloud from the device too.
+    claimDeviceFor(myBusinessId, rows.length>0 || !!error);
+    const a=await pullCustomers();const b=await pullSuppliers();
+    if(!error){
+      rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key))saveLocal(r.key,r.data);}); // cloud → local
+      if(!rows.length&&maySeedCloudFromDevice())await pushAllState();
+    }
+    reloadSettingsFromStorage();
     ok=ok&&(a!==false&&b!==false);
   }finally{_hydrating=false;}
   return ok;
