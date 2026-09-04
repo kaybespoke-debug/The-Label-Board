@@ -101,12 +101,34 @@ const app   = readFileSync(join(repo, 'site', 'layi_dashboard.html'), 'utf8');
 const adminFn = readFileSync(join(repo, 'supabase', 'functions', 'admin-api', 'index.ts'), 'utf8');
 const teamFn  = readFileSync(join(repo, 'supabase', 'functions', 'team-admin', 'index.ts'), 'utf8');
 
+/* All four apps, not just the customer one. The partner portal reaches the
+   database by hand-built fetch rather than supabase-js, so it called
+   /rest/v1/rpc/partner_me for months without anything here noticing that
+   partner_me lives in the `app` schema, which PostgREST does not serve.
+   Every partner login would have failed against a live project. */
+function jsIn(dir) {
+  const d = join(repo, ...dir.split('/'));
+  try {
+    return readdirSync(d).filter(f => f.endsWith('.js'))
+      .map(f => readFileSync(join(d, f), 'utf8')).join('\n');
+  } catch { return ''; }
+}
+const consoleJs = jsIn('admin/js');
+const portalJs  = jsIn('partners/js');
+const webJs     = jsIn('web/js');
+
 const named = new Set();
 const rpcs  = new Set();
-[app, adminFn, teamFn].forEach(src => {
+[app, adminFn, teamFn, consoleJs, portalJs, webJs].forEach(src => {
   (src.match(/from\('([a-z_]+)'\)/g) || []).forEach(m => named.add(m.slice(6, -2)));
   (src.match(/rpc\('([a-z_]+)'\)/g)  || []).forEach(m => rpcs.add(m.slice(5, -2)));
+  // the raw REST form: '/rest/v1/rpc/partner_me'
+  (src.match(/\/rest\/v1\/rpc\/([a-z_]+)/g) || []).forEach(m => rpcs.add(m.slice('/rest/v1/rpc/'.length)));
 });
+
+ok('the portal and console are actually being scanned',
+   portalJs.length > 0 && consoleJs.length > 0,
+   'partners/js or admin/js read as empty — the scanner has stopped working');
 
 const present = (await asAdmin(
   `select table_name from information_schema.tables where table_schema='public'`)).map(r => r.table_name);
@@ -119,6 +141,128 @@ const funcs = (await asAdmin(
   `select routine_name from information_schema.routines where routine_schema='public'`)).map(r => r.routine_name);
 for (const f of [...rpcs].sort()) {
   ok('the console calls ' + f + '(), and it exists', funcs.includes(f));
+}
+
+// =====================================================================
+section('Every column a select() names exists on the table it selects from');
+// =====================================================================
+// Naming the table is not enough. admin-api opened with
+//
+//   .from('platform_admins').select('id,name,role,active')
+//
+// against a table created as (id, email, added_at). PostgREST refuses a
+// select that names a column it cannot find, so the query returned an
+// error, the gateway read that as "no such staff member", and every
+// operator — including the owner — was told their account was not a Label
+// Board account. A locked door and a broken lock look identical from the
+// outside, which is why this checks the columns and not just the table.
+//
+// Scanned by walking each from('table') and taking the first select() that
+// follows it, rather than by one regex across the file: a mis-escaped
+// pattern here silently matches nothing and passes forever, which has
+// happened in this repo before.
+function selectsIn(src, label) {
+  const out = [];
+  let i = 0;
+  while ((i = src.indexOf(".from('", i)) !== -1) {
+    const close = src.indexOf("')", i + 7);
+    if (close === -1) break;
+    const table = src.slice(i + 7, close);
+    const window = src.slice(close, close + 220);
+    const next = window.indexOf(".from('");          // don't run into the next call
+    const sel = window.indexOf(".select('");
+    if (sel !== -1 && (next === -1 || sel < next)) {
+      const end = window.indexOf("')", sel + 9);
+      if (end !== -1) {
+        const cols = window.slice(sel + 9, end);
+        if (cols && cols !== '*') out.push({ table, cols, label });
+      }
+    }
+    i = close + 2;
+  }
+  return out;
+}
+
+/* The same question for a write. reportTenantPresence() builds `row` and
+   upserts it into businesses, and it is written to fail silently on purpose
+   — "this is our bookkeeping, not theirs" — so three missing columns would
+   never have surfaced as anything except a console where every studio's
+   last-seen stayed blank forever. Walk any function that upserts, take the
+   object literal it builds, and check its keys against the table. */
+function upsertsIn(src, label) {
+  const out = [];
+  let i = 0;
+  while ((i = src.indexOf('.upsert(', i)) !== -1) {
+    const head = src.lastIndexOf('function ', i);
+    const region = src.slice(head < 0 ? 0 : head, i);
+    const fromAt = region.lastIndexOf(".from('");
+    if (fromAt === -1) { i += 8; continue; }
+    const table = region.slice(fromAt + 7, region.indexOf("')", fromAt));
+    // the argument: either an inline literal, or an identifier declared above
+    const arg = src.slice(i + 8, src.indexOf(',', i + 8) < 0 ? i + 9 : src.indexOf(',', i + 8)).trim();
+    let objStart = -1;
+    if (arg.startsWith('{')) objStart = i + 8 + src.slice(i + 8).indexOf('{');
+    else if (/^[a-zA-Z_$][\w$]*$/.test(arg)) {
+      const decl = region.lastIndexOf('const ' + arg + '=');
+      if (decl !== -1) objStart = region.indexOf('{', decl) + (head < 0 ? 0 : head);
+    }
+    if (objStart > 0) {
+      let d = 0, end = -1;
+      for (let j = objStart; j < src.length && j < objStart + 2000; j++) {
+        if (src[j] === '{') d++;
+        else if (src[j] === '}') { d--; if (d === 0) { end = j; break; } }
+      }
+      if (end > 0) {
+        const body = src.slice(objStart + 1, end);
+        const keys = []; let dd = 0;
+        body.replace(/[{}[\]]|([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, (m0, k, off) => {
+          if (m0 === '{' || m0 === '[') dd++;
+          else if (m0 === '}' || m0 === ']') dd--;
+          else if (k && dd === 0) {
+            // A property key is preceded by the start of the object or a
+            // comma. Without this the `b` of `cond ? a : b` reads as a key,
+            // and the check invents a column nobody ever wrote.
+            let p = off - 1;
+            while (p >= 0 && /\s/.test(body[p])) p--;
+            if (p < 0 || body[p] === ',') keys.push(k);
+          }
+          return m0;
+        });
+        if (keys.length) out.push({ table, keys, label });
+      }
+    }
+    i += 8;
+  }
+  return out;
+}
+
+for (const { table, keys, label } of upsertsIn(app, 'the app')) {
+  const have = (await asAdmin(
+    `select column_name from information_schema.columns
+      where table_schema='public' and table_name=$1`, [table])).map(r => r.column_name);
+  for (const col of keys) {
+    ok(label + ' upserts ' + table + '.' + col + ', and it exists', have.includes(col),
+       have.length ? 'the table has: ' + have.join(', ') : 'no such table');
+  }
+}
+
+const selects = [
+  ...selectsIn(adminFn, 'admin-api'),
+  ...selectsIn(teamFn, 'team-admin'),
+];
+ok('the Edge Functions are actually being scanned for columns', selects.length > 0,
+   'found no select() with an explicit column list — the scanner has stopped working');
+
+for (const { table, cols, label } of selects) {
+  const have = (await asAdmin(
+    `select column_name from information_schema.columns
+      where table_schema='public' and table_name=$1`, [table])).map(r => r.column_name);
+  for (const raw of cols.split(',')) {
+    const col = raw.trim().split(':').pop().trim();   // handles alias:column
+    if (!col) continue;
+    ok(label + ' selects ' + table + '.' + col + ', and it exists', have.includes(col),
+       have.length ? 'the table has: ' + have.join(', ') : 'no such table');
+  }
 }
 
 // =====================================================================
@@ -257,9 +401,17 @@ section('Our own records are ours');
 
   const t = await asUser(U.ada, `select * from platform_tenant_summary()`);
   ok('a tenant cannot enumerate every studio on the platform', !!t.error, 'the call was allowed');
+  // Named rather than counted. The migrations now carry seeded test studios,
+  // and an assertion that the whole platform holds exactly two tenants turns
+  // every future seed into a failure that says nothing about the schema.
   const rows = await asAdmin(`select name, members, branches from platform_tenant_summary()`);
-  ok('the console gets its tenant list', rows.length === 2, 'saw ' + rows.length);
-  ok('the tenant list counts members', rows.every(r => Number(r.members) === 1));
+  const seen = rows.map(r => r.name);
+  ok('the console gets its tenant list',
+     seen.includes('Ada Atelier') && seen.includes('Bola Shoes'),
+     'saw ' + (seen.join(', ') || 'nothing'));
+  ok('the tenant list counts members',
+     rows.filter(r => ['Ada Atelier', 'Bola Shoes'].includes(r.name))
+         .every(r => Number(r.members) === 1));
 }
 
 // =====================================================================

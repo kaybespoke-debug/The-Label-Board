@@ -29,10 +29,37 @@ So do not hold up your testing for this. Run them in parallel.
 
 ---
 
-## 0. Prove the migrations still build a working database
+## Where this has got to
 
-Before creating anything, run the three suites. They build a database from
-`supabase/migrations/` **alone**, in filename order, and attack it.
+Steps 0 to 3 are **done**. The project exists, the schema is on it, and both
+Edge Functions are deployed and verified.
+
+```
+Project     the-label-board
+Ref         eskubrbgbcbaejynjxvh
+Org         The Label Board (free tier)
+Region      eu-west-2 (London — the shorter hop to Lagos than Frankfurt,
+            because Nigerian international fibre lands through London)
+URL         https://eskubrbgbcbaejynjxvh.supabase.co
+```
+
+**The old project `gcdrkoitjqwbidcfgyzl` is still there and still wired into
+`site/layi_dashboard.html`.** Leave it alone until step 6, then delete it.
+It is the hand-built one: `memberships` never existed on it, so nothing was
+isolated, and half the app's tables were missing. It holds one business,
+`11111111-1111-1111-1111-111111111111`, which is the hardcoded `LAYI_BIZ`
+placeholder, with 18 state rows and 11 customers of demo data. Nothing real.
+
+What is left for you: creating the test accounts (3b) and any other operator
+accounts, because both mean setting a password, and steps 5 and 8, because
+they need the domain.
+
+---
+
+## 0. Prove the migrations still build a working database  ✅ done
+
+Run the five suites. They build a database from `supabase/migrations/`
+**alone**, in filename order, and attack it.
 
 ```bash
 node supabase/tests/app_schema_harness.mjs
@@ -46,48 +73,60 @@ node supabase/tests/rls_harness.mjs
 node supabase/tests/feedback_rls_harness.mjs
 ```
 
-All three must be green. The first one is the one that matters most here: it
-checks that every table and function the shipped code names is actually
-created by a migration, and that every column the app writes exists on the
-table it writes to. It exists because five objects the app uses every day
-(`app_state`, `profiles`, `suppliers`, `platform_audit` and
-`platform_tenant_summary()`) were once created by hand and were missing from
-the migrations entirely — a fresh project would have failed silently.
+```bash
+node supabase/tests/partner_rls_harness.mjs
+```
+
+```bash
+node supabase/tests/tlb_policy_harness.mjs
+```
+
+All five must be green. The first matters most here: it checks that every
+table, function and column the shipped code names is actually created by a
+migration — the two Edge Functions included. It exists because five objects
+the app uses every day (`app_state`, `profiles`, `suppliers`,
+`platform_audit` and `platform_tenant_summary()`) were once created by hand
+and were missing from the migrations entirely.
+
+The last one is newer and builds its database differently on purpose. See
+the note in `CLAUDE.md`: Supabase grants `anon` blanket access to new tables
+in `public` and a bare Postgres does not, so a suite that never had those
+grants cannot tell you whether your policies would hold on a real project.
 
 ---
 
-## 1. Create the project
+## 1. Create the project  ✅ done
 
-Supabase → **New project**. Region closest to your customers (Europe West or
-Africa, not US). Save the database password somewhere real.
+Region closest to your customers (Europe West, not US). The database
+password is generated at creation; if you ever need it, reset it from
+**Project Settings → Database**.
 
-Then from **Project Settings → API**, copy:
+From **Project Settings → API**:
 
-- the **Project URL**
-- the **anon / public** key — safe to ship in a browser, it is designed for it
+- the **Project URL** and **anon / public** key are in step 6 below
 - the **service_role** key — never put this in any file in this repo
 
 ---
 
-## 2. Run the migrations
+## 2. Run the migrations  ✅ done
 
-From the repo root, with the Supabase CLI linked to the new project:
-
-```bash
-supabase db push
-```
-
-If you would rather paste SQL by hand, run the files in
-`supabase/migrations/` in **filename order**, all seven, without skipping:
+All thirteen applied, in filename order:
 
 ```
-20260827090000_tenant_isolation.sql     the tenant spine + row-level security
-20260827090100_saas_admin.sql           the console's own subscriber tables
-20260827090200_staff_management.sql     our staff, tickets, tasks
-20260827090300_rls_hardening.sql        tightens the above
-20260827090400_partner_portal.sql       partners, referrals, payouts
-20260827090500_feedback.sql             studios talking to us
-20260828090000_app_runtime.sql          what the running apps talk to
+20260827090000_tenant_isolation.sql        the tenant spine + row-level security
+20260827090100_saas_admin.sql              the console's own subscriber tables
+20260827090200_staff_management.sql        our staff, tickets, tasks
+20260827090300_rls_hardening.sql           tightens the above
+20260827090400_partner_portal.sql          partners, referrals, payouts
+20260827090500_feedback.sql                studios talking to us
+20260828090000_app_runtime.sql             what the running apps talk to
+20260904120000_fix_tlb_policy_recursion.sql  four console tables were unreadable
+20260904130000_console_gateway_schema.sql    the console could not have signed anyone in
+20260904140000_expose_browser_rpcs.sql       the partner portal could not either
+20260904150000_seed_platform_owner.sql       who operates the platform
+20260904160000_studio_onboarding.sql         an account now gets a studio to belong to
+20260904170000_seed_test_studios.sql         six studios, one per trade
+20260904180000_partner_onboarding.sql        a partner can exist before their account
 ```
 
 **Do not run any loose .sql from the repo root.** There aren't any any more,
@@ -96,30 +135,31 @@ and `customers` with older shapes, and because they used
 `create table if not exists`, whichever ran first would win and the security
 policies would land on the wrong columns.
 
-**Check it worked.** In the SQL editor:
+To re-do this on some future project, `supabase db push` with the CLI
+linked; the migrations are the source of truth and nothing is created by
+hand any more.
 
-```sql
-select table_name from information_schema.tables
-where table_schema = 'public' order by table_name;
-```
+**Checked, and worth re-checking after any change.** The live schema was
+compared against one built from the migration files alone — every column,
+every policy with its full USING and WITH CHECK expression and its role
+list, every RLS enable/force flag, every function, every view. Identical.
+The only difference left is that Supabase grants `authenticated` SELECT and
+UPDATE on `feedback_ref_seq` on top of the USAGE the migration grants, which
+is harmless.
 
-You should see `app_state`, `businesses`, `branches`, `customers`,
-`feedback`, `feedback_replies`, `memberships`, `orders`, `partners`,
-`platform_admins`, `platform_audit`, `products`, `profiles`, `staff`,
-`suppliers`, `transactions` and the `tlb_*` set. If `memberships` is missing,
-stop — every security policy calls `app.in_scope()`, which reads it, and
-nothing is isolated without it.
+If `memberships` is ever missing, stop — every security policy calls
+`app.in_scope()`, which reads it, and nothing is isolated without it.
 
 ---
 
-## 3. Deploy the two Edge Functions
+## 3. Deploy the two Edge Functions  ✅ done
 
 ```bash
-supabase functions deploy admin-api
+supabase functions deploy admin-api --no-verify-jwt
 ```
 
 ```bash
-supabase functions deploy team-admin
+supabase functions deploy team-admin --no-verify-jwt
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
@@ -130,20 +170,96 @@ injected by Supabase; you do not set them.
 is why the console never queries a table directly, and why the service_role
 key never leaves the server.
 
+**`--no-verify-jwt` is deliberate and is not a hole.** Both functions verify
+the caller themselves: they take the forwarded `Authorization` header, call
+`auth.getUser()` against it, and return 401 if it is missing or invalid,
+then check `platform_admins` or `profiles` before doing anything. Leaving
+the gateway's own check on would reject the browser's CORS preflight, which
+carries no `Authorization` header, so the console would fail with a CORS
+error instead of a login error. Verified after deploying: preflight 200, no
+token 401, anon key alone 401.
+
 ---
 
-## 4. Make yourself a platform admin
+## 3b. Create the test accounts  ← you, next
+
+Six studios and one partner are already in the database, each waiting for
+the address that will claim it. Nothing about them needs building: create
+the account in **Auth → Users → Add user**, and a trigger on `auth.users`
+attaches it as the owner the moment it appears — the business, the branch,
+the profile and the membership all get written for you.
+
+Set whatever password you like. It is yours, it is set in the dashboard,
+and it appears nowhere in this repo.
+
+| Create this account | and you get |
+|---|---|
+| `test.bespoke@thelabelboard.com` | Adé Bespoke — one workroom, Yaba |
+| `test.footwear@thelabelboard.com` | Okoro & Sons Shoes — the bench, Aba |
+| `test.leather@thelabelboard.com` | Ìfé Leather — the studio, Lekki |
+| `test.rtw@thelabelboard.com` | House of Nneka — the boutique, Ikoyi |
+| `test.fabrics@thelabelboard.com` | Balogun Fabrics — the shop, Balogun Market |
+| `test.multi@thelabelboard.com` | LAYI — four studios, on trial |
+| `test.partner@thelabelboard.com` | Chidi Okafor, a silver partner with two referrals |
+
+Each studio arrives already set to its own trade, so the production board
+shows *Last & Pattern → Clicking → Closing* for the shoemaker and *Cloth
+Received → Measured & Cut → Packed* for the fabric shop. That is generated
+from the app's own presets, not written out again in SQL.
+
+**Tick "Auto Confirm User"**, or the account cannot sign in until the
+confirmation email is dealt with, and email is step 5.
+
+**They arrive with no orders.** The app fills an empty cloud from the device
+on first sign-in, so to give a studio its full worked data — customers,
+orders, staff, the lot — load the matching example in the app *before* you
+sign in as that studio, and it will be pushed up as theirs. Signing in on a
+clean device instead gives you a correctly configured, empty studio, which
+is the better test of what a real new subscriber sees.
+
+**An address nobody prepared still works.** Any other account gets a fresh
+business of its own, named from `business_name` in the user metadata, or
+from the email if there is none. That is the real signup path, and it is the
+same code.
+
+---
+
+## 4. Make yourself a platform admin  ✅ done
+
+Kayode / `layiojomo@gmail.com` is in `platform_admins` as `owner`, and the
+console signs in with that account. If you add other operators, the four
+roles `admin-api` knows are `owner`, `finance`, `support` and `developer` —
+each allowed a different set of actions, and `owner` is the only one that
+can read the audit log.
+
+The console prefills `kayode@thelabelboard.com` on its sign-in screen, which
+is the branded identity, not the account. **Sign in with the address the
+Auth user actually has.**
+
+<details>
+<summary>The original step 4, for adding an operator later</summary>
+
+This is the one step that cannot be done for you, because it means setting a
+password.
 
 Auth → Users → **Add user** with your own email and a password. Copy the
-UUID, then:
+UUID, then in the SQL editor:
 
 ```sql
 insert into public.platform_admins (id, name, role, active)
 values ('<your-uuid>', 'Kayode', 'owner', true);
 ```
 
+`role` must be one of `owner`, `finance`, `support`, `developer` — those are
+the four `admin-api` knows, and each one is allowed a different set of
+actions. `owner` is the only one that can read the audit log.
+
 **Check it worked:** sign in to the console once step 6 is done and the
-support page should say **Live**, not **Example data**.
+support page should say **Live**, not **Example data**. If it says your
+account is not a Label Board staff account, the row is missing or `active`
+is false — the message cannot tell those apart.
+
+</details>
 
 ---
 
@@ -167,19 +283,36 @@ anybody real.
 
 ## 6. Point the apps at the project
 
-Three files, three edits.
+Three files, three edits. **Do step 4 first.** Filling these in is what
+switches each app from its worked example to the real database, and until
+your `platform_admins` row exists the console will switch to Live and then
+refuse you, which looks like a broken deploy rather than a missing row.
 
-**Customer app** — `site/layi_dashboard.html`, near the top:
+The values, for all three:
+
+```
+URL   https://eskubrbgbcbaejynjxvh.supabase.co
+key   the anon / public key from Project Settings → API
+```
+
+The anon key is safe in a browser — it is designed for it, and every table
+in this project refuses it. That was checked directly: with the anon key
+alone, all 34 tables answer `permission denied`, including the ones holding
+our own subscribers and payments.
+
+**Customer app** — `site/layi_dashboard.html`, near the top. This one is
+**not blank today**: it still points at the old project, so it is a replace
+rather than a fill-in.
 
 ```js
-const SUPA_URL='https://<your-project>.supabase.co';
+const SUPA_URL='https://eskubrbgbcbaejynjxvh.supabase.co';
 const SUPA_KEY='<anon key>';
 ```
 
 **Admin console** — `admin/js/config.js`:
 
 ```js
-SUPA_URL: 'https://<your-project>.supabase.co',
+SUPA_URL: 'https://eskubrbgbcbaejynjxvh.supabase.co',
 SUPA_KEY: '<anon key>',
 ```
 
@@ -188,6 +321,11 @@ SUPA_KEY: '<anon key>',
 The console and the portal ship blank on purpose: with these empty they run a
 self-contained worked example, which is what you want for a demo. Filling
 them in is what switches them to real data. Nothing else changes.
+
+Once the customer app is pointed at the new project and you have signed in
+once to confirm it works, **delete `gcdrkoitjqwbidcfgyzl`**. Leaving a second
+project answering the same schema names is how the wrong one gets debugged
+for an afternoon.
 
 ---
 

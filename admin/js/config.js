@@ -23,8 +23,8 @@
    ============================================================ */
 
 const CONFIG = {
-  SUPA_URL: '',
-  SUPA_KEY: '',
+  SUPA_URL: 'https://eskubrbgbcbaejynjxvh.supabase.co',
+  SUPA_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc',
 
   /* How often the inbox re-reads itself while the console is open.
      Support staff leave this on a second monitor all day, so a quiet
