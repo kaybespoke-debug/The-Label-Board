@@ -4,7 +4,20 @@
 // (username/PIN demo logins never touch the cloud). Discovers keys from the source, so a new key that
 // nobody wired for sync fails this gate automatically.
 const fs=require('fs'),vm=require('vm');const html=fs.readFileSync((process.argv[2] || 'site/layi_dashboard.html'),'utf8');
-const allKeys=[...new Set((html.match(/layi_dash_[a-z]+/g)||[]))].sort();
+/* [a-z_]+ rather than [a-z]+. The old pattern stopped at the second
+   underscore, so layi_dash_biz_owner was discovered as "layi_dash_biz" — and a
+   key whose truncated prefix happened to already be covered would have been
+   skipped entirely, which is the failure this gate exists to prevent. */
+const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
+
+/* Keys that describe the DEVICE rather than the studio, and must never sync.
+   layi_dash_biz_owner records which studio's data this browser is holding, so
+   that signing in as a different one wipes rather than merges. Syncing it would
+   be circular — the device would be told by the cloud what the cloud is — and
+   pushing it into app_state would hand every other device of that studio a
+   claim marker naming a business they may not be. Listed here by name, with the
+   reason, so adding one is a decision rather than an omission. */
+const DEVICE_LOCAL=new Set(['layi_dash_biz_owner']);
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const mkEl=()=>({innerHTML:'',value:'',checked:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
 const cache={};const _ls={};
@@ -18,7 +31,12 @@ const pusherKeys=run('typeof SYNC_PUSHERS!=="undefined"?Object.keys(SYNC_PUSHERS
 const covered=new Set([...stateKeys,...pusherKeys]);
 
 // 1) Every storage key the app persists must be wired for sync.
-allKeys.forEach(k=>{ if(!covered.has(k)) F('storage key not wired for cloud sync: '+k); });
+allKeys.forEach(k=>{ if(!covered.has(k)&&!DEVICE_LOCAL.has(k)) F('storage key not wired for cloud sync: '+k); });
+// And the inverse, so a device-local key cannot be quietly wired up later.
+DEVICE_LOCAL.forEach(k=>{
+  if(covered.has(k)) F('device-local key is wired for cloud sync, which would share it between devices: '+k);
+  if(!allKeys.includes(k)) F('device-local key is declared but no longer used, so this exemption is stale: '+k);
+});
 // 2) A key must not be double-wired (both a relational pusher and the generic blob path).
 stateKeys.forEach(k=>{ if(pusherKeys.includes(k)) F('key '+k+' is wired twice (relational pusher AND app_state)'); });
 
