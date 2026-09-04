@@ -99,9 +99,35 @@ const api=fs.readFileSync('supabase/functions/admin-api/index.ts','utf8');
 const idx=fs.readFileSync('admin/index.html','utf8');
 const mig=fs.readFileSync('supabase/migrations/20260827090500_feedback.sql','utf8');
 
-/* 8) The console is wired, and ships blank so a demo stays a demo. ------------------ */
-if(!/SUPA_URL:\s*''/.test(cfg)||!/SUPA_KEY:\s*''/.test(cfg))
-  F('admin/js/config.js ships with credentials filled in');
+/* 8) The console is wired, and whatever it ships with is safe to ship. -------------- */
+// This used to require the config to be blank, so that a demo stayed a demo.
+// The console is now pointed at a real project on purpose, which is a real
+// trade-off and worth naming: with it filled in, the deployed console cannot
+// be explored without a Label Board staff account, because Supabase Auth
+// decides who gets in rather than a password set in the browser. Blanking
+// these two lines restores the self-contained demo and nothing else changes.
+//
+// What must hold either way is that admin/ is served over the public web, so
+// the key in it is readable by anyone. An anon key is built for that and every
+// table in the project refuses it. A service_role key bypasses row level
+// security entirely and would hand over every studio on the platform to
+// anybody who viewed source.
+{
+  const key=(cfg.match(/SUPA_KEY:\s*'([^']*)'/)||[])[1]||'';
+  const url=(cfg.match(/SUPA_URL:\s*'([^']*)'/)||[])[1]||'';
+  let role='';
+  if(key.split('.').length===3){
+    try{role=JSON.parse(Buffer.from(key.split('.')[1],'base64').toString()).role||'';}
+    catch(e){role='unreadable';}
+  }
+  if(role==='service_role')
+    F('admin/js/config.js ships a service_role key, which bypasses every policy in the database');
+  if(key&&role!=='anon'&&!/^sb_publishable_/.test(key))
+    F('admin/js/config.js ships a key that is neither anon nor publishable (role='+(role||'unknown')+')');
+  if(url&&!/^https:\/\//.test(url))
+    F('admin/js/config.js points at a plain http url');
+  console.log('  console ships: '+(url?'LIVE ('+role+' key)':'blank, running its worked example'));
+}
 if(/service_role|SERVICE_ROLE/i.test(cfg)||/service_role/i.test(live))
   F('the service role key appears in the console, which would hand every studio to any browser');
 if(!/js\/live\.js/.test(idx)||!/js\/config\.js/.test(idx))
