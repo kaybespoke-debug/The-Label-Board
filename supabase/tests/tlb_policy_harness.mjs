@@ -217,6 +217,29 @@ section('A policy that can never be true is not security, it is a bug');
      outsider.rows.length + ' row(s)');
 }
 
+// ---------------------------------------------------------------------
+section('Every function in app pins its search_path');
+// ---------------------------------------------------------------------
+// The whole security model rests on app.in_scope() and its neighbours, and
+// most of them are SECURITY DEFINER. A definer function with a mutable
+// search_path can be pointed at somebody else's table by whoever calls it.
+// app.slugify shipped without one and the migration that added it claimed
+// two functions later that search_path is pinned "as everywhere else here"
+// — a rule with one exception is not a rule, and Supabase's linter found
+// it before this suite did.
+{
+  const fns = await asAdmin(
+    `select p.proname, p.prosecdef, p.proconfig
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'app' order by p.proname`);
+  ok('there are app functions to check at all', fns.length > 0, 'found none');
+  for (const f of fns) {
+    ok('app.' + f.proname + ' pins its search_path',
+       (f.proconfig || []).some(c => String(c).startsWith('search_path=')),
+       f.prosecdef ? 'and it is SECURITY DEFINER, so this is not cosmetic' : '');
+  }
+}
+
 console.log('\n' + '='.repeat(60));
 console.log(pass + ' passed, ' + failures.length + ' failed');
 if (failures.length) {
