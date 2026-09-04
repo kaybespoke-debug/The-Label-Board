@@ -426,10 +426,30 @@ check(robots.includes('Sitemap: https://'), 'the robots file points at the sitem
 check(robots.includes('Disallow: /thanks.html'), 'the thank you page is kept out of the index');
 
 const sitemap = read('sitemap.xml');
+/* The domain comes from config.js, which says of itself that everything
+   Kayode is likely to change lives there and nowhere else. It was written
+   out again here, so moving from thelabelboard.app to the .com that was
+   actually bought turned ten passing checks red while the sitemap was
+   right and the check was the stale one. A gate holding its own copy of a
+   value the site owns will always eventually disagree with it. */
+const ORIGIN = 'https://' + S.domain;
 INDEXABLE.forEach(p => {
-  const loc = p === 'index.html' ? '<loc>https://thelabelboard.app/</loc>' : '<loc>https://thelabelboard.app/' + p + '</loc>';
+  const loc = p === 'index.html' ? '<loc>' + ORIGIN + '/</loc>' : '<loc>' + ORIGIN + '/' + p + '</loc>';
   check(sitemap.includes(loc), 'the sitemap offers ' + p);
 });
+/* One domain, everywhere. Written against whatever config.js says rather
+   than against a spelling, so it holds before and after a move and catches
+   the half-finished version of one — which is the state that actually
+   hurts, because a sitemap advertising a domain the canonical tags deny is
+   worse than either domain on its own. */
+{
+  // all() yields match objects, not strings — [0] is the matched text.
+  const strays = [...new Set(all(sitemap + robots + redirects, /thelabelboard\.[a-z]+/g).map(m => m[0]))]
+    .filter(d => d !== S.domain);
+  check(strays.length === 0,
+    'the sitemap, robots and redirects all use the domain config.js names',
+    strays.join(', '));
+}
 check(!sitemap.includes('thanks.html') && !sitemap.includes('404.html'),
   'the sitemap does not offer the pages that should not be indexed');
 check(all(sitemap, /<loc>/g).length === INDEXABLE.length,
