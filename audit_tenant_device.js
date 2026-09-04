@@ -214,6 +214,40 @@ section('An unmarked device whose cloud already has a studio on it');
 }
 
 // ---------------------------------------------------------------------
+section('A signed-in studio can fill itself from its trade example');
+// ---------------------------------------------------------------------
+// Settings offers "Load example studio…". Signed in, on a device that studio
+// is claimed by, that is not demo data being borrowed — it is that studio
+// creating records, which must sync like any other records it creates. This
+// is how a test studio gets a full set without any of it living in a
+// migration, and it is the same path a real studio uses to try the app out.
+{
+  const { sb, run } = boot();
+  const { client, writes } = makeSupa({ app_state: [], customers: [], suppliers: [] });
+  // signed in, device already claimed by this studio
+  run(`store.set('layi_dash_biz_owner', ${JSON.stringify(B)});`);
+  sb.__stub = client; run('supa=__stub; liveMode=true; myBusinessId=' + JSON.stringify(B) + ';');
+  run("loadExampleAs('footwear');");
+
+  ok('the studio now has its trade\'s orders', run('rawOrders().length') > 0,
+     String(run('rawOrders().length')));
+  ok('and they are that trade\'s work, not another\'s',
+     /brogue|boot|loafer|sandal|mule/i.test(String(run('rawOrders()[0].garment'))),
+     String(run('rawOrders()[0].garment')));
+  ok('the studio keeps the one branch its trade uses',
+     run('getBranches().length') === 1, String(run('getBranches().length')));
+
+  const pushed = new Set(writes.filter(w => w.table === 'app_state').flatMap(w => (w.rows || []).map(r => r.key)));
+  ok('the orders were pushed to the cloud, not just written locally',
+     pushed.has('layi_dash_orders'), [...pushed].join(', ') || 'nothing pushed');
+  ok('and so were the products', pushed.has('layi_dash_products'), [...pushed].join(', '));
+  ok('every push carries this studio\'s business id and no other',
+     writes.filter(w => w.table === 'app_state')
+           .every(w => (w.rows || []).every(r => r.business_id === B)),
+     'a push named the wrong studio');
+}
+
+// ---------------------------------------------------------------------
 section('A signed-in studio with no business id writes nowhere');
 // ---------------------------------------------------------------------
 // myBusinessId||LAYI_BIZ used to be the fallback in eight places. LAYI_BIZ is
