@@ -123,7 +123,38 @@ async function main() {
 const DEMO = G('DEMO_PROVIDER');
 const demoCodeFor = G('demoCodeFor');
 
-check(CONFIG.live === false, 'config ships blank, so the portal runs its own demo until it is filled in');
+/* This suite tests the demo provider, and the portal only selects it when
+   CONFIG.live is false. That used to be guaranteed by asserting the shipped
+   config was blank — which worked right up until the portal was pointed at a
+   real project, at which point every check below would have exercised the
+   Supabase provider instead, failed to reach it from a sandbox, and told us
+   nothing. Force it here instead, so the suite tests what it says it tests
+   whatever the shipped config happens to say. */
+const shippedLive = CONFIG.live;
+G('CONFIG.live = false');
+check(G('AUTH.provider()') === G('DEMO_PROVIDER'),
+  'the demo front door is what gets tested, whatever config.js says');
+
+/* What actually matters about the shipped config: this folder is published
+   to the public web, so the key in it is readable by anyone. An anon key is
+   designed for that and every table refuses it. A service_role key bypasses
+   row level security entirely, and pasting one here would hand the whole
+   platform to anybody who viewed source. */
+{
+  const cfg = fs.readFileSync(path.join(__dirname, 'partners', 'js', 'config.js'), 'utf8');
+  const key = (cfg.match(/SUPA_KEY:\s*'([^']*)'/) || [])[1] || '';
+  let role = '';
+  if (key.split('.').length === 3) {
+    try { role = JSON.parse(Buffer.from(key.split('.')[1], 'base64').toString()).role || ''; }
+    catch (e) { role = 'unreadable'; }
+  }
+  check(role !== 'service_role', 'the shipped key is not a service_role key');
+  check(!key || role === 'anon' || /^sb_publishable_/.test(key),
+    'the shipped key is an anon or publishable key, or there is none', 'role=' + (role || 'none'));
+  const url = (cfg.match(/SUPA_URL:\s*'([^']*)'/) || [])[1] || '';
+  check(!url || /^https:\/\//.test(url), 'and the project URL is https, not plain http');
+  console.log('  note  the portal ships ' + (shippedLive ? 'LIVE, pointed at a project' : 'blank, running its own demo'));
+}
 check(db() === null, 'nothing is loaded before anyone signs in');
 check(AUTH.signedIn() === false, 'and nobody is signed in');
 check(PROFILES.length === 3, 'three demo partners, not one — a door with one person behind it proves nothing');

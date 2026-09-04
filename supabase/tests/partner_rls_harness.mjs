@@ -564,6 +564,45 @@ section('11. Whole-schema audit of the partner tables');
 }
 
 // =====================================================================
+console.log('\nA partner nobody has claimed yet belongs to nobody');
+// =====================================================================
+// user_id became nullable so a partner can be prepared — code, tier,
+// referral link — before anybody has signed up, and the trigger on
+// auth.users attaches the account when it appears. Every policy here is
+// `user_id = auth.uid()` or app.is_partner(), and auth.uid() is never null
+// for a signed-in caller, so an unclaimed row should be invisible rather
+// than unowned-and-therefore-open. Worth proving rather than reasoning
+// about, because "null matches nothing" is exactly the kind of thing that
+// is true until somebody writes `is not distinct from`.
+{
+  const un = (await asAdmin(
+    `insert into partners(user_id, code, name, business_name, email, tier, status, pending_email)
+     values (null, 'UNCLAIMED-1', 'Nobody Yet', 'Pending Co', 'pending@x', 'bronze', 'active', 'pending@x')
+     returning id`))[0].id;
+  await asAdmin(`insert into partner_links(partner_id, label, code, is_default)
+                 values ($1, 'Main', 'UNCLAIMED-1', true)`, [un]);
+  await asAdmin(`insert into partner_ledger(partner_id, kind, amount, rate_pct, basis, credited_on, clears_on, status)
+                 values ($1, 'signup', 9999, 30, 33330, current_date, current_date, 'pending')`, [un]);
+
+  for (const [who, uid] of [['another partner', U.a], ['a signed-out visitor', U.outsider]]) {
+    const r = await asUser(uid, `select id from partners where id = $1`, [un]);
+    ok('an unclaimed partner is invisible to ' + who, r.rows.length === 0,
+       r.error || (r.rows.length + ' row(s)'));
+    const l = await asUser(uid, `select id from partner_ledger where partner_id = $1`, [un]);
+    ok('and so is the money against it, to ' + who, l.rows.length === 0,
+       l.error || (l.rows.length + ' row(s)'));
+  }
+  const anon = await asAnon(`select id from partners where id = $1`, [un]);
+  ok('and to the anon key', anon.rows.length === 0, anon.error || (anon.rows.length + ' row(s)'));
+
+  // and nobody can claim it from a browser by writing their own id onto it
+  const grab = await asUser(U.a,
+    `update partners set user_id = $1 where id = $2 returning id`, [U.a, un]);
+  ok('a partner cannot claim an unclaimed row by writing their own id onto it',
+     grab.rows.length === 0, grab.rows.length + ' row(s) updated');
+}
+
+// =====================================================================
 console.log('\n' + '='.repeat(66));
 if (failures.length === 0) {
   console.log('ALL ' + pass + ' CHECKS PASSED');
