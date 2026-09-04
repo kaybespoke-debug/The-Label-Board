@@ -50,8 +50,9 @@ isolated, and half the app's tables were missing. It holds one business,
 `11111111-1111-1111-1111-111111111111`, which is the hardcoded `LAYI_BIZ`
 placeholder, with 18 state rows and 11 customers of demo data. Nothing real.
 
-What is left for you is step 4, because it needs a password, and steps 5 to
-8, because they need the domain.
+What is left for you: creating the test accounts (3b) and any other operator
+accounts, because both mean setting a password, and steps 5 and 8, because
+they need the domain.
 
 ---
 
@@ -109,7 +110,7 @@ From **Project Settings → API**:
 
 ## 2. Run the migrations  ✅ done
 
-All nine applied, in filename order:
+All thirteen applied, in filename order:
 
 ```
 20260827090000_tenant_isolation.sql        the tenant spine + row-level security
@@ -121,6 +122,11 @@ All nine applied, in filename order:
 20260828090000_app_runtime.sql             what the running apps talk to
 20260904120000_fix_tlb_policy_recursion.sql  four console tables were unreadable
 20260904130000_console_gateway_schema.sql    the console could not have signed anyone in
+20260904140000_expose_browser_rpcs.sql       the partner portal could not either
+20260904150000_seed_platform_owner.sql       who operates the platform
+20260904160000_studio_onboarding.sql         an account now gets a studio to belong to
+20260904170000_seed_test_studios.sql         six studios, one per trade
+20260904180000_partner_onboarding.sql        a partner can exist before their account
 ```
 
 **Do not run any loose .sql from the repo root.** There aren't any any more,
@@ -175,7 +181,63 @@ token 401, anon key alone 401.
 
 ---
 
-## 4. Make yourself a platform admin  ← you, next
+## 3b. Create the test accounts  ← you, next
+
+Six studios and one partner are already in the database, each waiting for
+the address that will claim it. Nothing about them needs building: create
+the account in **Auth → Users → Add user**, and a trigger on `auth.users`
+attaches it as the owner the moment it appears — the business, the branch,
+the profile and the membership all get written for you.
+
+Set whatever password you like. It is yours, it is set in the dashboard,
+and it appears nowhere in this repo.
+
+| Create this account | and you get |
+|---|---|
+| `test.bespoke@thelabelboard.com` | Adé Bespoke — one workroom, Yaba |
+| `test.footwear@thelabelboard.com` | Okoro & Sons Shoes — the bench, Aba |
+| `test.leather@thelabelboard.com` | Ìfé Leather — the studio, Lekki |
+| `test.rtw@thelabelboard.com` | House of Nneka — the boutique, Ikoyi |
+| `test.fabrics@thelabelboard.com` | Balogun Fabrics — the shop, Balogun Market |
+| `test.multi@thelabelboard.com` | LAYI — four studios, on trial |
+| `test.partner@thelabelboard.com` | Chidi Okafor, a silver partner with two referrals |
+
+Each studio arrives already set to its own trade, so the production board
+shows *Last & Pattern → Clicking → Closing* for the shoemaker and *Cloth
+Received → Measured & Cut → Packed* for the fabric shop. That is generated
+from the app's own presets, not written out again in SQL.
+
+**Tick "Auto Confirm User"**, or the account cannot sign in until the
+confirmation email is dealt with, and email is step 5.
+
+**They arrive with no orders.** The app fills an empty cloud from the device
+on first sign-in, so to give a studio its full worked data — customers,
+orders, staff, the lot — load the matching example in the app *before* you
+sign in as that studio, and it will be pushed up as theirs. Signing in on a
+clean device instead gives you a correctly configured, empty studio, which
+is the better test of what a real new subscriber sees.
+
+**An address nobody prepared still works.** Any other account gets a fresh
+business of its own, named from `business_name` in the user metadata, or
+from the email if there is none. That is the real signup path, and it is the
+same code.
+
+---
+
+## 4. Make yourself a platform admin  ✅ done
+
+Kayode / `layiojomo@gmail.com` is in `platform_admins` as `owner`, and the
+console signs in with that account. If you add other operators, the four
+roles `admin-api` knows are `owner`, `finance`, `support` and `developer` —
+each allowed a different set of actions, and `owner` is the only one that
+can read the audit log.
+
+The console prefills `kayode@thelabelboard.com` on its sign-in screen, which
+is the branded identity, not the account. **Sign in with the address the
+Auth user actually has.**
+
+<details>
+<summary>The original step 4, for adding an operator later</summary>
 
 This is the one step that cannot be done for you, because it means setting a
 password.
@@ -196,6 +258,8 @@ actions. `owner` is the only one that can read the audit log.
 support page should say **Live**, not **Example data**. If it says your
 account is not a Label Board staff account, the row is missing or `active`
 is false — the message cannot tell those apart.
+
+</details>
 
 ---
 
