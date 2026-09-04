@@ -101,12 +101,34 @@ const app   = readFileSync(join(repo, 'site', 'layi_dashboard.html'), 'utf8');
 const adminFn = readFileSync(join(repo, 'supabase', 'functions', 'admin-api', 'index.ts'), 'utf8');
 const teamFn  = readFileSync(join(repo, 'supabase', 'functions', 'team-admin', 'index.ts'), 'utf8');
 
+/* All four apps, not just the customer one. The partner portal reaches the
+   database by hand-built fetch rather than supabase-js, so it called
+   /rest/v1/rpc/partner_me for months without anything here noticing that
+   partner_me lives in the `app` schema, which PostgREST does not serve.
+   Every partner login would have failed against a live project. */
+function jsIn(dir) {
+  const d = join(repo, ...dir.split('/'));
+  try {
+    return readdirSync(d).filter(f => f.endsWith('.js'))
+      .map(f => readFileSync(join(d, f), 'utf8')).join('\n');
+  } catch { return ''; }
+}
+const consoleJs = jsIn('admin/js');
+const portalJs  = jsIn('partners/js');
+const webJs     = jsIn('web/js');
+
 const named = new Set();
 const rpcs  = new Set();
-[app, adminFn, teamFn].forEach(src => {
+[app, adminFn, teamFn, consoleJs, portalJs, webJs].forEach(src => {
   (src.match(/from\('([a-z_]+)'\)/g) || []).forEach(m => named.add(m.slice(6, -2)));
   (src.match(/rpc\('([a-z_]+)'\)/g)  || []).forEach(m => rpcs.add(m.slice(5, -2)));
+  // the raw REST form: '/rest/v1/rpc/partner_me'
+  (src.match(/\/rest\/v1\/rpc\/([a-z_]+)/g) || []).forEach(m => rpcs.add(m.slice('/rest/v1/rpc/'.length)));
 });
+
+ok('the portal and console are actually being scanned',
+   portalJs.length > 0 && consoleJs.length > 0,
+   'partners/js or admin/js read as empty — the scanner has stopped working');
 
 const present = (await asAdmin(
   `select table_name from information_schema.tables where table_schema='public'`)).map(r => r.table_name);
@@ -119,6 +141,65 @@ const funcs = (await asAdmin(
   `select routine_name from information_schema.routines where routine_schema='public'`)).map(r => r.routine_name);
 for (const f of [...rpcs].sort()) {
   ok('the console calls ' + f + '(), and it exists', funcs.includes(f));
+}
+
+// =====================================================================
+section('Every column a select() names exists on the table it selects from');
+// =====================================================================
+// Naming the table is not enough. admin-api opened with
+//
+//   .from('platform_admins').select('id,name,role,active')
+//
+// against a table created as (id, email, added_at). PostgREST refuses a
+// select that names a column it cannot find, so the query returned an
+// error, the gateway read that as "no such staff member", and every
+// operator — including the owner — was told their account was not a Label
+// Board account. A locked door and a broken lock look identical from the
+// outside, which is why this checks the columns and not just the table.
+//
+// Scanned by walking each from('table') and taking the first select() that
+// follows it, rather than by one regex across the file: a mis-escaped
+// pattern here silently matches nothing and passes forever, which has
+// happened in this repo before.
+function selectsIn(src, label) {
+  const out = [];
+  let i = 0;
+  while ((i = src.indexOf(".from('", i)) !== -1) {
+    const close = src.indexOf("')", i + 7);
+    if (close === -1) break;
+    const table = src.slice(i + 7, close);
+    const window = src.slice(close, close + 220);
+    const next = window.indexOf(".from('");          // don't run into the next call
+    const sel = window.indexOf(".select('");
+    if (sel !== -1 && (next === -1 || sel < next)) {
+      const end = window.indexOf("')", sel + 9);
+      if (end !== -1) {
+        const cols = window.slice(sel + 9, end);
+        if (cols && cols !== '*') out.push({ table, cols, label });
+      }
+    }
+    i = close + 2;
+  }
+  return out;
+}
+
+const selects = [
+  ...selectsIn(adminFn, 'admin-api'),
+  ...selectsIn(teamFn, 'team-admin'),
+];
+ok('the Edge Functions are actually being scanned for columns', selects.length > 0,
+   'found no select() with an explicit column list — the scanner has stopped working');
+
+for (const { table, cols, label } of selects) {
+  const have = (await asAdmin(
+    `select column_name from information_schema.columns
+      where table_schema='public' and table_name=$1`, [table])).map(r => r.column_name);
+  for (const raw of cols.split(',')) {
+    const col = raw.trim().split(':').pop().trim();   // handles alias:column
+    if (!col) continue;
+    ok(label + ' selects ' + table + '.' + col + ', and it exists', have.includes(col),
+       have.length ? 'the table has: ' + have.join(', ') : 'no such table');
+  }
 }
 
 // =====================================================================

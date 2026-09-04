@@ -72,16 +72,30 @@ serving the old version.
 Every object the apps talk to is created by a migration in
 `supabase/migrations/`, applied in filename order. Nothing is created by hand
 any more: five objects once were, and were missing from the migrations
-entirely, so a fresh project would have run none of it. Three suites guard it:
+entirely, so a fresh project would have run none of it. Five suites guard it:
 
 ```bash
-node supabase/tests/app_schema_harness.mjs    # a fresh DB actually runs the app
-node supabase/tests/rls_harness.mjs           # no tenant can reach another
-node supabase/tests/feedback_rls_harness.mjs  # what studios tell us stays theirs
+node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
+node supabase/tests/rls_harness.mjs            # no tenant can reach another
+node supabase/tests/feedback_rls_harness.mjs   # what studios tell us stays theirs
+node supabase/tests/partner_rls_harness.mjs    # no partner can reach another
+node supabase/tests/tlb_policy_harness.mjs     # our own books, as Supabase serves them
 ```
 
 The first reads the shipped code for every table, function and column it
-names, so a new table the app starts using is checked the day it is used.
+names — the two Edge Functions included, because they are the half that
+talks to the tables the browser is deliberately not allowed to touch. So a
+new table the app starts using is checked the day it is used.
+
+**The last one builds a different database on purpose.** Every other suite
+runs the migrations at a bare Postgres, which is right for the tenant
+tables because they grant and revoke explicitly. It is wrong for the `tlb_`
+tables, which granted nothing and relied on an absence — and a bare
+Postgres has that absence for free while Supabase does not. Supabase ships
+`alter default privileges in schema public grant all on tables to anon,
+authenticated` on every project, so a table in `public` is reachable with
+the public anon key from the moment it exists. `tlb_policy_harness` sets
+that default first, so the policies are actually reached and tested.
 
 `SUPABASE_SETUP.md` is the go-live runbook.
 

@@ -100,9 +100,13 @@ Deno.serve(async (req) => {
       const id = String(body.id || '')
       const value = String(body.value || '')
       const col = action === 'setPlan' ? 'plan' : 'status'
+      // These have to match the CHECK constraints on businesses, or the
+      // update is refused by the database after passing validation here.
+      // They also match PLANS in the customer app and the plan names the
+      // console displays — one vocabulary, in four places.
       const VALID = action === 'setPlan'
-        ? ['trial', 'studio', 'growth', 'atelier']
-        : ['active', 'past_due', 'paused', 'cancelled']
+        ? ['trial', 'starter', 'pro', 'premium']
+        : ['active', 'suspended', 'closed']
       if (!id) return json({ error: 'No studio id' }, 400)
       if (!VALID.includes(value)) return json({ error: `${col} must be one of: ${VALID.join(', ')}` }, 400)
       const { error } = await admin.from('businesses').update({ [col]: value }).eq('id', id)
