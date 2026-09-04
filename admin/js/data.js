@@ -822,7 +822,7 @@ function ownerAccount() {
     /* The branded address is the identity, but thelabelboard.com has no
        mailboxes yet, so the working address signs in too. Nothing is ever
        emailed to either: they are identifiers, not destinations. */
-    altEmails: ['kaybespoke@gmail.com'],
+    altEmails: ['kaybespoke@gmail.com', 'layiojomo@gmail.com'],
     phone: '+234 800 000 0000', gender: s[5] === 'M' ? 'Male' : 'Female', dob: s[6],
     address: '—', nationality: 'Nigerian', emergency: '—',
     empType: 'Full time', startDate: iso(TODAY), status: 'active',

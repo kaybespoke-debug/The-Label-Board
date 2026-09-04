@@ -239,3 +239,120 @@ function liveStatusLine() {
           (LIVE.lastLoadedAt ? ' · updated ' + new Date(LIVE.lastLoadedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '')
   };
 }
+
+/* ============================================================
+   SIGNING IN FOR REAL
+
+   The console had no way to sign into Supabase at all. Its login is
+   credentials.js — PBKDF2 in this browser — which is right for the demo
+   and for a console nobody has connected yet, but it produces no Supabase
+   session. liveCall() asks getSession() for a token, got null every time,
+   and reported "Not signed in". So filling in config.js flipped the badge
+   to Live while the data stayed the worked example: the most misleading
+   state the console could be in.
+
+   What follows adds the real path and leaves the local one alone. When
+   config.js is blank nothing here runs and the demo behaves exactly as it
+   did. When it is filled in, the password goes to Supabase Auth, and
+   whether you are staff at all is decided by admin-api against
+   platform_admins — server side, where it cannot be edited by a browser.
+   ============================================================ */
+
+/* Our four roles, as admin-api understands them, mapped onto the console's
+   own. admin-api is the one that decides what an operator may DO — it
+   refuses any action the role does not list — so this only decides which
+   pages the console bothers to draw. A role we do not recognise gets the
+   most limited one rather than the most generous. */
+const LIVE_ROLE_TO_CONSOLE = {
+  owner: 'owner',
+  finance: 'finance',
+  support: 'support',
+  developer: 'product'
+};
+
+async function liveSignIn(email, password) {
+  const c = liveClient();
+  if (!c) return { ok: false, error: 'This console is not connected to a project.' };
+  let session;
+  try {
+    const { data, error } = await c.auth.signInWithPassword({
+      email: String(email || '').trim().toLowerCase(),
+      password: password
+    });
+    if (error) return { ok: false, error: error.message, credentials: true };
+    session = data && data.session;
+  } catch (e) {
+    return { ok: false, error: 'Could not reach the sign-in server.' };
+  }
+  if (!session) return { ok: false, error: 'Signed in, but no session came back.' };
+
+  /* A valid Supabase account is not the same as being one of us. Any studio
+     owner on the platform holds one of these. admin-api checks
+     platform_admins and turns everybody else away, so ask it before letting
+     anyone past the login screen — and sign them back out if it says no,
+     rather than leaving a session lying around in the browser. */
+  try {
+    const out = await liveCall('me');
+    LIVE.me = out.me;
+    LIVE.ready = true;
+    LIVE.error = '';
+    return { ok: true, me: out.me };
+  } catch (e) {
+    try { await c.auth.signOut(); } catch (e2) {}
+    LIVE.ready = false;
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
+/* The console draws itself from DB.staff, so a real operator needs a record
+   there to be. Adopt one that already matches the address, otherwise build
+   it from what admin-api told us. Deliberately does not invent a password:
+   this account signs in through Supabase, and a local credential for it
+   would be a second, weaker way in. */
+function liveAdoptStaff(me) {
+  const email = String((me && me.email) || '').toLowerCase();
+  const existing = (DB.staff || []).find(s =>
+    String(s.email || '').toLowerCase() === email ||
+    (s.altEmails || []).some(a => String(a).toLowerCase() === email));
+  const roleId = LIVE_ROLE_TO_CONSOLE[String((me && me.role) || '').toLowerCase()] || 'support';
+
+  if (existing) {
+    existing.roleId = roleId;          // the server's answer wins
+    existing.status = 'active';
+    return existing;
+  }
+  const name = (me && me.name) || email.split('@')[0] || 'Operator';
+  const s = {
+    id: Math.max(0, ...(DB.staff || []).map(x => +x.id || 0)) + 1,
+    staffId: 'TLB-' + String((DB.staff || []).length + 1).padStart(3, '0'),
+    name: name, dept: 'Platform', title: 'Operator', roleId: roleId,
+    username: '@' + String(name).split(' ')[0].toLowerCase(),
+    email: email, altEmails: [], phone: '—', status: 'active',
+    empType: 'Full time', startDate: iso(TODAY), workLocation: '—',
+    reportsTo: null, lastActiveLabel: 'Now'
+  };
+  (DB.staff || (DB.staff = [])).push(s);
+  return s;
+}
+
+async function liveSignOut() {
+  const c = LIVE.client;
+  LIVE.ready = false; LIVE.me = null;
+  if (!c) return;
+  try { await c.auth.signOut(); } catch (e) {}
+}
+
+/* Does this browser already hold a Supabase session? Called on boot so a
+   refresh does not throw a signed-in operator back to the login screen. */
+async function liveRestore() {
+  if (!CONFIG.live) return null;
+  const c = liveClient();
+  if (!c) return null;
+  try {
+    const { data: { session } } = await c.auth.getSession();
+    if (!session) return null;
+    const out = await liveCall('me');
+    LIVE.me = out.me; LIVE.ready = true; LIVE.error = '';
+    return out.me;
+  } catch (e) { return null; }
+}

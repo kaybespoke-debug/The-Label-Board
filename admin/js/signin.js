@@ -242,6 +242,32 @@ async function doSignIn() {
   if (!em.value.trim()) { err.textContent = 'Enter your work email.'; em.focus(); return; }
   if (!pw.value) { err.textContent = 'Enter your password.'; pw.focus(); return; }
 
+  /* Connected to a project? Then Supabase Auth is the authority on who this
+     is, and admin-api on whether they are one of us. The local credential
+     store below stays for the demo and for a console nobody has connected,
+     but it must not be a second way into a live console: a password set
+     here months ago should not still open a real inbox. */
+  if (CONFIG.live && typeof liveSignIn === 'function') {
+    btn.disabled = true; btn.textContent = 'Checking…';
+    const r = await liveSignIn(em.value, pw.value);
+    btn.disabled = false; btn.textContent = 'Sign in';
+    pw.value = '';
+    if (r.ok) {
+      try { localStorage.setItem(LAST_EMAIL_KEY, credKeyFor(em.value)); } catch (e) {}
+      signInAs(liveAdoptStaff(r.me));
+      return;
+    }
+    /* Same answer for a wrong password and an address that is not staff.
+       Either one, spelled out, tells somebody which of the two they got
+       right. The exception is a connection that never happened, which is
+       worth saying because it is ours to fix and not theirs. */
+    err.textContent = /reach|network|fetch/i.test(r.error || '')
+      ? 'Could not reach the sign-in server. Check your connection.'
+      : 'Those details do not match a Label Board staff account.';
+    pw.focus();
+    return;
+  }
+
   const s = staffByEmail(em.value);
   const target = s ? credEmailFor(s) : credKeyFor(em.value);
 
@@ -314,6 +340,11 @@ function doSignOut() {
   const s = Q.staffM(ME.staffId);
   if (s) logAction('login', 'Signed out', s.name + ' signed out');
   try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+  /* End the Supabase session too. Clearing our own key and leaving theirs
+     would put the next person at this machine straight back in, because
+     liveRestore would find a session and sign them in without asking. */
+  if (typeof liveStopPolling === 'function') liveStopPolling();
+  if (typeof liveSignOut === 'function') liveSignOut();
   closeModal();
   LOGIN_MODE = 'signin';
   document.body.classList.add('signed-out');
@@ -323,6 +354,27 @@ function doSignOut() {
 
 /* called once at boot */
 function initSignIn() {
+  /* Connected to a project? Then the password lives in Supabase Auth and
+     this browser holds no credential of its own — which is the point, not a
+     first run. Without this the setup screen below would appear on every
+     fresh browser and walk a real operator through choosing a LOCAL
+     password that opens nothing, while the account that would actually
+     work was never asked for.
+
+     Restoring is asynchronous, so show the sign-in screen and let it come
+     back and dismiss itself if this browser already holds a session. */
+  if (CONFIG.live) {
+    LOGIN_MODE = 'signin';
+    document.body.classList.add('signed-out');
+    document.getElementById('login').classList.add('on');
+    buildLogin();
+    if (typeof liveRestore === 'function') {
+      liveRestore().then(me => { if (me) signInAs(liveAdoptStaff(me)); })
+                   .catch(() => {});
+    }
+    return false;
+  }
+
   /* No password anywhere means first run. Force setup even if a session is
      open, because a console left with no password is the thing this is
      here to prevent. */
