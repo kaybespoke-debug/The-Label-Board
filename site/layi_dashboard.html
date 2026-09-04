@@ -2535,8 +2535,28 @@ async function doLogin(){
       const {error}=await supa.auth.signInWithPassword({email:raw.toLowerCase(),password:p});
       if(error){errEl.textContent=/confirm/i.test(error.message)?'This account is not confirmed yet (check Supabase → Authentication → Users).':('Sign-in failed: '+error.message);return;}
       const {data:{user}}=await supa.auth.getUser();
-      const {data:prof,error:pe}=await supa.from('profiles').select('name,role_id,business_id,staff_id').eq('id',user.id).single();
-      if(pe){errEl.textContent='Signed in, but your profile was not found: '+pe.message;return;}
+      const {data:prof,error:pe}=await supa.from('profiles').select('name,role_id,business_id,staff_id').eq('id',user.id).maybeSingle();
+      /* The password was right and the account is real; there is simply no
+         studio attached to it. That is not a sign-in failure and must not be
+         described as one, or somebody spends an evening retyping a password
+         that was never wrong.
+         Three ways to get here: an operator or partner account, which sign in
+         to the console and the portal instead and have no studio by design; an
+         account made before onboarding existed; or provisioning that failed,
+         which is deliberately quiet because a trigger that raises on signup
+         makes the signup itself fail with nothing to read.
+         Signed back out, because a session with nothing behind it just means
+         the next tap lands on the same wall. */
+      if(pe||!prof){
+        try{await supa.auth.signOut();}catch(e){}
+        errEl.innerHTML=pe
+          ? 'Signed in, but your studio could not be read: '+esc(pe.message)
+          : 'That password is correct, but this account has no studio on it.'
+            +'<br><span style="opacity:.75">Operator and partner accounts sign in to the '
+            +'control centre and the partner portal instead. If this should be a studio, '
+            +'it has not been set up yet.</span>';
+        return;
+      }
       currentUser={id:user.id,name:prof.name||'Owner',username:raw.toLowerCase(),roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
       liveMode=true; myBusinessId=prof.business_id||LAYI_BIZ;
       errEl.textContent='Loading your studio…';

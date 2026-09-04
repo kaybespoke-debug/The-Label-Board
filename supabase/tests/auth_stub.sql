@@ -62,3 +62,23 @@ as $$
 $$;
 
 grant usage on schema auth to anon, authenticated, service_role;
+
+-- Enough of auth.users for the onboarding trigger to fire against.
+--
+-- studio_onboarding hangs a trigger off this table, which is the only place
+-- an account actually comes into existence, and it is written to warn rather
+-- than raise on failure — a trigger that raises here makes the account
+-- creation itself fail, and the dashboard reports only "Database error
+-- creating new user". The cost of that choice is that a broken trigger is
+-- silent: the account exists, no studio does, and the app says "Signed in,
+-- but your profile was not found".
+--
+-- Silent is exactly what a test is for. Only the three columns the trigger
+-- reads, because a fuller copy of Supabase's table would drift from theirs
+-- and start testing the copy.
+create table if not exists auth.users (
+  id                  uuid primary key default gen_random_uuid(),
+  email               text unique,
+  raw_user_meta_data  jsonb not null default '{}'::jsonb,
+  created_at          timestamptz not null default now()
+);
