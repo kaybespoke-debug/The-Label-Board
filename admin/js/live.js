@@ -211,6 +211,7 @@ function liveStartPolling() {
   if (!LIVE.on() || LIVE.timer) return;
   const secs = Math.max(30, +CONFIG.inboxRefreshSeconds || 90);
   LIVE.timer = setInterval(async () => {
+    await liveLoadTenants();   // a studio that signed up since the console opened
     const changed = await liveLoadInbox();
     if (changed && typeof render === 'function') { try { render(); } catch (e) {} }
   }, secs * 1000);
@@ -223,6 +224,7 @@ async function liveStart() {
   if (!CONFIG.live) return;
   const ok = await liveConnect();
   if (!ok) return;
+  await liveLoadTenants();
   await liveLoadInbox();
   liveStartPolling();
   if (typeof render === 'function') { try { render(); } catch (e) {} }
@@ -355,4 +357,89 @@ async function liveRestore() {
     LIVE.me = out.me; LIVE.ready = true; LIVE.error = '';
     return out.me;
   } catch (e) { return null; }
+}
+
+/* ============================================================
+   REAL STUDIOS IN THE SUBSCRIBER LIST
+
+   admin-api has served `tenants` since it was written, and
+   platform_tenant_summary() exists to answer it. Nothing ever called
+   either. So a studio could sign up, use the app, and never appear
+   anywhere in the console — the subscriber list was the worked example
+   and only the worked example, which is a convincing way to believe you
+   have no customers.
+
+   Merged into DB.subscribers in the same shape as the example ones and
+   marked live, exactly as the inbox does, so every page, filter, count
+   and detail view that already works carries on working.
+   ============================================================ */
+
+/* What we actually know about a real studio, and nothing we do not.
+   The console's own example subscribers carry a sales CRM's worth of
+   detail — channel, health score, referral graph, orders in the last
+   thirty days. None of that exists for a real tenant yet, so it is left
+   empty rather than invented: a fabricated health score on a real
+   customer is worse than a blank one, because somebody will act on it. */
+function liveToSubscriber(row) {
+  const planId = String(row.plan || 'trial');
+  const plan = (typeof planById === 'function' ? planById(planId) : null) || { name: planId, seats: 0, monthly: 0 };
+  // businesses.status is active/suspended/closed; the console thinks in
+  // active/trial/expired. A studio on the trial plan is on trial whatever
+  // its row says, because that is what the app will be showing them.
+  const status = String(row.status) === 'closed' ? 'expired'
+    : planId === 'trial' ? 'trial' : 'active';
+  const outlets = Math.max(1, Number(row.branches) || 1);
+
+  return {
+    id: 'live-' + row.id,
+    liveId: row.id,
+    live: true,
+    name: row.name || '(unnamed studio)',
+    owner: '',
+    email: row.contact_email || '',
+    phone: '',
+    city: '',
+    plan: planId,
+    planName: plan.name,
+    cycle: planId === 'trial' ? 'trial' : 'monthly',
+    status,
+    pastDue: false,
+    /* No health signal exists for a real studio yet. 'onboarding' for a trial
+       is a statement of fact; everything else stays neutral rather than
+       claiming to have measured something. */
+    health: status === 'expired' ? 'churned' : status === 'trial' ? 'onboarding' : 'steady',
+    users: Number(row.members) || 0,
+    seats: plan.seats || 0,
+    joined: String(row.created_at || '').slice(0, 10),
+    renewsOn: '',
+    renewIn: null,
+    /* The plan's list price, which is what they would owe — not money we have
+       taken. Nothing bills these studios yet, so treating this as collected
+       revenue would overstate it. */
+    mrr: status === 'active' ? (plan.monthly || 0) : 0,
+    channel: 'Direct',
+    channelSource: 'signup',
+    businesses: Array.from({ length: outlets }, function (_, i) {
+      return { name: i === 0 ? 'Main studio' : 'Studio ' + (i + 1), city: '', staff: 0, openedOn: '' };
+    }),
+    referredBy: null,
+    referrals: [],
+    lastSeen: String(row.last_active_at || '').slice(0, 10),
+    ordersLast30: null,
+    notes: []
+  };
+}
+
+async function liveLoadTenants() {
+  if (!LIVE.on()) return false;
+  try {
+    const out = await liveCall('tenants');
+    DB.subscribers = mergeLive(DB.subscribers || [], (out.tenants || []).map(liveToSubscriber));
+    return true;
+  } catch (e) {
+    // A role that may not list tenants is not an error worth shouting about;
+    // admin-api refuses per role and the console simply shows what it can.
+    LIVE.error = LIVE.error || String(e.message || e);
+    return false;
+  }
 }

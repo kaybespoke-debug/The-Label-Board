@@ -85,19 +85,20 @@ for (const key of studios) {
     if (JSON.stringify(full[k]) !== JSON.stringify(defaults[k])) diff[k] = full[k];
   }
   bundle.settingsDiff = diff;
+
   out[key] = bundle;
   const bytes = Buffer.byteLength(JSON.stringify(bundle));
   const co = run('(SETTINGS.company&&SETTINGS.company.name)||""');
   const orders = run('rawOrders().length');
   const prods = run('getProducts().length');
   const staff = run('getStaff().length');
-  const custs = Object.keys(bundle.customers || {}).length;
+  const custCount = Object.keys(bundle.customers || {}).length;
   console.log(
     key.padEnd(9) + String(co).padEnd(22) +
     'orders ' + String(orders).padStart(3) +
     '  products ' + String(prods).padStart(3) +
     '  staff ' + String(staff).padStart(3) +
-    '  customers ' + String(custs).padStart(3) +
+    '  customers ' + String(custCount).padStart(3) +
     '  ' + (bytes / 1024).toFixed(0).padStart(4) + ' KB');
 }
 
