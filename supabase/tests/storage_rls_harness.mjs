@@ -41,9 +41,17 @@ const db = await PGlite.create();
 await db.exec(readFileSync(join(repo, 'supabase/tests/auth_stub.sql'), 'utf8'));
 /* Supabase's default privileges, in force before the migrations run, so a
    table created in public is as reachable here as it is there. */
+/* FUNCTIONS matter as much as tables here, and leaving them out is exactly
+   how this suite passed while an anonymous caller could set any studio's
+   storage cap on the live project.
+   `revoke all on function ... from public` is the shape that looks right and
+   is not: it removes the PUBLIC pseudo-role's grant and leaves Supabase's
+   explicit grants to anon and authenticated untouched. A bare Postgres has
+   no such grants, so the revoke appeared to work here and did nothing there. */
 await db.exec(`
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on sequences to anon, authenticated;
+  alter default privileges in schema public grant all on functions to anon, authenticated;
 `);
 
 const migDir = join(repo, 'supabase/migrations');
@@ -295,6 +303,40 @@ section('Selling more space, without moving anybody else');
   const capNow = Number((await admin(`select coalesce(storage_cap_bytes,0) c from public.businesses where id=$1`, [bizA]))[0].c);
   ok('nor by writing the column directly', capNow !== 9999999999999,
     'a studio set its own storage_cap_bytes');
+
+  /* And the grant itself, not just the outcome.
+     This is the check that was missing. Every one of these was written as
+     "service role only" and every one of them was executable by the anon key
+     on the live project, because Supabase grants EXECUTE on functions in
+     public to anon and authenticated by default and `revoke from public`
+     does not touch that. Asserting the privilege directly is the only way to
+     see it: calling the function and getting an error proves nothing, since
+     the error might be about its arguments. */
+  const OPERATOR_ONLY = ['set_studio_storage_cap', 'recount_storage_usage',
+    'set_studio_plan', 'record_studio_payment', 'platform_billing_summary',
+    'studio_payments', 'platform_tenant_summary'];
+  for (const name of OPERATOR_ONLY) {
+    /* Resolved by name and asked about by oid, so the check does not depend
+       on how Postgres chooses to spell an argument list. */
+    const rows = await admin(
+      `select p.oid,
+              has_function_privilege('anon', p.oid, 'execute')          as anon_can,
+              has_function_privilege('authenticated', p.oid, 'execute') as auth_can
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = $1`, [name]);
+    if (!rows.length) { ok('operator-only function exists: ' + name, false, 'not found — update this list'); continue; }
+    rows.forEach(r => {
+      ok('anon CANNOT execute ' + name, r.anon_can === false,
+        'the public key can call it, whatever the comment above it says');
+      ok('authenticated CANNOT execute ' + name, r.auth_can === false,
+        'any signed-in tenant can call it');
+    });
+  }
+  // and the one a studio is meant to have
+  ok('but a signed-in studio CAN read its own usage',
+    (await admin(`select has_function_privilege('authenticated','public.my_storage_usage()','execute') p`))[0].p === true);
+  ok('and a signed-out caller cannot',
+    (await admin(`select has_function_privilege('anon','public.my_storage_usage()','execute') p`))[0].p === false);
 }
 
 // ---------------------------------------------------------------------
