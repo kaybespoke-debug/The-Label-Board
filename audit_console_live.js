@@ -39,7 +39,6 @@ const called = new Set([...consoleJs.matchAll(/liveCall\('([a-zA-Z]+)'/g)].map(m
    a decision; an action sitting in neither list is an oversight, which is what
    `tenants` was. */
 const KNOWINGLY_UNUSED = {
-  setPlan:   'no billing yet, so the console does not move a studio between plans',
   setStatus: 'suspending a studio is not offered from the console yet',
   setNote:   'studio notes are kept in the console\'s own records, not on the tenant row',
   audit:     'the audit trail has no page yet; admin-api logs to it regardless',

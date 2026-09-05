@@ -72,7 +72,7 @@ serving the old version.
 Every object the apps talk to is created by a migration in
 `supabase/migrations/`, applied in filename order. Nothing is created by hand
 any more: five objects once were, and were missing from the migrations
-entirely, so a fresh project would have run none of it. Six suites guard it:
+entirely, so a fresh project would have run none of it. Seven suites guard it:
 
 ```bash
 node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
@@ -81,6 +81,7 @@ node supabase/tests/feedback_rls_harness.mjs   # what studios tell us stays thei
 node supabase/tests/partner_rls_harness.mjs    # no partner can reach another
 node supabase/tests/tlb_policy_harness.mjs     # our own books, as Supabase serves them
 node supabase/tests/onboarding_harness.mjs      # a new account becomes a studio it can sign into
+node supabase/tests/billing_harness.mjs         # every studio is on the books, and revenue is what arrived
 ```
 
 The first reads the shipped code for every table, function and column it

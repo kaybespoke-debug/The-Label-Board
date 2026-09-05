@@ -225,6 +225,8 @@ async function liveStart() {
   const ok = await liveConnect();
   if (!ok) return;
   await liveLoadTenants();
+  await liveLoadBilling();
+  await liveLoadPayments();
   await liveLoadInbox();
   liveStartPolling();
   if (typeof render === 'function') { try { render(); } catch (e) {} }
@@ -442,4 +444,119 @@ async function liveLoadTenants() {
     LIVE.error = LIVE.error || String(e.message || e);
     return false;
   }
+}
+
+/* ============================================================
+   WHAT A STUDIO IS ON, AND WHAT IT HAS PAID
+
+   The subscriber list arrived from platform_tenant_summary(), which knows
+   what plan a studio is on and nothing about money. So MRR was the plan's
+   list price — what a studio would owe if it were paying, reported as
+   though it were revenue. For a console whose whole job is to tell you how
+   the business is doing, that is the worst possible default: it is always
+   optimistic, and it is optimistic by exactly the amount you have failed
+   to collect.
+
+   platform_billing_summary() answers both halves: the active subscription
+   (plan, cycle, price, trial end, renewal) and the sum of payments that
+   actually completed. Pending and failed ones are counted but not banked.
+   ============================================================ */
+
+async function liveLoadBilling() {
+  if (!LIVE.on()) return false;
+  try {
+    const out = await liveCall('billing');
+    const by = {};
+    (out.billing || []).forEach(function (r) { by[r.business_id] = r; });
+
+    (DB.subscribers || []).forEach(function (s) {
+      if (!s.live) return;                       // example rows keep their own figures
+      const b = by[s.liveId];
+      if (!b) return;
+      s.plan = b.plan || s.plan;
+      s.planName = (typeof planById === 'function' && planById(s.plan) ? planById(s.plan).name : s.plan);
+      s.cycle = b.billing_cycle || s.cycle;
+      /* The real price on the real subscription, not the plan's list price.
+         A studio moved onto Pro at a discount is worth what it pays. */
+      s.mrr = b.is_trial ? 0 : (Number(b.monthly_price) || 0);
+      s.status = b.is_trial ? 'trial' : s.status;
+      s.trialEndsOn = b.trial_ends_on || null;
+      s.renewsOn = b.renews_on || s.renewsOn;
+      s.renewIn = b.renews_on ? Math.round((parseD(b.renews_on) - startOfDay(TODAY)) / DAY) : s.renewIn;
+      s.paidToDate = Number(b.paid_to_date) || 0;
+      s.paymentsCount = Number(b.payments_count) || 0;
+      s.lastPaidOn = b.last_paid_on ? String(b.last_paid_on).slice(0, 10) : null;
+      /* A trial that has run out is not still a trial. Nothing expires it
+         automatically — there is no billing run — so the console says so
+         rather than showing a studio as trialling three weeks after it
+         stopped. */
+      if (b.is_trial && b.trial_ends_on && parseD(b.trial_ends_on) < startOfDay(TODAY)) {
+        s.health = 'at-risk';
+        s.trialExpired = true;
+      }
+    });
+    return true;
+  } catch (e) {
+    LIVE.error = LIVE.error || String(e.message || e);
+    return false;
+  }
+}
+
+/* Real payments alongside the example ones, in the shape the Payments page
+   already reads. */
+function liveToPayment(row) {
+  return {
+    id: 'live-' + row.id,
+    liveId: row.id,
+    live: true,
+    subId: row.business_id ? 'live-' + row.business_id : null,
+    subscriber: row.business_name || '(unknown studio)',
+    plan: '', cycle: '',
+    ref: row.reference || '—',
+    amount: Number(row.amount) || 0,
+    provider: 'Recorded by hand',
+    method: row.payment_method || '—',
+    /* tlb_payments says completed/pending/failed/refunded; the console reads
+       successful/pending/failed/refunded. Mapped rather than renamed on
+       either side, because both names are already in use elsewhere. */
+    status: row.status === 'completed' ? 'successful' : (row.status || 'pending'),
+    date: String(row.paid_on || '').slice(0, 10),
+    invoice: row.reference || '—',
+    note: row.notes || ''
+  };
+}
+
+async function liveLoadPayments() {
+  if (!LIVE.on()) return false;
+  try {
+    const out = await liveCall('payments');
+    DB.payments = mergeLive(DB.payments || [], (out.payments || []).map(liveToPayment));
+    return true;
+  } catch (e) {
+    LIVE.error = LIVE.error || String(e.message || e);
+    return false;
+  }
+}
+
+/* ---------------- acting on it ---------------- */
+
+/* Moving a studio onto a plan. Both books or neither: businesses.plan is
+   what the app reads to decide what the studio may do, the subscription is
+   what we invoice against, and set_studio_plan writes them together. */
+async function liveSetPlan(subId, plan, cycle, price) {
+  const s = Q.sub(subId);
+  if (!s || !s.live) throw new Error('That is an example subscriber, not a real studio.');
+  await liveCall('setPlan', { id: s.liveId, value: plan, cycle: cycle, price: Number(price) || 0 });
+  await liveLoadTenants();
+  await liveLoadBilling();
+}
+
+async function liveRecordPayment(subId, amount, method, reference, note) {
+  const s = Q.sub(subId);
+  if (!s || !s.live) throw new Error('That is an example subscriber, not a real studio.');
+  await liveCall('recordPayment', {
+    id: s.liveId, amount: Number(amount), method: method, reference: reference, note: note
+  });
+  await liveLoadPayments();
+  await liveLoadBilling();
 }
