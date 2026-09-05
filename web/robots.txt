@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 Disallow: /thanks.html
 
-Sitemap: https://thelabelboard.app/sitemap.xml
+Sitemap: https://thelabelboard.com/sitemap.xml

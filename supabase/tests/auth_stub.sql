@@ -82,3 +82,52 @@ create table if not exists auth.users (
   raw_user_meta_data  jsonb not null default '{}'::jsonb,
   created_at          timestamptz not null default now()
 );
+
+-- =====================================================================
+-- Enough of Supabase Storage to run the real storage policies.
+--
+-- studio_media_storage creates a bucket, hangs a trigger off
+-- storage.objects and puts four policies on it. Those policies ARE the
+-- storage cap and the tenant wall — a browser talks to the storage API
+-- directly, so nothing in the app stands between a forged request and
+-- this table. They have to be tested against the same shape Supabase
+-- serves, not a paraphrase.
+--
+-- Only the columns the migration and the app actually touch. A fuller
+-- copy of Supabase's table would drift from theirs and start testing
+-- the copy instead of the policy.
+--
+-- Never applied to a real project: on a real project this schema is
+-- already there, and `create ... if not exists` leaves it alone.
+-- =====================================================================
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  owner              uuid,
+  public             boolean not null default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[],
+  created_at         timestamptz not null default now()
+);
+
+create table if not exists storage.objects (
+  id         uuid primary key default gen_random_uuid(),
+  bucket_id  text references storage.buckets(id),
+  name       text not null,
+  owner      uuid,
+  metadata   jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  unique (bucket_id, name)
+);
+
+-- Supabase ships storage with RLS on. Without this the policies exist and
+-- are never consulted, and every test below would pass while the real
+-- bucket was wide open.
+alter table storage.objects enable row level security;
+alter table storage.buckets enable row level security;
+
+grant usage on schema storage to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to authenticated;
+grant select on storage.buckets to anon, authenticated;

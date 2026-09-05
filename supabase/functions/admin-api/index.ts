@@ -24,13 +24,13 @@ const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ALLOWED: Record<string, string[]> = {
   owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
-              'billing', 'payments', 'recordPayment'],
+              'billing', 'payments', 'recordPayment', 'setStorageCap'],
   // Finance is the role that exists to do this. Support and developer are not
   // given it: what every subscriber pays is not something a support agent needs
   // to answer a ticket, and a role that can read it will eventually be given to
   // somebody because it was easier than making a new one.
   finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus',
-              'billing', 'payments', 'recordPayment'],
+              'billing', 'payments', 'recordPayment', 'setStorageCap'],
   support:   ['me', 'tenants', 'tenant', 'setNote',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback'],
   // a developer reads what studios reported and can move it along, but does
@@ -163,6 +163,39 @@ Deno.serve(async (req) => {
       })
       if (error) return json({ error: error.message }, 500)
       await log({ plan: value, cycle, price }, id)
+      return json({ ok: true })
+    }
+
+    /* Selling one studio more space.
+       Extra storage costs us about $0.0213/GB/month (~N28), so this is the
+       row an operator writes after agreeing a price — never something a
+       tenant can reach. The column behind it is not writable by the studio
+       either: businesses carries column-level grants and storage_cap_bytes
+       is not among them.
+       A null gb clears the override and returns them to their plan's cap. */
+    if (action === 'setStorageCap') {
+      const id = String(body.id || '')
+      const raw = body.gb
+      if (!id) return json({ error: 'No studio id' }, 400)
+      const gb = (raw === null || raw === undefined || raw === '') ? null : Number(raw)
+      if (gb !== null && (!isFinite(gb) || gb < 0)) {
+        return json({ error: 'Storage has to be a number of GB, or empty to use the plan default' }, 400)
+      }
+      // A cap below what they are already storing would strand them: they
+      // could not upload, and could not be told a number that made sense.
+      if (gb !== null) {
+        const { data: b } = await admin
+          .from('businesses').select('storage_used_bytes,name').eq('id', id).maybeSingle()
+        const used = Number(b?.storage_used_bytes || 0)
+        if (used > gb * 1e9) {
+          return json({ error: `${b?.name || 'That studio'} is already storing ${(used / 1e9).toFixed(1)} GB. Set the cap above that, or ask them to delete some photos first.` }, 400)
+        }
+      }
+      const { error } = await admin.rpc('set_studio_storage_cap', {
+        p_business: id, p_gb: gb, p_note: String(body.note || '').slice(0, 500) || null
+      })
+      if (error) return json({ error: error.message }, 500)
+      await log({ storageCapGb: gb, note: body.note || '' }, id)
       return json({ ok: true })
     }
 

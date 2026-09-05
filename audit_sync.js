@@ -17,7 +17,17 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    pushing it into app_state would hand every other device of that studio a
    claim marker naming a business they may not be. Listed here by name, with the
    reason, so adding one is a decision rather than an omission. */
-const DEVICE_LOCAL=new Set(['layi_dash_biz_owner']);
+/* layi_dash_media_urls holds signed URLs for this studio's photos. They are
+   short-lived bearer tokens minted for THIS device, and they expire; pushing
+   them into app_state would sync a cache of credentials between devices and
+   hand every one of them a token it did not ask for and cannot refresh.
+   Each device mints its own from the path, which is the part that IS synced.
+
+   layi_dash_storage_usage is a cached copy of a number the DATABASE owns —
+   how full the studio is, as the upload policy computes it. Syncing a cache
+   of a server value is how two devices end up arguing about it; each refreshes
+   from my_storage_usage() instead. */
+const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls','layi_dash_storage_usage']);
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const mkEl=()=>({innerHTML:'',value:'',checked:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
 const cache={};const _ls={};

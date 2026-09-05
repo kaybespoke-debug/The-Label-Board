@@ -96,14 +96,22 @@ section:last-of-type{border-bottom:0}
 .hdr{position:sticky;top:0;z-index:90;background:color-mix(in srgb,var(--bg) 94%,transparent);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line)}
-.hdr-in{display:flex;align-items:center;gap:22px;height:74px}
-.brand{display:flex;align-items:center;gap:12px;flex:none;color:var(--text)}
+/* Three columns: wordmark in the left corner, tabs on the centre of the page,
+   actions right. The middle column is auto and the outer two are equal, so the
+   tabs sit on the centre of the page rather than the centre of whatever is
+   left over after the wordmark.
+
+   Each item names its column. Without that, hiding the tabs below 1000px takes
+   them out of the grid altogether and the actions get placed into the middle
+   column, which parks them next to the wordmark instead of the right edge. */
+.hdr-in{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;height:74px}
+.brand{display:flex;align-items:center;gap:12px;flex:none;color:var(--text);grid-column:1;justify-self:start}
 .brand:hover{color:var(--text)}
 .brand svg{width:38px;height:38px;flex:none;border-radius:8px}
 .brand-name{display:block;font-weight:700;font-size:14px;letter-spacing:.06em}
 .brand-sub{display:block;font-size:9.5px;color:var(--faint);letter-spacing:.16em;
   text-transform:uppercase;margin-top:2px}
-.hdr-nav{display:flex;align-items:center;gap:2px;margin-left:20px;flex-wrap:nowrap}
+.hdr-nav{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;grid-column:2;justify-self:center}
 .hdr-nav>a{display:inline-flex;align-items:center;gap:6px;
   font-size:14px;font-weight:500;color:var(--dim);padding:9px 13px;border-radius:6px;
   background:none;border:0;cursor:pointer;transition:.16s;font-family:inherit}
@@ -114,7 +122,7 @@ section:last-of-type{border-bottom:0}
 .hdr-nav>a{position:relative}
 .hdr-nav>a.on::after{content:"";position:absolute;left:13px;right:13px;bottom:3px;
   height:2px;border-radius:2px;background:var(--gold)}
-.hdr-act{display:flex;align-items:center;gap:9px;flex:none;margin-left:auto}
+.hdr-act{display:flex;align-items:center;gap:9px;flex:none;grid-column:3;justify-self:end}
 .hdr-act .login{font-size:14px;font-weight:500;color:var(--dim);padding:9px 8px}
 .hdr-act .login:hover{color:var(--text)}
 .burger{display:none;width:38px;height:38px;border-radius:6px;border:1px solid var(--line);
@@ -156,67 +164,19 @@ body.menu-open .drawer{display:flex}
 .point b{font-size:12.5px;font-weight:600;display:block}
 .point span{display:block;color:var(--faint);font-size:11px;margin-top:3px}
 
-/* ---------- the product, drawn rather than photographed ---------- */
+/* ---------- the product, shown as real screenshots of the app ---------- */
 .device{position:relative}
-.screen{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
-  box-shadow:var(--shadow);overflow:hidden}
-.screen-bar{display:flex;align-items:center;gap:7px;padding:10px 14px;background:var(--bg-2);
-  border-bottom:1px solid var(--line)}
-.screen-dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
-.screen-ttl{font-size:10.5px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-left:8px}
-.screen-body{display:grid;grid-template-columns:118px minmax(0,1fr);min-height:0}
-.screen-side{border-right:1px solid var(--line);padding:12px 9px;background:var(--bg-2)}
-.screen-side b{display:block;font-family:var(--serif);font-size:12px;letter-spacing:.1em;
-  padding:0 5px 10px;color:var(--text)}
-.screen-side i{display:flex;align-items:center;gap:7px;font-style:normal;font-size:10.5px;
-  color:var(--faint);padding:6px;border-radius:5px}
-.screen-side i.on{background:color-mix(in srgb,var(--gold) 14%,transparent);color:var(--gold-2)}
-.screen-side i::before{content:"";width:5px;height:5px;border-radius:2px;background:currentColor;opacity:.7}
-.screen-main{padding:13px}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.kpis .k{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px}
-.kpis .k small{display:block;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.kpis .k b{display:block;font-family:var(--serif);font-size:18px;margin-top:5px;font-variant-numeric:tabular-nums}
-.kpis .k.gold b{color:var(--gold-2)}
-.kpis .k.green b{color:var(--green)}
-.kpis .k.red b{color:var(--red)}
-.rows{margin-top:10px;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
-.rows .rh{display:flex;justify-content:space-between;padding:8px 11px;background:var(--panel-2);
-  font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-.row{display:grid;grid-template-columns:1.5fr .8fr .6fr;gap:8px;padding:9px 11px;
-  border-top:1px solid var(--line);font-size:10.5px;align-items:center}
-.row span:last-child{text-align:right;color:var(--gold-2);font-variant-numeric:tabular-nums}
-.row .tag{font-size:8.5px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:20px;
-  border:1px solid;justify-self:start;white-space:nowrap}
-.tag.cut{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 42%,transparent);
-  background:color-mix(in srgb,var(--blue) 13%,transparent)}
-.tag.sew{color:var(--purple);border-color:color-mix(in srgb,var(--purple) 42%,transparent);
-  background:color-mix(in srgb,var(--purple) 13%,transparent)}
-.tag.fit{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 42%,transparent);
-  background:color-mix(in srgb,var(--amber) 13%,transparent)}
-.tag.done{color:var(--green);border-color:color-mix(in srgb,var(--green) 42%,transparent);
-  background:color-mix(in srgb,var(--green) 13%,transparent)}
-.tag.late{color:var(--red);border-color:color-mix(in srgb,var(--red) 42%,transparent);
-  background:color-mix(in srgb,var(--red) 13%,transparent)}
-/* the phone that sits over the corner of the screen */
-.phone{position:absolute;right:-46px;bottom:-26px;width:150px;z-index:3;background:var(--panel);
-  border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;
-  padding:8px 7px 10px}
-.phone .pt{display:flex;justify-content:space-between;font-size:8px;color:var(--faint);padding:0 4px 7px}
-.phone .pk{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 9px;
-  margin-bottom:6px}
-.phone .pk small{display:block;font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.phone .pk b{display:block;font-family:var(--serif);font-size:15px;margin-top:3px}
-.phone .pr{display:flex;justify-content:space-between;gap:6px;font-size:8.5px;padding:6px 2px;
-  border-top:1px solid var(--line)}
-.phone .pr span:last-child{color:var(--gold-2)}
 
 /* ---------- industries strip ---------- */
-.industries{display:grid;grid-template-columns:repeat(7,200px);gap:14px;justify-content:center}
+.industries{display:grid;grid-template-columns:repeat(4,minmax(0,272px));gap:14px;justify-content:center}
 .industry{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
-  overflow:hidden;display:block;color:var(--text);transition:border-color .2s ease,transform .2s ease}
+  overflow:hidden;display:block;color:var(--text);transition:border-color .2s ease,transform .2s ease;
+  padding:0;font:inherit;text-align:center;cursor:pointer;width:100%}
+/* the one that is open reads as chosen, not merely hovered */
+.industry.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.industry.on b{color:var(--gold-2)}
 .industry:hover{border-color:var(--gold);transform:translateY(-2px);color:var(--text)}
-.industry .pic{height:120px;position:relative;display:grid;place-items:center;
+.industry .pic{height:164px;position:relative;display:grid;place-items:center;
   background:linear-gradient(150deg,var(--panel-2),var(--bg-2));border-bottom:1px solid var(--line);
   background-size:cover;background-position:center}
 .industry .pic svg{width:34px;height:34px;fill:none;stroke:var(--gold);stroke-width:1.3;
@@ -278,6 +238,10 @@ body.menu-open .drawer{display:flex}
 
 .callout{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--gold);
   border-radius:0 var(--r) var(--r) 0;padding:18px 20px}
+.callout-row{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.callout-row h4{font-family:var(--serif);font-size:18px;margin-bottom:6px}
+.callout-row>div{flex:1;min-width:min(100%,340px)}
+.callout-row .btn{flex:none}
 .callout p{color:var(--dim);font-size:15px;line-height:1.65}
 .callout p+p{margin-top:11px}
 .callout strong{color:var(--text)}
@@ -299,6 +263,12 @@ body.menu-open .drawer{display:flex}
 .pic-panel svg{width:56px;height:56px;fill:none;stroke:var(--gold);stroke-width:1.1;opacity:.5}
 .pic-panel.shot svg{display:none}
 
+/* the detail a tile opens, in place rather than on another page */
+.trade-detail{margin-top:22px}
+/* the panel heading answers to the section heading above it, so it is smaller
+   than the h2 it would have been on a page of its own */
+.trade-h{font-size:clamp(22px,2.6vw,30px);margin-bottom:12px}
+
 /* ---------- proof strip ---------- */
 .strip{border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);background:var(--bg-2)}
 .strip-in{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line-soft)}
@@ -307,6 +277,11 @@ body.menu-open .drawer{display:flex}
 .strip-cell .k{font-size:12px;color:var(--faint);margin-top:4px;line-height:1.45}
 
 /* ---------- pricing ---------- */
+/* the currency picker, beside the billing period */
+.ccy-slot{display:inline-flex}
+.ccy{font-size:13px;font-weight:600;color:var(--text);background:var(--panel);
+  border:1px solid var(--line);border-radius:var(--r-btn);padding:9px 11px;cursor:pointer}
+.ccy:hover{border-color:var(--gold)}
 .plan-switch{display:inline-flex;align-items:center;gap:3px;background:var(--panel);
   border:1px solid var(--line);border-radius:var(--r-btn);padding:3px}
 .plan-switch button{border:0;background:transparent;color:var(--faint);font-size:13.5px;font-weight:600;
@@ -336,18 +311,20 @@ body.menu-open .drawer{display:flex}
 .plan-feats li.hd{padding-left:0;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--faint);margin-top:15px;font-weight:700}
 .plan-feats li.hd::before{display:none}
-
-.minis{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)}
-.mini-row{display:flex;align-items:center;gap:14px;padding:15px 18px;border-top:1px solid var(--line);
-  color:var(--text);transition:background .18s ease}
-.mini-row:first-child{border-top:0}
-.mini-row:hover{background:var(--panel-2);color:var(--text)}
-.mini-row .mn{font-family:var(--serif);font-size:18px;min-width:92px}
-.mini-row .mw{color:var(--faint);font-size:13px;flex:1;min-width:0}
-.mini-row .mp{font-size:19px;font-weight:600;white-space:nowrap;color:var(--gold-2);
-  font-variant-numeric:tabular-nums}
-.mini-row .mp .cur{font-size:14px;opacity:.85}
-.mini-row .mp .mper{font-size:12px;color:var(--faint);font-weight:500;margin-left:3px}
+/* What a plan does not include, so the gap is visible rather than something
+   you only find out later. Quieter than the ticks on purpose: it should read
+   as what you would gain by moving up, not as a list of complaints. */
+.plan-feats li.no{color:var(--faint);opacity:.85}
+.plan-feats li.no::before{border:0;left:1px;top:6px;width:9px;height:9px;transform:none;
+  background:
+    linear-gradient(to bottom right,transparent 44%,currentColor 44%,currentColor 56%,transparent 56%),
+    linear-gradient(to bottom left,transparent 44%,currentColor 44%,currentColor 56%,transparent 56%);
+  opacity:.75}
+/* the first one starts a new group, so it needs a little air above it */
+.plan-feats li:not(.no)+li.no{margin-top:15px;padding-top:13px;border-top:1px dashed var(--line)}
+/* that first one carries the divider padding, so its mark has to come down
+   with the text rather than float in the gap above it */
+.plan-feats li:not(.no)+li.no::before{top:19px}
 
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
 table{width:100%;border-collapse:collapse;min-width:640px}
@@ -399,6 +376,14 @@ tbody tr.grp td{background:var(--panel-2);font-size:10.5px;letter-spacing:.12em;
 .faq .ans p+p{margin-top:11px}
 
 /* ---------- tabs ---------- */
+/* the way back from a deep link, above the tabs it landed you in */
+.backlink{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+  letter-spacing:.02em;color:var(--faint);margin-bottom:16px}
+.backlink::before{content:"";width:7px;height:7px;border-left:1.6px solid currentColor;
+  border-bottom:1.6px solid currentColor;transform:rotate(45deg);transition:transform .18s ease}
+.backlink:hover{color:var(--gold-2)}
+.backlink:hover::before{transform:rotate(45deg) translate(-2px,2px)}
+
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 .tab{font-size:13px;font-weight:600;padding:9px 15px;border-radius:var(--r-btn);
   border:1px solid var(--line);background:transparent;color:var(--faint);cursor:pointer;
@@ -438,8 +423,11 @@ html.js-on .pane.on{display:block;animation:rise .28s ease both}
 .cta{background:var(--bg-2)}
 .cta h2{margin-bottom:14px}
 .ftr{padding:clamp(38px,4.4vw,56px) 0 30px;background:#050b13;border-top:1px solid var(--line)}
-.ftr-top{display:grid;grid-template-columns:1.6fr repeat(3,minmax(0,1fr));gap:30px;
+.ftr-top{display:grid;grid-template-columns:1.5fr repeat(4,minmax(0,1fr));gap:30px;
   padding-bottom:30px;border-bottom:1px solid var(--line-soft)}
+/* the contact column: the same list, but the last line is an address rather
+   than a link, so it needs a little air above it */
+.ftr-talk .small{margin-top:14px;color:var(--faint);font-size:12.5px;line-height:1.65}
 .ftr-about p{color:var(--faint);font-size:13.5px;margin-top:15px;max-width:34ch;line-height:1.7}
 .ftr h5{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text);
   margin:0 0 13px;font-weight:700}
@@ -499,9 +487,10 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 .toc a{font-size:14px}
 
 /* ---------- responsive ---------- */
-@media (max-width:1100px){
-  .industries{grid-template-columns:repeat(4,200px)}
-}
+/* seven across needs 1484px of content, so below a 1580px window the strip
+   goes to four and three. minmax lets a tile give up width instead of pushing
+   the page sideways, which is what a fixed 200px did between 938 and 681. */
+
 @media (max-width:1000px){
   .hdr-nav{display:none}
   .hdr-act .login{display:none}
@@ -513,14 +502,23 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .plans{grid-template-columns:minmax(0,1fr);max-width:460px;margin:0 auto}
   .tiers{grid-template-columns:repeat(2,minmax(0,1fr))}
   .ftr-top{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ftr-about{grid-column:1 / -1}
   .head{display:block}
   .head p{margin-top:14px}
-  .phone{width:138px;right:-6px;bottom:-34px}
 }
 @media (max-width:680px){
   .wrap{width:calc(100% - 32px)}
-  .hdr-in{height:66px;gap:10px}
+  /* On a phone the tabs are gone and the burger is back beside the buttons, so
+     the row is wordmark, empty middle, burger. The gold button comes off here:
+     at 360px it has to share 328px with the wordmark and the burger and ends
+     up wrapping onto two lines. Every hero carries the same button, and so
+     does the drawer the burger opens, so nothing is actually lost. */
+  .hdr-in{height:66px;gap:10px;grid-template-columns:auto minmax(0,1fr) auto}
   .drawer{inset:66px 0 0}
+  .brand svg{width:32px;height:32px}
+  .brand{gap:10px}
+  .brand-name{font-size:12.5px;letter-spacing:.05em}
+  .brand-sub{font-size:8.5px;letter-spacing:.13em}
   .hdr-act .btn{display:none}
   .g2,.g3,.g4{grid-template-columns:minmax(0,1fr)}
   .g-2up{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -530,14 +528,9 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .g-2up .card .ico{width:26px;height:26px;border-radius:7px;margin-bottom:8px}
   .g-2up .card .ico svg{width:14px;height:14px}
   .g-2up .card a.more{font-size:12px;margin-top:9px}
-  .industries{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .industry .pic{height:96px}
   .strip-in{grid-template-columns:repeat(2,minmax(0,1fr))}
   .fgrid{grid-template-columns:minmax(0,1fr)}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .screen-body{grid-template-columns:minmax(0,1fr)}
-  .screen-side{display:none}
-  .phone{display:none}
   .split-list{columns:1}
   .ftr-top{grid-template-columns:minmax(0,1fr);gap:26px}
   .price .amt{font-size:32px}
@@ -567,56 +560,21 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 
 /* ---------- photographs, once they arrive ---------- */
 .industry .pic img,.pic-panel img{position:absolute;inset:0;z-index:1;width:100%;height:100%;
-  object-fit:cover;filter:brightness(.86) saturate(.82) contrast(1.04)}
+  object-fit:cover;filter:brightness(.97) saturate(.9) contrast(1.03)}
 .pic-panel{position:relative;overflow:hidden}
 .pic-panel.has-photo{background-image:linear-gradient(rgba(6,16,29,.3),rgba(6,16,29,.42)),var(--photo)}
 .pic-panel.has-photo svg{display:none}
+/* cover, not a fixed 62% by 100%: that second value stretched the picture to
+   the height of the band whatever shape it was. The gradient is what keeps the
+   headline readable, so it can do the darkening on its own and the photograph
+   can be left close to how it was made. */
 .hero-bg.has-photo{
-  background:linear-gradient(90deg,var(--bg) 0%,var(--bg) 34%,color-mix(in srgb,var(--bg) 88%,transparent) 52%,color-mix(in srgb,var(--bg) 70%,transparent) 100%),
-    var(--photo) right center/62% 100% no-repeat,var(--bg);
-  filter:saturate(.55) brightness(.72)}
+  background:linear-gradient(90deg,var(--bg) 0%,var(--bg) 30%,color-mix(in srgb,var(--bg) 86%,transparent) 50%,color-mix(in srgb,var(--bg) 52%,transparent) 100%),
+    var(--photo) right center/cover no-repeat,var(--bg);
+  filter:saturate(.88)}
 @media (max-width:1000px){
   .hero-bg.has-photo{background:linear-gradient(color-mix(in srgb,var(--bg) 84%,transparent),color-mix(in srgb,var(--bg) 93%,transparent)),var(--photo) center/cover,var(--bg)}
 }
-
-/* ---------- the product mock used on the product and demo pages ----------
-   Same idea as .screen in the hero, with a three line statistic instead of a
-   two line one. Kept as its own component because those pages show a whole
-   screen rather than a single panel. */
-.mock{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
-  box-shadow:var(--shadow-soft);overflow:hidden}
-.mock-bar{display:flex;align-items:center;gap:7px;padding:10px 13px;background:var(--bg-2);
-  border-bottom:1px solid var(--line)}
-.mock-dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
-.mock-ttl{font-size:10px;color:var(--faint);letter-spacing:.11em;text-transform:uppercase;margin-left:8px}
-.mock-body{padding:15px}
-.mock-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.stat{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 12px}
-.stat .k{font-size:8.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint)}
-.stat .v{font-family:var(--serif);font-size:19px;margin-top:4px;font-variant-numeric:tabular-nums}
-.stat .d{font-size:11px;margin-top:2px;color:var(--faint)}
-.stat.up .v{color:var(--green)}
-.stat.warn .v{color:var(--amber)}
-.mock-list{margin-top:12px;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
-.mock-list .lh{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;
-  background:var(--panel-2);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-.mock-li{display:flex;align-items:center;gap:10px;min-width:0;padding:10px 12px;
-  border-top:1px solid var(--line);font-size:13px}
-.mock-li .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mock-li .amt{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
-.pill{font-size:9.5px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:20px;
-  border:1px solid;white-space:nowrap}
-.pill.cut{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 42%,transparent);
-  background:color-mix(in srgb,var(--blue) 13%,transparent)}
-.pill.sew{color:var(--purple);border-color:color-mix(in srgb,var(--purple) 42%,transparent);
-  background:color-mix(in srgb,var(--purple) 13%,transparent)}
-.pill.fit{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 42%,transparent);
-  background:color-mix(in srgb,var(--amber) 13%,transparent)}
-.pill.done{color:var(--green);border-color:color-mix(in srgb,var(--green) 42%,transparent);
-  background:color-mix(in srgb,var(--green) 13%,transparent)}
-.pill.late{color:var(--red);border-color:color-mix(in srgb,var(--red) 42%,transparent);
-  background:color-mix(in srgb,var(--red) 13%,transparent)}
-@media (max-width:680px){.mock-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* the hero composite, which carries its own dark ground */
 .device .shot{display:block;width:100%;height:auto;border-radius:var(--r);
@@ -654,12 +612,18 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    times. On a phone it loses its blurb and the three lists sit side by side. */
 @media (max-width:680px){
   .ftr{padding:28px 0 20px}
-  .ftr-top{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px;padding-bottom:18px}
+  .ftr-top{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px;padding-bottom:16px}
   .ftr-about{grid-column:1 / -1}
   .ftr-about p{display:none}
   .ftr h5{margin-bottom:9px;font-size:10px}
   .ftr ul li{margin-bottom:6px}
   .ftr ul a{font-size:12.5px}
+  /* the contact block reads across rather than down on a phone */
+  .ftr-talk{grid-column:1 / -1;border-top:1px solid var(--line-soft);padding-top:14px}
+  .ftr-talk ul{display:flex;flex-wrap:wrap;gap:5px 18px}
+  .ftr-talk ul li{margin-bottom:0}
+  .ftr-talk .small{margin-top:8px}
+  .ftr-talk .small br{display:none}
   .ftr-bot{padding-top:14px;gap:8px}
   .ftr-bot nav{gap:14px}
   /* the final call to action does not need to be a full screen either */
@@ -668,16 +632,20 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 }
 
 /* ---------- pictures are never asked to stretch past their own pixels ----------
-   The tiles and the hero composite came out of a single reference image, so
-   there is a hard ceiling on how large they can be drawn before they soften.
-   Everything below keeps them at or under that size. */
+   The trade tiles are photographs 1000px wide and the product shots are
+   captures of the running app at 1180. Both have a ceiling before they soften,
+   so nothing below draws them larger than they really are.
+
+   Nothing here may set a height on a tile picture. This block sits after the
+   phone and tablet breakpoints and carries the same specificity, so a height
+   written here silently wins over both of them, and the phone ends up with a
+   164px picture in a 134px wide swipe tile. That is exactly what happened. */
 
 .industries{gap:12px}
-.industry{width:200px}
-.industry .pic{height:118px;position:relative}
+.industry .pic{position:relative}
 /* a navy wash over every tile, so a bright studio and a dark workshop sit together */
 .industry .pic::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
-  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 45%,transparent))}
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 30%,transparent))}
 .industry .pic svg{position:relative;z-index:0}
 
 
@@ -725,3 +693,14 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 .on-light .checks li::after{border-left-color:var(--gold);border-bottom-color:var(--gold)}
 /* where a light section meets a dark one, the seam is a hairline of neither */
 .on-light + section,section + .on-light{border-top:0}
+
+/* ---------- real screenshots of the software ----------
+   These are captures of the running app with the demo account in it, so what
+   the site shows and what the demo shows are the same thing. */
+.shot{display:block;width:100%;height:auto;border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--shadow)}
+.shot-phone{position:absolute;right:-38px;bottom:-34px;width:158px;height:auto;
+  border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);z-index:3}
+.shot-cap{margin-top:10px;font-size:12.5px;color:var(--faint)}
+@media (max-width:1000px){.shot-phone{width:128px;right:-10px;bottom:-20px}}
+@media (max-width:680px){.shot-phone{display:none}}

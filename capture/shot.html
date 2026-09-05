@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>capture</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#06101d}
+  iframe{border:0;display:block;width:100vw;height:100vh}
+</style></head><body>
+<iframe id="f" src="/site/layi_dashboard.html"></iframe>
+<script>
+/* Loads the real app, signs into the demo, sets the theme and goes to one
+   view, so a headless screenshot captures the actual software. Usage:
+   shot.html?theme=black#orders  */
+var q = new URLSearchParams(location.search);
+var theme = q.get('theme') || 'black';
+var view = (location.hash || '').slice(1);  /* empty means: leave it where it boots */
+var f = document.getElementById('f');
+f.onload = function () {
+  var w = f.contentWindow;
+  try {
+    if (typeof w.demoLogin === 'function') w.demoLogin();
+    if (typeof w.setTheme === 'function') w.setTheme(theme);
+    /* the app fades pages in, so a screenshot can catch one half painted */
+    var st = w.document.createElement('style');
+    st.textContent = '*,*::before,*::after{animation:none !important;transition:none !important}';
+    w.document.head.appendChild(st);
+    setTimeout(function () {
+      try { if (view && typeof w.go === 'function') w.go(view); } catch (e) {}
+      try { if (typeof w.setTheme === 'function') w.setTheme(theme); } catch (e) {}
+      w.document.head.appendChild(st.cloneNode(true));
+      /* on a phone the app stacks its menu above the content, so a capture of
+         the top of the page is a list of links rather than the software */
+      try {
+        var m = w.document.querySelector('main.main');
+        if (m) { var y = m.getBoundingClientRect().top + w.pageYOffset; w.scrollTo(0, Math.max(0, y)); }
+      } catch (e) {}
+      document.title = 'ready:' + view + ':' + theme;
+    }, 900);
+  } catch (e) { document.title = 'ERR ' + e.message; }
+};
+</script></body></html>

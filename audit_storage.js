@@ -48,8 +48,19 @@ const b2=J("storageUsage()");
 run("var c=getCustomers();var k=Object.keys(c)[0];c[k].note='a much longer note that is pure text and should not count toward image storage at all';setCustomers(c);");
 if(J("storageUsage()").bytes!==b2.bytes) F('a text change changed the storage figure — only photos should count');
 
-// 3) The go-live seam is a pass-through today.
-if(run("saveImageAsset('data:image/png;base64,ABC')")!=='data:image/png;base64,ABC') F('saveImageAsset should return the image unchanged until go-live');
+// 3) The seam is real now: it uploads to object storage. With no backend —
+// the demo, or a studio before it has one — it must still hand the bytes
+// straight back, because that is also the path a photo takes when there is
+// no signal, and losing it would be far worse than storing it inline.
+run("liveMode=false;");
+{
+  run("globalThis.__seam='PENDING';saveImageAsset('data:image/png;base64,ABC','progress').then(function(r){globalThis.__seam=r;});");
+  const out=run("globalThis.__seam");
+  if(out!=='PENDING'&&out!=='data:image/png;base64,ABC')
+    F('with no backend saveImageAsset should return the image unchanged, got '+out);
+}
+if(!/await supa\.storage\.from\(MEDIA_BUCKET\)/.test(html))
+  F('saveImageAsset never uploads, so photos are still being written into the database');
 
 // 4) The Settings meter renders a usage bar.
 run("renderStorageMeter();");
@@ -78,12 +89,13 @@ if(!/used/.test(meter)||!/width:/.test(meter)) F('the storage meter does not ren
     if(B.reference.dim<1000)F('reference photos are too small to be worth keeping');
   }
   // the seam is used where it matters
-  if(!/updateDraft\.photos\.push\(await compressFor\(f,'progress'\)\)/.test(html))
-    F('progress photos do not go through the photo budget, so the budget is a number nobody applies');
-  if(!/draft\.clientPhotos\.push\(await compressFor\(f,'reference'\)\)/.test(html))
-    F('a client\'s own photos do not go through the photo budget');
-  if(!/draft\.outfits\[i\]\.photos\.push\(await compressFor\(f,'reference'\)\)/.test(html))
-    F('outfit photos do not go through the photo budget');
+  // compressed to its budget AND put in storage, in that order, at every site
+  if(!/updateDraft\.photos\.push\(await saveImageAsset\(await compressFor\(f,'progress'\),'progress'\)\)/.test(html))
+    F('progress photos do not go through the photo budget and into storage');
+  if(!/draft\.clientPhotos\.push\(await saveImageAsset\(await compressFor\(f,'reference'\),'client'\)\)/.test(html))
+    F('a client\'s own photos do not go through the photo budget and into storage');
+  if(!/draft\.outfits\[i\]\.photos\.push\(await saveImageAsset\(await compressFor\(f,'reference'\),'outfit'\)\)/.test(html))
+    F('outfit photos do not go through the photo budget and into storage');
   /* Every plan's allowance must exist as a tier, exactly. storageTierName()
      rounds DOWN to the largest tier that fits, so a plan selling 15GB against
      a ladder that stops at 1GB enforces 1GB. Nothing errors; the plan panel
