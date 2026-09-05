@@ -86,13 +86,24 @@ function initials(s) {
 }
 
 /* ---------------- plan catalogue ---------------- */
+/* This is what actually bills, so when it and the app disagree about a price
+   this one is right and audit_tiers says so. The ids are the ones stored on
+   businesses.plan; the names are what the customer is sold. seats: 0 means
+   unlimited — Pro no longer counts people. */
 const PLANS = [
-  { id: 'starter', name: 'Starter', monthly: 29000, annual: 290000, seats: 3, live: true,
-    features: ['1 outlet', '3 team seats', 'Orders & production board', 'Basic reports'] },
-  { id: 'pro', name: 'Pro', monthly: 49000, annual: 490000, seats: 10, live: true,
-    features: ['3 outlets', '10 team seats', 'Inventory & suppliers', 'Payroll & attendance', 'Full reports'] },
-  { id: 'premium', name: 'Premium', monthly: 79000, annual: 790000, seats: 30, live: true,
-    features: ['Unlimited outlets', '30 team seats', 'Everything in Pro', 'Concierge & storefront', 'Priority support'] },
+  { id: 'starter', name: 'Basic', monthly: 27000, annual: 270000, seats: 3, live: true,
+    features: ['1 studio', '3 team seats', 'Orders, production & client records',
+               'Invoices, and who owes what', 'Basic finance (money in, money out)'] },
+  { id: 'pro', name: 'Pro', monthly: 65000, annual: 650000, seats: 0, live: true,
+    features: ['3 studios, each scoped & reported separately', 'Unlimited team seats & roles',
+               'Receivables & the chase list, with one-tap reminders', 'Full finance & reporting lines',
+               'Fitting & measurement history', 'Onboarding, migration & priority support'] },
+  /* Priced per business, so there is no figure to quote. An operator types the
+     negotiated price when moving a studio onto it — set_studio_plan takes it. */
+  { id: 'premium', name: 'Bespoke', monthly: 0, annual: 0, seats: 0, live: true, invoiceOnly: true,
+    features: ['Everything in Pro', 'Unlimited studios', 'Custom features & workflow tailoring',
+               'Dedicated onboarding, migration & training at scale', 'Priority/dedicated support',
+               'Invoiced per business, not charged at a checkout'] },
   { id: 'trial', name: 'Trial', monthly: 0, annual: 0, seats: 3, live: true,
     features: ['14 days', 'Full Pro features', 'No card required'] }
 ];

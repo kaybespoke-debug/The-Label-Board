@@ -41,7 +41,7 @@ DETAIL.sub = function (id) {
       '<div class="sec-t">Business</div>' +
       kv('Trading name', esc(s.name)) + kv('Owner', esc(s.owner)) + kv('Email', esc(s.email)) +
       kv('Phone', s.phone) + kv('Base city', s.city) + kv('Found us via', s.channel) +
-      kv('Outlets', s.businesses.length) + kv('Team on the account', s.users + ' of ' + s.seats + ' seats') +
+      kv('Outlets', s.businesses.length) + kv('Team on the account', s.seats ? s.users + ' of ' + s.seats + ' seats' : s.users + ' · unlimited seats') +
       '<div class="sec-t">Account</div>' +
       kv('Subscriber ID', 'TLB-S' + String(s.id).padStart(4, '0')) +
       kv('Status', statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '')) +
@@ -56,9 +56,9 @@ DETAIL.sub = function (id) {
     body = '<div class="sec-t">Current plan</div>' +
       kv('Plan', '<span class="tier">' + s.planName + '</span>') +
       kv('Billing cycle', s.cycle === 'annual' ? 'Annual, paid up front' : s.cycle === 'trial' ? 'Free trial' : 'Monthly') +
-      kv('List price', s.cycle === 'annual' ? money(p.annual) + ' / year' : p.monthly ? money(p.monthly) + ' / month' : 'Free') +
+      kv('List price', p.invoiceOnly ? 'Invoiced per business' : s.cycle === 'annual' ? money(p.annual) + ' / year' : p.monthly ? money(p.monthly) + ' / month' : 'Free') +
       kv('Recognised MRR', s.mrr ? money(s.mrr) : '—') +
-      kv('Seats included', p.seats + ' (using ' + s.users + ')') +
+      kv('Seats included', p.seats ? p.seats + ' (using ' + s.users + ')' : 'Unlimited (using ' + s.users + ')') +
       kv('Renews on', s.status === 'expired' ? '<span class="note">Not renewing</span>' : fmtD(s.renewsOn) + (s.renewIn <= 7 && s.renewIn >= 0 ? ' <span class="pill amber">in ' + s.renewIn + 'd</span>' : '')) +
       '<div class="sec-t">Value</div>' +
       kv('Lifetime revenue', money(lifetime)) +
@@ -158,7 +158,7 @@ DETAIL.sub = function (id) {
     dstat(money(lifetime), 'Lifetime revenue', 'g') +
     dstat(tenureLbl, 'Subscriber for') +
     dstat(s.referralConverted + (s.referralEarned ? ' · ' + moneyShort(s.referralEarned) : ''), 'Referrals', s.referralEarned ? 'm' : '') +
-    dstat(s.users + '/' + s.seats, 'Seats used') +
+    dstat(s.seats ? s.users + '/' + s.seats : s.users + ' / ∞', 'Seats used') +
     (s.pastDue ? dstat(money(s.mrr), 'Past due', 'r') : '') +
     '</div>' +
     '<div class="dsplit">' +

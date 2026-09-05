@@ -277,6 +277,48 @@ section('The dashboard counts them too');
      run('Q.subsAsOf().length') === 3, String(run('Q.subsAsOf().length')));
 }
 
+// ---------------------------------------------------------------------
+section('A plan with no seat limit reads as one');
+// ---------------------------------------------------------------------
+/* Pro sells unlimited staff, and unlimited is stored as 0. Every place that
+   printed "3 of 10 seats" now prints "3 of 0 seats" unless it was told, which
+   reads as a studio that has overrun a limit of nothing. Same for Bespoke,
+   which carries no monthly price and would otherwise be listed as Free — the
+   one wrong number on that row is the one an operator would quote. */
+{
+  /* Put a subscriber onto the unlimited plan explicitly rather than hunting
+     for one, because the fixtures carry their own seat counts and the first
+     Pro row found happened to have a number on it — which passed while the
+     unlimited case, the one that actually breaks, was never rendered. */
+  const sub = run('DB.subscribers[0]');
+  if (!sub) ok('there is a subscriber to render', false);
+  else {
+    run('(function(){var s=DB.subscribers[0];var p=PLANS.find(p=>p.seats===0);s.plan=p.id;s.planName=p.name;s.seats=p.seats;s.users=3;})()');
+    const html = run('(function(){try{return DETAIL.sub(' + JSON.stringify(sub.id) + ');}catch(e){return "ERR:"+e.message;}})()');
+    ok('a subscriber on an unlimited-seat plan renders', typeof html === 'string' && html.length > 0 && String(html).indexOf('ERR:') !== 0, String(html).slice(0, 120));
+    ok('and never says "of 0 seats"', String(html).indexOf('of 0 seats') < 0);
+    ok('and never shows a seat count of 0', !/[\/ ]0 seats|3\/0/.test(String(html)));
+    ok('it shows the seats as unlimited instead', /unlimited|∞/i.test(String(html)));
+    /* The Subscription tab quotes the list price and the seats included, and
+       it is a vertical tab chosen from UI.vtab rather than an argument — so
+       asking DETAIL.sub for it by parameter renders the Profile tab instead
+       and the check reads a panel that never contained the number it was
+       looking for. Set the tab the way the console does. */
+    const subTab = run('(function(){try{UI.vtab["sub"+' + JSON.stringify(sub.id) + ']="subscription";return DETAIL.sub(' + JSON.stringify(sub.id) + ');}catch(e){return "ERR:"+e.message;}})()');
+    ok('the subscription tab renders for an unlimited plan', String(subTab).indexOf('ERR:') !== 0, String(subTab).slice(0, 120));
+    ok('and reaches the seats line at all', /Seats included/.test(String(subTab)), 'the tab rendered but has no seats row to check');
+    ok('and does not quote 0 seats included', String(subTab).indexOf('>0 (using') < 0);
+    run('(function(){UI.vtab["sub"+' + JSON.stringify(sub.id) + ']="profile";})()');
+  }
+  const bespoke = run('PLANS.find(p => p.invoiceOnly)');
+  ok('the invoice-only plan is not listed at a price of zero',
+     !bespoke || bespoke.monthly === 0 && bespoke.invoiceOnly === true);
+  // the plan filter is built from PLANS, not typed out again beside it
+  const subsHtml = run('(function(){try{return PAGES.subscribers();}catch(e){return "";}})()');
+  run('PLANS').forEach(p => ok('the plan filter offers ' + p.name,
+     String(subsHtml).indexOf('>Plan: ' + p.name + '<') >= 0 || String(subsHtml).indexOf(p.name) >= 0));
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass + ' passed, ' + failures.length + ' FAILED:');

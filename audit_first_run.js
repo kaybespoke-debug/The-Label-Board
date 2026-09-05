@@ -196,6 +196,87 @@ section('Two trades, and the tabs that follow');
   ok('a studio that does both gets both', c.run('showsRetail()') && c.run('showsBespoke()'));
 }
 
+// ---------------------------------------------------------------------
+section('How many of you, and how many outlets');
+// ---------------------------------------------------------------------
+/* Both are optional bands rather than a number, because a studio setting
+   itself up on a phone knows "two or three of us" and does not know its
+   headcount to the person.
+
+   The rule worth guarding is that neither answer CREATES anything. Somebody
+   who says "six or more" must not find six blank staff records waiting to be
+   deleted — the answer is worth a visible Team tab and a plan that fits, and
+   nothing else. Handing a new customer a tidying job as the first thing they
+   ever do in the app is a worse first impression than asking nothing. */
+{
+  const a = freshStudio();
+  a.run('openStudioSetup();');
+  const form = a.run('renderStudioSetup(),(document.getElementById("modal")||{}).innerHTML') || '';
+  ok('the setup screen asks how many people work with them', /How many people work with you/.test(form));
+  ok('and how many studios or outlets they run', /How many studios or outlets/.test(form));
+  /* The heading and the answers are two different things. Checking only the
+     heading passed against a version where the question was there and every
+     option had gone, which is a question nobody can answer. */
+  a.run('SETUP_TEAM').forEach(o =>
+    ok('the "' + o.label + '" answer is offered', form.indexOf('>' + o.label + '<') >= 0));
+  a.run('SETUP_OUTLETS').forEach(o =>
+    ok('the "' + o.label + '" outlet answer is offered', form.indexOf('>' + o.label + '<') >= 0));
+  ok('and every option is tappable', (form.match(/setupPick\('(team|outlets)'/g) || []).length >=
+    a.run('SETUP_TEAM').length + a.run('SETUP_OUTLETS').length);
+  ok('both are marked optional, so nobody is blocked by a number they do not know',
+    (form.match(/\(optional\)/g) || []).length >= 3);
+  ok('"tick all that applies" is the wording on both multi-answer questions',
+    (form.match(/tick all that applies/gi) || []).length >= 2);
+
+  // saying nothing must still work, and must change nothing
+  const q = freshStudio();
+  q.run('openStudioSetup();');
+  q.run("setupToggleDoes('bespoke');");
+  fillSetup(q, { name: 'Quiet Studio' });
+  q.run('saveStudioSetup();');
+  ok('a studio that answers neither count is still set up', q.run("SETTINGS.setupDone") === true);
+  ok('and is not given team tools it did not ask for', q.run("SETTINGS.teamTools") !== 'on');
+
+  const b = freshStudio();
+  b.run('openStudioSetup();');
+  b.run("setupToggleDoes('bespoke');");
+  b.run("setupPick('team','many');setupPick('outlets','two');");
+  fillSetup(b, { name: 'Six Of Us' });
+  const staffBefore = b.run('getStaff().length');
+  b.run('saveStudioSetup();');
+
+  ok('the answers are kept, so nobody is asked twice',
+    b.run("SETTINGS.setupTeamBand") === 'many' && b.run("SETTINGS.setupOutletsBand") === 'two');
+  ok('saying there are six of you reveals the team tabs at once',
+    b.run("teamToolsOn()") === true, 'teamTools=' + b.run('SETTINGS.teamTools'));
+  ok('and invents nobody: no staff records are created from a rough count',
+    b.run('getStaff().length') === staffBefore);
+  ok('and invents no outlets either: one branch is set up, the rest are theirs to name',
+    b.run('getBranches().length') === 1);
+  ok('the plan starts as one that fits what they described',
+    b.run("SETTINGS.plan") === b.run("smallestPlanFitting(3,8).id"),
+    'got ' + b.run('SETTINGS.plan'));
+  ok('which for six people is not the three-seat plan',
+    b.run("SETTINGS.plan") !== 'starter' && b.run("SETTINGS.plan") !== 'trial');
+
+  // a solo studio is left exactly as it was
+  const s = freshStudio();
+  s.run('openStudioSetup();');
+  s.run("setupToggleDoes('bespoke');");
+  s.run("setupPick('team','solo');setupPick('outlets','one');");
+  fillSetup(s, { name: 'Just Me' });
+  s.run('saveStudioSetup();');
+  ok('a solo studio is not forced into the team tabs it does not need yet',
+    s.run("SETTINGS.teamTools") !== 'on');
+  ok('and the automatic reveal still works for them on the day they hire',
+    s.run("(function(){var l=getStaff();l.push({id:'x1',name:'A',active:true});l.push({id:'x2',name:'B',active:true});setStaff(l);return teamToolsOn();})()") === true);
+  // and a band can be unpicked
+  const u = freshStudio();
+  u.run('openStudioSetup();');
+  u.run("setupPick('team','many');setupPick('team','many');");
+  ok('a band can be tapped again to unset it', u.run("setupDraft.team") === '');
+}
+
 console.log('\nFirst run audit:');
 console.log('  asked once, on the first live sign-in, and never again');
 if (failures.length) {
