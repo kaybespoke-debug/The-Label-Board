@@ -48,7 +48,7 @@ DETAIL.sub = function (id) {
       kv('Health', statusPill(s.health)) +
       kv('Joined', fmtD(s.joined)) + kv('Subscriber for', tenureLbl) +
       kv('Last seen', ago(s.lastSeen)) + kv('Orders in last 30 days', s.ordersLast30) +
-      (referrer ? kv('Referred by', '<button class="lnk" onclick="openDetail(\'sub\',' + referrer.id + ')">' + esc(referrer.name) + ' &rsaquo;</button>') : kv('Referred by', '<span class="note">Direct signup</span>'));
+      (referrer ? kv('Referred by', '<button class="lnk" onclick="openDetail(\'sub\',\'' + referrer.id + '\')">' + esc(referrer.name) + ' &rsaquo;</button>') : kv('Referred by', '<span class="note">Direct signup</span>'));
   }
 
   else if (tab === 'subscription') {
@@ -85,7 +85,7 @@ DETAIL.sub = function (id) {
         ? '<div class="tw"><table><thead><tr><th>Business referred</th><th class="hide-sm">Plan</th>' +
         '<th class="hide-sm">Status</th><th class="hide-sm">Joined</th>' +
         '<th class="num">Commission</th><th>Paid</th><th></th></tr></thead><tbody>' +
-        s.referralLedger.map(r => '<tr class="klik" onclick="openDetail(\'sub\',' + r.subId + ')">' +
+        s.referralLedger.map(r => '<tr class="klik" onclick="openDetail(\'sub\',\'' + r.subId + '\')">' +
           '<td class="t-main">' + esc(r.name) + '</td>' +
           '<td class="hide-sm"><span class="tier">' + r.plan + '</span></td>' +
           '<td class="hide-sm">' + statusPill(r.status) + '</td>' +
@@ -121,7 +121,7 @@ DETAIL.sub = function (id) {
       '</div>' +
       (pays.length ? '<div class="tw"><table><thead><tr><th>Date</th><th class="hide-sm">Reference</th><th class="hide-sm">Invoice</th>' +
         '<th class="num">Amount</th><th class="hide-sm">Method</th><th>Status</th><th></th></tr></thead><tbody>' +
-        pays.map(p => '<tr class="klik" onclick="openDetail(\'pay\',' + p.id + ')">' +
+        pays.map(p => '<tr class="klik" onclick="openDetail(\'pay\',\'' + p.id + '\')">' +
           '<td>' + fmtD(p.date) + '</td><td class="hide-sm">' + p.ref + '</td><td class="hide-sm">' + p.invoice + '</td>' +
           '<td class="num">' + money(p.amount) + '</td><td class="hide-sm">' + p.method + '</td>' +
           '<td>' + statusPill(p.status) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
@@ -130,18 +130,18 @@ DETAIL.sub = function (id) {
 
   else if (tab === 'support') {
     body = '<div class="sec-t">Tickets from this subscriber</div>' +
-      (tickets.length ? tickets.map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+      (tickets.length ? tickets.map(t => '<div class="row klik" onclick="openDetail(\'ticket\',\'' + t.id + '\')">' +
         '<div><b>' + esc(t.title) + '</b><small>#' + t.ref + ' · ' + ago(t.openedAt) + ' · ' + t.assignedName + '</small></div>' +
         statusPill(t.state) + '</div>').join('') : '<div class="note">No tickets. Nothing has gone wrong for them yet.</div>') +
       '<div class="sec-t">Feedback &amp; reviews</div>' +
-      (fb.length ? fb.map(f => '<div class="row klik" onclick="openDetail(\'fb\',' + f.id + ')">' +
+      (fb.length ? fb.map(f => '<div class="row klik" onclick="openDetail(\'fb\',\'' + f.id + '\')">' +
         '<div><b>' + esc(f.title) + '</b><small>' + f.kind + (f.rating ? ' · ' + '★'.repeat(f.rating) : ' · ' + f.votes + ' votes') + '</small></div>' +
         statusPill(f.state === 'published' ? 'published' : 'open') + '</div>').join('') : '<div class="note">No feedback submitted.</div>');
   }
 
   else if (tab === 'activity') {
     body = '<div class="sec-t">What we have done on this account</div>' +
-      (acts.length ? acts.map(a => '<div class="row klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
+      (acts.length ? acts.map(a => '<div class="row klik" onclick="openDetail(\'audit\',\'' + a.id + '\')">' +
         '<div><b>' + a.action + '</b><small>' + esc(a.detail) + '</small></div>' +
         '<span class="note">' + ago(a.at) + '</span></div>').join('')
         : '<div class="note">No admin actions recorded against this account.</div>');
@@ -201,9 +201,9 @@ DETAIL.staff = function (id) {
       kv('Start date', fmtD(s.startDate)) +
       kv('Length of service', Math.round((DB.today - new Date(s.startDate)) / DAY / 30) + ' months') +
       kv('Status', statusPill(s.status)) +
-      kv('Reports to', boss ? '<button class="lnk" onclick="openDetail(\'staff\',' + boss.id + ')">' + esc(boss.name) + ' &rsaquo;</button>' : '<span class="note">Nobody</span>') +
+      kv('Reports to', boss ? '<button class="lnk" onclick="openDetail(\'staff\',\'' + boss.id + '\')">' + esc(boss.name) + ' &rsaquo;</button>' : '<span class="note">Nobody</span>') +
       (reports.length ? '<div class="kv"><span class="k">Direct reports (' + reports.length + ')</span><span class="v">' +
-        reports.map(r => '<button class="lnk" style="display:block;text-align:right" onclick="openDetail(\'staff\',' + r.id + ')">' + esc(r.name) + ' · ' + r.title + ' &rsaquo;</button>').join('') +
+        reports.map(r => '<button class="lnk" style="display:block;text-align:right" onclick="openDetail(\'staff\',\'' + r.id + '\')">' + esc(r.name) + ' · ' + r.title + ' &rsaquo;</button>').join('') +
         '</span></div>' : kv('Direct reports', '<span class="note">None</span>')) +
       kv('Work location', s.workLocation) +
       '<div class="sec-t">Access</div>' +
@@ -246,11 +246,11 @@ DETAIL.staff = function (id) {
       statCard({ label: 'Tasks', value: myTasks.filter(t => !t.done).length, tone: myTasks.filter(t => !t.done && t.dueIn < 0).length ? 'bad' : 'info', sub: myTasks.filter(t => t.done).length + ' completed' }) +
       '</div>' +
       '<div class="sec-t">Assigned tickets</div>' +
-      (openA.concat(closed).length ? openA.concat(closed).slice(0, 8).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+      (openA.concat(closed).length ? openA.concat(closed).slice(0, 8).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',\'' + t.id + '\')">' +
         '<div><b>' + esc(t.title) + '</b><small>' + esc(t.subscriber) + ' · ' + ago(t.openedAt) + '</small></div>' +
         statusPill(t.state) + '</div>').join('') : '<div class="note">No tickets assigned.</div>') +
       '<div class="sec-t">Open tasks</div>' +
-      (myTasks.length ? myTasks.map(t => '<div class="row klik" onclick="openDetail(\'task\',' + t.id + ')">' +
+      (myTasks.length ? myTasks.map(t => '<div class="row klik" onclick="openDetail(\'task\',\'' + t.id + '\')">' +
         '<div><b>' + esc(t.title) + '</b><small>Due ' + fmtD(t.due) + '</small></div>' +
         '<span class="pill ' + (t.done ? 'green' : t.dueIn < 0 ? 'red' : 'amber') + '">' + (t.done ? 'Done' : t.dueIn < 0 ? Math.abs(t.dueIn) + 'd late' : 'Open') + '</span></div>').join('')
         : '<div class="note">No tasks assigned.</div>');
@@ -309,7 +309,7 @@ DETAIL.staff = function (id) {
       '<div class="tw" style="margin-top:12px"><table><thead><tr><th>Month</th><th class="num hide-sm">Gross</th>' +
       '<th class="num hide-sm">Deductions</th><th class="num">Net</th><th>Paid</th>' +
       '<th class="hide-sm">Visible to staff</th><th></th></tr></thead><tbody>' +
-      slips.map(sl => '<tr class="klik" onclick="openDetail(\'slip\',' + sl.id + ')">' +
+      slips.map(sl => '<tr class="klik" onclick="openDetail(\'slip\',\'' + sl.id + '\')">' +
         '<td class="t-main">' + sl.month + '</td>' +
         '<td class="num hide-sm">' + money(sl.gross) + '</td>' +
         '<td class="num hide-sm" style="color:var(--red)">−' + money(sl.deductions) + '</td>' +
@@ -436,13 +436,13 @@ DETAIL.slip = function (id) {
   const others = Q.slipsForStaff(sl.staffId).filter(x => x.id !== sl.id);
 
   return backBtn() +
-    '<div class="dhead"><div class="dav klik" style="cursor:pointer" onclick="openDetail(\'staff\',' + sl.staffId + ')">' +
+    '<div class="dhead"><div class="dav klik" style="cursor:pointer" onclick="openDetail(\'staff\',\'' + sl.staffId + '\')">' +
     initials(sl.staffName) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>Payslip · ' + sl.month + '</h2>' +
     '<div class="dmeta">' + esc(sl.staffName) + ' · ' + st.staffId + ' · ' + sl.dept + ' · pay date ' + fmtD(sl.payDate) + '</div></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
     /* the person's record belongs at the top, next to the other actions */
-    '<button class="btn" onclick="openDetail(\'staff\',' + sl.staffId + ')">Open ' +
+    '<button class="btn" onclick="openDetail(\'staff\',\'' + sl.staffId + '\')">Open ' +
     esc(sl.staffName.split(' ')[0]) + '&rsquo;s record &rarr;</button>' +
     '<button class="btn" onclick="downloadSlip(' + sl.id + ')">Download</button>' +
     (sl.uploaded ? '' : '<button class="btn gold" onclick="publishSlip(' + sl.id + ')">Publish to staff</button>') +
@@ -473,7 +473,7 @@ DETAIL.slip = function (id) {
     '<div class="ph-sub">' + others.length + ' more on record · tap to open</div></div></div>' +
     (others.length
       ? '<div class="tw"><table><thead><tr><th>Month</th><th class="num">Net</th><th class="hide-sm">Status</th><th></th></tr></thead><tbody>' +
-      others.map(x => '<tr class="klik" onclick="openDetail(\'slip\',' + x.id + ')">' +
+      others.map(x => '<tr class="klik" onclick="openDetail(\'slip\',\'' + x.id + '\')">' +
         '<td class="t-main">' + x.month + '</td>' +
         '<td class="num">' + money(x.net) + '</td>' +
         '<td class="hide-sm">' + statusPill(x.status) + '</td>' +
@@ -540,12 +540,12 @@ DETAIL.ticket = function (id) {
     '<div class="pnl"><div class="ph"><h3>Ticket</h3></div>' +
     kv('Reference', t.ref) + kv('Type', t.kind) + kv('State', statusPill(t.state)) +
     kv('Opened', fmtD(t.openedAt)) + kv('First reply', t.firstReplyMins + ' minutes') +
-    kv('Assigned to', t.assignedTo ? '<button class="lnk" onclick="openDetail(\'staff\',' + t.assignedTo + ')">' + esc(t.assignedName) + ' &rsaquo;</button>' : '<span class="pill amber">Unassigned</span>') +
+    kv('Assigned to', t.assignedTo ? '<button class="lnk" onclick="openDetail(\'staff\',\'' + t.assignedTo + '\')">' + esc(t.assignedName) + ' &rsaquo;</button>' : '<span class="pill amber">Unassigned</span>') +
     (t.resolvedAt ? kv('Resolved', fmtD(t.resolvedAt)) : '') + '</div>' +
     '<div class="pnl"><div class="ph"><h3>Who raised it</h3></div>' +
     kv('Business', esc(t.subscriber)) + kv('Owner', esc(s.owner)) + kv('Plan', '<span class="tier">' + s.planName + '</span>') +
     kv('Health', statusPill(s.health)) + kv('MRR', s.mrr ? money(s.mrr) : '—') +
-    '<button class="btn" style="width:100%;margin-top:12px" onclick="openDetail(\'sub\',' + s.id + ')">Open account &rarr;</button></div>' +
+    '<button class="btn" style="width:100%;margin-top:12px" onclick="openDetail(\'sub\',\'' + s.id + '\')">Open account &rarr;</button></div>' +
     '</div></div>';
 };
 
@@ -571,10 +571,10 @@ DETAIL.pay = function (id) {
     '</div><div><div class="pnl"><div class="ph"><h3>Subscriber</h3></div>' +
     kv('Business', esc(s.name)) + kv('Owner', esc(s.owner)) + kv('Status', statusPill(s.status)) +
     kv('MRR', s.mrr ? money(s.mrr) : '—') + kv('Lifetime', money(DB.payments.filter(x => x.subId === s.id && x.status === 'successful').reduce((t, x) => t + x.amount, 0))) +
-    '<button class="btn" style="width:100%;margin-top:12px" onclick="openDetail(\'sub\',' + s.id + ')">Open account &rarr;</button></div>' +
+    '<button class="btn" style="width:100%;margin-top:12px" onclick="openDetail(\'sub\',\'' + s.id + '\')">Open account &rarr;</button></div>' +
     '<div class="pnl"><div class="ph"><h3>Other payments</h3></div>' +
     DB.payments.filter(x => x.subId === s.id && x.id !== p.id).slice(0, 6).map(x =>
-      '<div class="row klik" onclick="openDetail(\'pay\',' + x.id + ')"><div><b>' + money(x.amount) + '</b><small>' + fmtD(x.date) + '</small></div>' +
+      '<div class="row klik" onclick="openDetail(\'pay\',\'' + x.id + '\')"><div><b>' + money(x.amount) + '</b><small>' + fmtD(x.date) + '</small></div>' +
       statusPill(x.status) + '</div>').join('') + '</div></div></div>';
 };
 
@@ -587,7 +587,7 @@ DETAIL.onb = function (id) {
     '<div class="dhead"><div class="dav">' + initials(o.name) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>' + esc(o.name) + ' ' + statusPill(o.state) + '</h2>' +
     '<div class="dmeta">' + esc(o.owner) + ' · ' + esc(o.city) + ' · found us via ' + esc(o.channel) + '</div></div>' +
-    '<div style="display:flex;gap:8px"><button class="btn" onclick="openDetail(\'sub\',' + s.id + ')">Full account</button>' +
+    '<div style="display:flex;gap:8px"><button class="btn" onclick="openDetail(\'sub\',\'' + s.id + '\')">Full account</button>' +
     '<button class="btn gold" onclick="formConvert(' + s.id + ')">Convert to paid</button></div></div>' +
     '<div class="dstats">' +
     dstat(o.progress + '%', 'Setup complete', o.progress >= 80 ? 'g' : 'a') +
@@ -632,7 +632,7 @@ DETAIL.fb = function (id) {
     '<p style="font-size:14px;line-height:1.75">' + esc(f.body) + '</p></div>' +
     '<div class="pnl"><div class="ph"><h3>Who</h3></div>' + kv('Business', esc(s.name)) +
     kv('Owner', esc(s.owner)) + kv('Plan', '<span class="tier">' + s.planName + '</span>') +
-    '<button class="btn" style="width:100%;margin-top:12px" onclick="openDetail(\'sub\',' + s.id + ')">Open account &rarr;</button></div></div>';
+    '<button class="btn" style="width:100%;margin-top:12px" onclick="openDetail(\'sub\',\'' + s.id + '\')">Open account &rarr;</button></div></div>';
 };
 
 DETAIL.ann = function (id) {
@@ -667,7 +667,7 @@ DETAIL.task = function (id) {
     '<div class="pnl" style="max-width:720px"><div class="ph"><h3>Detail</h3></div>' +
     '<p style="font-size:14px;line-height:1.75">' + esc(t.body) + '</p>' +
     '<div class="sec-t">Assigned to</div>' +
-    '<button class="btn" onclick="openDetail(\'staff\',' + t.assignedTo + ')">' + esc(t.assignedName) + ' &rarr;</button></div>';
+    '<button class="btn" onclick="openDetail(\'staff\',\'' + t.assignedTo + '\')">' + esc(t.assignedName) + ' &rarr;</button></div>';
 };
 
 DETAIL.audit = function (id) {
@@ -681,13 +681,13 @@ DETAIL.audit = function (id) {
     '<p style="font-size:14px;line-height:1.75">' + esc(a.detail) + '</p>' +
     '<div class="sec-t">Why</div><p class="note">' + esc(a.reason) + '</p>' +
     (tgt && tgt[0] === 'subscriber' ? '<div class="sec-t">Affected account</div>' +
-      '<button class="btn" onclick="openDetail(\'sub\',' + tgt[1] + ')">' + esc((Q.sub(tgt[1]) || {}).name || 'Open account') + ' &rarr;</button>' : '') +
+      '<button class="btn" onclick="openDetail(\'sub\',\'' + tgt[1] + '\')">' + esc((Q.sub(tgt[1]) || {}).name || 'Open account') + ' &rarr;</button>' : '') +
     (tgt && tgt[0] === 'ticket' ? '<div class="sec-t">Related ticket</div>' +
-      '<button class="btn" onclick="openDetail(\'ticket\',' + tgt[1] + ')">Open ticket &rarr;</button>' : '') +
+      '<button class="btn" onclick="openDetail(\'ticket\',\'' + tgt[1] + '\')">Open ticket &rarr;</button>' : '') +
     '</div><div class="pnl"><div class="ph"><h3>Record</h3></div>' +
     kv('Entry ID', 'AUD-' + String(a.id).slice(-6)) +
     kv('Action type', a.kind) +
-    kv('Who did it', '<button class="lnk" onclick="openDetail(\'staff\',' + a.actorId + ')">' + esc(a.actor) + ' &rsaquo;</button>') +
+    kv('Who did it', '<button class="lnk" onclick="openDetail(\'staff\',\'' + a.actorId + '\')">' + esc(a.actor) + ' &rsaquo;</button>') +
     kv('Their role', a.actorRole) +
     kv('When', fmtD(a.at) + ' ' + new Date(a.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })) +
     kv('IP address', a.ip) + kv('Device', a.device) +

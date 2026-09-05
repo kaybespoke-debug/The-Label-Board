@@ -134,6 +134,64 @@ section('And they reach the screen');
 }
 
 // ---------------------------------------------------------------------
+section('And they can be opened');
+// ---------------------------------------------------------------------
+// The console emitted its click handlers as onclick="openDetail('sub'," + id + ")"
+// with the id unquoted, and looked rows up with `s.id === +id`. Both assume a
+// number. A live row is namespaced — "live-<uuid>" — so the handler was a
+// syntax error and the lookup was NaN: clicking a real studio did nothing, and
+// reaching its panel any other way said "Subscriber not found."
+//
+// The same two lines open a support ticket, so a real studio's message could
+// not be opened either. That is the console's whole purpose, and it had never
+// worked for a live row.
+{
+  const html = run('PAGES.subscribers()');
+  const ids = run('DB.subscribers.map(s=>s.id)');
+
+  ok('a live subscriber id is passed to the click handler as a string',
+     ids.every(id => html.indexOf("openDetail('sub','" + id + "')") !== -1),
+     'the handler would be a syntax error and the click would do nothing');
+
+  ok('looking one up by its own id finds it',
+     ids.every(id => !!run('Q.sub(' + JSON.stringify(id) + ')')),
+     'Q.sub coerces with +id, which is NaN for a namespaced id');
+
+  ok('and an example subscriber is still found by its numeric id',
+     (function () {
+       run('DB.subscribers.push({id:4242,name:"Example Co",status:"active",plan:"pro",planName:"Pro",joined:"2026-01-01",renewIn:5,mrr:1,users:1,seats:3,health:"steady",businesses:[],referrals:[],notes:[],owner:"",email:"",city:"",lastSeen:"2026-01-01",renewsOn:"2026-02-01",pastDue:false,cycle:"monthly",channel:"Direct"});');
+       const bothWays = !!run('Q.sub(4242)') && !!run('Q.sub("4242")');
+       run('DB.subscribers = DB.subscribers.filter(s=>s.id!==4242);');
+       return bothWays;
+     })(), 'making live ids work must not break the example ones');
+
+  const detail = run('DETAIL.sub(' + JSON.stringify(ids[0]) + ')');
+  ok('the detail panel renders for a live studio',
+     typeof detail === 'string' && !/Subscriber not found/.test(detail),
+     'it rendered the not-found state');
+  ok('and it names the studio it was opened for',
+     detail.indexOf('Okoro &amp; Sons') !== -1 || detail.indexOf('Okoro & Sons') !== -1);
+}
+
+// ---------------------------------------------------------------------
+section('A live support ticket opens too');
+// ---------------------------------------------------------------------
+{
+  run(`DB.tickets = mergeLive(DB.tickets || [], [{
+    id:'live-tkt-1', liveId:'tkt-1', live:true, ref:'TLB-2001',
+    title:'Cannot print an invoice', body:'The button does nothing.',
+    sub:'Okoro & Sons Shoes', subId:null, kind:'bug', status:'open',
+    priority:'high', opened:'2026-09-04', updated:'2026-09-04', replies:[], assignee:null
+  }]);`);
+  ok('a live ticket is found by its id', !!run("Q.ticket('live-tkt-1')"),
+     'Q.ticket coerced with +id, so a live ticket could never be opened');
+  const sup = run('PAGES.support ? PAGES.support() : ""');
+  ok('the support page passes the ticket id as a string',
+     sup.indexOf("openDetail('ticket','live-tkt-1')") !== -1,
+     'the click handler would be a syntax error');
+}
+
+// ---------------------------------------------------------------------
 section('The dashboard counts them too');
 // ---------------------------------------------------------------------
 {

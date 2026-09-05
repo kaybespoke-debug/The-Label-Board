@@ -1901,7 +1901,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v36';
+const APP_VERSION='layi-v37';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -2735,6 +2735,126 @@ function _rtNotify(key,oldStr,newData){try{
   else if(key==='layi_dash_txns'){const o=_safeArr(oldStr),n=Array.isArray(newData)?newData:[];if(n.length>o.length){const added=n.slice(o.length).filter(t=>t.dir==='in');if(added.length)pushActivity('payment','A payment came in: '+cur(added.reduce((s,t)=>s+(+t.amount||0),0)),true);}}
   else if(key==='layi_dash_appts'){const o=_safeArr(oldStr),n=Array.isArray(newData)?newData:[];if(n.length>o.length)pushActivity('appointment','New appointment booked',true);}
 }catch(e){}}
+/* ===== FIRST RUN: WHAT IS THIS STUDIO? ==========================================
+   Everything downstream hangs off two answers — what a studio does, and how it
+   sells. Production stages, the measurements it takes, the word it uses for an
+   item, which tabs appear, and where a website order lands are all derived from
+   them.
+
+   Nothing ever asked. A brand new tenant inherited DEFAULTS: a company called
+   LAYI, one branch called "Main", and branchDoes() falling through to
+   ['bespoke','rtw'] because the branch named no trade. So a shoemaker's first
+   sight of the app was somebody else's label doing two trades they may not be
+   in, and the only way to correct it was to find Settings and know what to
+   change. This asks instead, once, in the order the answers matter.
+
+   Deliberately skippable and deliberately not a wizard: one screen, three
+   questions, and a studio that skips it is not asked again. Getting a studio to
+   its own data quickly matters more than a complete profile.
+   ============================================================================= */
+let setupDraft=null;
+
+/* Only for a real studio, on its first run. Never for the demo — somebody
+   exploring the example already has a studio in front of them — and a device
+   with orders on it has plainly been set up whatever the marker says. */
+function needsStudioSetup(){
+  if(!liveMode)return false;
+  if(SETTINGS.setupDone)return false;
+  try{ if(rawOrders().length)return false; }catch(e){}
+  return true;
+}
+function maybeOpenStudioSetup(){ if(needsStudioSetup())openStudioSetup(); }
+
+function openStudioSetup(){
+  const co=(SETTINGS.company&&SETTINGS.company.name)||'';
+  setupDraft={
+    /* LAYI is the demo tenant's name and arrives via DEFAULTS, so it is an
+       unanswered question rather than this studio's own answer. */
+    name:(co&&co!=='LAYI')?co:'',
+    location:'', does:[], channels:['showroom']
+  };
+  renderStudioSetup();
+}
+function setupToggleDoes(k){
+  setupSync();
+  const i=setupDraft.does.indexOf(k);
+  if(i>=0)setupDraft.does.splice(i,1); else setupDraft.does.push(k);
+  renderStudioSetup();
+}
+function setupSync(){
+  if(!setupDraft)return;
+  const n=document.getElementById('su_name'),l=document.getElementById('su_loc');
+  if(n)setupDraft.name=n.value;
+  if(l)setupDraft.location=l.value;
+  const sh=document.getElementById('su_show'),on=document.getElementById('su_onl');
+  if(sh||on){const c=[];if(sh&&sh.checked)c.push('showroom');if(on&&on.checked)c.push('online');
+    setupDraft.channels=c.length?c:['showroom'];}
+}
+function renderStudioSetup(){
+  const d=setupDraft;if(!d)return;
+  const chips=branchActivities().map(function(a){
+    const on=d.does.indexOf(a.key)>=0;
+    return '<div onclick="setupToggleDoes(\'' + a.key + '\')" style="cursor:pointer;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--panel-2)':'transparent')+';border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px">'
+      +'<div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:5px;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--gold)':'transparent')+';color:#1a1206;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">'+(on?'✓':'')+'</span><b style="font-size:14px">'+esc(a.label)+'</b></div>'
+      +(a.desc?'<div style="font-size:11.5px;color:var(--text-faint);margin-top:4px">'+esc(a.desc)+'</div>':'')
+      +'</div>';
+  }).join('');
+  openModal('<h3>Set up your studio</h3><div class="msub">Three questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
+    +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
+    +'<div class="field"><label>Where do you work from <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="su_loc" value="'+esc(d.location)+'" placeholder="City / area"></div>'
+    +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick everything)</span></label>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:2px">'+chips+'</div></div>'
+    +'<div class="field"><label>How do you sell</label><div style="display:flex;gap:20px;padding-top:4px">'
+    +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_show" '+(d.channels.indexOf('showroom')>=0?'checked':'')+'> In person</label>'
+    +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_onl" '+(d.channels.indexOf('online')>=0?'checked':'')+'> Online</label>'
+    +'</div></div>'
+    +'<div class="modal-foot"><button class="btn ghost" onclick="skipStudioSetup()">Skip for now</button><span style="flex:1"></span><button class="btn" onclick="saveStudioSetup()">Start</button></div>');
+}
+/* Skipping is a real answer. It is recorded, so the studio is asked once and
+   never again — a setup screen that reappears every morning is worse than no
+   setup screen at all. */
+function skipStudioSetup(){
+  SETTINGS.setupDone=true;save('layi_dash_settings',SETTINGS);
+  setupDraft=null;closeModal();
+}
+function saveStudioSetup(){
+  setupSync();
+  const d=setupDraft;if(!d)return;
+  const name=(d.name||'').trim();
+  if(!name){alert('What is your label called?');return;}
+  if(!d.does.length){alert('Tick at least one thing you do, so the app knows which tabs to show you.');return;}
+
+  SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:name});
+  const existing=getBranches()[0]||{};
+  SETTINGS.branches=[{
+    id:existing.id||uid('br'),
+    name:(d.location||'').trim()||name,
+    location:(d.location||'').trim(),
+    active:true,
+    does:d.does.slice(),
+    type:summaryType(d.does),
+    channels:d.channels.slice()
+  }];
+  /* The production board should be the right board the first time they open
+     it. Stages come from the first trade they picked that has its own; a
+     studio doing two keeps the first one's and can change it in Settings. */
+  const withStages=d.does.map(function(k){return (branchActivities().find(function(a){return a.key===k;})||{}).stages;}).filter(Boolean);
+  if(withStages.length&&STAGE_PRESETS[withStages[0]]){
+    SETTINGS.productionStages=STAGE_PRESETS[withStages[0]].slice();
+    if(typeof applyStages==='function')applyStages();
+  }
+  SETTINGS.itemWord='';            // let the trade choose the word
+  SETTINGS.setupDone=true;
+  save('layi_dash_settings',SETTINGS);
+  if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+d.does.join(', '));
+  setupDraft=null;closeModal();
+  if(typeof applyBranding==='function')applyBranding();
+  if(typeof applyBizVisibility==='function')applyBizVisibility();
+  if(typeof renderBranchSwitch==='function')renderBranchSwitch();
+  renderAll();
+  if(typeof toast==='function')toast('Welcome to '+name);
+}
+
 function enterApp(){
   document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';
   applyBranding();applySidebar();if(typeof paintNavIcons==='function')paintNavIcons();
@@ -2770,6 +2890,7 @@ function enterApp(){
   renderAll();updateNavGroups();go('activity');
   try{saveSession();}catch(e){}
   try{maybeOfferBiometric();}catch(e){}
+  try{maybeOpenStudioSetup();}catch(e){}
 }
 /* ===== SIGNED-IN SESSION =====
    Device-local and deliberately simple: the account id plus a timestamp. It lets

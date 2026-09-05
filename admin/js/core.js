@@ -293,10 +293,15 @@ const Q = {
   leaveTaken(staffId) { return Q.leaveFor(staffId).filter(l => l.status === 'approved' && parseD(l.to) <= DB.today).reduce((t, l) => t + l.days, 0); },
 
   /* misc */
-  sub(id) { return DB.subscribers.find(s => s.id === +id); },
-  staffM(id) { return DB.staff.find(s => s.id === +id); },
+  /* Compared as text, not coerced with +id. Example subscribers have numeric
+     ids and live ones are namespaced strings like "live-<uuid>", and +"live-…"
+     is NaN — so a real studio was never found and its detail panel said
+     "Subscriber not found." String() matches both without either having to
+     pretend to be the other. */
+  sub(id) { return DB.subscribers.find(s => String(s.id) === String(id)); },
+  staffM(id) { return DB.staff.find(s => String(s.id) === String(id)); },
   role(id) { return DB.roles.find(r => r.id === id); },
-  ticket(id) { return DB.tickets.find(t => t.id === +id); },
+  ticket(id) { return DB.tickets.find(t => String(t.id) === String(id)); },
   refCommissionTotal() { return DB.subscribers.reduce((t, s) => t + (s.referralEarned || 0), 0); },
   tasksFor(f) {
     if (f === 'mine') return DB.tasks.filter(t => t.assignedTo === 1 || t.createdBy === 1);
