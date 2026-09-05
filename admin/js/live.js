@@ -551,6 +551,20 @@ async function liveSetPlan(subId, plan, cycle, price) {
   await liveLoadBilling();
 }
 
+/* Granting one studio more space than its plan includes.
+   This is how we say yes to a big brand without raising the cap for
+   everybody: an override on that studio's row, set after a price is agreed.
+   Extra storage costs us about N28/GB/month, so whatever is charged for it
+   wants to be comfortably above that.
+   Passing null clears the override and returns them to their plan. */
+async function liveSetStorageCap(subId, gb, note) {
+  const s = Q.sub(subId);
+  if (!s || !s.live) throw new Error('That is an example subscriber, not a real studio.');
+  const value = (gb === null || gb === undefined || gb === '') ? null : Number(gb);
+  await liveCall('setStorageCap', { id: s.liveId, gb: value, note: note || '' });
+  await liveLoadTenants();
+}
+
 async function liveRecordPayment(subId, amount, method, reference, note) {
   const s = Q.sub(subId);
   if (!s || !s.live) throw new Error('That is an example subscriber, not a real studio.');

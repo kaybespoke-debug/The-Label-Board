@@ -1901,7 +1901,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v38';
+const APP_VERSION='layi-v39';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -2707,6 +2707,13 @@ async function doLogin(){
       await hydrateFromCloud();
       try{reportTenantPresence();}catch(e){}
       startRealtime();
+      /* Photos: find out how full they are, mint the URLs this screen needs,
+         then move anything still held as bytes up to storage. The sweep runs
+         after the app is usable and never blocks sign-in — it is catch-up
+         work, not a step somebody waits on. */
+      try{ await refreshCloudUsage(); }catch(e){}
+      try{ await ensurePhotoUrls(allPhotoRefs()); }catch(e){}
+      setTimeout(function(){ startMediaSweep(); },1500);
       errEl.textContent='';document.getElementById('loginPass').value='';
       activeBranchView='all'; // start on the all-studios view (renderBranchSwitch pins branch-locked roles to their studio)
       enterApp();
@@ -2748,6 +2755,35 @@ function showOfflineInfo(){
     <div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Got it</button></div>`);
 }
 if(typeof window!=='undefined'&&window.addEventListener){try{window.addEventListener('online',updateConnPill);window.addEventListener('offline',updateConnPill);}catch(e){}}
+
+/* ---- moving photos up, in the background --------------------------------
+   A studio that worked all morning with no signal comes back with photos on
+   the device. They go up when the signal returns, a few at a time so the
+   sweep never competes with whatever the person is actually doing, and it
+   stops on its own once there is nothing left. */
+let _sweepTimer=null;
+async function startMediaSweep(){
+  if(_sweepTimer)return;
+  const tick=async function(){
+    const r=await sweepInlinePhotos(15);
+    if(r.moved){ try{ await refreshCloudUsage(); }catch(e){} }
+    if(!r.left||!navigator.onLine){ clearInterval(_sweepTimer); _sweepTimer=null; }
+  };
+  await tick();
+  if(inlinePhotoCount()>0&&!_sweepTimer)_sweepTimer=setInterval(tick,20000);
+}
+if(typeof window!=='undefined'&&window.addEventListener){
+  try{
+    window.addEventListener('online',function(){
+      if(!liveMode)return;
+      /* Back on the network: refresh the usage figure, re-mint any signed URL
+         that expired while we were away, and pick the sweep back up. */
+      refreshCloudUsage().catch(function(){});
+      ensurePhotoUrls(allPhotoRefs()).catch(function(){});
+      startMediaSweep();
+    });
+  }catch(e){}
+}
 
 /* ===== NOTIFICATIONS (alerts only) =====
    No feed or bell — the Company log and Audit trail already record every activity. This just
@@ -3803,7 +3839,7 @@ function batchSet(stageIdx,val){batchApply(stageIdx,val);}
 function batchStep(stageIdx,delta){const o=getOrders().find(x=>x.id===batchId);if(!o)return;batchApply(stageIdx,(o.batch.reached[stageIdx]||0)+delta);}
 function addOutfit(){syncOrderDraft();draft.outfits.push(blankOutfit());reRenderOrder();}
 function removeOutfit(i){syncOrderDraft();draft.outfits.splice(i,1);if(!draft.outfits.length)draft.outfits.push(blankOutfit());reRenderOrder();}
-async function addClientPhotos(files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.clientPhotos.push(await compressFor(f,'reference'));}reRenderOrder();}
+async function addClientPhotos(files){syncOrderDraft();if(photoUploadBlocked())return;for(const f of files){if(!f.type.startsWith('image/'))continue;draft.clientPhotos.push(await saveImageAsset(await compressFor(f,'reference'),'client'));}reRenderOrder();}
 function removeClientPhoto(idx){syncOrderDraft();draft.clientPhotos.splice(idx,1);reRenderOrder();}
 function orderMeasRefHtml(client){const key=nameKey(client||'');if(!key)return '';const latest=latestMeasOf(key);if(!latest)return '';const ks=MEAS_ALL.filter(f=>latest.meas&&latest.meas[f]);if(!ks.length&&!latest.fit&&!latest.posture)return '';
   return `<div class="kv" style="margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-2)"><b>📐 Measurements on file</b>${latest.at&&latest.at>new Date(1).toISOString()?' <span style="color:var(--text-faint)">('+new Date(latest.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+')</span>':''}${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}<br><span style="color:var(--text-faint);font-size:12px">${ks.slice(0,8).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')}${ks.length>8?' …':''}</span></div>`;}
@@ -3815,19 +3851,19 @@ function clientPick(){const s=document.getElementById('f_clientPick');const t=do
 function clientChosen(){if(!draft)return;syncOrderDraft();const nm=(fv('f_client')||'').trim();const key=nameKey(nm);const c=getCustomers()[key];if(c){const e=document.getElementById('f_email');if(e&&!e.value&&c.email)e.value=c.email;const w=document.getElementById('f_whatsapp');if(w&&!w.value&&c.whatsapp)w.value=c.whatsapp;const a=document.getElementById('f_address');if(a&&!a.value&&c.address)a.value=c.address;}const cm=document.getElementById('clientMatch');if(cm)cm.innerHTML=!nm?'':(c?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Customers on save</span>');refreshOrderMeas();}
 function toggleOrderMeas(){syncOrderDraft();orderMeasOpen=!orderMeasOpen;reRenderOrder();}
 function loadLatestMeasIntoOrder(){syncOrderDraft();const key=nameKey(draft.client||'');const latest=key?latestMeasOf(key):null;if(latest){draft.meas=Object.assign({},latest.meas||{});draft.measFit=latest.fit||'';draft.measPosture=latest.posture||'';draft.measNote=latest.note||'';orderMeasOpen=true;reRenderOrder();}}
-async function addOutfitPhotos(i,files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.outfits[i].photos.push(await compressFor(f,'reference'));}reRenderOrder();}
+async function addOutfitPhotos(i,files){syncOrderDraft();if(photoUploadBlocked())return;for(const f of files){if(!f.type.startsWith('image/'))continue;draft.outfits[i].photos.push(await saveImageAsset(await compressFor(f,'reference'),'outfit'));}reRenderOrder();}
 function removeOutfitPhoto(i,idx){syncOrderDraft();draft.outfits[i].photos.splice(idx,1);reRenderOrder();}
 function recalcTotal(){let t=0;draft.outfits.forEach((o,i)=>{const e=document.getElementById('of_price_'+i);if(e)t+=+e.value||0;});const el=document.getElementById('orderTotal');if(el)el.textContent=cur(t);}
 
 function photoGrid(photos,addLabel,addAttr,rmFn){
   return`<div class="photo-grid">
-    ${photos.map((p,idx)=>`<div class="thumb"><img src="${p}" onclick="lightbox(this.src)"><span class="rm" onclick="${rmFn}(${idx})">✕</span></div>`).join('')}
+    ${photos.map((p,idx)=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"><span class="rm" onclick="${rmFn}(${idx})">✕</span></div>`).join('')}
     <label class="add-photo">＋<span>${addLabel}</span><input type="file" accept="image/*" multiple style="display:none" onchange="${addAttr}(this.files)"></label>
   </div>`;
 }
 function outfitPhotoGrid(i,photos){
   return`<div class="photo-grid">
-    ${photos.map((p,idx)=>`<div class="thumb"><img src="${p}" onclick="lightbox(this.src)"><span class="rm" onclick="removeOutfitPhoto(${i},${idx})">✕</span></div>`).join('')}
+    ${photos.map((p,idx)=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"><span class="rm" onclick="removeOutfitPhoto(${i},${idx})">✕</span></div>`).join('')}
     <label class="add-photo">＋<span>photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addOutfitPhotos(${i},this.files)"></label>
   </div>`;
 }
@@ -4121,11 +4157,11 @@ function openDetail(id){
   const att=orderAttention(o);
   const attBanner=att?`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid ${att.sev};border-left:4px solid ${att.sev};background:var(--panel-2);border-radius:10px;padding:12px 14px;margin-bottom:14px"><div style="flex:1;min-width:200px"><b style="color:${att.sev}">⚠ Action needed</b><div style="font-size:13.5px;color:var(--text-dim);margin-top:3px">${esc(att.text)}</div></div>${att.act?`<button class="btn sm" onclick="${att.act.fn}">${esc(att.act.label)}</button>`:''}</div>`:'';
   const owed=orderNet(o)-(+o.paid||0);
-  const clientPhotos=o.clientPhotos.length?`<div class="field"><label>Client photos</label><div class="photo-grid">${o.clientPhotos.map(p=>`<div class="thumb"><img src="${p}" onclick="lightbox(this.src)"></div>`).join('')}</div></div>`:'';
+  const clientPhotos=o.clientPhotos.length?`<div class="field"><label>Client photos</label><div class="photo-grid">${o.clientPhotos.map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"></div>`).join('')}</div></div>`:'';
   const outfits=o.outfits.map((of,i)=>`
     <div class="detail-out">
       <div class="doh"><div>${isGroup(o)?'<b>'+esc(of.person||('Person '+(i+1)))+'</b> · ':''}${esc(of.name||of.type||'Item '+(i+1))}${(of.name&&of.type)?` <span style="color:var(--text-faint);font-size:12px">· ${esc(of.type)}</span>`:''}${isGroup(o)?` <span class="badge b-gold" style="font-size:11px">${esc(STAGES[+of.stageIndex||0])}</span>`:''}</div>${can('orders')?`<div class="dop">${cur(of.price)}</div>`:''}</div>
-      ${of.photos.length?`<div class="photo-grid">${of.photos.map(p=>`<div class="thumb"><img src="${p}" onclick="lightbox(this.src)"></div>`).join('')}</div>`:''}
+      ${of.photos.length?`<div class="photo-grid">${of.photos.map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"></div>`).join('')}</div>`:''}
       ${(of.materials&&of.materials.length)?`<div class="kv"><b>Materials:</b> ${of.materials.map(m=>esc(m)).join(' · ')}</div>`:''}
       ${of.style?`<div class="kv"><b>Styling:</b> ${esc(of.style)}</div>`:''}
       ${of.finish?`<div class="kv"><b>Finishing:</b> ${esc(of.finish)}</div>`:''}
@@ -4133,7 +4169,7 @@ function openDetail(id){
       ${isGroup(o)&&(of.measFit||of.measNote)?`<div class="kv">${of.measFit?'<b>Fit:</b> '+esc(of.measFit):''}${of.measNote?(of.measFit?' · ':'')+esc(of.measNote):''}</div>`:''}
     </div>`).join('');
   const ups=(o.updates||[]).slice().reverse().map(u=>`<div class="up-line"><b>${esc(u.by)}</b> · ${esc(u.stage)}${u.worker?' · <span style="color:var(--gold)">'+esc(u.worker)+'</span>':''} <span style="color:var(--text-faint)">· ${timeAgo(u.at)}</span><br>${esc(u.note)}
-    ${(u.photos&&u.photos.length)?`<div class="photo-grid">${u.photos.map(p=>`<div class="thumb"><img src="${p}" onclick="lightbox(this.src)"></div>`).join('')}</div>`:''}</div>`).join('');
+    ${(u.photos&&u.photos.length)?`<div class="photo-grid">${u.photos.map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"></div>`).join('')}</div>`:''}</div>`).join('');
   const c=getCustomers()[nameKey(o.client)]||{};
   const contact=(c.email||c.whatsapp)?`<div class="contact-row">${c.email?`<a href="mailto:${esc(c.email)}">✉ ${esc(c.email)}</a>`:''}${c.whatsapp?`<a href="https://wa.me/${esc(String(c.whatsapp).replace(/[^0-9]/g,''))}" target="_blank">WhatsApp ${esc(c.whatsapp)}</a>`:''}</div>`:'';
   const makers=(o.commissions||[]).filter(c=>c.kind==='maker'&&c.staffId).map(c=>`${esc(staffName(c.staffId))} <span style="color:var(--text-faint)">(${esc(c.work||'making')})</span>`).filter(Boolean);
@@ -4264,7 +4300,7 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
       ${f.paid>0?line('Paid','− '+cs+fmtNum(f.paid)):''}
       ${line('Balance due',cs+fmtNum(f.balance),true)}
     </table>
-    ${photos.length?`<div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">${photos.map(p=>`<img src="${p}" style="width:110px;height:110px;object-fit:cover;border-radius:6px">`).join('')}</div>`:''}
+    ${photos.length?`<div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">${photos.map(p=>`<img src="${photoSrc(p)}" style="width:110px;height:110px;object-fit:cover;border-radius:6px">`).join('')}</div>`:''}
     ${((showBanks&&showBanks.length)||co.payInstructions)?`<div style="margin-top:22px;padding:14px;background:#faf6ee;border-radius:8px;font-size:13px"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Payment ${ocur(o)!==SETTINGS.currency?'('+ocur(o)+')':''}</div>${(showBanks||[]).map(b=>`<div style="margin-bottom:3px"><b>${esc(b.currency||'')}</b> · ${[b.bank,b.name,b.no].filter(Boolean).map(esc).join(' · ')}</div>`).join('')}${co.payInstructions?`<div style="white-space:pre-line;margin-top:6px">${esc(co.payInstructions)}</div>`:''}</div>`:''}
     <div style="margin-top:24px;text-align:center;color:#aaa;font-size:12px">Thank you for choosing ${esc(co.name||tenantName())}.</div>
   </div>`;
@@ -4404,7 +4440,7 @@ function copyInvoiceText(id){const o=getOrders().find(x=>x.id===id);if(!o)return
 /* ===== PRODUCTION UPDATE (all roles, with optional photos) ===== */
 function openUpdate(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;updateDraft={id,stage:o.stageIndex,note:'',photos:[],client:o.client,garment:o.garment,worker:(currentUser&&currentUser.staffId)||''};renderUpdateModal();}
 function syncUpdate(){if(!updateDraft)return;const s=document.getElementById('u_stage');const n=document.getElementById('u_note');const w=document.getElementById('u_worker');if(s)updateDraft.stage=+s.value;if(n)updateDraft.note=n.value;if(w)updateDraft.worker=w.value;}
-async function addUpdatePhotos(files){syncUpdate();for(const f of files){if(!f.type.startsWith('image/'))continue;updateDraft.photos.push(await compressFor(f,'progress'));}renderUpdateModal();}
+async function addUpdatePhotos(files){syncUpdate();if(photoUploadBlocked())return;for(const f of files){if(!f.type.startsWith('image/'))continue;updateDraft.photos.push(await saveImageAsset(await compressFor(f,'progress'),'progress'));}renderUpdateModal();}
 function removeUpdatePhoto(idx){syncUpdate();updateDraft.photos.splice(idx,1);renderUpdateModal();}
 function renderUpdateModal(){
   const _dispIdx=STAGES.indexOf('Dispatched');const _delIdx=STAGES.indexOf('Delivered');
@@ -5109,16 +5145,16 @@ function initSettingsCollapse(){groupSettings();}
 const PLANS=[
   {id:'trial',   name:'Trial',   monthly:0,     studios:1, seats:3, storageGb:2,
    blurb:'14 days, everything in Pro', features:['chase']},
-  {id:'starter', name:'Basic',   monthly:27000, studios:1, seats:3, storageGb:15,
+  {id:'starter', name:'Basic',   monthly:27000, studios:1, seats:3, storageGb:20,
    blurb:'One studio, three people', features:[]},
   /* Pro is the full product: no feature is held back and staff are unlimited.
      That makes storage the only thing left protecting margin, which is why
      its cap is a real number rather than a generous gesture. */
-  {id:'pro',     name:'Pro',     monthly:65000, studios:3, seats:0, storageGb:150,
+  {id:'pro',     name:'Pro',     monthly:65000, studios:3, seats:0, storageGb:200,
    blurb:'Everything, and as many people as you employ', features:['chase']},
   /* Priced per business, so it carries no monthly figure to quote. An operator
      types the negotiated price when they move a studio onto it. */
-  {id:'premium', name:'Bespoke', monthly:0, invoiceOnly:true, studios:0, seats:0, storageGb:1024,
+  {id:'premium', name:'Bespoke', monthly:0, invoiceOnly:true, studios:0, seats:0, storageGb:1000,
    blurb:'Shaped around how you already work', features:['chase']}
 ];
 /* ---- what a plan includes, as opposed to how much of it ------------------
@@ -5252,7 +5288,7 @@ function cur2(n){return '\u20a6'+fmtNum(n||0);}
    is quietly capped at 1GB while the plan panel promises fifteen. Nothing
    errors, nothing is logged, and the first anybody hears of it is a customer
    who cannot save a photo. audit_storage now pins them together. */
-const STORAGE_TIERS=[{name:'Free',gb:2},{name:'Studio',gb:15},{name:'Growth',gb:150},{name:'Atelier',gb:1024}];
+const STORAGE_TIERS=[{name:'Free',gb:2},{name:'Studio',gb:20},{name:'Growth',gb:200},{name:'Atelier',gb:1000}];
 /* Storage comes from the plan. It used to be its own setting, which meant a
    studio could be on Starter with an Atelier allowance and nobody would notice
    until the bill did not match. An explicit storageTier still wins if one was
@@ -5274,9 +5310,280 @@ function storageUsage(){
   return {bytes,photos};
 }
 function fmtBytes(b){b=+b||0;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';if(b<1073741824)return (b/1048576).toFixed(1)+' MB';return (b/1073741824).toFixed(2)+' GB';}
-// Go-live seam: every image save routes through here. Inline now; uploads to per-business cloud
-// storage and returns a URL once live. Kept sync now; becomes async (callers await) at go-live.
-function saveImageAsset(dataUrl){ /* go-live: if(liveMode) return uploadToStorage(dataUrl); */ return dataUrl; }
+
+/* ---- how full the studio actually is -------------------------------------
+   Once photos live in storage, the only honest source for this is the
+   database: it is the number the upload policy is enforced against, and it
+   counts what is really stored rather than what this device happens to know
+   about. Held locally between refreshes so a meter can render without a
+   round trip, and falling back to counting local bytes when there is no
+   backend at all (the demo, and a studio working offline). */
+const CLOUD_USAGE_KEY='layi_dash_storage_usage';   // local only; never synced
+function cloudUsage(){ return load(CLOUD_USAGE_KEY,null); }
+async function refreshCloudUsage(){
+  if(!supa||!liveMode||!myBusinessId)return null;
+  try{
+    const {data,error}=await supa.rpc('my_storage_usage');
+    if(error||!data||!data.length)return null;
+    const mine=data.find(r=>r.business_id===myBusinessId)||data[0];
+    const u={used:Number(mine.used_bytes)||0,cap:Number(mine.cap_bytes)||0,
+             pct:Number(mine.pct)||0,at:Date.now()};
+    saveLocal(CLOUD_USAGE_KEY,u);
+    return u;
+  }catch(e){ return null; }
+}
+/* Keep the meter honest between refreshes without waiting for a round trip. */
+function bumpStorageUsed(bytes){
+  const u=cloudUsage();if(!u)return;
+  u.used=Math.max(0,(u.used||0)+(+bytes||0));
+  u.pct=u.cap?Math.round(u.used*1000/u.cap)/10:0;
+  saveLocal(CLOUD_USAGE_KEY,u);
+}
+/* One place decides what "full" means, so the warning, the block and the
+   meter can never disagree with each other. */
+function storageState(){
+  const u=cloudUsage();
+  if(u&&u.cap>0){
+    return {used:u.used,cap:u.cap,pct:u.pct,
+            warn:u.pct>=80&&u.pct<100,full:u.pct>=100,known:true};
+  }
+  // no backend (demo / brand new / offline before the first refresh)
+  const used=storageUsage().bytes,cap=storageLimitBytes();
+  const pct=cap?Math.round(used*1000/cap)/10:0;
+  return {used,cap,pct,warn:pct>=80&&pct<100,full:pct>=100,known:false};
+}
+/* The only thing a full studio cannot do. Called before any work is done on
+   the file, so nobody waits through a compress for a photo that will be
+   refused — and it always says why. An upload that just quietly does not
+   happen is the worst version of this. */
+function photoUploadBlocked(){
+  const s=storageState();
+  if(!s.full)return false;
+  alert(storageFullMessage());
+  return true;
+}
+function storageFullMessage(){
+  const s=storageState();
+  return 'You have reached your storage limit ('+fmtBytes(s.used)+' of '+fmtBytes(s.cap)+').\n\n'
+    +'Everything else keeps working — orders, clients, finance and every photo you already have. '
+    +'Only new photo uploads are paused.\n\n'
+    +'Upgrade your plan, or talk to us about more space.';
+}
+/* ==========================================================================
+   PHOTOS LIVE IN OBJECT STORAGE, NOT IN THE DATABASE
+
+   Every photo used to be a base64 data URL sitting inside the order record,
+   and orders sync through the generic app_state row. So each photo was being
+   written into Postgres — the most expensive place it could possibly go:
+
+     database storage  $0.125/GB     file storage  $0.0213/GB   5.9x
+     base64 overhead   +33%                                     1.33x
+     database egress   $0.09/GB      CDN-cached    $0.03/GB     3x
+     Pro includes      8 GB disk     vs            100 GB files 12.5x
+
+   And the shape was worse than the rate. app_state holds ONE row per business
+   per key, upserted whole, so a studio's entire photo library was re-read on
+   every sign-in and re-broadcast to every connected device on every order
+   update. Cost to serve scaled as library x headcount, on a plan that had
+   just stopped limiting headcount.
+
+   A photo is now one of two strings:
+
+     'sb:<business>/<kind>/<uuid>.webp'   uploaded; the record holds a path
+     'data:image/...'                     not uploaded YET
+
+   The second is not a failure state. A tailor photographing a fitting in a
+   workroom with no signal must not lose the photo or be told to come back
+   later, so an upload that cannot happen keeps the bytes on the device
+   exactly as before, and sweepInlinePhotos() moves them up when the signal
+   returns. That same sweep is what migrates the photos that were already in
+   the database before any of this existed — one path, used twice, so the
+   migration is exercised every time anybody goes offline.
+   ========================================================================== */
+const MEDIA_BUCKET='studio-media';
+const MEDIA_PREFIX='sb:';
+const MEDIA_URL_KEY='layi_dash_media_urls';   // local only; never synced
+const MEDIA_URL_TTL=604800;                   // 7 days
+
+function isStoredPhoto(s){return typeof s==='string'&&s.slice(0,3)===MEDIA_PREFIX;}
+function storedPath(s){return isStoredPhoto(s)?s.slice(3):'';}
+function isInlinePhoto(s){return typeof s==='string'&&s.slice(0,5)==='data:';}
+
+/* path -> {url, exp}. Persisted, and deliberately so: offline we hand the
+   browser a signed URL whose token has expired, the service worker strips
+   the token and answers from its media cache, and the photo appears. A URL
+   we could not regenerate offline would make every photo a broken image. */
+let _mediaUrls=null;
+function mediaUrls(){ if(!_mediaUrls)_mediaUrls=load(MEDIA_URL_KEY,{})||{}; return _mediaUrls; }
+function saveMediaUrls(){ try{ saveLocal(MEDIA_URL_KEY,_mediaUrls||{}); }catch(e){} }
+
+/* Sync, because rendering is sync. A path with no URL yet returns a
+   transparent pixel and is picked up by the next ensurePhotoUrls() pass. */
+const BLANK_PX='data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+function photoSrc(s){
+  if(!isStoredPhoto(s))return s||BLANK_PX;      // inline, or already a URL
+  const hit=mediaUrls()[storedPath(s)];
+  return (hit&&hit.url)||BLANK_PX;
+}
+/* Mint signed URLs for anything we do not have one for, or whose token is
+   within a day of expiring. Batched — one round trip for a whole screen. */
+async function ensurePhotoUrls(list){
+  if(!supa||!liveMode)return false;
+  const now=Math.floor(Date.now()/1000);
+  const m=mediaUrls();
+  const want=[];
+  (list||[]).forEach(s=>{
+    if(!isStoredPhoto(s))return;
+    const p=storedPath(s);
+    const hit=m[p];
+    if(!hit||!hit.url||hit.exp-now<86400)if(want.indexOf(p)<0)want.push(p);
+  });
+  if(!want.length)return false;
+  try{
+    const {data,error}=await supa.storage.from(MEDIA_BUCKET).createSignedUrls(want,MEDIA_URL_TTL);
+    if(error||!data)return false;
+    data.forEach(d=>{ if(d&&d.path&&d.signedUrl)m[d.path]={url:d.signedUrl,exp:now+MEDIA_URL_TTL}; });
+    saveMediaUrls();
+    return true;
+  }catch(e){ return false; }
+}
+/* Every photo string the studio holds, so a render pass can resolve them all
+   at once rather than one request per thumbnail. */
+function allPhotoRefs(){
+  const out=[];
+  const add=v=>{ if(isStoredPhoto(v))out.push(v); };
+  try{
+    getOrders().forEach(o=>{
+      (o.clientPhotos||[]).forEach(add);
+      (o.outfits||[]).forEach(of=>(of.photos||[]).forEach(add));
+      (o.updates||[]).forEach(u=>(u.photos||[]).forEach(add));
+    });
+    const c=getCustomers();Object.keys(c).forEach(k=>(c[k].photos||[]).forEach(add));
+  }catch(e){}
+  return out;
+}
+async function refreshPhotoUrls(){
+  const changed=await ensurePhotoUrls(allPhotoRefs());
+  if(changed&&typeof renderAll==='function')renderAll();
+  return changed;
+}
+
+/* ---- putting one photo up ------------------------------------------------
+   Returns 'sb:<path>' on success and the data URL itself on failure, so the
+   caller always gets something it can store and show. Never returns nothing,
+   and never throws: losing a photo because a network blipped is not a
+   trade we are willing to make. */
+function mediaKey(kind){
+  const ext='webp';
+  return (myBusinessId||'')+'/'+(kind||'misc')+'/'+
+    Date.now().toString(36)+Math.random().toString(36).slice(2,10)+'.'+ext;
+}
+function dataUrlToBlob(dataUrl){
+  const i=dataUrl.indexOf(',');
+  const meta=dataUrl.slice(0,i), body=dataUrl.slice(i+1);
+  const mime=(meta.match(/data:([^;]+)/)||[,'image/webp'])[1];
+  const bin=atob(body);
+  const arr=new Uint8Array(bin.length);
+  for(let j=0;j<bin.length;j++)arr[j]=bin.charCodeAt(j);
+  return new Blob([arr],{type:mime});
+}
+let _storageFullNotified=false;
+async function saveImageAsset(dataUrl,kind){
+  if(!dataUrl||!isInlinePhoto(dataUrl))return dataUrl;
+  if(!supa||!liveMode||!myBusinessId)return dataUrl;      // demo, or no studio yet
+  if(!navigator.onLine)return dataUrl;                    // offline: keep it, sweep later
+  try{
+    const blob=dataUrlToBlob(dataUrl);
+    const path=mediaKey(kind);
+    const {error}=await supa.storage.from(MEDIA_BUCKET)
+      .upload(path,blob,{contentType:blob.type,cacheControl:'31536000',upsert:false});
+    if(error){
+      /* The one refusal worth naming, because it is the only one the studio
+         can do anything about. RLS returns a policy violation when the cap
+         is reached; everything else is a network or server problem. */
+      if(/row-level security|violates|policy/i.test(error.message||'')&&!_storageFullNotified){
+        _storageFullNotified=true;
+        setTimeout(()=>{_storageFullNotified=false;},4000);
+        alert(storageFullMessage());
+      }else if(typeof toast==='function'){
+        toast('Photo saved on this device — it will upload when there is signal');
+      }
+      return dataUrl;
+    }
+    mediaUrls();                       // make sure the map is loaded
+    await ensurePhotoUrls([MEDIA_PREFIX+path]);
+    bumpStorageUsed(blob.size);
+    return MEDIA_PREFIX+path;
+  }catch(e){
+    return dataUrl;                    // keep the bytes, try again on the sweep
+  }
+}
+
+/* ---- the sweep: catch-up AND migration -----------------------------------
+   Finds every photo still held as bytes — one taken offline this morning, or
+   one that has been in the database since before storage existed — uploads
+   it, and rewrites the record to hold a path instead.
+
+   Nothing is deleted until the upload has been confirmed by a path coming
+   back. If any single photo fails, that one photo stays inline and the rest
+   still move; the sweep is idempotent and simply tries again next time. */
+let _sweeping=false;
+async function sweepInlinePhotos(limit){
+  if(_sweeping||!supa||!liveMode||!myBusinessId||!navigator.onLine)return {moved:0,left:0};
+  _sweeping=true;
+  let moved=0,left=0,budget=limit||40;
+  try{
+    // orders: client photos, outfit photos, progress photos
+    const orders=rawOrders();let ordersDirty=false;
+    for(const o of orders){
+      const lists=[[o.clientPhotos,'client']];
+      (o.outfits||[]).forEach(of=>lists.push([of.photos,'outfit']));
+      (o.updates||[]).forEach(u=>lists.push([u.photos,'progress']));
+      for(const [arr,kind] of lists){
+        if(!Array.isArray(arr))continue;
+        for(let i=0;i<arr.length;i++){
+          if(!isInlinePhoto(arr[i]))continue;
+          if(budget--<=0){left++;continue;}
+          const res=await saveImageAsset(arr[i],kind);
+          if(isStoredPhoto(res)){arr[i]=res;moved++;ordersDirty=true;}else left++;
+        }
+      }
+    }
+    if(ordersDirty)saveSafe('layi_dash_orders',orders);
+
+    // client photos on the customer record
+    const cust=getCustomers();let custDirty=false;
+    for(const k of Object.keys(cust)){
+      const arr=cust[k].photos;
+      if(!Array.isArray(arr))continue;
+      for(let i=0;i<arr.length;i++){
+        if(!isInlinePhoto(arr[i]))continue;
+        if(budget--<=0){left++;continue;}
+        const res=await saveImageAsset(arr[i],'client');
+        if(isStoredPhoto(res)){arr[i]=res;moved++;custDirty=true;}else left++;
+      }
+    }
+    if(custDirty)setCustomers(cust);
+  }catch(e){}
+  finally{_sweeping=false;}
+  if(moved&&typeof renderAll==='function')renderAll();
+  return {moved,left};
+}
+/* How many photos are still sitting in the database, so the app can say so
+   rather than leaving somebody to wonder. */
+function inlinePhotoCount(){
+  let n=0;
+  const count=v=>{if(isInlinePhoto(v))n++;};
+  try{
+    getOrders().forEach(o=>{
+      (o.clientPhotos||[]).forEach(count);
+      (o.outfits||[]).forEach(of=>(of.photos||[]).forEach(count));
+      (o.updates||[]).forEach(u=>(u.photos||[]).forEach(count));
+    });
+    const c=getCustomers();Object.keys(c).forEach(k=>(c[k].photos||[]).forEach(count));
+  }catch(e){}
+  return n;
+}
 /* Ask for persistent storage once. Silent if the browser refuses or does not
    support it: it is protection, never a blocker. */
 async function requestPersistentStorage(){
@@ -5297,8 +5604,57 @@ function renderStorageMeter(){const el=document.getElementById('storageMeter');i
       ? ''
       : 'Running on this device only, so the real limit is your browser\u2019s, not the plan tier. Photos are what fill it. Export a backup regularly.';
   }catch(e){}
-  const col=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
-  el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(u.bytes)} used <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span></span><span style="color:var(--text-dim)">${esc(storageTierName())} · ${fmtBytes(lim)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div></div><div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
+  /* Once photos live in storage the database is the honest source: it is the
+     number the upload policy is enforced against. storageState() falls back
+     to counting local bytes when there is no backend. */
+  const st=storageState();
+  const shownUsed=st.known?st.used:u.bytes;
+  const shownCap=st.known?st.cap:lim;
+  const shownPct=Math.min(100,Math.round(st.pct));
+  const col=st.full?'var(--red)':st.warn?'var(--amber)':'var(--green)';
+
+  /* At 80% a calm sentence, not a modal. At 100% the plain truth about what
+     still works, because the fear is that the app has stopped — and it has
+     not. Only new photo uploads pause. */
+  const notice=st.full
+    ? `<div class="kv" style="margin-top:10px;border-left:3px solid var(--red);padding-left:10px">
+         <b>You have reached your storage limit.</b><br>
+         <span style="color:var(--text-dim)">Everything still works — orders, clients, finance, and every photo you already have. Only new photo uploads are paused.</span>
+       </div>`
+    : st.warn
+    ? `<div class="kv" style="margin-top:10px;border-left:3px solid var(--amber);padding-left:10px">
+         You have used ${fmtBytes(shownUsed)} of ${fmtBytes(shownCap)}.
+         <span style="color:var(--text-dim)">Nothing changes until you reach the limit, and even then only new photo uploads pause.</span>
+       </div>`
+    : '';
+
+  /* The way to say yes. Visible before they are full, not only after. */
+  const more=(st.warn||st.full||currentPlan().id==='pro')
+    ? `<div style="margin-top:10px"><button class="btn sm ghost" onclick="askForMoreStorage()">Need more storage? Talk to us</button></div>`
+    : '';
+
+  /* Photos still sitting on this device because there was no signal when
+     they were taken. Said out loud rather than left to look like a bug. */
+  const pending=(typeof inlinePhotoCount==='function'&&liveMode)?inlinePhotoCount():0;
+  const pendingNote=pending
+    ? `<div class="sd" style="color:var(--text-faint);margin-top:6px">${pending} photo${pending===1?'':'s'} still on this device, waiting for signal. ${pending===1?'It uploads':'They upload'} on its own.</div>`
+    : '';
+
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(shownUsed)} used${st.known?'':` <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span>`}</span><span style="color:var(--text-dim)">${esc(currentPlan().name)} · ${fmtBytes(shownCap)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${shownPct}%;background:${col};border-radius:5px"></div></div>${notice}${more}${pendingNote}<div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
+}
+/* Extra space is sold, not switched on. It is an override an operator sets
+   on that one studio after agreeing a price, so saying yes to a big brand
+   never means raising the cap for everybody. */
+function askForMoreStorage(){
+  const st=storageState();
+  const co=(SETTINGS.company&&SETTINGS.company.name)||tenantName()||'our studio';
+  const body='Hello, this is '+co+'. We are using '+fmtBytes(st.used)+' of our '
+    +fmtBytes(st.cap)+' and would like more storage. Could you let us know what that would cost?';
+  if(typeof openFeedback==='function'){
+    openFeedback('support',{title:'More storage for '+co,body:body});
+    return;
+  }
+  alert(body+'\n\nSend this to us and we will come back with a price.');
 }
 function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
@@ -5447,9 +5803,13 @@ const FEEDBACK_KINDS=[
 ];
 let feedbackDraft=null,feedbackTab='new';
 function feedbackKindLabel(k){const f=FEEDBACK_KINDS.find(x=>x.k===k);return f?f.label:k;}
-function openFeedback(kind){
+/* prefill lets a screen open this with the message already written — asking
+   for more storage, for instance, where making somebody compose the request
+   themselves is a small tax on the one conversation we want them to have. */
+function openFeedback(kind,prefill){
   feedbackTab='new';
-  feedbackDraft={kind:kind||'suggestion',title:'',body:'',rating:0,urgency:'normal',
+  prefill=prefill||{};
+  feedbackDraft={kind:kind||'suggestion',title:prefill.title||'',body:prefill.body||'',rating:0,urgency:'normal',
     contactName:(currentUser&&currentUser.name)||userLabel()||'',
     contactEmail:(currentUser&&currentUser.email)||''};
   renderFeedbackModal();
@@ -9570,7 +9930,7 @@ function openCustomer(key){
   const profPhotos=(custRec.photos||[]);
   const orderPhotos=[];data.orders.forEach(o=>(o.clientPhotos||[]).forEach(p=>orderPhotos.push(p)));
   const allPhotos=[...new Set(profPhotos.concat(orderPhotos))];
-  const photoHtml=`<div class="field"><label>Client photos${can('customers')?` <span style="float:right;cursor:pointer;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0" onclick="document.getElementById('custPhotoFile').click()">+ Add photo</span>`:''}</label>${allPhotos.length?`<div class="photo-grid">${allPhotos.slice(0,24).map(p=>`<div class="thumb"><img src="${p}" onclick="lightbox(this.src)">${can('customers')&&profPhotos.includes(p)?`<span class="rm" onclick="event.stopPropagation();removeCustomerPhoto('${esc(key)}',${profPhotos.indexOf(p)})">×</span>`:''}</div>`).join('')}</div>`:'<div class="kv" style="color:var(--text-faint)">No photos yet.'+(can('customers')?' Tap “+ Add photo”, or attach client photos when creating an order.':'')+'</div>'}<input type="file" id="custPhotoFile" accept="image/*" multiple style="display:none" onchange="addCustomerPhotos('${esc(key)}',this.files)"></div>`;
+  const photoHtml=`<div class="field"><label>Client photos${can('customers')?` <span style="float:right;cursor:pointer;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0" onclick="document.getElementById('custPhotoFile').click()">+ Add photo</span>`:''}</label>${allPhotos.length?`<div class="photo-grid">${allPhotos.slice(0,24).map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)">${can('customers')&&profPhotos.includes(p)?`<span class="rm" onclick="event.stopPropagation();removeCustomerPhoto('${esc(key)}',${profPhotos.indexOf(p)})">×</span>`:''}</div>`).join('')}</div>`:'<div class="kv" style="color:var(--text-faint)">No photos yet.'+(can('customers')?' Tap “+ Add photo”, or attach client photos when creating an order.':'')+'</div>'}<input type="file" id="custPhotoFile" accept="image/*" multiple style="display:none" onchange="addCustomerPhotos('${esc(key)}',this.files)"></div>`;
   const ordersHtml=data.orders.slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).map(o=>{
     const du=daysUntil(o.due);const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):'';
     return`<div class="up-line" style="cursor:pointer" onclick="openDetail('${o.id}')"><b>${o.id}</b> · ${esc(o.garment)} · ${STAGES[o.stageIndex]}${can('money')?' · '+curO(orderNet(o),o):''}${+o.satisfaction>0?' · <span style="color:var(--gold)" title="Client feedback">'+'★'.repeat(+o.satisfaction)+'</span>':''} <span style="color:var(--text-faint)">${when?'· '+when:''}</span></div>`;}).join('');
@@ -9664,7 +10024,7 @@ function editCustomer(key){if(!can('customers'))return;const data=buildCustomerD
     <div class="field"><label>Note (preferences)</label><input class="fld" id="cu_note" value="${esc(data.note||'')}" placeholder="Preferences, how they found us…"></div>
     <div class="field"><label>Delivery address</label><textarea class="fld" id="cu_address" placeholder="Street, city, postcode/landmark">${esc(data.address||'')}</textarea></div>`:`<div class="kv" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--text-faint)">🔒 Contact details are hidden for your role.</div>`}
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="openCustomer('${esc(key)}')">Cancel</button><button class="btn" onclick="saveCustomerContact('${esc(key)}')">Save</button></div>`);}
-async function addCustomerPhotos(key,files){if(!can('customers'))return;const c=getCustomers();const cust=c[key]||{name:key};cust.photos=Array.isArray(cust.photos)?cust.photos:[];for(const f of files){if(!f||!f.type||!f.type.startsWith('image/'))continue;try{cust.photos.push(await compressImage(f,900,0.72));}catch(e){}}c[key]=cust;setCustomers(c);openCustomer(key);}
+async function addCustomerPhotos(key,files){if(!can('customers'))return;if(photoUploadBlocked())return;const c=getCustomers();const cust=c[key]||{name:key};cust.photos=Array.isArray(cust.photos)?cust.photos:[];for(const f of files){if(!f||!f.type||!f.type.startsWith('image/'))continue;try{cust.photos.push(await saveImageAsset(await compressFor(f,'reference'),'client'));}catch(e){}}c[key]=cust;setCustomers(c);openCustomer(key);}
 function removeCustomerPhoto(key,idx){if(!can('customers'))return;const c=getCustomers();const cust=c[key];if(!cust||!Array.isArray(cust.photos))return;cust.photos.splice(idx,1);setCustomers(c);openCustomer(key);}
 /* ===== CORRESPONDENCE ======================================================
    Everything anybody has ever said, done or recorded about one client, in one
@@ -9766,7 +10126,7 @@ function correspondenceHtml(key,data){
     const meta=CORR_KINDS[e.kind]||{label:e.kind,hue:'var(--text-dim)'};
     const when=e.at?new Date(e.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
     const jump=e.orderId?` onclick="closeModal();openDetail('${e.orderId}')" style="cursor:pointer;border-left:3px solid ${meta.hue};padding-left:10px"`:` style="border-left:3px solid ${meta.hue};padding-left:10px"`;
-    const pics=(e.photos&&e.photos.length)?`<div style="margin-top:6px">${e.photos.slice(0,4).map(p=>`<img src="${p}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;margin-right:5px" onclick="event.stopPropagation();lightbox('${p}')">`).join('')}</div>`:'';
+    const pics=(e.photos&&e.photos.length)?`<div style="margin-top:6px">${e.photos.slice(0,4).map(p=>`<img src="${photoSrc(p)}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;margin-right:5px" onclick="event.stopPropagation();lightbox(photoSrc('${p}'))">`).join('')}</div>`:'';
     const by=[e.who?esc(e.who):'',e.worker&&e.worker!==e.who?'work by '+esc(e.worker):''].filter(Boolean).join(' · ');
     return `<div class="up-line"${jump}><b>${esc(e.title)}</b> <span class="badge" style="font-size:10px">${esc(meta.label)}</span>${e.flag?` <span class="badge" style="font-size:10px;color:var(--amber)">${esc(e.flag)}</span>`:''} <span style="color:var(--text-faint);font-size:12px">· ${when}</span>${e.text?'<br>'+esc(e.text):''}${by?`<br><span style="color:var(--text-faint);font-size:12px">${by}</span>`:''}${pics}</div>`;
   }).join('');
