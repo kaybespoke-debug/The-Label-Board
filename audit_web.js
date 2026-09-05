@@ -198,23 +198,55 @@ built.forEach(p => {
 
 /* ================= 6. the prices match the ones we bill ================= */
 const adminData = fs.readFileSync(path.join(__dirname, 'admin', 'js', 'data.js'), 'utf8');
-const planRe = /\{\s*id:\s*'(starter|pro|premium)',\s*name:\s*'([^']+)',\s*monthly:\s*(\d+),\s*annual:\s*(\d+),\s*seats:\s*(\d+)/g;
-const plans = all(adminData, planRe).map(m => ({ id: m[1], name: m[2], monthly: +m[3], annual: +m[4], seats: +m[5] }));
+/* The id is what the database stores; the NAME is what a customer is sold,
+   and the two are deliberately different — starter/pro/premium against
+   Basic/Pro/Bespoke. This used to read them as if they were the same word,
+   which quietly compared a naira price against `undefined` the moment a plan
+   was renamed. */
+const planRe = /\{\s*id:\s*'(starter|pro|premium)',\s*name:\s*'([^']+)',\s*monthly:\s*(\d+),\s*annual:\s*(\d+),\s*seats:\s*(\d+),\s*live:\s*true(,\s*invoiceOnly:\s*true)?/g;
+const plans = all(adminData, planRe).map(m => ({
+  id: m[1], name: m[2], monthly: +m[3], annual: +m[4], seats: +m[5], invoiceOnly: !!m[6]
+}));
 check(plans.length === 3, 'the three paid plans were read out of the admin console');
 
 const naira = n => n.toLocaleString('en-US');
 plans.forEach(pl => {
-  ['pricing.html'].forEach(p => {
-    check(html[p].includes('data-monthly="' + naira(pl.monthly) + '"'),
-      p + ' prints the ' + pl.name + ' monthly price the console bills (' + naira(pl.monthly) + ')');
-    check(html[p].includes('data-annual="' + naira(pl.annual) + '"'),
-      p + ' prints the ' + pl.name + ' yearly price the console bills (' + naira(pl.annual) + ')');
-  });
-  check(pl.annual === pl.monthly * 10, pl.name + ' yearly really is ten months for twelve');
-  check(html['pricing.html'].includes('>' + pl.seats + '<'),
-    'the comparison table shows the ' + pl.name + ' seat count (' + pl.seats + ')');
   check(html['pricing.html'].includes('<h3>' + pl.name + '</h3>'), 'the pricing page offers the ' + pl.name + ' plan');
+
+  if (pl.invoiceOnly) {
+    /* A plan priced per business must not carry a figure anywhere on a public
+       page. Printing one is worse than printing nothing: it becomes the number
+       the customer believes, and it is not a number anybody agreed. */
+    check(!html['pricing.html'].includes('data-plan="' + pl.id + '"'),
+      pl.name + ' is invoice-only and must not be wired to the currency table');
+    check(/Priced per business/i.test(html['pricing.html']),
+      pl.name + ' does not say it is priced per business');
+    check(/invoice/i.test(html['pricing.html']),
+      pl.name + ' does not tell them they will be invoiced rather than charged');
+  } else {
+    check(html['pricing.html'].includes('data-monthly="' + naira(pl.monthly) + '"'),
+      'pricing.html prints the ' + pl.name + ' monthly price the console bills (' + naira(pl.monthly) + ')');
+    check(html['pricing.html'].includes('data-annual="' + naira(pl.annual) + '"'),
+      'pricing.html prints the ' + pl.name + ' yearly price the console bills (' + naira(pl.annual) + ')');
+    check(pl.annual === pl.monthly * 10, pl.name + ' yearly really is ten months for twelve');
+    check(html['pricing.html'].includes('data-plan="' + pl.id + '"'),
+      pl.name + ' is not wired to the currency table, so it never changes currency');
+  }
+
+  /* seats: 0 means unlimited. A comparison table printing "0" against Team
+     logins reads as a plan that includes nobody. */
+  if (pl.seats === 0) {
+    check(/<td>Team logins<\/td>[\s\S]{0,200}?Unlimited/.test(html['pricing.html']),
+      pl.name + ' has unlimited seats but the table does not say Unlimited');
+  } else {
+    check(html['pricing.html'].includes('>' + pl.seats + '<'),
+      'the comparison table shows the ' + pl.name + ' seat count (' + pl.seats + ')');
+  }
 });
+/* The comparison table must never print a bare 0 in a plan column: it is
+   always either a real number or a word. */
+check(!/<td class="c">0<\/td>/.test(html['pricing.html']),
+  'the comparison table prints a bare 0 in a plan column, which reads as "none"');
 /* Pricing lives on the Pricing tab and nowhere else. Two pages printing the
    same figure is how one of them ends up stale, so rather than checking that
    they agree, the gate now checks there is only ever one of them. */
@@ -271,11 +303,20 @@ const trial = S.trialDays;
 check(String(trial) === '14', 'the trial length in the configuration is the one the console offers');
 /* Premium is shorter on purpose, and both numbers come from the configuration
    rather than being typed into the page, so they cannot drift apart. */
-const trialTop = S.trialDaysPremium;
-check(typeof trialTop === 'number' && trialTop > 0, 'there is a trial length for Premium (' + trialTop + ')');
-check(trialTop <= trial, 'the Premium trial is not longer than the standard one');
-check(html['pricing.html'].indexOf('data-cfg="trialDaysPremium"') !== -1,
-  'Premium has a trial of its own, taken from the configuration');
+/* There is no separate trial for the top plan any more. Bespoke is agreed and
+   invoiced per business, so what it offers is a conversation, not a countdown
+   — and a page that offered "start your free trial" on a plan nobody can buy
+   without talking to us was making a promise it could not keep.
+   The two SELF-SERVE plans must still both offer the standard trial. */
+check(S.trialDaysPremium === undefined,
+  'there is still a separate trial length for the top plan, which is now invoice-only');
+{
+  const trialButtons = (html['pricing.html'].match(/data-cfg="trialDays"/g) || []).length;
+  check(trialButtons >= 2,
+    'both self-serve plans should offer the standard trial (' + trialButtons + ' found)');
+  check(/Talk to us/.test(html['pricing.html']),
+    'the invoice-only plan does not offer a way to start the conversation');
+}
 check(html['pricing.html'].indexOf('Talk to us first') === -1,
   'no plan sends a ready buyer away to a conversation instead of a trial');
 ['pricing.html', 'book.html'].forEach(p => {
@@ -377,9 +418,14 @@ check(!/"priceCurrency"/.test(html['index.html']),
 /* structured data has to describe what is actually on the page it sits on */
 check(html['pricing.html'].includes('application/ld+json'), 'the pricing page carries the offers for search engines');
 check(/"priceCurrency": "NGN"/.test(html['pricing.html']), 'the structured data prices are in Naira');
-plans.forEach(pl => {
+plans.filter(pl => !pl.invoiceOnly).forEach(pl => {
   check(html['pricing.html'].includes('"price": "' + pl.monthly + '"'),
     'the structured data quotes the ' + pl.name + ' price the console bills (' + pl.monthly + ')');
+});
+// and a plan with no price must not invent one for a search engine either
+plans.filter(pl => pl.invoiceOnly).forEach(pl => {
+  check(!new RegExp('"name": "' + pl.name + '"[^}]*"price"').test(html['pricing.html']),
+    'the structured data puts a price on ' + pl.name + ', which is agreed per business');
 });
 
 /* every picture the pages ask for is actually in the folder */
@@ -627,23 +673,39 @@ tileTrades.forEach(t => {
    because a rate that moved would quote a shop two different numbers on two
    days without anybody having decided anything. */
 const ccyBlock = (cfgSrc.match(/currencies:\s*\[[\s\S]*?\n  \]/) || [''])[0];
-const markets = all(ccyBlock, /\{\s*code:\s*'([A-Z]{3})'[^}]*starter:\s*(\d+),\s*pro:\s*(\d+),\s*premium:\s*(\d+)/g)
-  .map(m => ({ code: m[1], starter: +m[2], pro: +m[3], premium: +m[4] }));
+/* Only the PRICED plans appear here. Bespoke is agreed per business, so it
+   carries no figure in any currency — and the regex no longer demands one,
+   because requiring `premium:` was what made this read zero currencies the
+   moment it was correctly removed. */
+const markets = all(ccyBlock, /\{\s*code:\s*'([A-Z]{3})'[^}]*?starter:\s*(\d+),\s*pro:\s*(\d+)/g)
+  .map(m => ({ code: m[1], starter: +m[2], pro: +m[3] }));
 check(markets.length >= 2, 'the site quotes more than one currency (' + markets.length + ')');
 markets.forEach(m => {
-  check(m.starter > 0 && m.pro > 0 && m.premium > 0, 'every market has a price for every plan: ' + m.code);
-  check(m.starter < m.pro && m.pro < m.premium, 'the plans go up in price in ' + m.code);
+  check(m.starter > 0 && m.pro > 0, 'every market has a price for every priced plan: ' + m.code);
+  check(m.starter < m.pro, 'the plans go up in price in ' + m.code);
 });
 
 /* naira is the real one, and it is the one the console bills */
 const ngn = markets.filter(m => m.code === 'NGN')[0];
 check(!!ngn, 'naira is one of the currencies');
 if (ngn) {
-  const byName = {};
-  plans.forEach(pl => { byName[pl.name.toLowerCase()] = pl.monthly; });
-  ['starter', 'pro', 'premium'].forEach(k => {
-    check(ngn[k] === byName[k], 'the naira ' + k + ' price is the one the console bills (' +
-      ngn[k] + ' against ' + byName[k] + ')');
+  /* Keyed by plan ID. The currency table is a map from the id the database
+     stores to a price, not from the name on the card. */
+  plans.filter(pl => !pl.invoiceOnly).forEach(pl => {
+    check(ngn[pl.id] === pl.monthly, 'the naira ' + pl.name + ' price is the one the console bills (' +
+      ngn[pl.id] + ' against ' + pl.monthly + ')');
+  });
+  plans.filter(pl => pl.invoiceOnly).forEach(pl => {
+    check(ngn[pl.id] === undefined,
+      pl.name + ' is priced per business but carries a currency price, which the page would print');
+  });
+  /* And every market has to price every priced plan, or a visitor in one
+     currency sees a card with no figure on it. */
+  markets.forEach(mk => {
+    plans.filter(pl => !pl.invoiceOnly).forEach(pl => {
+      check(typeof mk[pl.id] === 'number' && mk[pl.id] > 0,
+        mk.code + ' has no price for ' + pl.name);
+    });
   });
 }
 
@@ -651,7 +713,7 @@ if (ngn) {
 const pr = html['pricing.html'];
 check(pr.indexOf('data-plan="starter"') !== -1, 'each plan tells the currency table which one it is');
 check(pr.indexOf('id="ccy-slot"') !== -1, 'there is somewhere for the currency picker to go');
-plans.forEach(pl => {
+plans.filter(pl => !pl.invoiceOnly).forEach(pl => {
   check(pr.indexOf('data-monthly="' + pl.monthly.toLocaleString('en-US') + '"') !== -1,
     'the page still carries the naira price as plain text: ' + pl.name);
 });
@@ -688,11 +750,16 @@ check(prPlans.length === 3, 'there are three self serve plans (' + prPlans.lengt
 prPlans.forEach((block, i) => {
   const name = (block.match(/<h3>([^<]+)<\/h3>/) || [])[1] || ('plan ' + i);
   const gaps = (block.match(/class="no"/g) || []).length;
-  if (i < prPlans.length - 1) {
+  /* The ENTRY plan has to be honest about its ceiling, or nobody understands
+     what they are moving up for. Pro no longer crosses anything off, and that
+     is the point of the retier rather than an omission: it is sold as the
+     full product with no feature held back, so a list of things it lacks
+     would be a list we would have to invent. */
+  if (i === 0) {
     check(gaps >= 2, 'the ' + name + ' plan says what you would gain by moving up (' + gaps + ')');
     check(gaps <= 4, 'the ' + name + ' plan does not read as a list of complaints (' + gaps + ')');
   } else {
-    check(gaps === 0, 'the top plan has nothing crossed off it, because nothing is above it');
+    check(gaps === 0, 'the ' + name + ' plan crosses things off, but it is sold as complete');
   }
 });
 

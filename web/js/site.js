@@ -67,26 +67,154 @@
   }
 
   /* ---------------- price cycle ---------------- */
+  /* ---------------- currency ----------------
+     The page is written in naira, which is what it says with no JavaScript
+     and what the admin console actually bills. Everything here only ever
+     replaces that text with another price the configuration already holds.
+     Nothing is converted in the browser and no rate is fetched: a rate that
+     moved would quote a shop two different numbers on two days without
+     anybody having decided anything.
+
+     The first guess comes from the browser's own time zone and language,
+     never from an IP lookup. An IP lookup means calling a third party on
+     every page load and telling them who is reading our pricing, for a
+     guess that a picker sitting right there can correct in one click. */
+  var CCY_KEY = 'tlb_ccy';
+  var cycleNow = 'monthly';
+  var ccyNow = null;
+
+  function currencies() {
+    return (typeof SITE !== 'undefined' && SITE.currencies) || [];
+  }
+  function findCcy(code) {
+    var list = currencies();
+    for (var i = 0; i < list.length; i++) if (list[i].code === code) return list[i];
+    return list[0] || null;
+  }
+  function remembered() {
+    try { return window.localStorage.getItem(CCY_KEY); } catch (e) { return null; }
+  }
+  function remember(code) {
+    try { window.localStorage.setItem(CCY_KEY, code); } catch (e) { /* private mode, fine */ }
+  }
+  function guessCcy() {
+    if (typeof SITE === 'undefined') return 'NGN';
+    var zone = '';
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
+    if (SITE.currencyByZone && SITE.currencyByZone[zone]) return SITE.currencyByZone[zone];
+    var lang = (navigator.language || '').toUpperCase();
+    var region = lang.split('-')[1] || '';
+    if (SITE.currencyByRegion && SITE.currencyByRegion[region]) return SITE.currencyByRegion[region];
+    /* a whole continent shares a handful of zones, so this is the last resort */
+    if (zone.indexOf('Europe/') === 0) return 'EUR';
+    if (zone.indexOf('America/') === 0) return 'USD';
+    return 'NGN';
+  }
+  function group(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function paint() {
+    var c = findCcy(ccyNow);
+    if (!c) return;
+    var annual = cycleNow === 'annual';
+    $$('[data-plan]').forEach(function (el) {
+      var amount = c[el.getAttribute('data-plan')];
+      if (amount == null) return;
+      var amt = el.querySelector('[data-monthly]');
+      var sym = el.querySelector('.cur');
+      if (amt) amt.textContent = group(annual ? amount * 10 : amount);
+      if (sym) sym.textContent = c.symbol;
+    });
+    $$('[data-per]').forEach(function (el) {
+      el.textContent = annual ? 'per year' : 'per month';
+    });
+    $$('[data-note-monthly]').forEach(function (el) {
+      var note = el.getAttribute(annual ? 'data-note-annual' : 'data-note-monthly');
+      el.textContent = c.code === 'NGN' ? note : note + ', invoiced in ' + c.code;
+    });
+    $$('[data-ccy-code]').forEach(function (el) { el.textContent = c.code; });
+  }
+
+  function setCcy(code) {
+    ccyNow = findCcy(code) ? code : 'NGN';
+    remember(ccyNow);
+    var sel = $('#ccy');
+    if (sel && sel.value !== ccyNow) sel.value = ccyNow;
+    paint();
+  }
+
   function setCycle(cycle) {
+    cycleNow = cycle === 'annual' ? 'annual' : 'monthly';
     $$('[data-cycle]').forEach(function (b) {
-      var on = b.getAttribute('data-cycle') === cycle;
+      var on = b.getAttribute('data-cycle') === cycleNow;
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-    $$('[data-monthly]').forEach(function (el) {
-      el.textContent = el.getAttribute(cycle === 'annual' ? 'data-annual' : 'data-monthly');
-    });
-    $$('[data-per]').forEach(function (el) {
-      el.textContent = cycle === 'annual' ? 'per year' : 'per month';
-    });
-    $$('[data-note-monthly]').forEach(function (el) {
-      el.textContent = el.getAttribute(cycle === 'annual' ? 'data-note-annual' : 'data-note-monthly');
-    });
+    paint();
   }
 
-  /* ---------------- tabs ---------------- */
+  /* Builds the picker from the configuration, so adding a market is one line
+     in config.js and nothing else. It is built rather than written into the
+     page because with no JavaScript there is nothing it could do, and a dead
+     control is worse than no control. */
+  function buildCcyPicker() {
+    var slot = $('#ccy-slot');
+    if (!slot || !currencies().length) return;
+    var sel = document.createElement('select');
+    sel.id = 'ccy';
+    sel.className = 'ccy';
+    sel.setAttribute('aria-label', 'Currency');
+    currencies().forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.code;
+      o.textContent = c.code + ' \u00b7 ' + c.label;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () { setCcy(sel.value); });
+    slot.appendChild(sel);
+    setCcy(remembered() || guessCcy());
+  }
+
+  /* ---------------- tabs ----------------
+     A screenshot inside a hidden pane is lazy, so the browser does not fetch it
+     until the pane is shown, and the first click on a tab leaves an empty box
+     for a beat. Once the page has finished loading and the browser is idle, the
+     panes that are still hidden are told to load anyway. The picture above the
+     fold has already been painted by then, so nothing is taken from it. */
+  function warmPanes() {
+    $$('.pane img[loading="lazy"]').forEach(function (img) { img.loading = 'eager'; });
+  }
+  /* Warmed when the tab strip is nearly in view, not on load. Four screens is
+     most of a megabyte, and somebody who reads the hero and leaves should not
+     pay for it on a phone. By the time they have read the section above the
+     tabs, the pictures are there. Same sweep as the reveals, for the same
+     reason: an observer that never delivers would leave the panes cold. */
+  function warmPanesWhenQuiet() {
+    var strips = $$('.tabs, .industries');
+    if (!strips.length) return;
+    function sweep() {
+      var h = window.innerHeight || 800;
+      var near = strips.some(function (el) {
+        var r = el.getBoundingClientRect();
+        return r.top < h * 1.5 && r.bottom > -h;
+      });
+      if (!near) return;
+      warmPanes();
+      window.removeEventListener('scroll', sweep);
+      window.removeEventListener('resize', sweep);
+    }
+    window.addEventListener('scroll', sweep, { passive: true });
+    window.addEventListener('resize', sweep);
+    sweep();
+  }
+
+  /* Keyed on the attribute rather than the class, because two different
+     controls open panes now: the pill tabs on Product and the booking page,
+     and the photograph tiles on the home page. Selecting .tab only would leave
+     a tile's highlight behind while its panel opened, which it did. */
   function selectTab(group, name) {
-    $$('.tab[data-group="' + group + '"]').forEach(function (b) {
+    $$('[data-group="' + group + '"][data-tab]').forEach(function (b) {
       var on = b.getAttribute('data-tab') === name;
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -159,10 +287,56 @@
 
     $$('[data-year]').forEach(function (el) { el.textContent = String(new Date().getFullYear()); });
 
+    buildCcyPicker();
+
+    warmPanesWhenQuiet();
+
+    /* ---------------- the trade tiles ----------------
+       Kayode asked for the detail to appear when you point at a tile. Hover is
+       only half an answer, because a phone has no cursor and this site is read
+       on a phone first, so a tile is a real control: tapping or clicking it
+       opens its panel, which is what the click delegate below already does for
+       anything carrying data-tab.
+
+       Hover is then an extra, and only where there is a true cursor. The media
+       query matters: a touch screen reports hover on the tap that precedes the
+       click, so without it a tap would open one panel on touch and another on
+       click. The small delay stops a cursor dragged across the row from
+       flipping through all eight, and nothing closes on leaving, so the panel
+       you last looked at stays put. */
+    var fineCursor = window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+    if (fineCursor) {
+      var hoverTimer = null;
+      $$('.industries [data-tab]').forEach(function (tile) {
+        tile.addEventListener('mouseenter', function () {
+          clearTimeout(hoverTimer);
+          hoverTimer = setTimeout(function () {
+            selectTab(tile.getAttribute('data-group'), tile.getAttribute('data-tab'));
+          }, 110);
+        });
+        tile.addEventListener('mouseleave', function () { clearTimeout(hoverTimer); });
+      });
+    }
+
     document.addEventListener('click', function (ev) {
-      var t = ev.target.closest ? ev.target.closest('[data-act],[data-cycle],[data-tab],a[href^="#"]') : null;
+      var t = ev.target.closest ? ev.target.closest('[data-act],[data-cycle],[data-tab],[data-back],a[href^="#"]') : null;
 
       if (!t) return;
+
+      /* The back link. Its href points at the section on the home page it came
+         from, which is right for somebody who arrived from the navigation and
+         is what happens with no JavaScript. But if they got here from our own
+         site, going back through history is the only thing that returns them
+         to the exact place on the page they left, rather than the top of the
+         section, and that is the whole point of the link. */
+      if (t.hasAttribute && t.hasAttribute('data-back')) {
+        var from = document.referrer || '';
+        if (from.indexOf(location.origin + '/') === 0 && history.length > 1) {
+          ev.preventDefault();
+          history.back();
+        }
+        return;
+      }
 
       var act = t.getAttribute('data-act');
       if (act === 'menu') { ev.preventDefault(); toggleMenu(); return; }

@@ -6,22 +6,38 @@
 <meta name="theme-color" content="#06101d">
 <meta name="color-scheme" content="dark">
 <title>Pricing · The Label Board</title>
-<meta name="description" content="One fee for the whole shop. Starter, Pro and Premium plans in Naira, billed monthly or yearly, with 14 days free and no card to start.">
-<link rel="canonical" href="https://thelabelboard.app/pricing.html">
+<meta name="description" content="One fee for the whole studio. Basic and Pro in Naira, billed monthly or yearly, with 14 days free and no card to start. Bespoke is priced per business.">
+<link rel="canonical" href="https://thelabelboard.com/pricing.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Label Board">
 <meta property="og:title" content="Pricing · The Label Board">
 <meta property="og:description" content="One fee for the whole shop, not per person. No commission on your sales.">
-<meta property="og:url" content="https://thelabelboard.app/pricing.html">
-<meta property="og:image" content="https://thelabelboard.app/img/hero.jpg">
+<meta property="og:url" content="https://thelabelboard.com/pricing.html">
+<meta property="og:image" content="https://thelabelboard.com/img/hero.jpg">
 <meta property="og:image:alt" content="A maker at the bench, and The Label Board dashboard">
-<meta name="twitter:image" content="https://thelabelboard.app/img/hero.jpg">
+<meta name="twitter:image" content="https://thelabelboard.com/img/hero.jpg">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "The Label Board",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, Android, iOS, Windows, macOS",
+  "url": "https://thelabelboard.com/pricing.html",
+  "publisher": { "@type": "Organization", "@id": "https://thelabelboard.com/#organisation" },
+  "offers": [
+    { "@type": "Offer", "name": "Basic", "price": "27000", "priceCurrency": "NGN" },
+    { "@type": "Offer", "name": "Pro", "price": "65000", "priceCurrency": "NGN" },
+    { "@type": "Offer", "name": "Bespoke", "priceCurrency": "NGN", "priceSpecification": { "@type": "PriceSpecification", "valueAddedTaxIncluded": false, "description": "Priced per business, invoiced" } }
+  ]
+}
+</script>
 </head>
 <body>
 <script>document.documentElement.classList.add('js-on');setTimeout(function(){if(!window.__tlbReady)document.documentElement.classList.remove('js-on')},2500);</script>
@@ -47,32 +63,28 @@
     </a>
 
     <nav class="hdr-nav" aria-label="Main">
-      <a href="features.html">Product</a>
-      <a href="solutions.html">Solutions</a>
+      <a href="features.html">Features</a>
       <a href="pricing.html">Pricing</a>
-      <a href="demo.html">Demo</a>
       <a href="about.html">Our story</a>
-      <a href="contact.html">Help</a>
+      <a href="contact.html">Support</a>
     </nav>
 
     <div class="hdr-act">
-      <a class="login" data-cfg-link="app" href="https://app.thelabelboard.app">Log in</a>
-      <a class="btn btn-gold btn-sm" href="demo.html#book">Book a demo</a>
+      <a class="login" data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a>
+      <a class="btn btn-gold btn-sm" href="book.html">Book a demo</a>
       <button class="burger" type="button" data-act="menu" aria-label="Menu"><span></span><span></span><span></span></button>
     </div>
   </div>
 </header>
 
 <div class="drawer" id="drawer">
-  <a href="features.html">Product</a>
-  <a href="solutions.html">Solutions</a>
+  <a href="features.html">Features</a>
   <a href="pricing.html">Pricing</a>
-  <a href="demo.html">Demo</a>
   <a href="about.html">Our story</a>
-  <a href="contact.html">Help and contact</a>
+  <a href="contact.html">Support and contact</a>
   <a href="partners.html">Partners</a>
-  <a class="btn btn-gold" href="demo.html#book">Book a demo</a>
-  <a class="btn btn-line" data-cfg-link="app" href="https://app.thelabelboard.app">Log in</a>
+  <a class="btn btn-gold" href="book.html">Book a demo</a>
+  <a class="btn btn-line" data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a>
 </div>
 
 <main id="main">
@@ -82,12 +94,14 @@
     <span class="eyebrow">Pricing</span>
     <h1>One fee for the shop, not for each person</h1>
     <p class="lede">We do not take a cut of what you sell and we do not charge you per order. Busy months cost the same as quiet ones, which is the only way a price is fair to a shop.</p>
+    <p class="small" style="margin-top:12px">Shown and invoiced in your own currency.</p>
     <div class="btn-row center" style="margin-top:24px">
       <span class="plan-switch" role="group" aria-label="Billing period">
         <button type="button" data-cycle="monthly" class="on" aria-pressed="true">Monthly</button>
         <button type="button" data-cycle="annual" aria-pressed="false">Yearly</button>
       </span>
       <span class="save-note">Two months free on yearly</span>
+      <span id="ccy-slot" class="ccy-slot"></span>
     </div>
   </div>
 </section>
@@ -97,51 +111,61 @@
     <div class="plans">
 
       <div class="plan">
-        <h3>Starter</h3>
-        <p class="who">One outlet, up to three people. The solo maker or the single shop.</p>
-        <div class="price"><span class="cur">₦</span><span class="amt num" data-monthly="29,000" data-annual="290,000">29,000</span><span class="per" data-per>per month</span></div>
+        <h3>Basic</h3>
+        <p class="who">Get your studio in order. One studio, two or three of you. The solo designer or the new brand leaving spreadsheets behind.</p>
+        <div class="price" data-plan="starter"><span class="cur">₦</span><span class="amt num" data-monthly="27,000" data-annual="270,000">27,000</span><span class="per" data-per>per month</span></div>
         <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, two months free">Billed monthly, cancel any time</p>
-        <a class="btn btn-line btn-wide" href="demo.html#book"><span>Start free for <span data-cfg="trialDays">14</span> days</span></a>
+        <a class="btn btn-line btn-wide" href="book.html"><span>Start free for <span data-cfg="trialDays">14</span> days</span></a>
         <ul class="plan-feats">
           <li class="hd">The essentials</li>
-          <li>1 outlet, 3 team seats</li>
-          <li>Orders, deposits and balances</li>
-          <li>Customers, measurements and the board</li>
+          <li>1 studio, up to 3 team logins</li>
+          <li>Orders, production tracking and client records</li>
           <li>Invoices, receipts and job sheets</li>
-          <li>Money in, expenses and profit per order</li>
+          <li>See who owes you and how much</li>
+          <li>Basic finance: money in, money out</li>
+          <li>20GB for photos and documents</li>
           <li>Offline, on your phone, with import and export</li>
+          <li class="no">Reminders and the chase list</li>
+          <li class="no">A second studio</li>
+          <li class="no">Payroll, rota and leave</li>
         </ul>
+        <p class="note">The honest sting: you can see what you are owed and invoice for it, but not chase it. Enough to run a small operation. The day you are chasing unpaid balances or your team grows, you feel the ceiling.</p>
       </div>
 
       <div class="plan feat">
         <span class="plan-tag">Most chosen</span>
         <h3>Pro</h3>
-        <p class="who">Up to three outlets and ten people. Where inventory and payroll start to earn their keep.</p>
-        <div class="price"><span class="cur">₦</span><span class="amt num" data-monthly="49,000" data-annual="490,000">49,000</span><span class="per" data-per>per month</span></div>
+        <p class="who">Run the entire business. Everything, with no feature held back, and as many people as you employ.</p>
+        <div class="price" data-plan="pro"><span class="cur">₦</span><span class="amt num" data-monthly="65,000" data-annual="650,000">65,000</span><span class="per" data-per>per month</span></div>
         <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, two months free">Billed monthly, cancel any time</p>
-        <a class="btn btn-gold btn-wide" href="demo.html#book"><span>Start free for <span data-cfg="trialDays">14</span> days</span></a>
+        <a class="btn btn-gold btn-wide" href="book.html"><span>Start free for <span data-cfg="trialDays">14</span> days</span></a>
         <ul class="plan-feats">
-          <li class="hd">Everything in Starter, and</li>
-          <li>3 outlets, 10 team seats</li>
-          <li>Stock with automatic deduction, and suppliers</li>
-          <li>Rota, attendance and leave</li>
-          <li>Payroll with piece rates and commission</li>
-          <li>Funds, owner pay and full reports</li>
+          <li class="hd">Everything in Basic, and</li>
+          <li>Unlimited team logins, with roles and permissions</li>
+          <li>Up to 3 studios, each scoped and reported on its own</li>
+          <li>Receivables and the chase list, with one-tap reminders</li>
+          <li>Full finance: real profit, expenses, cash-basis truth</li>
+          <li>Reporting lines, so managers see their own team</li>
+          <li>Client fitting records and measurement history</li>
+          <li>200GB for photos and documents</li>
+          <li>Onboarding, data migration and priority support</li>
         </ul>
+        <p class="note">Basic shows you who owes you and lets you invoice them. Pro chases them down and collects, and runs your whole team, every studio and your real numbers.</p>
       </div>
 
       <div class="plan">
-        <h3>Premium</h3>
-        <p class="who">Unlimited outlets, up to thirty people, and the storefront tools.</p>
-        <div class="price"><span class="cur">₦</span><span class="amt num" data-monthly="79,000" data-annual="790,000">79,000</span><span class="per" data-per>per month</span></div>
-        <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, two months free">Billed monthly, cancel any time</p>
-        <a class="btn btn-line btn-wide" href="demo.html#book">Talk to us first</a>
+        <h3>Bespoke</h3>
+        <p class="who">For larger brands and groups needing it shaped around how they already work.</p>
+        <div class="price"><span class="amt">Priced per business</span></div>
+        <p class="price-note">We agree what is in it, then send an invoice rather than a checkout</p>
+        <a class="btn btn-line btn-wide" href="book.html"><span>Talk to us</span></a>
         <ul class="plan-feats">
           <li class="hd">Everything in Pro, and</li>
-          <li>Unlimited outlets, 30 team seats</li>
-          <li>Branch transfers and group reporting</li>
-          <li>Concierge and storefront tools</li>
-          <li>Priority support, onboarding and your first import</li>
+          <li>As many studios as you run</li>
+          <li>Custom features and workflow tailoring</li>
+          <li>Storage by agreement, however much you need</li>
+          <li>Dedicated onboarding, migration and training at scale</li>
+          <li>Priority, dedicated support</li>
         </ul>
       </div>
 
@@ -152,22 +176,44 @@
         <h4>Founding members keep their price for life</h4>
         <p>The first seventy five businesses to come on board pay forty percent less than the list price, for as long as they stay with us, on whichever plan they choose. Places are counted, and when they are gone they are gone.</p>
       </div>
-      <a class="btn btn-gold" href="demo.html#book">Claim a place</a>
+      <a class="btn btn-gold" href="book.html">Claim a place</a>
     </div>
 
-    <p class="note center" style="margin-top:20px">Prices are in Naira and exclude VAT where it applies. Yearly billing is ten months for twelve.</p>
+    <div class="callout callout-row" style="margin-top:16px">
+      <div>
+        <h4>None of these three fit?</h4>
+        <p>A group of shops under one owner, an association buying for its members, or a business that needs something built around it. Tell us what you need and we will agree what is in it, what it costs and how you are invoiced.</p>
+      </div>
+      <a class="btn btn-line" href="book.html">Tell us what you need</a>
+    </div>
+
+    <p class="note center" style="margin-top:18px">Prices exclude VAT where it applies. Yearly is ten months for twelve. Basic and Pro both trial for <span data-cfg="trialDays">14</span> days, with no card to start. Bespoke is agreed and invoiced per business.</p>
   </div>
 </section>
 
-<hr class="rule">
+<div class="strip">
+  <div class="wrap">
+    <div class="strip-in">
+      <div class="strip-cell"><div class="v num">0%</div><div class="k">taken from what you sell, on every plan</div></div>
+      <div class="strip-cell"><div class="v num">Unlimited</div><div class="k">orders, customers and invoices</div></div>
+      <div class="strip-cell"><div class="v num">2</div><div class="k">months free when you pay for the year</div></div>
+      <div class="strip-cell"><div class="v num"><span data-cfg="trialDays">14</span></div><div class="k">days free to start, and no card</div></div>
+    </div>
+  </div>
+</div>
 
-<!-- ============ trial ============ -->
+<!-- ============ what the fee is next to ============ -->
 <section class="tight on-light">
   <div class="wrap">
-    <div class="grid g3">
-      <div class="card"><h3><span data-cfg="trialDays">14</span> days, free</h3><p>Full Pro features, no card asked for. If it does not fit, walk away.</p></div>
-      <div class="card"><h3>No free forever plan</h3><p>Everyone here is a paying customer, which is what keeps it good.</p></div>
-      <div class="card"><h3>Your money stays yours</h3><p>Customer payments settle into your own account. We never take a percentage of a sale.</p></div>
+    <div class="sec-head">
+      <span class="eyebrow">Worth it or not</span>
+      <h2>What the fee is standing next to</h2>
+    </div>
+    <div class="grid g2 g-2up">
+      <div class="card"><h3>One balance you would have missed</h3><p>What is overdue is the first thing on the dashboard, with a name against it. A shop that lets a single forty thousand naira balance go quiet has already lost more that month than Basic costs.</p></div>
+      <div class="card"><h3>A percentage costs you more the better you do</h3><p>Three percent of six million naira of sales is a hundred and eighty thousand naira a month, and it grows as you do. Every plan here is a flat fee whatever you sell, your customers pay into your own account, and we never hold your money on the way.</p></div>
+      <div class="card"><h3>Cheaper than the hand you would hire</h3><p>Somebody to keep these records, chase these balances and work out these wages costs several times this every month, and what they learn goes home with them at the end of it.</p></div>
+      <div class="card"><h3>Nothing to lose by finding out</h3><p><span data-cfg="trialDays">14</span> days free, no card asked for. Everything you put in is exportable any day you ask, so leaving is a thing you can actually do, which is the only reason staying means anything.</p></div>
     </div>
   </div>
 </section>
@@ -186,12 +232,13 @@
     <div class="tw">
       <table>
         <thead>
-          <tr><th>Feature</th><th class="c">Starter</th><th class="c">Pro</th><th class="c">Premium</th></tr>
+          <tr><th>Feature</th><th class="c">Basic</th><th class="c">Pro</th><th class="c">Bespoke</th></tr>
         </thead>
         <tbody>
           <tr class="grp"><td colspan="4">Studio and people</td></tr>
-          <tr><td>Outlets</td><td class="c">1</td><td class="c">3</td><td class="c">Unlimited</td></tr>
-          <tr><td>Team seats</td><td class="c">3</td><td class="c">10</td><td class="c">30</td></tr>
+          <tr><td>Studios</td><td class="c">1</td><td class="c">3</td><td class="c">Unlimited</td></tr>
+          <tr><td>Team logins</td><td class="c">3</td><td class="c">Unlimited</td><td class="c">Unlimited</td></tr>
+          <tr><td>Storage for photos and documents</td><td class="c">20GB</td><td class="c">200GB</td><td class="c">By agreement</td></tr>
           <tr><td>Six roles with permissions</td><td class="c"><span class="yes">Yes</span></td><td class="c"><span class="yes">Yes</span></td><td class="c"><span class="yes">Yes</span></td></tr>
 
           <tr class="grp"><td colspan="4">Orders and production</td></tr>
@@ -285,10 +332,10 @@
 <section class="cta">
   <div class="wrap center">
     <h2>Try it before you decide anything</h2>
-    <p class="lede">Open the demo, or book a call and we will walk your own numbers through it with you.</p>
+    <p class="lede">Book a call and we will walk your own numbers through it with you before you decide anything.</p>
     <div class="btn-row center">
-      <a class="btn btn-gold" href="demo.html">Open the live demo</a>
-      <a class="btn btn-line" href="demo.html#book">Book a walkthrough</a>
+      <a class="btn btn-gold" href="book.html">Book a demo</a>
+      <a class="btn btn-line" href="contact.html">Ask us a question</a>
     </div>
   </div>
 </section>
@@ -314,42 +361,54 @@
             <span class="brand-sub">Fashion business software</span>
           </span>
         </a>
-        <p>Run the business behind your label. Built in Lagos, for the way the trade actually works here.</p>
+        <p>Run the business behind your label. Built in Lagos, for the way the trade actually works here: made to order and off the rail, one shop or six, on a phone when the line is bad.</p>
       </div>
       <div>
         <h5>Product</h5>
         <ul>
-          <li><a href="features.html">Features</a></li>
+          <li><a href="features.html">What it does</a></li>
           <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="demo.html">Demo</a></li>
           <li><a href="features.html#offline">Offline and phone</a></li>
+          <li><a href="features.html#team">Staff and branches</a></li>
+          <li><a href="book.html">Book a demo</a></li>
         </ul>
       </div>
       <div>
-        <h5>Solutions</h5>
+        <h5>Your trade</h5>
         <ul>
-          <li><a href="solutions.html#tailors">Made to order</a></li>
-          <li><a href="solutions.html#readytowear">Retail and boutiques</a></li>
-          <li><a href="solutions.html#fabrics">Fabrics and supply</a></li>
-          <li><a href="referrals.html">Refer a business</a></li>
+          <li><a href="index.html#tailors">Bespoke tailors</a></li>
+          <li><a href="index.html#readytowear">Ready to wear</a></li>
+          <li><a href="index.html#shoes">Shoes and bags</a></li>
+          <li><a href="index.html#fabrics">Fabrics and haberdashery</a></li>
+          <li><a href="index.html#trades">Every kind of business</a></li>
         </ul>
       </div>
       <div>
         <h5>Company</h5>
         <ul>
-          <li><a href="about.html">About us</a></li>
-          <li><a href="contact.html">Help and contact</a></li>
-          <li><a href="partners.html">Partners</a></li>
-          <li><a href="contact.html">Contact</a></li>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="partners.html">Become a partner</a></li>
+          <li><a href="referrals.html">Refer a business</a></li>
+          <li><a href="contact.html">Support and contact</a></li>
+          <li><a data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a></li>
         </ul>
+      </div>
+      <div class="ftr-talk">
+        <h5>Talk to a person</h5>
+        <ul>
+          <li><a data-cfg-link="whatsapp" href="https://wa.me/2348000000000">WhatsApp us</a></li>
+          <li><a data-cfg-link="phone" href="tel:+2348000000000"><span data-cfg="phone">+234 800 000 0000</span></a></li>
+          <li><a data-cfg-link="email" href="mailto:hello@thelabelboard.com"><span data-cfg="email">hello@thelabelboard.com</span></a></li>
+          <li><a data-cfg-link="instagram" href="https://instagram.com/thelabelboard"><span data-cfg="instagram">@thelabelboard</span></a></li>
+        </ul>
+        <p class="small"><span data-cfg="city">Lagos, Nigeria</span><br>Monday to Saturday, 9 to 6.</p>
       </div>
     </div>
     <div class="ftr-bot">
-      <p class="small">© <span data-year>2026</span> The Label Board. All rights reserved.</p>
+      <p class="small">&copy; <span data-year>2026</span> The Label Board. Made in Lagos.</p>
       <nav aria-label="Legal">
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="contact.html">Contact</a>
       </nav>
     </div>
   </div>

@@ -5,12 +5,18 @@
 /features      /features.html   301
 /price         /pricing.html    301
 /plans         /pricing.html    301
-/book          /demo.html#book  301
-/trial         /demo.html#book  301
+/book          /book.html       301
+/trial         /book.html       301
 /partner       /partners.html   301
 /refer         /referrals.html  301
-/app           https://app.thelabelboard.app   302
-/portal        https://partners.thelabelboard.app  302
+/app           https://app.thelabelboard.com   302
+/portal        https://partners.thelabelboard.com  302
+
+/solutions    /index.html#trades   301
+/solutions.html /index.html#trades 301
+
+/demo         /book.html      301
+/demo.html    /book.html      301
 
 /support      /contact.html   301
 /support.html /contact.html   301

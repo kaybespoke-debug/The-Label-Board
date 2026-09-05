@@ -10,31 +10,80 @@ const SITE = {
   /* ---- identity ---- */
   name: 'The Label Board',
   tagline: 'Run the business behind your label.',
-  domain: 'thelabelboard.app',
+  domain: 'thelabelboard.com',
 
   /* ---- where the other apps live -------------------------------------
      PLACEHOLDERS. Point these at the real Netlify URLs once each app is
      deployed. Until then every button that uses them still renders, it
      simply lands on a site that is not published yet.                  */
-  appUrl: 'https://app.thelabelboard.app',
-  partnerPortalUrl: 'https://partners.thelabelboard.app',
+  appUrl: 'https://app.thelabelboard.com',
+  partnerPortalUrl: 'https://partners.thelabelboard.com',
 
   /* ---- how people reach us ----
      PLACEHOLDERS. Replace with the real address and number.            */
-  email: 'hello@thelabelboard.app',
-  supportEmail: 'support@thelabelboard.app',
+  email: 'hello@thelabelboard.com',
+  supportEmail: 'support@thelabelboard.com',
   phoneDisplay: '+234 800 000 0000',
   phoneDial: '+2348000000000',
   whatsapp: '2348000000000',
   instagram: 'thelabelboard',
   city: 'Lagos, Nigeria',
 
-  /* ---- the demo studio anyone can open ---- */
-  demoUser: 'owner',
-  demoPass: 'layi2025',
-
-  /* ---- trial ---- */
+  /* ---- trial ----
+     One length, for both self-serve plans. Bespoke used to have a shorter
+     trial of its own, which read as a penalty for paying more; it is now
+     agreed and invoiced per business, so what it offers is a conversation
+     rather than a countdown.                                             */
   trialDays: 14,
+
+  /* ---- what each market pays -----------------------------------------
+     Prices are SET per currency, not converted from naira in the browser.
+     A live rate would change what the page says without anybody deciding
+     it, and the naira rate moves enough that a shop could be quoted two
+     different numbers on two days. Each line below is a decision.
+
+     Naira is the real one: it is the price the admin console bills and the
+     one audit_web.js checks against it. THE OTHER FIVE ARE SEEDS. They were
+     worked out by converting the naira price at roughly 1,530 to the
+     dollar in August 2026 and rounding to a clean number, and they are
+     Kayode's to set properly. A price for a market is a decision about
+     that market, not arithmetic on a rate. Change a number here and every plan, the
+     yearly price and the comparison table all follow.
+
+     Yearly is ten months for twelve, worked out rather than typed, so it
+     can never disagree with the monthly price.                          */
+  /* Keyed by PLAN ID, not by the name a customer is sold. The ids are
+     starter / pro and they are what the database stores; the names on the
+     page are Basic and Pro. There is deliberately no `premium` here \u2014
+     Bespoke is priced per business and quoting a number for it on a public
+     page is the one thing it must never do. */
+  currencies: [
+    { code: 'NGN', symbol: '\u20a6', label: 'Nigeria (naira)',        starter: 27000, pro: 65000 },
+    { code: 'USD', symbol: '$',       label: 'United States (dollar)', starter: 18,    pro: 42 },
+    { code: 'GBP', symbol: '\u00a3', label: 'United Kingdom (pound)', starter: 14,    pro: 33 },
+    { code: 'CAD', symbol: 'CA$',     label: 'Canada (dollar)',        starter: 24,    pro: 58 },
+    { code: 'EUR', symbol: '\u20ac', label: 'Europe (euro)',          starter: 17,    pro: 40 },
+    { code: 'GHS', symbol: 'GH\u20b5', label: 'Ghana (cedi)',         starter: 215,   pro: 520 }
+  ],
+
+  /* Which one a visitor is shown first. Read from the browser's own time
+     zone and language, never from an IP lookup: that would mean calling a
+     third party on every page load, telling them who is reading our
+     pricing, and adding a dependency to a site that has none. A guess is
+     all this is, so the picker is always there to correct it, and the
+     choice is remembered. */
+  currencyByZone: {
+    'Africa/Lagos': 'NGN', 'Africa/Accra': 'GHS', 'Europe/London': 'GBP',
+    /* every Canadian zone is an America/ one, and the last resort in
+       guessCcy sends America/ to dollars, so Canada has to be named */
+    'America/Toronto': 'CAD', 'America/Vancouver': 'CAD', 'America/Edmonton': 'CAD',
+    'America/Winnipeg': 'CAD', 'America/Halifax': 'CAD', 'America/St_Johns': 'CAD',
+    'America/Regina': 'CAD', 'America/Montreal': 'CAD'
+  },
+  currencyByRegion: {
+    NG: 'NGN', GH: 'GHS', GB: 'GBP', US: 'USD', CA: 'CAD',
+    IE: 'EUR', FR: 'EUR', DE: 'EUR', IT: 'EUR', ES: 'EUR', NL: 'EUR', PT: 'EUR', BE: 'EUR'
+  },
 
   /* ---- partner programme, mirrors PARTNERS.md and the portal ---- */
   partner: {
@@ -55,9 +104,7 @@ SITE.text = {
   phone: SITE.phoneDisplay,
   city: SITE.city,
   instagram: '@' + SITE.instagram,
-  demoUser: SITE.demoUser,
-  demoPass: SITE.demoPass,
-  trialDays: String(SITE.trialDays)
+  trialDays: String(SITE.trialDays),
 };
 SITE.link = {
   email: 'mailto:' + SITE.email,
