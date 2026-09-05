@@ -671,7 +671,7 @@ function formAnnouncement(id) {
     '<div class="fg"><label>Title</label><input id="anTitle" value="' + (a ? esc(a.title) : '') + '"></div>' +
     '<div class="fg"><label>Message</label><textarea id="anBody">' + (a ? esc(a.body) : '') + '</textarea></div>' +
     '<div class="f2"><div class="fg"><label>Audience</label><select id="anAud">' +
-    ['All subscribers', 'Premium', 'Pro', 'Starter', 'Trial users', 'Past due accounts'].map(x =>
+    ['All subscribers'].concat(PLANS.filter(p => p.id !== 'trial').map(p => p.name)).concat(['Trial users', 'Past due accounts']).map(x =>
       '<option' + (a && a.audience === x ? ' selected' : '') + '>' + x + '</option>').join('') +
     '</select></div><div class="fg"><label>Channel</label><select id="anCh">' +
     ['In-app', 'Email', 'In-app + Email'].map(x => '<option' + (a && a.channel === x ? ' selected' : '') + '>' + x + '</option>').join('') +

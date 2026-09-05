@@ -173,12 +173,12 @@ PAGES.subscribers = function () {
     ]) +
     '<span class="spacer"></span>' +
     '<select class="sel" onchange="UI.planFilter=this.value;render()">' +
-    [['any', 'Any plan'], ['premium', 'Premium'], ['pro', 'Pro'], ['starter', 'Starter'], ['trial', 'Trial']]
+    [['any', 'Any plan']].concat(PLANS.slice().reverse().map(p => [p.id, p.name]))
       .map(o => '<option value="' + o[0] + '"' + (planSel === o[0] ? ' selected' : '') + '>' +
         (o[0] === 'any' ? 'Plan: any' : 'Plan: ' + o[1]) + '</option>').join('') +
     '</select>' +
     '<select class="sel" onchange="UI.sort.subscribers=this.value;render()">' +
-    [['name', 'Name A–Z'], ['name-desc', 'Name Z–A'], ['tier', 'Tier (Premium first)'], ['tier-asc', 'Tier (Starter first)'],
+    [['name', 'Name A–Z'], ['name-desc', 'Name Z–A'], ['tier', 'Tier (highest first)'], ['tier-asc', 'Tier (lowest first)'],
      ['mrr-desc', 'MRR high → low'], ['mrr-asc', 'MRR low → high'], ['newest', 'Newest first'], ['oldest', 'Longest standing'],
      ['renewal', 'Renewal date'], ['users', 'Most users'], ['referrals', 'Top referrers'], ['active', 'Recently active'],
      ['health', 'Health (at risk first)']]

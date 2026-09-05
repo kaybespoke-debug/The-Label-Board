@@ -1901,7 +1901,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v37';
+const APP_VERSION='layi-v38';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -2295,19 +2295,66 @@ function measGrid(prefix,meas){meas=meas||{};const F=measFieldsFor(meas);_measRe
 function readMeas(prefix){const m={};(_measRendered[prefix]||MEAS_BODY).forEach((f,i)=>{const v=fv(prefix+'_'+i);if(v)m[f]=v;});return m;}
 function measHistoryOf(key){const c=getCustomers()[key];if(!c)return [];let h=Array.isArray(c.measHistory)?c.measHistory.slice():[];if(!h.length&&c.meas&&Object.keys(c.meas).length){h=[{id:'legacy',at:'',meas:c.meas,posture:'',fit:'',note:c.measurements||''}];}return h.sort((a,b)=>(b.at||'').localeCompare(a.at||''));}
 function latestMeasOf(key){return measHistoryOf(key)[0]||null;}
+/* ---- where a measurement came from --------------------------------------
+   A number on a page does not say how much to trust it, and by the time a
+   piece does not fit, the person who could have told you has forgotten. These
+   are the answers to "who took this, and how", and the reason to keep them is
+   that they are the first thing anybody asks when something is wrong.
+
+   The one that earns this on its own is `client`. A studio that cut to numbers
+   the client sent over WhatsApp is in a completely different position from one
+   that measured them in the room, both in whose mistake it was and in what
+   they should do about it. It is marked as unverified everywhere it shows. */
+const MEAS_SOURCES=[
+  {k:'studio', label:'In the studio',        hint:'Measured in person, here'},
+  {k:'visit',  label:'At the client',        hint:'Measured in person, off site'},
+  {k:'video',  label:'Over a video call',    hint:'We guided them through it'},
+  {k:'client', label:'The client sent them', hint:'Their numbers, not ours', unverified:true},
+  {k:'garment',label:'Copied from a garment',hint:'Measured off something that already fits'}
+];
+function measSource(k){return MEAS_SOURCES.find(s=>s.k===k)||null;}
+function measSourceLabel(rec){const s=measSource(rec&&rec.source);return s?s.label:'';}
+/* One short line saying who to ask and how much to trust it. Empty for the
+   older records that predate the question, rather than guessing at them. */
+function measProvenance(rec){
+  if(!rec)return '';
+  const s=measSource(rec.source);
+  const bits=[];
+  if(s)bits.push(s.label);
+  if(rec.takenBy)bits.push('by '+rec.takenBy);
+  if(!bits.length)return '';
+  return bits.join(' · ')+(s&&s.unverified?' · not verified by us':'');
+}
 function measReadGrid(meas){meas=meas||{};const ks=MEAS_ALL.filter(f=>meas[f]);if(!ks.length)return '<div class="kv" style="color:var(--text-faint)">No measurement values.</div>';return `<div class="meas-grid">${ks.map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)">${esc(meas[f])}</div></div>`).join('')}</div>`;}
 function measReadGridFull(meas){meas=meas||{};return `<div class="meas-grid">${measFieldsFor(meas).map(f=>`<div class="meas-cell"><label>${f}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);${meas[f]?'':'color:var(--text-faint)'}">${esc(meas[f]||'—')}</div></div>`).join('')}</div>`;}
 function openMeasRecord(key,recId){if(!can('customers'))return;const h=measHistoryOf(key);const rec=recId?h.find(r=>r.id===recId):null;const base=rec?rec.meas:(h[0]?h[0].meas:{});
   openModal(`<h3>${rec?'Measurement record':'New measurement record'}</h3><div class="msub">${esc((getCustomers()[key]||{}).name||key)}</div>
     <div class="row2"><div class="field"><label>Date taken</label><input class="fld" type="date" id="mr_date" value="${rec&&rec.at?rec.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div>
     <div class="field"><label>Preferred fit</label><select class="fld" id="mr_fit"><option value="">—</option>${FIT_STYLES.map(x=>`<option ${rec&&rec.fit===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
+    <div class="row2"><div class="field"><label>How was it taken?</label><select class="fld" id="mr_source"><option value="">—</option>${MEAS_SOURCES.map(s=>`<option value="${s.k}" ${rec&&rec.source===s.k?'selected':''}>${esc(s.label)}</option>`).join('')}</select><div class="sd" style="color:var(--text-faint);margin-top:5px">Numbers a client sent are recorded as theirs, so a fitting problem later has an answer.</div></div>
+    <div class="field"><label>Who took it?</label><select class="fld" id="mr_takenBy"><option value="">—</option>${(function(){
+      const staff=getStaff().filter(s=>s.active!==false);
+      /* Default to whoever is doing this, when they have a staff record — the
+         person filling the form is nearly always the person who measured. */
+      const mine=(function(){try{const me=myStaff();return me?me.name:'';}catch(e){return '';}})();
+      const chosen=rec?(rec.takenBy||''):(mine||'');
+      const names=staff.map(s=>s.name);
+      if(chosen&&names.indexOf(chosen)<0)names.unshift(chosen);
+      return names.map(n=>`<option value="${esc(n)}" ${chosen===n?'selected':''}>${esc(n)}</option>`).join('');
+    })()}</select></div></div>
     <div class="field"><label>Body posture observations</label><input class="fld" id="mr_posture" value="${rec?esc(rec.posture||''):''}" placeholder="e.g. slightly stooped, broad shoulders, one shoulder higher"></div>
     <div class="field"><label>Notes</label><input class="fld" id="mr_note" value="${rec?esc(rec.note||''):''}" placeholder="Any fitting notes"></div>
     <div class="field"><label>Measurements</label>${measGrid('mr_m',base)}</div>
     <div class="modal-foot">${rec&&rec.id&&rec.id!=='legacy'?`<button class="btn danger sm" onclick="delMeasRecord('${esc(key)}','${rec.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="openCustomer('${esc(key)}')">Cancel</button><button class="btn" onclick="saveMeasRecord('${esc(key)}','${rec&&rec.id?rec.id:''}')">Save record</button></div>`);}
 function saveMeasRecord(key,recId){const c=getCustomers();const cust=c[key]||{name:key};cust.measHistory=Array.isArray(cust.measHistory)?cust.measHistory:[];
   if(!cust.measHistory.length&&cust.meas&&Object.keys(cust.meas).length){cust.measHistory.push({id:uid('mr'),at:new Date(0).toISOString(),meas:cust.meas,posture:'',fit:'',note:cust.measurements||''});}
-  const meas=readMeas('mr_m');const at=fv('mr_date')||new Date().toISOString().slice(0,10);const rec={at:new Date(at).toISOString(),fit:fv('mr_fit')||'',posture:fv('mr_posture')||'',note:fv('mr_note')||'',meas};
+  const meas=readMeas('mr_m');const at=fv('mr_date')||new Date().toISOString().slice(0,10);
+  /* recordedBy is who typed it; takenBy is who held the tape. They are usually
+     the same person and sometimes are not — a CRE entering what a tailor
+     measured at a fitting — and the difference is exactly what somebody needs
+     when a piece comes back. */
+  const rec={at:new Date(at).toISOString(),fit:fv('mr_fit')||'',posture:fv('mr_posture')||'',note:fv('mr_note')||'',
+    source:fv('mr_source')||'',takenBy:fv('mr_takenBy')||'',recordedBy:userLabel(),recordedAt:new Date().toISOString(),meas};
   if(recId&&recId!=='legacy'){const ex=cust.measHistory.find(r=>r.id===recId);if(ex)Object.assign(ex,rec);else{rec.id=uid('mr');cust.measHistory.push(rec);}}
   else{rec.id=uid('mr');cust.measHistory.push(rec);}
   const latest=cust.measHistory.slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''))[0];cust.meas=latest?latest.meas:meas;
@@ -2583,6 +2630,30 @@ function timeAgo(iso){const s=Math.floor((Date.now()-new Date(iso))/1000);if(s<6
 const isToday=d=>d&&new Date(d).toDateString()===today.toDateString();
 
 /* ===== IMAGE COMPRESSION ===== */
+/* ---- how hard to squeeze a photo, by what it is for ----------------------
+   Pro sells unlimited staff, so seats no longer protect margin and storage is
+   the only limit left. The largest and fastest-growing category by a distance
+   is progress photos: one or more on every stage move, on every order, from
+   every one of an unbounded number of people. They are also the most
+   disposable — evidence that the work happened, looked at once, rarely opened
+   again.
+
+   Reference photos are the opposite. The style a client brought in, the
+   finished piece that becomes a marketing shot, a fabric the studio is
+   matching. Those get opened months later and are worth the bytes.
+
+   So the two are no longer squeezed the same. Progress drops to 900px at 0.62,
+   roughly 55% of the bytes of a reference photo, on the category that
+   generates the most of them. Nothing a studio keeps for its own use loses
+   quality to pay for it. */
+const PHOTO_BUDGET={
+  reference:{dim:1100,q:0.72},   // client's own photos, outfits, the finished piece
+  progress:{dim:900,q:0.62}      // stage-by-stage proof of work
+};
+function compressFor(file,kind){
+  const b=PHOTO_BUDGET[kind]||PHOTO_BUDGET.reference;
+  return compressImage(file,b.dim,b.q);
+}
 function compressImage(file,maxDim=1100,quality=0.72){
   return new Promise((resolve,reject)=>{
     const r=new FileReader();
@@ -2771,9 +2842,40 @@ function openStudioSetup(){
     /* LAYI is the demo tenant's name and arrives via DEFAULTS, so it is an
        unanswered question rather than this studio's own answer. */
     name:(co&&co!=='LAYI')?co:'',
-    location:'', does:[], channels:['showroom']
+    location:'', does:[], channels:['showroom'], team:'', outlets:''
   };
   renderStudioSetup();
+}
+/* How many people, and how many outlets. Both are bands rather than a number,
+   because a studio setting itself up on a phone knows "two or three of us" and
+   does not know its headcount to the person, and because the two things these
+   answers decide are themselves banded.
+
+   They do NOT create anything. A studio that says "six or more" does not get
+   six blank staff records to delete; it gets the Team tab already visible and
+   a plan that fits, which is the whole of what the answer is worth. Inventing
+   records from a rough count is how an app hands somebody a tidying job as
+   their first experience of it. */
+const SETUP_TEAM=[
+  {k:'solo', label:'Just me',      n:1},
+  {k:'few',  label:'2 to 5 of us', n:3},
+  {k:'many', label:'6 or more',    n:8}
+];
+const SETUP_OUTLETS=[
+  {k:'one',  label:'One',          n:1},
+  {k:'two',  label:'2 or 3',       n:3},
+  {k:'more', label:'More than 3',  n:5}
+];
+function setupPick(field,k){setupSync();setupDraft[field]=(setupDraft[field]===k?'':k);renderStudioSetup();}
+function setupBandRow(field,opts){
+  return opts.map(function(o){
+    const on=setupDraft[field]===o.k;
+    return '<span onclick="setupPick(\''+field+'\',\''+o.k+'\')" style="cursor:pointer;display:inline-block;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--panel-2)':'transparent')+';border-radius:999px;padding:7px 14px;font-size:13.5px;margin:0 8px 8px 0">'+esc(o.label)+'</span>';
+  }).join('');
+}
+function setupBandN(field,opts,fallback){
+  const hit=opts.find(function(o){return o.k===setupDraft[field];});
+  return hit?hit.n:fallback;
 }
 function setupToggleDoes(k){
   setupSync();
@@ -2799,15 +2901,21 @@ function renderStudioSetup(){
       +(a.desc?'<div style="font-size:11.5px;color:var(--text-faint);margin-top:4px">'+esc(a.desc)+'</div>':'')
       +'</div>';
   }).join('');
-  openModal('<h3>Set up your studio</h3><div class="msub">Three questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
+  openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
     +'<div class="field"><label>Where do you work from <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="su_loc" value="'+esc(d.location)+'" placeholder="City / area"></div>'
-    +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick everything)</span></label>'
+    +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label>'
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:2px">'+chips+'</div></div>'
-    +'<div class="field"><label>How do you sell</label><div style="display:flex;gap:20px;padding-top:4px">'
+    +'<div class="field"><label>How do you sell <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label><div style="display:flex;gap:20px;padding-top:4px">'
     +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_show" '+(d.channels.indexOf('showroom')>=0?'checked':'')+'> In person</label>'
     +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_onl" '+(d.channels.indexOf('online')>=0?'checked':'')+'> Online</label>'
     +'</div></div>'
+    +'<div class="field"><label>How many people work with you? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
+    +'<div style="padding-top:2px">'+setupBandRow('team',SETUP_TEAM)+'</div>'
+    +'<div class="sd" style="color:var(--text-faint)">Tell us and the Team, Rota and Payroll tabs are there from the start. Add the actual people whenever you like.</div></div>'
+    +'<div class="field"><label>How many studios or outlets do you run? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
+    +'<div style="padding-top:2px">'+setupBandRow('outlets',SETUP_OUTLETS)+'</div>'
+    +'<div class="sd" style="color:var(--text-faint)">We set up the first one now. You name and add the rest in Settings, so each is scoped and reported on its own.</div></div>'
     +'<div class="modal-foot"><button class="btn ghost" onclick="skipStudioSetup()">Skip for now</button><span style="flex:1"></span><button class="btn" onclick="saveStudioSetup()">Start</button></div>');
 }
 /* Skipping is a real answer. It is recorded, so the studio is asked once and
@@ -2844,15 +2952,35 @@ function saveStudioSetup(){
     if(typeof applyStages==='function')applyStages();
   }
   SETTINGS.itemWord='';            // let the trade choose the word
+  /* The two counts. Neither creates a record; both change what the studio
+     walks into. */
+  const teamN=setupBandN('team',SETUP_TEAM,1);
+  const outletsN=setupBandN('outlets',SETUP_OUTLETS,1);
+  SETTINGS.setupTeamBand=d.team||'';
+  SETTINGS.setupOutletsBand=d.outlets||'';
+  /* Progressive disclosure normally waits for a second staff record to exist.
+     Somebody who has just told us there are five of them should not have to
+     hire themselves into their own app before the Team tab appears. Saying
+     "just me" is left alone rather than forced off, so the automatic reveal
+     still fires the day they hire. */
+  if(teamN>1||outletsN>1)SETTINGS.teamTools='on';
+  /* Start them on a plan that fits what they just described, instead of
+     inferring one from a device with a single account and one branch on it. */
+  if(typeof smallestPlanFitting==='function')SETTINGS.plan=smallestPlanFitting(outletsN,teamN).id;
   SETTINGS.setupDone=true;
   save('layi_dash_settings',SETTINGS);
-  if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+d.does.join(', '));
+  if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+d.does.join(', ')+(d.team?' · team '+d.team:'')+(d.outlets?' · outlets '+d.outlets:''));
   setupDraft=null;closeModal();
   if(typeof applyBranding==='function')applyBranding();
   if(typeof applyBizVisibility==='function')applyBizVisibility();
+  if(typeof applyTeamVisibility==='function')applyTeamVisibility();
   if(typeof renderBranchSwitch==='function')renderBranchSwitch();
   renderAll();
-  if(typeof toast==='function')toast('Welcome to '+name);
+  /* If they said there are more of them, or more than one outlet, say where
+     those live rather than leaving them to find it. */
+  const nextStep=outletsN>1?'Add your other studios in Settings › Branches.'
+    :(teamN>1?'Add your team in the Team tab whenever you are ready.':'');
+  if(typeof toast==='function')toast('Welcome to '+name+(nextStep?' · '+nextStep:''));
 }
 
 function enterApp(){
@@ -3675,7 +3803,7 @@ function batchSet(stageIdx,val){batchApply(stageIdx,val);}
 function batchStep(stageIdx,delta){const o=getOrders().find(x=>x.id===batchId);if(!o)return;batchApply(stageIdx,(o.batch.reached[stageIdx]||0)+delta);}
 function addOutfit(){syncOrderDraft();draft.outfits.push(blankOutfit());reRenderOrder();}
 function removeOutfit(i){syncOrderDraft();draft.outfits.splice(i,1);if(!draft.outfits.length)draft.outfits.push(blankOutfit());reRenderOrder();}
-async function addClientPhotos(files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.clientPhotos.push(await compressImage(f));}reRenderOrder();}
+async function addClientPhotos(files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.clientPhotos.push(await compressFor(f,'reference'));}reRenderOrder();}
 function removeClientPhoto(idx){syncOrderDraft();draft.clientPhotos.splice(idx,1);reRenderOrder();}
 function orderMeasRefHtml(client){const key=nameKey(client||'');if(!key)return '';const latest=latestMeasOf(key);if(!latest)return '';const ks=MEAS_ALL.filter(f=>latest.meas&&latest.meas[f]);if(!ks.length&&!latest.fit&&!latest.posture)return '';
   return `<div class="kv" style="margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-2)"><b>📐 Measurements on file</b>${latest.at&&latest.at>new Date(1).toISOString()?' <span style="color:var(--text-faint)">('+new Date(latest.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+')</span>':''}${latest.fit?' · fit '+esc(latest.fit):''}${latest.posture?' · '+esc(latest.posture):''}<br><span style="color:var(--text-faint);font-size:12px">${ks.slice(0,8).map(f=>esc(f)+' '+esc(latest.meas[f])).join(' · ')}${ks.length>8?' …':''}</span></div>`;}
@@ -3687,7 +3815,7 @@ function clientPick(){const s=document.getElementById('f_clientPick');const t=do
 function clientChosen(){if(!draft)return;syncOrderDraft();const nm=(fv('f_client')||'').trim();const key=nameKey(nm);const c=getCustomers()[key];if(c){const e=document.getElementById('f_email');if(e&&!e.value&&c.email)e.value=c.email;const w=document.getElementById('f_whatsapp');if(w&&!w.value&&c.whatsapp)w.value=c.whatsapp;const a=document.getElementById('f_address');if(a&&!a.value&&c.address)a.value=c.address;}const cm=document.getElementById('clientMatch');if(cm)cm.innerHTML=!nm?'':(c?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Customers on save</span>');refreshOrderMeas();}
 function toggleOrderMeas(){syncOrderDraft();orderMeasOpen=!orderMeasOpen;reRenderOrder();}
 function loadLatestMeasIntoOrder(){syncOrderDraft();const key=nameKey(draft.client||'');const latest=key?latestMeasOf(key):null;if(latest){draft.meas=Object.assign({},latest.meas||{});draft.measFit=latest.fit||'';draft.measPosture=latest.posture||'';draft.measNote=latest.note||'';orderMeasOpen=true;reRenderOrder();}}
-async function addOutfitPhotos(i,files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.outfits[i].photos.push(await compressImage(f));}reRenderOrder();}
+async function addOutfitPhotos(i,files){syncOrderDraft();for(const f of files){if(!f.type.startsWith('image/'))continue;draft.outfits[i].photos.push(await compressFor(f,'reference'));}reRenderOrder();}
 function removeOutfitPhoto(i,idx){syncOrderDraft();draft.outfits[i].photos.splice(idx,1);reRenderOrder();}
 function recalcTotal(){let t=0;draft.outfits.forEach((o,i)=>{const e=document.getElementById('of_price_'+i);if(e)t+=+e.value||0;});const el=document.getElementById('orderTotal');if(el)el.textContent=cur(t);}
 
@@ -4207,8 +4335,9 @@ function measSheetInner(key,recId){
     ${docHeader('MEASUREMENT SHEET')}
     <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:18px">
       <div><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Client</div><div style="font-weight:700;font-size:16px">${esc(c.name||key)}</div></div>
-      <div style="text-align:right">${when?`<div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Taken</div><div>${when}</div>`:''}${rec&&rec.fit?`<div style="color:#666">Fit: ${esc(rec.fit)}</div>`:''}</div>
+      <div style="text-align:right">${when?`<div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Taken</div><div>${when}</div>`:''}${rec&&rec.fit?`<div style="color:#666">Fit: ${esc(rec.fit)}</div>`:''}${measProvenance(rec)?`<div style="color:#666;font-size:12px">${esc(measProvenance(rec))}</div>`:''}</div>
     </div>
+    ${(measSource(rec&&rec.source)||{}).unverified?`<div style="border:1px solid #c47d12;background:#fdf6e8;color:#8a5a0b;padding:8px 10px;border-radius:6px;font-size:12.5px;margin-bottom:14px">These measurements were supplied by the client and have not been checked by us. Confirm at first fitting before cutting.</div>`:''}
     ${measTableHtml(meas,false)}
     ${rec&&(rec.posture||rec.note)?`<div style="margin-top:18px;font-size:13px">${rec.posture?`<div><b>Posture:</b> ${esc(rec.posture)}</div>`:''}${rec.note?`<div><b>Notes:</b> ${esc(rec.note)}</div>`:''}</div>`:''}
   </div>`;
@@ -4275,7 +4404,7 @@ function copyInvoiceText(id){const o=getOrders().find(x=>x.id===id);if(!o)return
 /* ===== PRODUCTION UPDATE (all roles, with optional photos) ===== */
 function openUpdate(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;updateDraft={id,stage:o.stageIndex,note:'',photos:[],client:o.client,garment:o.garment,worker:(currentUser&&currentUser.staffId)||''};renderUpdateModal();}
 function syncUpdate(){if(!updateDraft)return;const s=document.getElementById('u_stage');const n=document.getElementById('u_note');const w=document.getElementById('u_worker');if(s)updateDraft.stage=+s.value;if(n)updateDraft.note=n.value;if(w)updateDraft.worker=w.value;}
-async function addUpdatePhotos(files){syncUpdate();for(const f of files){if(!f.type.startsWith('image/'))continue;updateDraft.photos.push(await compressImage(f));}renderUpdateModal();}
+async function addUpdatePhotos(files){syncUpdate();for(const f of files){if(!f.type.startsWith('image/'))continue;updateDraft.photos.push(await compressFor(f,'progress'));}renderUpdateModal();}
 function removeUpdatePhoto(idx){syncUpdate();updateDraft.photos.splice(idx,1);renderUpdateModal();}
 function renderUpdateModal(){
   const _dispIdx=STAGES.indexOf('Dispatched');const _delIdx=STAGES.indexOf('Delivered');
@@ -4385,15 +4514,25 @@ function renderPlanPanel(){
       +(over?' <span style="color:var(--red)">over</span>':'')+'</span></div>';
   };
   const next=nextPlanFor('studios')||nextPlanFor('seats');
-  box.innerHTML='<div class="kv" style="margin-bottom:10px"><b>'+esc(cur.name)+'</b>'
-      +(cur.monthly?' \u00b7 '+cur2(cur.monthly)+' a month':' \u00b7 free')
+  const priceOf=function(p){return p.invoiceOnly?'priced for your business':(p.monthly?cur2(p.monthly)+' a month':'free');};
+  const seatsOf=function(p){return p.seats===PLAN_UNLIMITED?'as many team accounts as you need':p.seats+' team accounts';};
+  /* What the plan includes, as opposed to how much of it. Only the things a
+     plan actually decides appear here, so this stays a short honest list
+     rather than a marketing panel inside the product. */
+  const featRows=Object.keys(PLAN_FEATURES).map(function(k){
+    const on=(cur.features||[]).indexOf(k)>=0;
+    return '<div class="bd-row"><span class="bl">'+esc(PLAN_FEATURES[k].label)+'</span><span class="bv" style="color:'+(on?'var(--green)':'var(--text-faint)')+'">'
+      +(on?'Included':'Not on '+esc(cur.name))+'</span></div>';
+  }).join('');
+  box.innerHTML='<div class="kv" style="margin-bottom:10px"><b>'+esc(cur.name)+'</b> \u00b7 '+priceOf(cur)
       +'<div style="color:var(--text-dim);font-size:13px">'+esc(cur.blurb)+'</div></div>'
     +row('Studios',use.studios,cur.studios)
     +row('Team accounts',use.seats,cur.seats)
     +'<div class="bd-row"><span class="bl">Storage</span><span class="bv">'+fmtBytes(storageUsage().bytes)+' of '+cur.storageGb+' GB</span></div>'
+    +featRows
     +(next?'<div class="sd" style="color:var(--text-faint);margin-top:10px">'+esc(next.name)+' gives you '
-      +(next.studios===PLAN_UNLIMITED?'as many studios as you need':next.studios+' studios')+' and '+next.seats
-      +' team accounts for '+cur2(next.monthly)+' a month. Talk to us when you are ready.</div>':'')
+      +(next.studios===PLAN_UNLIMITED?'as many studios as you need':next.studios+' studios')+' and '+seatsOf(next)
+      +', '+priceOf(next)+'. Talk to us when you are ready.</div>':'')
     +'<div class="sd" style="color:var(--text-faint);margin-top:8px">Going over a limit never hides anything you already have. It only stops you adding more.</div>';
 }
 function renderPayMethodSettings(){
@@ -4961,16 +5100,83 @@ function initSettingsCollapse(){groupSettings();}
    purpose. If they ever disagree, the console is right — it is what actually
    bills — and the audit_tiers gate says so.
    ========================================================================= */
+/* The ids are trial/starter/pro/premium and must stay that way: they are a
+   CHECK constraint on businesses.plan and they are written on every live
+   subscription row. The NAMES are Basic / Pro / Bespoke, which is what a
+   customer is sold and what the website says. Renaming the ids to match the
+   names would mean a migration, a constraint change and a rewrite of every
+   existing row, to change a word nobody sees. */
 const PLANS=[
-  {id:'trial',   name:'Trial',   monthly:0,     studios:1, seats:3,  storageGb:1,
-   blurb:'14 days, everything in Pro'},
-  {id:'starter', name:'Starter', monthly:29000, studios:1, seats:3,  storageGb:20,
-   blurb:'One studio, three people'},
-  {id:'pro',     name:'Pro',     monthly:49000, studios:3, seats:10, storageGb:100,
-   blurb:'Three studios, ten people'},
-  {id:'premium', name:'Premium', monthly:79000, studios:0, seats:30, storageGb:1024,
-   blurb:'As many studios as you run'}
+  {id:'trial',   name:'Trial',   monthly:0,     studios:1, seats:3, storageGb:2,
+   blurb:'14 days, everything in Pro', features:['chase']},
+  {id:'starter', name:'Basic',   monthly:27000, studios:1, seats:3, storageGb:15,
+   blurb:'One studio, three people', features:[]},
+  /* Pro is the full product: no feature is held back and staff are unlimited.
+     That makes storage the only thing left protecting margin, which is why
+     its cap is a real number rather than a generous gesture. */
+  {id:'pro',     name:'Pro',     monthly:65000, studios:3, seats:0, storageGb:150,
+   blurb:'Everything, and as many people as you employ', features:['chase']},
+  /* Priced per business, so it carries no monthly figure to quote. An operator
+     types the negotiated price when they move a studio onto it. */
+  {id:'premium', name:'Bespoke', monthly:0, invoiceOnly:true, studios:0, seats:0, storageGb:1024,
+   blurb:'Shaped around how you already work', features:['chase']}
 ];
+/* ---- what a plan includes, as opposed to how much of it ------------------
+   Everything above this line is scale: how many studios, how many people, how
+   many gigabytes. This is the one place a plan decides what the product DOES,
+   and it exists because Basic and Pro are sold on a genuine difference in
+   capability rather than only on size:
+
+     "Basic shows you who owes you and lets you invoice them.
+      Pro chases them down and collects."
+
+   So the split is drawn at the narrowest possible place. Basic sees the whole
+   receivables picture — who owes, how much, how overdue, and the chase list
+   itself — and can raise an invoice against any of it. What it cannot do is
+   send the reminder. One verb, not one screen: hiding the money a studio is
+   owed would be hiding their own books from them to sell them a plan, and
+   that is not a thing we are willing to do.
+
+   Kept deliberately short. Every key added here is a thing the product no
+   longer simply does, and the reason to add one had better be that customers
+   are buying the difference. */
+const PLAN_FEATURES={
+  chase:{
+    label:'Reminders & follow-ups',
+    why:'See who owes you on any plan. Sending the reminder is Pro.'
+  }
+};
+function planIncludes(feature){
+  const f=(currentPlan().features)||[];
+  return f.indexOf(feature)>=0;
+}
+/* The cheapest plan that includes something, so a nudge can name it and its
+   price instead of saying "upgrade". An invoice-only plan carries monthly 0,
+   which sorts as free and would make Bespoke the cheapest thing on the list —
+   so it is ranked last, and only ever named when nothing priced has the
+   feature at all. */
+function planRank(p){return p.invoiceOnly?Infinity:(p.monthly||0);}
+function firstPlanWith(feature){
+  return PLANS.filter(p=>p.id!=='trial'&&(p.features||[]).indexOf(feature)>=0)
+              .sort((a,b)=>planRank(a)-planRank(b))[0]||null;
+}
+/* Returns true when the caller must stop, matching planStop's shape. */
+function featureStop(feature){
+  if(planIncludes(feature))return false;
+  const f=PLAN_FEATURES[feature]||{label:feature,why:''};
+  const next=firstPlanWith(feature);
+  let msg=f.label+' is not part of '+currentPlan().name+'.';
+  if(f.why)msg+='\n\n'+f.why;
+  if(next)msg+='\n\n'+next.name+(next.invoiceOnly?' includes it.':' includes it, for '+cur2(next.monthly)+' a month.');
+  msg+='\n\nNothing you already have is affected.';
+  alert(msg);
+  return true;
+}
+/* Chasing needs both: the role has to be allowed to see the money at all, and
+   the plan has to include sending the reminder. Two different questions, and
+   collapsing them into one is how a studio ends up unable to chase because
+   somebody edited a role. */
+function canChase(){return canReceivables()&&planIncludes('chase');}
 const PLAN_UNLIMITED=0;
 function smallestPlanFitting(studios,seats){
   for(let i=0;i<PLANS.length;i++){
@@ -5030,7 +5236,7 @@ function planStop(what,noun){
   let msg=cur.name+' includes '+lim+' '+(lim===1?nice.replace(/s$/,''):nice)+'.';
   if(next){
     const nl=next[what]===PLAN_UNLIMITED?'as many as you need':next[what]+' '+nice;
-    msg+='\n\n'+next.name+' gives you '+nl+' for '+cur2(next.monthly)+' a month.';
+    msg+='\n\n'+next.name+' gives you '+nl+(next.invoiceOnly?', priced for your business.':' for '+cur2(next.monthly)+' a month.');
     msg+='\n\nNothing you already have is affected.';
   }
   alert(msg);
@@ -5039,7 +5245,14 @@ function planStop(what,noun){
 /* Currency for a price we quote, which is always in the plan's own currency
    rather than the studio's. A London studio still pays in naira today. */
 function cur2(n){return '\u20a6'+fmtNum(n||0);}
-const STORAGE_TIERS=[{name:'Free',gb:1},{name:'Studio',gb:20},{name:'Growth',gb:100},{name:'Atelier',gb:1024}];
+/* One tier per plan, at exactly the plan's own figure. storageTierName() picks
+   the largest tier that fits inside the plan's allowance, so a tier ladder
+   that does not line up silently enforces a SMALLER limit than the plan sells:
+   set Basic to 15GB against a ladder whose next rung down is 1GB and the studio
+   is quietly capped at 1GB while the plan panel promises fifteen. Nothing
+   errors, nothing is logged, and the first anybody hears of it is a customer
+   who cannot save a photo. audit_storage now pins them together. */
+const STORAGE_TIERS=[{name:'Free',gb:2},{name:'Studio',gb:15},{name:'Growth',gb:150},{name:'Atelier',gb:1024}];
 /* Storage comes from the plan. It used to be its own setting, which meant a
    studio could be on Starter with an Atelier allowance and nobody would notice
    until the bill did not match. An explicit storageTier still wins if one was
@@ -5430,7 +5643,11 @@ async function waAutoSend(kind,o){var c=waCfg();if(!c.events||!c.events[kind])re
   try{await supa.functions.invoke(c.endpoint||'send-whatsapp',{body:{to:num,template:kind,text:msgTemplate(kind,o),order:(o&&o.id)||'',sender:c.sender||''}});
     logAudit('WhatsApp sent automatically',kind+' · '+((o&&o.client)||''));if(typeof pushActivity==='function')pushActivity('status','Auto WhatsApp ('+kind+') → '+((o&&o.client)||''));return true;
   }catch(e){return false;}}
-function waOnEvent(kind,o){try{if(waAutoReady())waAutoSend(kind,o);}catch(e){}}
+/* The automatic seam has to respect the plan too. It is dormant today, so this
+   guard closes the hole before there is one: without it, switching the sender
+   on at go-live would quietly hand every Basic studio automated chasing, which
+   is the one thing Pro is sold on. */
+function waOnEvent(kind,o){try{if(kind==='reminder'&&!planIncludes('chase'))return;if(waAutoReady())waAutoSend(kind,o);}catch(e){}}
 function renderWASettings(){var c=waCfg();var t=document.getElementById('wa_auto');if(!t)return;t.checked=!!c.auto;
   var ev=document.getElementById('wa_events');if(ev){var rows=[['confirm','When an order is confirmed'],['ready','When it is ready for collection or delivery'],['reminder','Payment reminders']];
     ev.innerHTML=rows.map(function(r){return '<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text-dim);cursor:pointer"><input type="checkbox" '+((c.events&&c.events[r[0]])?'checked':'')+' onchange="onWAEvent(\''+r[0]+'\',this.checked)"> '+r[1]+'</label>';}).join('');ev.style.display=c.auto?'':'none';}
@@ -5442,7 +5659,11 @@ function onWAEvent(k,on){var c=waCfg();c.events=c.events||{};c.events[k]=!!on;sa
 function esc0(s){return s==null?'':String(s);}
 function openMsgHelper(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const phone=(cust.whatsapp||o.whatsapp||'').replace(/[^0-9]/g,'');
   const block=(label,kind)=>{const msg=msgTemplate(kind,o);const wa=phone?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:'';return `<div class="field"><label>${label}</label><textarea class="fld" rows="3" readonly onclick="this.select()">${esc(msg)}</textarea><div style="margin-top:6px">${wa?`<a class="btn sm" href="${wa}" target="_blank" rel="noopener">Open in WhatsApp</a>`:'<span style="font-size:12px;color:var(--text-faint)">Add a WhatsApp number to this client to enable the WhatsApp button.</span>'}</div></div>`;};
-  openModal(`<h3>Message ${esc(o.client)}</h3><div class="msub">${o.id} · tap a message to select it, then copy</div>${block('Order confirmed','confirm')}${block('Ready for collection / delivery','ready')}${block('Payment reminder','reminder')}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);}
+  /* Confirming an order and telling somebody it is ready are how the studio
+     runs; those are on every plan. The payment reminder is the chase. */
+  const reminderBlock=planIncludes('chase')?block('Payment reminder','reminder')
+    :`<div class="field"><label>Payment reminder</label><div class="kv" style="color:var(--text-faint)">${esc(PLAN_FEATURES.chase.why)} <span style="cursor:pointer;color:var(--gold)" onclick="featureStop('chase')">See what Pro adds</span></div></div>`;
+  openModal(`<h3>Message ${esc(o.client)}</h3><div class="msub">${o.id} · tap a message to select it, then copy</div>${block('Order confirmed','confirm')}${block('Ready for collection / delivery','ready')}${reminderBlock}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);}
 function defaultDueDate(){var d=(SETTINGS.defaults&&+SETTINGS.defaults.leadDays)||0;if(!d)return '';return new Date(Date.now()+d*86400000).toISOString().slice(0,10);}
 function downloadCustomerTemplate(){var csv='name,phone,email,address,note\nA. Bakare,+234 800 000 0000,bakare@example.com,"12 Marina, Lagos",VIP client\n';var blob=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='layi_customers_template.csv';a.click();}
 function parseCSV(text){var rows=[],i=0,field='',row=[],inQ=false;text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');while(i<text.length){var c=text[i];if(inQ){if(c==='"'){if(text[i+1]==='"'){field+='"';i+=2;continue;}inQ=false;i++;continue;}field+=c;i++;continue;}if(c==='"'){inQ=true;i++;continue;}if(c===','){row.push(field);field='';i++;continue;}if(c==='\n'){row.push(field);rows.push(row);row=[];field='';i++;continue;}field+=c;i++;}if(field.length||row.length){row.push(field);rows.push(row);}return rows.filter(function(r){return r.some(function(x){return (x||'').trim()!=='';});});}
@@ -8362,7 +8583,13 @@ function openChaseList(){
     const cust=getCustomers()[c.key]||{};const num=String(cust.whatsapp||cust.phone||'').replace(/[^0-9]/g,'');
     const firstId=c.orders[0].id;
     const msg=`Hello ${(c.name||'').split(' ')[0]||''}, a gentle reminder from ${co}: there is an outstanding balance of ${cur(c.owed)} on your order${c.orders.length>1?'s':''}. Kindly let us know when we can expect payment. Thank you.`;
-    const waBtn=(num&&can('seeContact'))?`<a class="btn sm ghost" href="https://wa.me/${num}?text=${encodeURIComponent(msg)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--green)">Chase</a>`:'';
+    /* The list, the totals and how overdue each one is are the studio's own
+       books and show on every plan. Sending the reminder is the Pro line. */
+    const waBtn=(num&&can('seeContact'))
+      ?(planIncludes('chase')
+        ?`<a class="btn sm ghost" href="https://wa.me/${num}?text=${encodeURIComponent(msg)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--green)">Chase</a>`
+        :`<button class="btn sm ghost" onclick="event.stopPropagation();featureStop('chase')" style="color:var(--text-faint)">Chase</button>`)
+      :'';
     const payBtn=can('money')?`<button class="btn sm" onclick="event.stopPropagation();closeModal();openPayment('${firstId}')">Record payment</button>`:'';
     const open=getCustomers()[c.key]?`openCustomer('${c.key}')`:`openDetail('${firstId}')`;
     return `<div class="bd-row" style="cursor:pointer" onclick="closeModal();${open}"><span class="bl"><b>${esc(c.name)}</b> <span style="color:var(--text-faint)">\u00b7 ${c.orders.length} order${c.orders.length>1?'s':''} \u00b7 ${badge}</span></span><span style="display:flex;align-items:center;gap:8px;white-space:nowrap"><b style="color:${late?'var(--red)':'var(--amber)'}">${cur(c.owed)}</b>${waBtn}${payBtn}</span></div>`;
@@ -9351,7 +9578,7 @@ function openCustomer(key){
     :`<b>${loy.tier}</b> member · ${data.orders.length} order${data.orders.length===1?'':'s'}.`;
   staffDetailTab='profile';
   const showLoy=loyaltyOn();
-  const measBlock=(()=>{const mh=measHistoryOf(key);const latest=mh[0];return latest?`<div class="kv" style="margin-bottom:6px"><b>Latest${latest.at&&latest.at>new Date(1).toISOString()?' · '+new Date(latest.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}:</b> ${[latest.fit?'fit '+esc(latest.fit):'',latest.posture?'posture '+esc(latest.posture):'',latest.note?esc(latest.note):''].filter(Boolean).join(' · ')||'—'} ${can('customers')&&latest.id!=='legacy'?`<span style="cursor:pointer;color:var(--gold)" onclick="openMeasRecord('${esc(key)}','${latest.id}')">edit</span>`:(can('customers')?`<span style="cursor:pointer;color:var(--gold)" onclick="openMeasRecord('${esc(key)}')">update</span>`:'')}</div>${measReadGrid(latest.meas)}<div style="margin-top:6px"><span style="cursor:pointer;color:var(--gold);font-size:13px" onclick="var d=document.getElementById('custMeasFull');var s=d.style.display==='none';d.style.display=s?'block':'none';this.textContent=s?'Hide full measurement sheet ▴':'Show full measurement sheet ▾';">Show full measurement sheet ▾</span><div id="custMeasFull" style="display:none;margin-top:8px">${measReadGridFull(latest.meas)}</div></div>${mh.length>1?`<div class="kv" style="margin-top:8px"><b>History:</b> ${mh.slice(1).map(r=>`<span style="cursor:pointer;color:var(--gold)" onclick="openMeasRecord('${esc(key)}','${r.id}')">${r.at&&r.at>new Date(1).toISOString()?new Date(r.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):'older'}${r.fit?' ('+esc(r.fit)+')':''}</span>`).join(' · ')}</div>`:''}`:`<div class="kv" style="color:var(--text-faint)">No measurements recorded yet.${can('customers')?' Tap “+ New measurement record”.':''}</div>`;})();
+  const measBlock=(()=>{const mh=measHistoryOf(key);const latest=mh[0];return latest?`<div class="kv" style="margin-bottom:6px"><b>Latest${latest.at&&latest.at>new Date(1).toISOString()?' · '+new Date(latest.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}:</b> ${[latest.fit?'fit '+esc(latest.fit):'',latest.posture?'posture '+esc(latest.posture):'',latest.note?esc(latest.note):''].filter(Boolean).join(' · ')||'—'}${measProvenance(latest)?`<span style="color:${(measSource(latest.source)||{}).unverified?'var(--amber)':'var(--text-faint)'}"> · ${esc(measProvenance(latest))}</span>`:''} ${can('customers')&&latest.id!=='legacy'?`<span style="cursor:pointer;color:var(--gold)" onclick="openMeasRecord('${esc(key)}','${latest.id}')">edit</span>`:(can('customers')?`<span style="cursor:pointer;color:var(--gold)" onclick="openMeasRecord('${esc(key)}')">update</span>`:'')}</div>${measReadGrid(latest.meas)}<div style="margin-top:6px"><span style="cursor:pointer;color:var(--gold);font-size:13px" onclick="var d=document.getElementById('custMeasFull');var s=d.style.display==='none';d.style.display=s?'block':'none';this.textContent=s?'Hide full measurement sheet ▴':'Show full measurement sheet ▾';">Show full measurement sheet ▾</span><div id="custMeasFull" style="display:none;margin-top:8px">${measReadGridFull(latest.meas)}</div></div>${mh.length>1?`<div class="kv" style="margin-top:8px"><b>History:</b> ${mh.slice(1).map(r=>`<span style="cursor:pointer;color:var(--gold)" onclick="openMeasRecord('${esc(key)}','${r.id}')">${r.at&&r.at>new Date(1).toISOString()?new Date(r.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):'older'}${r.fit?' ('+esc(r.fit)+')':''}</span>${(measSource(r.source)||{}).unverified?' <span style="color:var(--amber);font-size:11px">client-sent</span>':''}`).join(' · ')}</div>`:''}`:`<div class="kv" style="color:var(--text-faint)">No measurements recorded yet.${can('customers')?' Tap “+ New measurement record”.':''}</div>`;})();
   const contactRow=(can('seeContact')&&(data.whatsapp||data.email))?`<div class="kv" style="margin-bottom:10px">${data.whatsapp?`<a href="tel:${esc(data.whatsapp)}" style="color:var(--gold)">Call</a> · <a href="https://wa.me/${String(data.whatsapp).replace(/[^0-9]/g,'')}" target="_blank" style="color:var(--gold)">WhatsApp</a>`:''}${data.email?(data.whatsapp?' · ':'')+`<a href="mailto:${esc(data.email)}" style="color:var(--gold)">Email</a>`:''}</div>`:'';
   const kvc=(l,v)=>v?`<div class="bd-row"><span class="bl">${l}</span><span class="bv">${esc(v)}</span></div>`:'';
   const _lastOrd=(data.orders||[]).slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0))[0];
@@ -9377,7 +9604,11 @@ function openCustomer(key){
   const log=(custRec.log||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   const notesPane=`${can('customers')?`<div style="margin-bottom:10px"><button class="btn sm ghost" onclick="addCustomerNote('${esc(key)}')">+ Add note / log</button></div>`:''}${data.note?`<div class="kv" style="margin-bottom:10px"><b>Preferences:</b> ${esc(data.note)}</div>`:''}${log.length?log.map(n=>`<div class="up-line"><b>${esc(n.type||'Note')}</b> <span style="color:var(--text-faint)">· ${n.at?new Date(n.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}</span><br>${esc(n.text)}${n.by?` <span style="color:var(--text-faint)">· ${esc(n.by)}</span>`:''}</div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No communication logged yet. Use the button above to record calls, messages and follow-ups.</div>'}`;
   const measPane=`<div style="margin-bottom:8px">${can('customers')?`<button class="btn sm ghost" onclick="openMeasRecord('${esc(key)}')">+ New measurement record</button>`:''}</div>${measBlock}`;
-  const ctabs=[['profile','Profile'],['orders','Orders'],['groups','Groups'],['measurements','Measurements']];
+  /* Correspondence sits directly after Orders because it is the answer to the
+     question people open a client record to ask. Notes & log stays where it
+     is: it is where you WRITE, correspondence is where you READ. */
+  const corrPane=correspondenceHtml(key,data);
+  const ctabs=[['profile','Profile'],['orders','Orders'],['correspondence','Correspondence'],['groups','Groups'],['measurements','Measurements']];
   if(can('money'))ctabs.push(['payments','Payments']);
   ctabs.push(['notes','Notes & log']);ctabs.push(['documents','Documents']);
   const ctabBtns=ctabs.map(([k,l])=>`<button class="ptab ${k==='profile'?'active':''}" data-pt="${k}" onclick="staffTab('${k}')">${l}</button>`).join('');
@@ -9390,6 +9621,7 @@ function openCustomer(key){
       <div class="profile-body">
         ${cpane('profile',profileRead)}
         ${cpane('orders',`<div class="field" style="margin-top:0"><label>Order history (${data.orders.length})</label>${ordersHtml||'<div class="kv">No orders yet.</div>'}</div>`)}
+        ${cpane('correspondence',`<div style="margin-bottom:10px">${can('customers')?`<button class="btn sm ghost" onclick="addCustomerNote('${esc(key)}')">+ Log a call or message</button>`:''}</div>${corrPane}`)}
         ${cpane('groups',groupsPane)}
         ${cpane('measurements',measPane)}
         ${can('money')?cpane('payments',paymentsPane):''}
@@ -9434,6 +9666,112 @@ function editCustomer(key){if(!can('customers'))return;const data=buildCustomerD
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="openCustomer('${esc(key)}')">Cancel</button><button class="btn" onclick="saveCustomerContact('${esc(key)}')">Save</button></div>`);}
 async function addCustomerPhotos(key,files){if(!can('customers'))return;const c=getCustomers();const cust=c[key]||{name:key};cust.photos=Array.isArray(cust.photos)?cust.photos:[];for(const f of files){if(!f||!f.type||!f.type.startsWith('image/'))continue;try{cust.photos.push(await compressImage(f,900,0.72));}catch(e){}}c[key]=cust;setCustomers(c);openCustomer(key);}
 function removeCustomerPhoto(key,idx){if(!can('customers'))return;const c=getCustomers();const cust=c[key];if(!cust||!Array.isArray(cust.photos))return;cust.photos.splice(idx,1);setCustomers(c);openCustomer(key);}
+/* ===== CORRESPONDENCE ======================================================
+   Everything anybody has ever said, done or recorded about one client, in one
+   place, oldest question first: "what happened with this person?"
+
+   Before this it was answerable only by opening six things. The note a CRE
+   logged after a phone call lived on the customer. The comment a tailor left
+   when the piece went to QC lived on the order. The measurement lived in the
+   measurement history. The payment lived in Finance. Each one was recorded
+   properly and none of them knew about the others, so the only person who
+   could answer "why is this client unhappy" was the person who happened to
+   have been there.
+
+   This READS all of them. It stores nothing and writes nothing. That is the
+   same rule the planner follows and for the same reason: a second copy of a
+   conversation is a copy that will disagree with the first one, and a client
+   record that disagrees with itself is worse than one that is merely scattered.
+   Add a source here and it appears; delete a note at its source and it
+   disappears from here, because there was never a second one.
+
+   Money is filtered by role, not by tab. Somebody without `money` sees that a
+   payment happened, because that is part of the story, and not how much. */
+function correspondenceOf(key,data){
+  const ev=[];
+  const add=e=>{if(e&&e.at)ev.push(e);};
+  const money=can('money');
+  const cust=(getCustomers()[key])||{};
+  const orders=(data&&data.orders)||[];
+  const oref=o=>(typeof orderRef==='function'?orderRef(o):o.id);
+
+  /* what somebody wrote down about this client themselves */
+  (cust.log||[]).forEach(n=>add({
+    at:n.at, kind:'note', title:n.type||'Note', text:n.text||'', who:n.by||''
+  }));
+
+  orders.forEach(o=>{
+    add({at:o.createdAt, kind:'order', title:'Order placed', orderId:o.id,
+         text:[oref(o),o.garment||''].filter(Boolean).join(' · ')+(money&&orderNetBase(o)?' · '+cur(orderNetBase(o)):''), who:o.by||o.takenBy||''});
+    /* the stage comments — the half of the history that already worked and
+       was only ever visible from inside the order */
+    (o.updates||[]).forEach(u=>add({
+      at:u.at, kind:'update', title:u.stage||'Update', orderId:o.id,
+      text:u.note||'', who:u.by||'', worker:u.worker||'', photos:u.photos||[]
+    }));
+    if(o.qc&&o.qc.at)add({
+      at:o.qc.at, kind:'qc', title:o.qc.status==='passed'?'Quality check passed':'Sent back for rework',
+      orderId:o.id, text:o.qc.note||'', who:o.qc.by||''
+    });
+    if(o.deliveredAt)add({at:o.deliveredAt, kind:'done', orderId:o.id,
+      title:(o.delivery&&o.delivery.enabled)?'Delivered':'Collected', text:oref(o), who:''});
+  });
+
+  /* measurements, with how they were taken — the thing you want in front of
+     you when a piece does not fit */
+  measHistoryOf(key).forEach(r=>{
+    if(r.id==='legacy'||!r.at||r.at<=new Date(1).toISOString())return;
+    add({at:r.at, kind:'meas', title:'Measurements taken',
+         text:[measProvenance(r),r.fit?'fit '+r.fit:'',r.note||''].filter(Boolean).join(' · '),
+         who:r.takenBy||r.recordedBy||'', flag:(measSource(r.source)||{}).unverified?'client-supplied':''});
+  });
+
+  /* money that actually moved against this client's orders */
+  {
+    const mine=new Set(orders.map(o=>o.id));
+    (typeof getTxns==='function'?getTxns():[]).forEach(t=>{
+      if(!t||t.dir!=='in'||!t.orderId||!mine.has(t.orderId))return;
+      add({at:t.at, kind:'pay', title:'Payment received', orderId:t.orderId,
+           text:(money?cur(t.amount):'')+(t.method?(money?' · ':'')+t.method:''), who:''});
+    });
+  }
+
+  /* fittings and appointments, matched the way every other list matches a
+     client: on the normalised name, not on a stored id the older records
+     never had */
+  (typeof getAppts==='function'?getAppts():[]).forEach(a=>{
+    if(!a||nameKey(a.client||'')!==key)return;
+    add({at:(a.date||'')+(a.time?'T'+a.time:'T00:00'), kind:'appt',
+         title:(a.type||'Appointment')+(a.status?' · '+a.status:''),
+         text:[a.location||'',a.note||''].filter(Boolean).join(' · '), who:a.staffName||''});
+  });
+
+  return ev.sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+const CORR_KINDS={
+  note:  {label:'Note / call',  hue:'var(--gold)'},
+  update:{label:'Order update', hue:'var(--blue)'},
+  order: {label:'Order',        hue:'var(--blue)'},
+  qc:    {label:'Quality',      hue:'var(--amber)'},
+  meas:  {label:'Measurements', hue:'var(--text-dim)'},
+  pay:   {label:'Payment',      hue:'var(--green)'},
+  appt:  {label:'Appointment',  hue:'var(--gold)'},
+  done:  {label:'Handover',     hue:'var(--green)'}
+};
+function correspondenceHtml(key,data){
+  const ev=correspondenceOf(key,data);
+  if(!ev.length)return '<div class="kv" style="color:var(--text-faint)">Nothing recorded for this client yet. Notes you log, comments posted on their orders, measurements, payments and appointments all collect here.</div>';
+  const head=`<div class="sd" style="color:var(--text-faint);margin-bottom:10px">${ev.length} entr${ev.length===1?'y':'ies'} · notes, order comments, measurements, payments and appointments, newest first. Nothing here is typed twice — it is the same record you see on the order or the note itself.</div>`;
+  const rows=ev.map(e=>{
+    const meta=CORR_KINDS[e.kind]||{label:e.kind,hue:'var(--text-dim)'};
+    const when=e.at?new Date(e.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+    const jump=e.orderId?` onclick="closeModal();openDetail('${e.orderId}')" style="cursor:pointer;border-left:3px solid ${meta.hue};padding-left:10px"`:` style="border-left:3px solid ${meta.hue};padding-left:10px"`;
+    const pics=(e.photos&&e.photos.length)?`<div style="margin-top:6px">${e.photos.slice(0,4).map(p=>`<img src="${p}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;margin-right:5px" onclick="event.stopPropagation();lightbox('${p}')">`).join('')}</div>`:'';
+    const by=[e.who?esc(e.who):'',e.worker&&e.worker!==e.who?'work by '+esc(e.worker):''].filter(Boolean).join(' · ');
+    return `<div class="up-line"${jump}><b>${esc(e.title)}</b> <span class="badge" style="font-size:10px">${esc(meta.label)}</span>${e.flag?` <span class="badge" style="font-size:10px;color:var(--amber)">${esc(e.flag)}</span>`:''} <span style="color:var(--text-faint);font-size:12px">· ${when}</span>${e.text?'<br>'+esc(e.text):''}${by?`<br><span style="color:var(--text-faint);font-size:12px">${by}</span>`:''}${pics}</div>`;
+  }).join('');
+  return head+rows;
+}
 function addCustomerNote(key){if(!can('customers'))return;openModal(`<h3>Add note / communication</h3><div class="msub">${esc((getCustomers()[key]||{}).name||key)}</div>
   <div class="field"><label>Type</label><select class="fld" id="cn_type">${['Note','Call','WhatsApp','Email','Meeting','Follow-up'].map(t=>`<option>${t}</option>`).join('')}</select></div>
   <div class="field"><label>Details</label><textarea class="fld" id="cn_text" placeholder="What was discussed, agreed, or to follow up on…"></textarea></div>
