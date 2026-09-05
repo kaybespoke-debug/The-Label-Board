@@ -23,8 +23,14 @@ const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 /* what each role is allowed to ask for. Anything not listed is refused. */
 const ALLOWED: Record<string, string[]> = {
   owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
-              'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback'],
-  finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus'],
+              'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
+              'billing', 'payments', 'recordPayment'],
+  // Finance is the role that exists to do this. Support and developer are not
+  // given it: what every subscriber pays is not something a support agent needs
+  // to answer a ticket, and a role that can read it will eventually be given to
+  // somebody because it was easier than making a new one.
+  finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus',
+              'billing', 'payments', 'recordPayment'],
   support:   ['me', 'tenants', 'tenant', 'setNote',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback'],
   // a developer reads what studios reported and can move it along, but does
@@ -96,22 +102,81 @@ Deno.serve(async (req) => {
       return json({ ok: true, tenant: { ...one, notes: notes?.notes || '' } })
     }
 
-    if (action === 'setPlan' || action === 'setStatus') {
+    /* ---- billing ------------------------------------------------------------
+       What every studio is on and what it has actually paid. paid_to_date sums
+       only completed payments: a plan's list price is what a studio owes, and
+       reporting that as revenue is how a business believes it is being paid
+       while nothing has landed. */
+    if (action === 'billing') {
+      const { data, error } = await admin.rpc('platform_billing_summary')
+      if (error) return json({ error: error.message }, 500)
+      await log({ count: (data || []).length })
+      return json({ ok: true, billing: data || [], role })
+    }
+
+    if (action === 'payments') {
+      const id = String(body.id || '')
+      // No id means every studio, for the Payments page; an id means one, for its panel.
+      const { data, error } = await admin.rpc('studio_payments', { p_business: id || null })
+      if (error) return json({ error: error.message }, 500)
+      await log({ viewed: id || 'all' }, id || null)
+      return json({ ok: true, payments: data || [] })
+    }
+
+    /* Recording a payment that has already happened — no gateway, no card. The
+       subscription it belongs to is resolved in the database rather than passed
+       in, so a payment cannot be filed against another studio's plan. */
+    if (action === 'recordPayment') {
+      const id = String(body.id || '')
+      const amount = Number(body.amount)
+      if (!id) return json({ error: 'No studio id' }, 400)
+      if (!isFinite(amount) || amount <= 0) return json({ error: 'A payment must be for an amount' }, 400)
+      const { data, error } = await admin.rpc('record_studio_payment', {
+        p_business: id,
+        p_amount: amount,
+        p_method: String(body.method || 'bank transfer').slice(0, 60),
+        p_reference: String(body.reference || '').slice(0, 120),
+        p_note: String(body.note || '').slice(0, 500)
+      })
+      if (error) return json({ error: error.message }, 500)
+      await log({ recorded: amount, method: body.method || 'bank transfer' }, id)
+      return json({ ok: true, id: data })
+    }
+
+    /* setPlan moves BOTH books: businesses.plan, which decides what the studio
+       may do in the app, and the active subscription, which is what we invoice.
+       They are written by one function so they cannot end up disagreeing — a
+       studio paying for Pro while the app treats it as a trial is the kind of
+       thing a customer discovers before we do. */
+    if (action === 'setPlan') {
       const id = String(body.id || '')
       const value = String(body.value || '')
-      const col = action === 'setPlan' ? 'plan' : 'status'
-      // These have to match the CHECK constraints on businesses, or the
-      // update is refused by the database after passing validation here.
-      // They also match PLANS in the customer app and the plan names the
-      // console displays — one vocabulary, in four places.
-      const VALID = action === 'setPlan'
-        ? ['trial', 'starter', 'pro', 'premium']
-        : ['active', 'suspended', 'closed']
+      const cycle = String(body.cycle || (value === 'trial' ? 'trial' : 'monthly'))
+      const price = Number(body.price)
+      const VALID = ['trial', 'starter', 'pro', 'premium']
       if (!id) return json({ error: 'No studio id' }, 400)
-      if (!VALID.includes(value)) return json({ error: `${col} must be one of: ${VALID.join(', ')}` }, 400)
-      const { error } = await admin.from('businesses').update({ [col]: value }).eq('id', id)
+      if (!VALID.includes(value)) return json({ error: `plan must be one of: ${VALID.join(', ')}` }, 400)
+      if (!['monthly', 'annual', 'trial'].includes(cycle)) return json({ error: 'Unknown billing cycle' }, 400)
+      if (!isFinite(price) || price < 0) return json({ error: 'A plan needs a price, even if it is zero' }, 400)
+      const { error } = await admin.rpc('set_studio_plan', {
+        p_business: id, p_plan: value, p_cycle: cycle, p_price: price
+      })
       if (error) return json({ error: error.message }, 500)
-      await log({ [col]: value }, id)
+      await log({ plan: value, cycle, price }, id)
+      return json({ ok: true })
+    }
+
+    if (action === 'setStatus') {
+      const id = String(body.id || '')
+      const value = String(body.value || '')
+      // These have to match the CHECK constraint on businesses, or the update
+      // is refused by the database after passing validation here.
+      const VALID = ['active', 'suspended', 'closed']
+      if (!id) return json({ error: 'No studio id' }, 400)
+      if (!VALID.includes(value)) return json({ error: `status must be one of: ${VALID.join(', ')}` }, 400)
+      const { error } = await admin.from('businesses').update({ status: value }).eq('id', id)
+      if (error) return json({ error: error.message }, 500)
+      await log({ status: value }, id)
       return json({ ok: true })
     }
 

@@ -192,6 +192,82 @@ section('A live support ticket opens too');
 }
 
 // ---------------------------------------------------------------------
+section('Money shown is money taken');
+// ---------------------------------------------------------------------
+// The subscriber list came from platform_tenant_summary(), which knows the
+// plan and nothing about payment, so MRR was the plan's LIST price — what a
+// studio would owe if it were paying, reported as though it were revenue.
+// For a console whose job is to say how the business is doing, that is the
+// worst default there is: always optimistic, and optimistic by exactly the
+// amount you have failed to collect.
+{
+  const BILLING = [
+    // on Pro at a negotiated price, has paid once
+    { business_id: 'aaaaaaaa-0000-0000-0000-000000000001', business_name: 'Okoro & Sons Shoes',
+      customer_id: 'c1', plan: 'pro', billing_cycle: 'monthly', monthly_price: 40000,
+      is_trial: false, trial_ends_on: null, renews_on: '2099-01-01', started_on: '2026-09-01',
+      paid_to_date: 40000, last_paid_on: '2026-09-04 10:00:00+00', payments_count: 1 },
+    // still on trial, worth nothing yet
+    { business_id: 'aaaaaaaa-0000-0000-0000-000000000002', business_name: 'LAYI',
+      customer_id: 'c2', plan: 'trial', billing_cycle: 'trial', monthly_price: 0,
+      is_trial: true, trial_ends_on: '2099-01-01', renews_on: '2099-01-01', started_on: '2026-09-01',
+      paid_to_date: 0, last_paid_on: null, payments_count: 0 },
+    // trial ran out weeks ago and nothing expired it
+    { business_id: 'aaaaaaaa-0000-0000-0000-000000000003', business_name: 'Balogun Fabrics',
+      customer_id: 'c3', plan: 'trial', billing_cycle: 'trial', monthly_price: 0,
+      is_trial: true, trial_ends_on: '2026-01-01', renews_on: '2026-01-01', started_on: '2025-12-01',
+      paid_to_date: 0, last_paid_on: null, payments_count: 0 },
+  ];
+  sb.__billing = BILLING;
+  run(`(function(){
+    var by={}; __billing.forEach(function(r){by[r.business_id]=r;});
+    DB.subscribers.forEach(function(s){
+      if(!s.live)return; var b=by[s.liveId]; if(!b)return;
+      s.plan=b.plan; s.cycle=b.billing_cycle;
+      s.mrr=b.is_trial?0:(Number(b.monthly_price)||0);
+      s.status=b.is_trial?'trial':s.status;
+      s.paidToDate=Number(b.paid_to_date)||0;
+      s.trialEndsOn=b.trial_ends_on;
+      if(b.is_trial&&b.trial_ends_on&&parseD(b.trial_ends_on)<startOfDay(TODAY)){s.trialExpired=true;s.health='at-risk';}
+    });
+  })();`);
+
+  const pro = run("Q.sub('live-aaaaaaaa-0000-0000-0000-000000000001')");
+  ok('a studio on a negotiated price is worth what it pays, not the list price',
+     pro.mrr === 40000, String(pro.mrr) + ' (list price for Pro is 49000)');
+  ok('and what it has actually paid is recorded', pro.paidToDate === 40000, String(pro.paidToDate));
+
+  const trial = run("Q.sub('live-aaaaaaaa-0000-0000-0000-000000000002')");
+  ok('a studio on trial contributes nothing to MRR', trial.mrr === 0, String(trial.mrr));
+
+  ok('platform MRR is the sum of what studios pay', run('Q.mrr()') === 40000,
+     String(run('Q.mrr()')) + ' — three studios, one paying');
+
+  const lapsed = run("Q.sub('live-aaaaaaaa-0000-0000-0000-000000000003')");
+  ok('a trial that ran out is flagged rather than shown as still trialling',
+     lapsed.trialExpired === true && lapsed.health === 'at-risk',
+     'nothing expires a trial automatically, so the console has to say so');
+}
+
+// ---------------------------------------------------------------------
+section('And a real payment reaches the Payments page');
+// ---------------------------------------------------------------------
+{
+  run(`DB.payments = mergeLive(DB.payments || [], [{
+    id:'live-pay-1', liveId:'pay-1', live:true,
+    subId:'live-aaaaaaaa-0000-0000-0000-000000000001',
+    subscriber:'Okoro & Sons Shoes', plan:'', cycle:'', ref:'TRF-991',
+    amount:40000, provider:'Recorded by hand', method:'bank transfer',
+    status:'successful', date:'2026-09-04', invoice:'TRF-991', note:''
+  }]);`);
+  const html = run('PAGES.payments ? PAGES.payments() : ""');
+  ok('the payments page renders', typeof html === 'string' && html.length > 0);
+  ok('and a hand-recorded payment appears on it',
+     html.indexOf('TRF-991') !== -1 || html.indexOf('Okoro &amp; Sons') !== -1,
+     'a payment that was taken is not shown');
+}
+
+// ---------------------------------------------------------------------
 section('The dashboard counts them too');
 // ---------------------------------------------------------------------
 {

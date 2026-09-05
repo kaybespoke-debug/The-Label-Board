@@ -206,9 +206,13 @@ section('A policy that can never be true is not security, it is a bug');
     ok('a platform admin can read ' + t, seen.error === null, seen.error || '');
   }
 
-  // tlb_customers has a row from the block above, so this distinguishes
+  // Named, not counted. Every studio now gets a billing record when it is provisioned,
+  // so the platform holds as many of these as there are studios; asserting a total
+  // turns each new seeded studio into a failure that says nothing about who can read
+  // what. What matters is that the row created above is visible, which distinguishes
   // "allowed and empty" from "allowed and actually returning it".
-  const rows = await asRole('authenticated', ADMIN, 'select id from public.tlb_customers');
+  const rows = await asRole('authenticated', ADMIN,
+    "select id from public.tlb_customers where owner_email = 'a@x'");
   ok('a platform admin sees the subscriber that exists', rows.rows.length === 1,
      rows.error || (rows.rows.length + ' row(s)'));
 
