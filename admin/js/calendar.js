@@ -85,7 +85,7 @@ function calDerived() {
     kind: 'task', recId: t.id, title: t.title, date: t.due, time: '',
     sub: '→ ' + t.assignedName, done: t.done,
     tone: t.done ? 'grey' : t.dueIn < 0 ? 'red' : t.dueIn === 0 ? 'amber' : 'blue',
-    go: "openDetail('task'," + t.id + ")",
+    go: "openDetail('task','" + t.id + "')",
     owner: t.assignedTo, everyone: false
   }));
 
@@ -99,13 +99,13 @@ function calDerived() {
     .forEach(s => out.push({
       kind: 'renewal', recId: s.id, title: s.name + ' renews', date: dayFromNow(s.renewIn), time: '',
       sub: money(s.mrr) + ' · ' + s.planName, tone: s.renewIn <= 3 ? 'amber' : 'green',
-      go: "openDetail('sub'," + s.id + ")", everyone: true
+      go: "openDetail('sub','" + s.id + "')", everyone: true
     }));
 
   Q.pastDue().forEach(s => out.push({
     kind: 'renewal', recId: s.id, title: s.name + ' is past due', date: dayFromNow(Math.min(0, s.renewIn)),
     time: '', sub: money(s.mrr) + ' not collected', tone: 'red',
-    go: "openDetail('sub'," + s.id + ")", everyone: true
+    go: "openDetail('sub','" + s.id + "')", everyone: true
   }));
 
   (DB.onboarding || []).forEach(o => out.push({

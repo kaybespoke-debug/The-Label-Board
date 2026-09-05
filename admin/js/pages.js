@@ -39,13 +39,13 @@ PAGES.dashboard = function () {
       const ovd = DB.payments.filter(p => p.subId === s.id && p.status === 'overdue')
         .sort((a, b) => a.date.localeCompare(b.date))[0];
       return { t: 'Payment failed', d: s.name, when: ovd ? ago(ovd.date) : 'this cycle',
-        go: "openDetail('sub'," + s.id + ")" };
+        go: "openDetail('sub','" + s.id + "')" };
     }))
     .concat(Q.trial().filter(s => s.renewIn <= 4).slice(0, 2).map(s =>
       ({ t: 'Trial ending', d: s.name, when: s.renewIn <= 0 ? 'today' : 'in ' + s.renewIn + 'd',
-         go: "openDetail('sub'," + s.id + ")" })))
+         go: "openDetail('sub','" + s.id + "')" })))
     .concat(recent.slice(0, 1).map(s => ({ t: 'New subscriber', d: s.name, when: ago(s.joined),
-      go: "openDetail('sub'," + s.id + ")" })))
+      go: "openDetail('sub','" + s.id + "')" })))
     .slice(0, 4);
 
   return periodBar() +
@@ -75,7 +75,7 @@ PAGES.dashboard = function () {
     '<div class="ph-sub">' + openT.length + ' open' +
     (urg.length ? ' · <span style="color:var(--red)">' + urg.length + ' urgent</span>' : '') + '</div></div>' +
     '<button class="lnk" onclick="drill(\'tickets.open\')">All</button></div>' +
-    (openT.length ? openT.slice(0, 4).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+    (openT.length ? openT.slice(0, 4).map(t => '<div class="row klik" onclick="openDetail(\'ticket\',\'' + t.id + '\')">' +
       '<div><b>' + esc(t.title.length > 26 ? t.title.slice(0, 25) + '…' : t.title) + '</b>' +
       '<small>' + esc(t.subscriber) + '</small></div>' + statusPill(t.state) + '</div>').join('')
       : '<div class="empty" style="padding:20px 6px">No open tickets.</div>') + '</div>' +
@@ -83,7 +83,7 @@ PAGES.dashboard = function () {
     '<div class="pnl' + (UI.dashPanel === 3 ? ' on' : '') + '"><div class="ph"><div><h3>Recent activity</h3>' +
     '<div class="ph-sub">Last few admin actions</div></div>' +
     '<button class="lnk" onclick="go(\'activity\')">All</button></div>' +
-    DB.activity.slice(0, 4).map(a => '<div class="row klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
+    DB.activity.slice(0, 4).map(a => '<div class="row klik" onclick="openDetail(\'audit\',\'' + a.id + '\')">' +
       '<div><b>' + a.action + '</b><small>' + esc(a.actor) + '</small></div>' +
       '<span class="note">' + ago(a.at) + '</span></div>').join('') + '</div>' +
 
@@ -100,7 +100,7 @@ PAGES.dashboard = function () {
     '<button class="lnk" onclick="go(\'subscribers\')">View all</button></div>' +
     '<div class="tw"><table><thead><tr><th>Business</th><th>Plan</th><th>Status</th><th class="hide-sm">Joined</th>' +
     '<th class="num">MRR</th><th></th></tr></thead><tbody>' +
-    recent.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
+    recent.map(s => '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
       '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
       '<td><span class="tier">' + s.planName + '</span></td>' +
       '<td>' + statusPill(s.status) + '</td>' +
@@ -198,7 +198,7 @@ PAGES.subscribers = function () {
       (list.length ? '<div class="tw"><table><thead><tr>' +
         '<th>Business</th><th class="hide-sm">Plan</th><th>Status</th><th class="hide-sm">Joined</th>' +
         '<th class="hide-sm">Renews</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
-        list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
+        list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + ' · ' + esc(s.city) + '</div></td>' +
           '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
           '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') + '</td>' +
@@ -218,7 +218,7 @@ PAGES.subscribers = function () {
       '<th class="num">MRR</th><th class="num hide-sm">Lifetime</th><th></th></tr></thead><tbody>' +
       Q.active().slice().sort((a, b) => b.mrr - a.mrr).slice(0, 10).map(s => {
         const lifetime = DB.payments.filter(p => p.subId === s.id && p.status === 'successful').reduce((t, p) => t + p.amount, 0);
-        return '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
+        return '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
           '<td class="t-main">' + esc(s.name) + '</td><td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
           '<td class="hide-sm">' + fmtD(s.joined) + '</td><td class="num">' + money(s.mrr) + '</td>' +
           '<td class="num hide-sm">' + money(lifetime) + '</td><td class="chev">&rsaquo;</td></tr>';
@@ -255,7 +255,7 @@ PAGES.onboarding = function () {
     ]) + '<span class="spacer"></span><button class="btn" onclick="exportOnboarding()">Export CSV</button></div>' +
 
     (list.length ? '<div class="cards">' + list.map(o =>
-      '<div class="card" onclick="openDetail(\'onb\',' + o.id + ')">' +
+      '<div class="card" onclick="openDetail(\'onb\',\'' + o.id + '\')">' +
       '<div style="display:flex;justify-content:space-between;align-items:center">' + statusPill(o.state) +
       (o.trialEndsIn <= 3 ? '<span class="pill red">Trial ends ' + (o.trialEndsIn <= 0 ? 'today' : 'in ' + o.trialEndsIn + 'd') + '</span>' : '') + '</div>' +
       '<h4>' + esc(o.name) + '</h4>' +
@@ -380,7 +380,7 @@ function referralBody() {
       ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Plan</th><th class="num hide-sm">Referred</th>' +
       '<th class="num">Converted</th><th class="num">Earned</th><th class="num hide-sm">Paid</th>' +
       '<th class="num hide-sm">Outstanding</th><th></th></tr></thead><tbody>' +
-      referrers.slice(0, 12).map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
+      referrers.slice(0, 12).map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',\'' + s.id + '\')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
         '<td class="num hide-sm">' + s.referrals.length + '</td>' +
@@ -455,7 +455,7 @@ PAGES.payments = function () {
     (list.length ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Reference</th><th class="hide-sm">Invoice</th>' +
       '<th class="num">Amount</th><th class="hide-sm">Method</th><th>Status</th>' +
       '<th class="hide-sm">Date</th><th></th></tr></thead><tbody>' +
-      list.slice(0, 200).map(p => '<tr class="klik" onclick="openDetail(\'pay\',' + p.id + ')">' +
+      list.slice(0, 200).map(p => '<tr class="klik" onclick="openDetail(\'pay\',\'' + p.id + '\')">' +
         '<td><div class="t-main">' + esc(p.subscriber) + '</div><div class="t-sub">' + p.plan + ' · ' + p.cycle + '</div></td>' +
         '<td class="hide-sm">' + p.ref + '</td><td class="hide-sm">' + p.invoice + '</td>' +
         '<td class="num">' + money(p.amount) + '</td>' +
@@ -526,7 +526,7 @@ function payrollBody(key) {
     '<th class="num hide-sm">Allowances</th><th class="num hide-sm">Gross</th>' +
     '<th class="num hide-sm">Deductions</th><th class="num">Net</th>' +
     '<th>Status</th><th class="hide-sm">Payslip</th><th></th></tr></thead><tbody>' +
-    slips.map(s => '<tr class="klik" onclick="openDetail(\'slip\',' + s.id + ')">' +
+    slips.map(s => '<tr class="klik" onclick="openDetail(\'slip\',\'' + s.id + '\')">' +
       '<td><div class="t-main">' + esc(s.staffName) + '</div><div class="t-sub">' + s.bank.split(' · ')[0] + '</div></td>' +
       '<td class="hide-sm">' + s.dept + '</td>' +
       '<td class="num hide-sm">' + money(s.basic) + '</td>' +

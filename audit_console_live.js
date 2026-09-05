@@ -43,13 +43,13 @@ const KNOWINGLY_UNUSED = {
   setStatus: 'suspending a studio is not offered from the console yet',
   setNote:   'studio notes are kept in the console\'s own records, not on the tenant row',
   audit:     'the audit trail has no page yet; admin-api logs to it regardless',
-  /* The list is wired; the detail panel is not. Opening a real studio shows
-     what the list already knows about it and no more — no notes, and no
-     fresher figures than the last poll. The panel is built around the example
-     subscribers' CRM fields, so wiring this properly means deciding what it
-     shows for a studio that has none of them, which is a design question
-     rather than a missing call. Listed so it stays visible. */
-  tenant:    'the subscriber detail panel does not read live studios yet'
+  /* The detail panel reads live studios now — it renders, it is reachable, and
+     it names the right studio. What  returns over and above the list
+     row is the studio's notes, and the subscriber panel has no notes section
+     to put them in. Calling it would be a request whose answer is discarded,
+     which is the same fault as never calling it, wearing a better disguise.
+     It belongs here until the panel has somewhere to show them. */
+  tenant:    'its only extra field is notes, and the panel has nowhere to show them',
 };
 
 served.forEach(a => {

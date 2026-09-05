@@ -79,7 +79,7 @@ PAGES.support = function () {
       '<span class="spacer"></span>' + searchBox('requests', 'Search requests…') +
       '<button class="btn" onclick="exportFeedback()">Export CSV</button></div>' +
       (list.length ? '<div class="cards">' + list.map(x =>
-        '<div class="card" onclick="openDetail(\'fb\',' + x.id + ')">' +
+        '<div class="card" onclick="openDetail(\'fb\',\'' + x.id + '\')">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
         '<span class="pill ' + (x.kind === 'feature' ? 'amber' : x.kind === 'suggestion' ? 'purple' : 'green') + '">' + x.kind.toUpperCase() + '</span>' +
         (x.rating ? '<span class="note">' + '★'.repeat(x.rating) + '</span>' : '<span class="note">' + x.votes + ' votes</span>') + '</div>' +
@@ -117,7 +117,7 @@ PAGES.support = function () {
       '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th class="num">Orders (30d)</th>' +
       '<th class="num hide-sm">Seats used</th><th class="hide-sm">Last seen</th><th></th></tr></thead><tbody>' +
       Q.active().slice().sort((a, b) => b.ordersLast30 - a.ordersLast30).slice(0, 12).map(s =>
-        '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')"><td class="t-main">' + esc(s.name) + '</td>' +
+        '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')"><td class="t-main">' + esc(s.name) + '</td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td><td class="num">' + s.ordersLast30 + '</td>' +
         '<td class="num hide-sm">' + s.users + ' / ' + s.seats + '</td><td class="hide-sm">' + ago(s.lastSeen) + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
@@ -135,7 +135,7 @@ PAGES.support = function () {
       (risk.length ? '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th>Why</th>' +
         '<th class="num hide-sm">Orders 30d</th><th class="hide-sm">Last seen</th>' +
         '<th class="num">MRR</th><th></th></tr></thead><tbody>' +
-        risk.slice().sort((a, b) => b.mrr - a.mrr).map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
+        risk.slice().sort((a, b) => b.mrr - a.mrr).map(s => '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
           '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
           '<td>' + (s.pastDue ? '<span class="pill red">Payment failed</span>'
@@ -179,7 +179,7 @@ PAGES.support = function () {
     '<span class="spacer"></span>' + searchBox('tickets', 'Search tickets…') +
     '<button class="btn gold" onclick="formNewTicket()">+ Log a ticket</button></div>' +
     (list.length ? '<div class="cards">' + list.map(t =>
-      '<div class="card" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+      '<div class="card" onclick="openDetail(\'ticket\',\'' + t.id + '\')">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' + statusPill(t.state) +
       '<span class="note">#' + t.ref + '</span></div>' +
       '<h4>' + esc(t.title) + '</h4><p>' + esc(t.body) + '</p>' +
@@ -213,7 +213,7 @@ PAGES.announcements = function () {
     (list.length ? '<div class="tw"><table><thead><tr><th>Announcement</th><th class="hide-sm">Audience</th><th class="hide-sm">Channel</th>' +
       '<th>Status</th><th class="hide-sm">Date</th><th class="num hide-sm">Reach</th>' +
       '<th class="num hide-sm">Opened</th><th></th></tr></thead><tbody>' +
-      list.map(a => '<tr class="klik" onclick="openDetail(\'ann\',' + a.id + ')">' +
+      list.map(a => '<tr class="klik" onclick="openDetail(\'ann\',\'' + a.id + '\')">' +
         '<td><div class="t-main">' + esc(a.title) + '</div><div class="t-sub">' + esc(a.body.slice(0, 58)) + '…</div></td>' +
         '<td class="hide-sm">' + a.audience + '</td><td class="hide-sm">' + a.channel + '</td>' +
         '<td>' + statusPill(a.state) + '</td>' +
@@ -249,7 +249,7 @@ PAGES.tasks = function () {
       { k: 'done', t: 'Completed', n: done.length }
     ]) + '<span class="spacer"></span><button class="btn gold" onclick="formTask()">+ Create task</button></div>' +
     (list.length ? '<div class="cards">' + list.map(t =>
-      '<div class="card" onclick="openDetail(\'task\',' + t.id + ')">' +
+      '<div class="card" onclick="openDetail(\'task\',\'' + t.id + '\')">' +
       '<div style="display:flex;justify-content:space-between;align-items:center">' +
       '<span class="pill ' + (t.done ? 'grey' : t.dueIn < 0 ? 'red' : t.dueIn === 0 ? 'amber' : t.priority === 'high' ? 'red' : t.priority === 'medium' ? 'amber' : 'blue') + '">' +
       (t.done ? 'DONE' : t.dueIn < 0 ? Math.abs(t.dueIn) + 'D LATE' : t.dueIn === 0 ? 'DUE TODAY' : 'IN ' + t.dueIn + 'D') + '</span>' +
@@ -308,7 +308,7 @@ PAGES.staff = function () {
       '<th class="num hide-sm">Hours</th><th class="hide-sm">State</th><th></th></tr></thead><tbody>' +
       all.map(s => {
         const a = Q.attToday(s.id);
-        return '<tr><td class="klik t-main" onclick="openDetail(\'staff\',' + s.id + ')">' + esc(s.name) + '</td>' +
+        return '<tr><td class="klik t-main" onclick="openDetail(\'staff\',\'' + s.id + '\')">' + esc(s.name) + '</td>' +
           '<td class="hide-sm">' + s.dept + '</td>' +
           '<td>' + (a && a.in ? a.in : '<span class="note">—</span>') + '</td>' +
           '<td>' + (a && a.out ? a.out : (a && a.in ? '<span class="pill green">on floor</span>' : '<span class="note">—</span>')) + '</td>' +
@@ -329,7 +329,7 @@ PAGES.staff = function () {
       all.slice().sort((a, b) => Q.attRate(a.id) - Q.attRate(b.id)).map(s => {
         const att = Q.attFor(s.id, 30);
         const rate = Q.attRate(s.id);
-        return '<tr class="klik" onclick="UI.vtab[\'staff' + s.id + '\']=\'attendance\';openDetail(\'staff\',' + s.id + ')">' +
+        return '<tr class="klik" onclick="UI.vtab[\'staff' + s.id + '\']=\'attendance\';openDetail(\'staff\',\'' + s.id + '\')">' +
           '<td class="t-main">' + esc(s.name) + '</td>' +
           '<td class="num"' + (rate < 85 ? ' style="color:var(--amber)"' : '') + '>' + rate + '%</td>' +
           '<td class="num hide-sm">' + att.filter(a => a.state === 'present').length + '</td>' +
@@ -346,7 +346,7 @@ PAGES.staff = function () {
       '<div class="ph-sub">' + DB.leave.filter(l => l.status === 'pending').length + ' awaiting approval</div></div></div>' +
       (DB.leave.filter(l => l.status === 'pending').length
         ? DB.leave.filter(l => l.status === 'pending').slice(0, 8).map(l =>
-          '<div class="row klik" onclick="UI.vtab[\'staff' + l.staffId + '\']=\'leave\';openDetail(\'staff\',' + l.staffId + ')">' +
+          '<div class="row klik" onclick="UI.vtab[\'staff' + l.staffId + '\']=\'leave\';openDetail(\'staff\',\'' + l.staffId + '\')">' +
           '<div><b>' + esc((Q.staffM(l.staffId) || {}).name) + '</b><small>' + l.type + ' · ' + l.days +
           ' day' + (l.days === 1 ? '' : 's') + ' from ' + fmtDShort(l.from) + '</small></div>' +
           '<span class="pill amber">Pending</span></div>').join('')
@@ -403,7 +403,7 @@ PAGES.staff = function () {
     (list.length ? '<div class="tw"><table><thead><tr><th>Name</th><th class="hide-sm">Department</th><th>Role</th>' +
       '<th class="num">Monthly basic</th><th class="hide-sm">Started</th>' +
       '<th class="hide-sm">Status</th><th></th></tr></thead><tbody>' +
-      list.map(s => '<tr class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
+      list.map(s => '<tr class="klik" onclick="openDetail(\'staff\',\'' + s.id + '\')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.staffId + ' · ' + s.username + '</div></td>' +
         '<td class="hide-sm">' + s.dept + '</td>' +
         '<td><div>' + s.title + '</div><div class="t-sub">' + ((Q.role(s.roleId) || {}).name || '—') + '</div></td>' +
@@ -448,7 +448,7 @@ PAGES.activity = function () {
     '<div class="ph-sub">' + list.length + ' entries · tap any one for who, when, from where, on what, and why</div></div></div>' +
     (list.length ? '<div class="tw"><table><thead><tr><th>Action</th><th class="hide-sm">Detail</th><th>Who</th>' +
       '<th class="hide-sm">When</th><th></th></tr></thead><tbody>' +
-      list.slice(0, 120).map(a => '<tr class="klik" onclick="openDetail(\'audit\',' + a.id + ')">' +
+      list.slice(0, 120).map(a => '<tr class="klik" onclick="openDetail(\'audit\',\'' + a.id + '\')">' +
         '<td class="t-main">' + a.action + '</td>' +
         '<td class="hide-sm" style="white-space:normal;max-width:340px">' + esc(a.detail) + '</td>' +
         '<td><div class="t-main">' + esc(a.actor) + '</div><div class="t-sub">' + a.actorRole + '</div></td>' +
@@ -539,7 +539,7 @@ PAGES.settings = function () {
     '<div style="margin-top:12px">' +
     DB.staff.map(st => {
       const r = Q.role(st.roleId) || { name: '—' };
-      return '<div class="row klik" onclick="openDetail(\'staff\',' + st.id + ')" style="border-left:3px solid ' +
+      return '<div class="row klik" onclick="openDetail(\'staff\',\'' + st.id + '\')" style="border-left:3px solid ' +
         (st.roleId === 'owner' ? 'var(--gold)' : 'var(--green)') + ';padding-left:10px">' +
         '<div><b>' + esc(st.name) + ' <span class="pill grey">' + r.name + '</span></b>' +
         '<small>' + st.username + ' · ' + st.email + '</small></div>' +
@@ -671,7 +671,7 @@ function roleCard(r) {
         '</div>') +
       (assigned ? '<div class="band">Held by</div><div class="chips">' +
         DB.staff.filter(s => s.roleId === r.id).map(s =>
-          '<button class="chip" onclick="openDetail(\'staff\',' + s.id + ')">' + esc(s.name) + ' &rsaquo;</button>').join('') +
+          '<button class="chip" onclick="openDetail(\'staff\',\'' + s.id + '\')">' + esc(s.name) + ' &rsaquo;</button>').join('') +
         '</div>' : '') +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
       (r.locked ? '' : '<button class="btn sm" onclick="renameRole(\'' + r.id + '\')">Rename</button>') +
