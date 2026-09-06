@@ -9,7 +9,7 @@ const UI = {
   back: 'dashboard',
   filters: {                  // per-page sub-tab state
     subscribers: 'all', payments: 'all', announcements: 'published',
-    tasks: 'mine', staff: 'all', support: 'tickets', feedback: 'all',
+    tasks: 'mine', staff: 'all', support: 'tickets', feedback: 'all', enquiries: 'new',
     onboarding: 'all', activity: 'all'
   },
   sort: { subscribers: 'name', payments: 'date-desc', payroll: 'net-desc', activity: 'newest' },

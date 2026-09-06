@@ -319,6 +319,56 @@ section('A plan with no seat limit reads as one');
      String(subsHtml).indexOf('>Plan: ' + p.name + '<') >= 0 || String(subsHtml).indexOf(p.name) >= 0));
 }
 
+// ---------------------------------------------------------------------
+section('Website enquiries reach the screen');
+// ---------------------------------------------------------------------
+/* The four public forms post to Netlify AND to the database. This is the
+   half that makes that worth doing: if the rows arrive and no page renders
+   them, an enquiry is just as invisible as it was in Netlify's dashboard —
+   which is the exact failure the subscriber list had, present in the data
+   and on no screen. */
+{
+  sb.__enq = [
+    { id: 'e1', at: new Date().toISOString(), kind: 'demo', name: 'Ada Obi',
+      email: 'ada@example.com', phone: '', business: 'Ada Couture',
+      message: 'We are 4 tailors in Surulere and would like to see it.',
+      source_page: 'book.html', extra: { city: 'Lagos' }, state: 'new',
+      handled_by: '', handled_at: '', notes: '' },
+    { id: 'e2', at: new Date().toISOString(), kind: 'partner', name: 'Musa & Sons',
+      email: 'musa@example.com', phone: '+234 800 000 0000', business: 'Musa Fabrics',
+      message: 'Interested in referring our customers.', source_page: 'partners.html',
+      extra: {}, state: 'converted', handled_by: 'Kayode', handled_at: new Date().toISOString(), notes: '' }
+  ];
+  run('DB.enquiries = __enq.map(function(r){ return Object.assign({live:true, liveId:r.id}, r); });');
+
+  const html = run('(function(){try{ return PAGES.enquiries(); }catch(e){ return "ERR:"+e.message; }})()');
+  ok('the enquiries page renders', typeof html === 'string' && html.indexOf('ERR:') !== 0, String(html).slice(0, 140));
+  ok('a real demo request appears on it', String(html).indexOf('Ada Obi') >= 0,
+     'an enquiry arrived and no page shows it');
+  ok('and what they actually wrote', /Surulere/.test(String(html)));
+  ok('and how to reach them', String(html).indexOf('ada@example.com') >= 0);
+  ok('a converted one is shown as converted', /converted/.test(String(html)));
+  ok('the count of what is waiting on us is right',
+     run("(DB.enquiries||[]).filter(function(e){return e.state==='new';}).length") === 1);
+
+  const det = run('(function(){try{ return DETAIL.enquiry("e1"); }catch(e){ return "ERR:"+e.message; }})()');
+  ok('an enquiry opens', String(det).indexOf('ERR:') !== 0, String(det).slice(0, 140));
+  ok('with a way to reply', /mailto:ada@example\.com/.test(String(det)));
+  ok('and the extra fields the form carried', /Lagos/.test(String(det)),
+     'a question added to a form is answered and then dropped');
+  ok('and a way to move it along', /enquiryState\(/.test(String(det)));
+
+  /* A studio name is typed by a stranger on the public internet. It is
+     rendered as text, always. */
+  run("DB.enquiries.push({id:'e3',at:new Date().toISOString(),kind:'contact',name:'<img src=x onerror=alert(1)>',email:'x@y.com',message:'<script>bad()<\\/script>',state:'new',extra:{},business:'',phone:'',source_page:'',handled_by:'',handled_at:'',notes:''});");
+  const xss = String(run('PAGES.enquiries()'));
+  ok('a name typed by a stranger is escaped, never injected',
+     xss.indexOf('<img src=x') < 0 && xss.indexOf('&lt;img') >= 0);
+  const xssDet = String(run('DETAIL.enquiry("e3")'));
+  ok('and so is the message they sent',
+     xssDet.indexOf('<script>bad()') < 0);
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass + ' passed, ' + failures.length + ' FAILED:');

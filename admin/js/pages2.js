@@ -680,3 +680,66 @@ function roleCard(r) {
     '</div>';
 }
 function toggleRoleOpen(id) { UI.openRole = (UI.openRole === id ? null : id); render(); }
+
+/* =================== ENQUIRIES ===================
+   Everybody who asked about us through the public website: demo requests,
+   contact messages, partner applications and referrals.
+
+   These arrive from the four forms on web/. Those forms still post to Netlify
+   exactly as they always did — that path works with JavaScript off and carries
+   Netlify's spam filtering — and they now ALSO post to the database, so this
+   page is a copy the console can work from rather than the only record. If the
+   database call fails, Netlify still has the submission and nothing is lost.
+
+   The table is read through admin-api under the service role, because it has
+   row-level security on with no policies at all. A stranger's phone number is
+   not something a tenant, or an anonymous caller, has any business seeing. */
+PAGES.enquiries = function () {
+  const f = UI.filters.enquiries || 'new';
+  let list = (DB.enquiries || []).slice();
+  if (f !== 'all') list = f === 'open' ? list.filter(e => ['new', 'open'].includes(e.state))
+                                       : list.filter(e => e.state === f || e.kind === f);
+  const q = UI.q.enquiries || '';
+  if (q) list = list.filter(e => matches(q, [e.name, e.email, e.phone, e.business, e.message, e.kind]));
+  list.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+
+  const all = DB.enquiries || [];
+  const nu = all.filter(e => e.state === 'new').length;
+  const KIND = { demo: 'Demo request', contact: 'Contact', partner: 'Partner application', referral: 'Referral' };
+  const TONE = { new: 'amber', open: 'blue', replied: 'green', converted: 'green', spam: 'grey', closed: 'grey' };
+
+  const tabs = [['new', 'New'], ['open', 'Needs a reply'], ['demo', 'Demo requests'],
+    ['partner', 'Partners'], ['referral', 'Referrals'], ['contact', 'Contact'],
+    ['converted', 'Converted'], ['spam', 'Spam'], ['all', 'Everything']];
+
+  return '<div class="stats">' +
+    statCard({ label: 'Waiting on us', value: nu, tone: nu ? 'warn' : 'money', sub: 'Nobody has picked these up yet' }) +
+    statCard({ label: 'Demo requests', value: all.filter(e => e.kind === 'demo').length, tone: 'info', sub: 'The ones closest to buying' }) +
+    statCard({ label: 'Converted', value: all.filter(e => e.state === 'converted').length, tone: 'money', sub: 'Became a subscriber' }) +
+    statCard({ label: 'In ' + PERIOD.label.toLowerCase(), value: all.filter(e => inPeriod(e.at)).length, tone: 'info', sub: 'Arrived inside the selected period' }) +
+    '</div>' +
+    '<div class="bar">' +
+    tabs.map(t => '<button class="tab' + (f === t[0] ? ' on' : '') + '" onclick="setFilter(\'enquiries\',\'' + t[0] + '\')">' + t[1] + '</button>').join('') +
+    '</div>' +
+    '<div class="bar">' + searchBox('enquiries', 'Search a name, an email, a message…') + '</div>' +
+    '<div class="pnl"><div class="ph"><div><h3>Website enquiries</h3>' +
+    '<div class="ph-sub">' + list.length + ' shown' +
+    (LIVE.on() ? '' : ' · not connected, so these are the worked example rather than real enquiries') +
+    '</div></div></div>' +
+    (list.length ? '<div class="tw"><table><thead><tr><th>Who</th><th class="hide-sm">About</th>' +
+      '<th class="hide-sm">Message</th><th>State</th><th class="hide-sm">When</th><th></th></tr></thead><tbody>' +
+      list.slice(0, 200).map(e =>
+        '<tr class="klik" onclick="openDetail(\'enquiry\',\'' + esc(String(e.id)) + '\')">' +
+        '<td><div class="t-main">' + esc(e.name || '(no name given)') + '</div>' +
+        '<div class="t-sub">' + esc(e.email || e.phone || '') + '</div></td>' +
+        '<td class="hide-sm"><div class="t-main">' + esc(KIND[e.kind] || e.kind) + '</div>' +
+        (e.business ? '<div class="t-sub">' + esc(e.business) + '</div>' : '') + '</td>' +
+        '<td class="hide-sm" style="white-space:normal;max-width:320px">' +
+        esc(String(e.message || '').slice(0, 160)) + (String(e.message || '').length > 160 ? '…' : '') + '</td>' +
+        '<td><span class="pill ' + (TONE[e.state] || 'grey') + '">' + esc(e.state) + '</span></td>' +
+        '<td class="hide-sm">' + ago(e.at) + '</td><td class="chev">&rsaquo;</td></tr>').join('') +
+      '</tbody></table></div>'
+      : '<div class="empty">' + (LIVE.on()
+        ? 'No enquiries match that filter. When somebody fills in a form on the website, they appear here.'
+        : 'Not connected to the live site yet.') + '</div>') + '</div>';
+};

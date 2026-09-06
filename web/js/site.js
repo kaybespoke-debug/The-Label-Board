@@ -373,3 +373,93 @@
     $$('.drawer a').forEach(function (a) { a.addEventListener('click', closeMenu); });
   });
 })();
+
+/* ==========================================================================
+   Enquiries also reach the operator console
+   --------------------------------------------------------------------------
+   The forms post to Netlify exactly as they always did. Nothing below changes
+   that: no preventDefault, no interception, no rewriting of the action. The
+   submission goes to Netlify whether this code runs, fails, or never loads at
+   all, which is the property worth protecting — a marketing form that silently
+   stops reaching anybody is the most expensive bug a website can have.
+
+   This adds a second copy, sent to the database, so the console can see and
+   work an enquiry instead of somebody remembering to open Netlify's dashboard.
+   It is fire-and-forget with keepalive, because the browser is navigating to
+   the thank-you page a few milliseconds later and a normal fetch would be
+   cancelled mid-flight.
+   ========================================================================== */
+(function () {
+  var FORM_KIND = { demo: 'demo', contact: 'contact', partner: 'partner', referral: 'referral' };
+  /* The honeypot on each form. A bot fills every field it can see; a person
+     never sees these, so anything in one means we write nothing and say
+     nothing — the database answers "fine" so the bot learns no more from
+     being refused than from succeeding. */
+  var TRAPS = ['studio-url', 'site-url', 'website-url', 'extra-url'];
+  /* Fields that have a column of their own. Everything else on the form is
+     carried in `extra`, so adding a question to a form never silently drops
+     the answer. */
+  var MAPPED = ['name', 'email', 'phone', 'studio', 'business', 'company', 'note', 'message', 'consent', 'form-name'];
+
+  function val(fd, keys) {
+    for (var i = 0; i < keys.length; i++) {
+      var v = fd.get(keys[i]);
+      if (v !== null && String(v).trim() !== '') return String(v).trim();
+    }
+    return '';
+  }
+
+  function send(form) {
+    var cfg = (typeof SITE !== 'undefined') ? SITE : null;
+    if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return;
+    var kind = FORM_KIND[form.getAttribute('name')];
+    if (!kind) return;
+
+    var fd;
+    try { fd = new FormData(form); } catch (e) { return; }
+
+    var trap = '';
+    TRAPS.forEach(function (t) { var v = fd.get(t); if (v && String(v).trim()) trap = String(v).trim(); });
+
+    var extra = {};
+    fd.forEach(function (v, k) {
+      if (MAPPED.indexOf(k) >= 0 || TRAPS.indexOf(k) >= 0) return;
+      if (v === null || String(v).trim() === '') return;
+      extra[k] = String(v).slice(0, 500);
+    });
+
+    var body = {
+      p_kind: kind,
+      p_name: val(fd, ['name']),
+      p_email: val(fd, ['email']),
+      p_phone: val(fd, ['phone']),
+      p_business: val(fd, ['studio', 'business', 'company']),
+      p_message: val(fd, ['note', 'message']),
+      p_source_page: (location.pathname || '').replace(/^\//, '') || 'index.html',
+      p_extra: extra,
+      p_trap: trap
+    };
+
+    try {
+      fetch(cfg.supabaseUrl + '/rest/v1/rpc/submit_enquiry', {
+        method: 'POST',
+        headers: {
+          'apikey': cfg.supabaseAnonKey,
+          'Authorization': 'Bearer ' + cfg.supabaseAnonKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body),
+        /* the page is navigating; without this the request is cancelled */
+        keepalive: true
+      }).catch(function () { /* Netlify still has it */ });
+    } catch (e) { /* Netlify still has it */ }
+  }
+
+  /* Capture phase, so this runs before anything else can stop the event —
+     and it never stops it itself. */
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || form.tagName !== 'FORM') return;
+    try { send(form); } catch (err) { /* never let this break a submission */ }
+  }, true);
+})();
