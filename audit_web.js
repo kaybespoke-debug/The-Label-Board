@@ -719,15 +719,88 @@ plans.filter(pl => !pl.invoiceOnly).forEach(pl => {
 });
 check(pr.indexOf('\u20a6') !== -1, 'the page still shows naira before any script runs');
 
-/* no live rate, and nothing asked of a third party to guess where a reader is */
+/* no live rate, and nothing asked of a third party to guess where a reader is.
+   The ban used to include the word `fetch(` outright, which was the cheapest
+   way to enforce it and is now too blunt: the forms send a copy of each
+   enquiry to our OWN backend so the operator console can see it. That is a
+   first-party POST of data the visitor deliberately typed and submitted, not
+   a rate lookup and not a third party being told who is reading our pricing.
+   So the third parties stay banned by name, and the one call we do make is
+   pinned to exactly what it is allowed to be. */
 const siteJs = read('js/site.js');
-['fetch(', 'XMLHttpRequest', 'ipapi', 'geoip', 'exchangerate', 'openexchange'].forEach(t => {
+['XMLHttpRequest', 'ipapi', 'geoip', 'exchangerate', 'openexchange', 'ip-api', 'ipinfo'].forEach(t => {
   check(siteJs.indexOf(t) === -1, 'no price or location is fetched from anywhere: ' + t);
 });
 check(siteJs.indexOf('resolvedOptions().timeZone') !== -1,
   'the currency guess comes from the browser rather than an IP lookup');
 check(siteJs.indexOf("'tlb_ccy'") !== -1, 'the chosen currency is remembered under our own key');
 check(!/layi_/.test(siteJs), 'the website still never touches the app storage keys');
+
+/* The one call the site makes, pinned to exactly what it may be.
+   The property being protected is not "we make no requests" — it is that a
+   form reaches somebody whatever happens. Netlify is the path that must never
+   break; this is a copy for the console alongside it. */
+{
+  const calls = all(siteJs, /fetch\(/g).length;
+  check(calls === 1, 'the website makes exactly one request, and it is the enquiry copy (' + calls + ' found)');
+  check(/rpc\/submit_enquiry/.test(siteJs),
+    'the only request goes to submit_enquiry, the one function the public key may call');
+  check(/cfg\.supabaseUrl/.test(siteJs),
+    'it is addressed to our own backend from configuration, not a hardcoded third party');
+  /* Nothing on page load. A visitor reading the pricing page tells us
+     nothing until they choose to send something. */
+  check(/addEventListener\('submit'/.test(siteJs),
+    'the request only happens when somebody submits a form');
+  check(!/DOMContentLoaded[\s\S]{0,400}fetch\(/.test(siteJs),
+    'nothing is sent merely because a page was opened');
+
+  /* THE one that matters. If this code ever cancels or rewrites a submission,
+     the Netlify path dies with it and enquiries stop reaching anybody, while
+     the form still looks like it worked. */
+  /* Comments stripped first. The block's own comment says "no
+     preventDefault", and a check that reads prose rather than code fails on
+     the sentence promising the very thing it is checking for. */
+  const enqRaw = (siteJs.match(/Enquiries also reach the operator console[\s\S]*$/) || [''])[0];
+  /* The match begins INSIDE the block's opening comment, so that comment has
+     no `/*` left to strip — drop everything up to where it closes, then strip
+     the rest. Without this the check reads the sentence "no preventDefault"
+     and reports the opposite of what the code does. */
+  const enqBlock = enqRaw.slice(enqRaw.indexOf('*/') + 2)
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  check(enqRaw.length > 0, 'the enquiry copy is where it says it is');
+  check(!/preventDefault/.test(enqBlock),
+    'the enquiry copy cancels the form submission, so Netlify never receives it');
+  check(!/\.action\s*=[^=]/.test(enqBlock), 'the enquiry copy rewrites the form action');
+  check(/keepalive:\s*true/.test(enqBlock),
+    'the request is cancelled by the navigation that follows it unless keepalive is TRUE');
+  check(/\.catch\(/.test(enqBlock),
+    'the request has no catch, so a failed copy can surface as an unhandled rejection');
+  check(!/\balert\(|\bconfirm\(/.test(enqBlock),
+    'a failed copy must never interrupt the visitor, whose submission already reached Netlify');
+  /* Nothing is sent because a page was opened — only because somebody chose
+     to submit something. The whole privacy argument for this file rests on it. */
+  check(!/DOMContentLoaded|window\.onload|readystatechange/.test(enqBlock),
+    'the enquiry copy runs on page load, so a reader who sent nothing is reported anyway');
+  check((enqBlock.match(/send\(/g) || []).length <= 2,
+    'send() is called from more than the submit handler and its own definition');
+
+  /* The public key may sit in configuration and nowhere else. */
+  const cfgJs = read('js/config.js');
+  check(/supabaseAnonKey/.test(cfgJs), 'the public key lives in configuration');
+  check(!/eyJ[A-Za-z0-9_-]{20,}/.test(siteJs), 'no key is hardcoded into the behaviour file');
+  /* and it must be the ANON key, never a service role one */
+  const key = (cfgJs.match(/supabaseAnonKey:\s*'([^']+)'/) || [])[1] || '';
+  if (key) {
+    let role = '';
+    try { role = JSON.parse(Buffer.from(key.split('.')[1], 'base64').toString()).role; } catch (e) {}
+    check(role === 'anon', 'the key on the public website is the anon key, not "' + role + '"');
+  }
+}
+/* Netlify stays the path that must never break: every form keeps posting to
+   it, with no JavaScript required. */
+forms.forEach(f => {
+  check(/data-netlify="true"/.test(f.tag), f.page + ' form "' + f.name + '" still posts to Netlify');
+});
 
 /* structured data stays in one currency, the one we actually bill */
 check(/"priceCurrency": "NGN"/.test(pr), 'the structured data is in the currency the console bills');

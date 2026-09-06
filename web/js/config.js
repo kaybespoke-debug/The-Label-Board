@@ -29,6 +29,27 @@ const SITE = {
   instagram: 'thelabelboard',
   city: 'Lagos, Nigeria',
 
+  /* ---- where enquiries go ---------------------------------------------
+     The four forms post to Netlify exactly as they always have. That path
+     needs no JavaScript, carries Netlify's spam filtering, and stays the
+     one that must never break.
+
+     They now ALSO post here, so the operator console can see an enquiry
+     instead of somebody remembering to open Netlify's dashboard. It is a
+     second copy, not a replacement: if this call fails, or the visitor has
+     scripts off, Netlify still has the submission and nobody is lost.
+
+     This key is meant to be public — it ships in every browser. It is worth
+     saying what it can actually do here, because "anon key on a marketing
+     site" should make somebody nervous: exactly one function,
+     submit_enquiry, which can only INSERT. It cannot read an enquiry, list
+     them, change one, or reach any other table or function on the project.
+     That is enforced by grants in the database and tested by
+     storage_rls_harness, which fails if anything else ever becomes
+     reachable by this key.                                              */
+  supabaseUrl: 'https://eskubrbgbcbaejynjxvh.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc',
+
   /* ---- trial ----
      One length, for both self-serve plans. Bespoke used to have a shorter
      trial of its own, which read as a penalty for paying more; it is now

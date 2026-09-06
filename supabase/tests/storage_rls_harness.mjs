@@ -314,7 +314,8 @@ section('Selling more space, without moving anybody else');
      the error might be about its arguments. */
   const OPERATOR_ONLY = ['set_studio_storage_cap', 'recount_storage_usage',
     'set_studio_plan', 'record_studio_payment', 'platform_billing_summary',
-    'studio_payments', 'platform_tenant_summary'];
+    'studio_payments', 'platform_tenant_summary',
+    'platform_enquiries', 'set_enquiry_state'];
   for (const name of OPERATOR_ONLY) {
     /* Resolved by name and asked about by oid, so the check does not depend
        on how Postgres chooses to spell an argument list. */
@@ -337,6 +338,42 @@ section('Selling more space, without moving anybody else');
     (await admin(`select has_function_privilege('authenticated','public.my_storage_usage()','execute') p`))[0].p === true);
   ok('and a signed-out caller cannot',
     (await admin(`select has_function_privilege('anon','public.my_storage_usage()','execute') p`))[0].p === false);
+
+  /* The inverse, which matters just as much. submit_enquiry is the ONE
+     function on this schema an anonymous stranger is meant to reach — it is
+     how a demo request from the website gets in. A sweeping revoke written
+     to close the others would silently close the front door too, and the
+     symptom would be a website that looks fine and generates no leads. */
+  ok('the website CAN still submit an enquiry',
+    (await admin(`select has_function_privilege('anon','public.submit_enquiry(text,text,text,text,text,text,text,jsonb,text)','execute') p`))[0].p === true,
+    'the public intake is closed, so no enquiry from the site ever arrives');
+
+  /* And it is the only one. Anything else that becomes anon-callable is
+     either a deliberate decision that belongs on this list, or a hole. */
+  const anonCallable = (await admin(
+    `select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
+     order by p.proname`)).map(r => r.proname);
+  const ANON_ALLOWED = ['submit_enquiry', 'partner_me', 'claim_referral_code'];
+  const unexpected = anonCallable.filter(n => !ANON_ALLOWED.includes(n));
+  ok('and nothing else in public is reachable by an anonymous caller',
+    unexpected.length === 0, 'anon can execute: ' + unexpected.join(', '));
+
+  /* The enquiries TABLE, separately from the functions. RLS with no policies
+     already returns nothing, so a stray grant here shows no symptom at all —
+     until somebody adds a permissive policy for an unrelated reason and a
+     stranger's phone number becomes public. The grant is the thing to hold. */
+  for (const who of ['anon', 'authenticated']) {
+    for (const priv of ['select', 'insert', 'update', 'delete']) {
+      const can = (await admin(
+        `select has_table_privilege($1,'public.enquiries',$2) p`, [who, priv]))[0].p;
+      ok(who + ' cannot ' + priv + ' the enquiries table', can === false,
+        'a website enquiry is readable or writable by ' + who);
+    }
+  }
+  ok('and the table has row level security forced on as well',
+    (await admin(`select relrowsecurity and relforcerowsecurity f
+                  from pg_class where oid='public.enquiries'::regclass`))[0].f === true);
 }
 
 // ---------------------------------------------------------------------

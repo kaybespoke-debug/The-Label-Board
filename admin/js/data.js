@@ -894,7 +894,7 @@ function emptyData() {
       { id: 1, staffId: 1, kind: 'Employment contract', status: 'missing', pages: 0,
         addedOn: iso(TODAY), body: [['Status', 'Not uploaded']], note: 'Nothing on file yet.' }
     ],
-    tickets: [], feedback: [], tasks: [], announcements: [], onboarding: [], calendar: [],
+    tickets: [], feedback: [], enquiries: [], tasks: [], announcements: [], onboarding: [], calendar: [],
     activity: [{
       id: 1, kind: 'login', action: 'Console opened', detail: 'Kayode Ojomo opened the Admin Control Centre',
       actorId: 1, actor: 'Kayode Ojomo', actorRole: 'Super Admin',
@@ -921,6 +921,10 @@ function demoData() {
     docs: buildDocs(staff),
     tickets: buildTickets(subscribers, staff),
     feedback: buildFeedback(subscribers),
+    /* Empty on purpose. An enquiry is a real person who really wrote to us,
+       so a made-up one beside them is somebody a support agent might try to
+       ring. The page says it is not connected instead of inventing four. */
+    enquiries: [],
     tasks: buildTasks(staff),
     announcements: buildAnnouncements(),
     calendar: buildCalendar(staff),

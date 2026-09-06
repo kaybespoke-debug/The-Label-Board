@@ -24,15 +24,18 @@ const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ALLOWED: Record<string, string[]> = {
   owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
-              'billing', 'payments', 'recordPayment', 'setStorageCap'],
+              'billing', 'payments', 'recordPayment', 'setStorageCap',
+              'enquiries', 'setEnquiryState'],
   // Finance is the role that exists to do this. Support and developer are not
   // given it: what every subscriber pays is not something a support agent needs
   // to answer a ticket, and a role that can read it will eventually be given to
   // somebody because it was easier than making a new one.
   finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus',
-              'billing', 'payments', 'recordPayment', 'setStorageCap'],
+              'billing', 'payments', 'recordPayment', 'setStorageCap',
+              'enquiries', 'setEnquiryState'],
   support:   ['me', 'tenants', 'tenant', 'setNote',
-              'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback'],
+              'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
+              'enquiries', 'setEnquiryState'],
   // a developer reads what studios reported and can move it along, but does
   // not write to a studio in our name
   developer: ['me', 'tenants', 'tenant', 'feedback', 'feedbackThread', 'setFeedbackState'],
@@ -196,6 +199,36 @@ Deno.serve(async (req) => {
       })
       if (error) return json({ error: error.message }, 500)
       await log({ storageCapGb: gb, note: body.note || '' }, id)
+      return json({ ok: true })
+    }
+
+    /* ---- enquiries from the public website -----------------------------
+       The four forms post to Netlify (unchanged, and still the fallback that
+       works with no JavaScript) and to the database, so this is the console's
+       copy rather than the only one. Read with the service role because the
+       table has row-level security on and no policies at all: nobody but us
+       sees a stranger's phone number. */
+    if (action === 'enquiries') {
+      const state = String(body.state || '')
+      const { data, error } = await admin.rpc('platform_enquiries', { p_state: state || null })
+      if (error) return json({ error: error.message }, 500)
+      await log({ count: (data || []).length, state: state || 'all' })
+      return json({ ok: true, enquiries: data || [], role })
+    }
+
+    if (action === 'setEnquiryState') {
+      const id = String(body.id || '')
+      const value = String(body.value || '')
+      const VALID = ['new', 'open', 'replied', 'converted', 'spam', 'closed']
+      if (!id) return json({ error: 'No enquiry id' }, 400)
+      if (!VALID.includes(value)) return json({ error: `state must be one of: ${VALID.join(', ')}` }, 400)
+      const { error } = await admin.rpc('set_enquiry_state', {
+        p_id: id, p_state: value,
+        p_by: staff.name || user.email,
+        p_notes: body.notes === undefined ? null : String(body.notes).slice(0, 2000)
+      })
+      if (error) return json({ error: error.message }, 500)
+      await log({ enquiry: id, state: value })
       return json({ ok: true })
     }
 

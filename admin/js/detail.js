@@ -693,3 +693,51 @@ DETAIL.audit = function (id) {
     kv('IP address', a.ip) + kv('Device', a.device) +
     kv('Target', a.target || '<span class="note">None</span>') + '</div></div>';
 };
+
+/* =================== ENQUIRY =================== */
+/* Everything the person actually sent, plus the one thing this page is for:
+   moving it along. The states are deliberately about US, not them — has
+   anybody picked it up, did we reply, did it become a subscriber. */
+DETAIL.enquiry = function (id) {
+  const e = (DB.enquiries || []).find(x => String(x.id) === String(id));
+  if (!e) return '<div class="empty">Enquiry not found.</div>';
+  const KIND = { demo: 'Demo request', contact: 'Contact', partner: 'Partner application', referral: 'Referral' };
+  const extra = e.extra && typeof e.extra === 'object' ? e.extra : {};
+  const extraRows = Object.keys(extra).filter(k => String(extra[k] || '').trim())
+    .map(k => kv(esc(k), esc(String(extra[k])))).join('');
+
+  const act = function (state, label, cls) {
+    return '<button class="btn ' + (cls || '') + '" onclick="enquiryState(\'' + esc(String(e.id)) + '\',\'' + state + '\')">' + label + '</button>';
+  };
+
+  return '<div class="dhead"><div><h2>' + esc(e.name || '(no name given)') + '</h2>' +
+    '<div class="dsub">' + esc(KIND[e.kind] || e.kind) +
+    (e.source_page ? ' · from ' + esc(e.source_page) : '') + ' · ' + ago(e.at) + '</div></div>' +
+    '<div class="dact">' +
+    (e.email ? '<a class="btn" href="mailto:' + esc(e.email) + '">Reply by email</a>' : '') +
+    (e.phone ? '<a class="btn" href="tel:' + esc(e.phone) + '">Call</a>' : '') +
+    '</div></div>' +
+
+    '<div class="sec-t">What they sent</div>' +
+    kv('Name', esc(e.name || '—')) +
+    kv('Email', e.email ? '<a href="mailto:' + esc(e.email) + '">' + esc(e.email) + '</a>' : '—') +
+    kv('Phone', e.phone ? '<a href="tel:' + esc(e.phone) + '">' + esc(e.phone) + '</a>' : '—') +
+    kv('Business', esc(e.business || '—')) +
+    kv('Came from', esc(e.source_page || '—')) +
+    extraRows +
+    '<div class="sec-t">Message</div>' +
+    '<div class="note" style="white-space:pre-wrap">' + (esc(e.message || '') || '<span class="note">Nothing written.</span>') + '</div>' +
+
+    '<div class="sec-t">Where it stands</div>' +
+    kv('State', '<span class="pill">' + esc(e.state) + '</span>') +
+    kv('Handled by', esc(e.handled_by || '—')) +
+    kv('Last touched', e.handled_at ? ago(e.handled_at) : '—') +
+    (e.notes ? kv('Notes', esc(e.notes)) : '') +
+    '<div class="btn-row" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">' +
+    act('open', 'Picked it up') +
+    act('replied', 'Replied') +
+    act('converted', 'Became a subscriber', 'gold') +
+    act('spam', 'Spam') +
+    act('closed', 'Close') +
+    '</div>';
+};

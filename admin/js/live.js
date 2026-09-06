@@ -228,6 +228,7 @@ async function liveStart() {
   await liveLoadBilling();
   await liveLoadPayments();
   await liveLoadInbox();
+  await liveLoadEnquiries();
   liveStartPolling();
   if (typeof render === 'function') { try { render(); } catch (e) {} }
 }
@@ -573,4 +574,51 @@ async function liveRecordPayment(subId, amount, method, reference, note) {
   });
   await liveLoadPayments();
   await liveLoadBilling();
+}
+
+/* =================== WEBSITE ENQUIRIES ===================
+   The four public forms post to Netlify (unchanged) and to the database.
+   This reads the database copy, so the console can see and work every
+   enquiry instead of somebody remembering to open Netlify's dashboard. */
+async function liveLoadEnquiries() {
+  if (!LIVE.on()) return false;
+  try {
+    const out = await liveCall('enquiries');
+    /* Not merged with example rows the way subscribers are. An enquiry is a
+       real person who really wrote to us; a made-up one sitting beside them
+       is somebody a support agent might genuinely try to ring. When we are
+       connected, this list is exactly what arrived and nothing else. */
+    DB.enquiries = (out.enquiries || []).map(function (r) {
+      return {
+        id: r.id, live: true, liveId: r.id,
+        at: r.at, kind: r.kind, name: r.name || '', email: r.email || '',
+        phone: r.phone || '', business: r.business || '', message: r.message || '',
+        source_page: r.source_page || '', extra: r.extra || {},
+        state: r.state || 'new', handled_by: r.handled_by || '',
+        handled_at: r.handled_at || '', notes: r.notes || ''
+      };
+    });
+    return true;
+  } catch (e) {
+    LIVE.error = LIVE.error || String(e.message || e);
+    return false;
+  }
+}
+
+async function liveSetEnquiryState(id, state, notes) {
+  await liveCall('setEnquiryState', { id: id, value: state, notes: notes });
+  await liveLoadEnquiries();
+}
+
+/* Called from the detail panel. Reloads and re-renders so the row and the
+   sidebar count move together. */
+async function enquiryState(id, state) {
+  if (!LIVE.on()) { toast('Not connected to the live site.'); return; }
+  try {
+    await liveSetEnquiryState(id, state);
+    toast('Marked ' + state);
+    render();
+  } catch (e) {
+    toast(String(e.message || e));
+  }
 }

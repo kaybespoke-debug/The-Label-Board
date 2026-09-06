@@ -161,6 +161,7 @@ const NAV = [
   ]],
   ['Engagement', [
     ['support', 'Support & Usage', 'i-chat', () => Q.openTickets().length + DB.feedback.filter(f => f.state === 'under review' || f.state === 'pending').length],
+    ['enquiries', 'Enquiries', 'i-inbox', () => (DB.enquiries || []).filter(e => e.state === 'new').length],
     ['announcements', 'Announcements', 'i-megaphone', () => DB.announcements.filter(a => a.state === 'scheduled').length]
   ]],
   ['Operations', [
@@ -178,7 +179,7 @@ const NAV = [
 const NAV_HUE = {
   dashboard:'var(--gold)', subscribers:'#c04668', onboarding:'#0f8a80',
   billing:'#2563a8', payments:'#1f9d57', payroll:'#6d5dd3', revenue:'#c47d12',
-  support:'#0f8a80', announcements:'#c2568a',
+  support:'#0f8a80', enquiries:'#c47d12', announcements:'#c2568a',
   tasks:'#2563a8', staff:'#6d5dd3', activity:'#5b6b82', settings:'#5b6b82'
 };
 /* the five pages you actually live in, for the bottom bar */
@@ -195,6 +196,7 @@ const TITLES = {
   payroll: ['Payroll', 'Salaries, deductions and payslips'],
   revenue: ['Revenue', 'Recurring revenue and SaaS performance'],
   support: ['Support & Usage', 'Tickets, what subscribers are asking for, and how the product is used'],
+  enquiries: ['Enquiries', 'Everybody who asked about us through the website'],
   announcements: ['Announcements', 'Tell subscribers what changed'],
   calendar: ['Calendar', 'Meetings, deadlines and what lands when'],
   tasks: ['Tasks', 'Internal work, who owns it, when it is due'],
