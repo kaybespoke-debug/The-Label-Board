@@ -114,6 +114,29 @@ audit_channels, audit_branch_scope and audit_simplicity.
 have to have its mode hardcoded to *both*, repeating the footwear mistake
 exactly. After this it is a one-line addition.
 
+### 3b. Bespoke vs made to measure, on the ORDER
+The website sells to **Made to measure** as one of its trades — its own tab,
+its own photo, a whole pane on the homepage. The app has no concept of it.
+The only trace is one comment inferring it from the presence of measurements
+on an imported website order.
+
+It is deliberately **not** a third mode on #3. Structurally bespoke and
+made-to-measure behave identically — production board, measurements,
+fittings — while ready-made needs none of them, so the studio axis stays
+binary. What differs is which stages, the price and the lead time.
+
+And it is not a property of a studio at all. A shoemaker cuts a bespoke last
+for one client, adjusts a standard last for the next, and sells ready-made off
+the shelf — same week, same workshop. Same for a bag maker. Made a studio
+setting, they would have to pick one and be wrong most of the time.
+
+So: one field per order (or per item on it) — **Bespoke / Made to measure /
+From stock**. It picks that order's stages, lets the form ask for fewer
+measurements on a made-to-measure job, and gives a studio the split of
+revenue between the two, which nothing can answer today.
+
+**Small**, and independent of #3.
+
 ### 4. Buttons that do not exist yet
 Wired, gated and callable, with no UI calling them:
 - `liveRecordPayment` — recording a payment against a studio
