@@ -23,6 +23,16 @@ if(!/WORK ORDER/.test(jobHtml)) F('job sheet is not labelled as a work order');
 if(jobId&&jobHtml.indexOf(jobId)<0) F('job sheet does not carry the order id');
 if(!/Measurements/.test(jobHtml)) F('job sheet has no measurements section');
 if(jobHtml.length<300) F('job sheet came out empty');
+// The materials column read x.fabric long after the field was renamed to materials,
+// so every bespoke work order printed a blank column and the cutter got nothing.
+const matOrder=run("getOrders().find(function(o){return o.kind!=='sale'&&(o.outfits||[]).some(function(x){return (x.materials||[]).length;});})");
+if(!matOrder){F('no demo order carries materials, so the job sheet cannot be checked against them');}
+else{
+  const want=run("(getOrders().find(function(o){return o.kind!=='sale'&&(o.outfits||[]).some(function(x){return (x.materials||[]).length;});}).outfits.find(function(x){return (x.materials||[]).length;}).materials[0])");
+  const mh=run("jobSheetInner(getOrders().find(function(o){return o.kind!=='sale'&&(o.outfits||[]).some(function(x){return (x.materials||[]).length;});}))");
+  if(mh.indexOf(want)<0) F('the job sheet does not print the material the order was cut from: expected "'+want+'"');
+  if(/>Fabric</.test(mh)) F('the job sheet still heads that column "Fabric", which is wrong for a shoemaker or bag maker');
+}
 
 // 2) Measurement sheet: a client with measurements produces a sheet carrying their name + values.
 const mkey=run("(function(){var c=getCustomers();for(var k in c){if(measHistoryOf(k).length&&Object.keys((measHistoryOf(k)[0]||{}).meas||{}).length)return k;}return Object.keys(c)[0]||'';})()");

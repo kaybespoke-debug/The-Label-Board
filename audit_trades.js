@@ -93,6 +93,14 @@ if(run("showsBespoke()")!==true)F('a shoemaker gets no Production board');
 if(run("showsRTW()")!==true)F('a shoemaker gets no Shop, so cannot stock ready pairs');
 setDoes(['fabrics']);
 if(run("showsRetail()")!==true)F('a fabric seller gets no Sales');
+// If a trade keeps stock it takes money over the counter, so it must be able to SEE
+// its takings. Footwear and leather are kind:'bespoke' with a catalogue, and the Sales
+// tab was hidden from both — they recorded sales they could never look at again.
+[['footwear',true],['leather',true],['rtw',true],['fabrics',true],['bespoke',false]].forEach(function(p){
+  setDoes([p[0]]);
+  if(run("salesVisible()")!==p[1])F('a '+p[0]+' studio '+(p[1]?'keeps stock and cannot see its Sales tab':'holds no stock but is shown a Sales tab'));
+});
+setDoes(['fabrics']);
 if(run("showsBespoke()")!==false)F('a fabric seller is shown a Production board they do not need');
 
 /* 8) Every example studio loads, and reads as its own trade. -------------------
@@ -104,11 +112,11 @@ const EX=run("EXAMPLE_STUDIOS.map(x=>x.key)");
   if(EX.indexOf(k)<0)F('there is no example studio for '+k);
 });
 const EXPECT={
-  bespoke: {word:'garment',stage:/fabric|cutting|stitch/i, prod:true,  retail:false},
-  footwear:{word:'pair',   stage:/last|clicking|closing/i, prod:true,  retail:false},
-  leather: {word:'piece',  stage:/pattern|cutting|skiv/i,  prod:true,  retail:false},
-  rtw:     {word:'garment',stage:/sampl|cutting|sew/i,     prod:false, retail:true},
-  fabrics: {word:'piece',  stage:/cloth|measured|packed/i, prod:false, retail:true}
+  bespoke: {word:'garment',stage:/fabric|cutting|stitch/i, prod:true,  retail:false, sells:false},
+  footwear:{word:'pair',   stage:/last|clicking|closing/i, prod:true,  retail:false, sells:true},
+  leather: {word:'piece',  stage:/pattern|cutting|skiv/i,  prod:true,  retail:false, sells:true},
+  rtw:     {word:'garment',stage:/sampl|cutting|sew/i,     prod:false, retail:true, sells:true},
+  fabrics: {word:'piece',  stage:/cloth|measured|packed/i, prod:false, retail:true, sells:true}
 };
 Object.keys(EXPECT).forEach(k=>{
   const want=EXPECT[k];
@@ -122,6 +130,7 @@ Object.keys(EXPECT).forEach(k=>{
   if(!want.stage.test(stages))F(k+' example has the wrong production stages: '+stages);
   if(run("showsBespoke()")!==want.prod)F(k+' example '+(want.prod?'should':'should not')+' show a Production board');
   if(run("showsRetail()")!==want.retail)F(k+' example '+(want.retail?'should':'should not')+' show Sales');
+  if(run("salesVisible()")!==want.sells)F(k+' example '+(want.sells?'should':'should not')+' reach the Sales tab');
   // and it must have data, or there is nothing to look at
   if(!run("getOrders().length"))F(k+' example has no orders, so every tab is empty');
   if(!run("getTxns().length"))F(k+' example has no money recorded');

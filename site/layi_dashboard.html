@@ -3303,8 +3303,13 @@ function bizType(){const b=showsBespoke(),r=showsRetail();return (b&&r)?'both':(
 function showsBespoke(){const v=activeBranchesInView();return v.length?v.some(branchIsBespoke):isBespokeType(SETTINGS.businessType||'both');}
 function showsRTW(){const v=activeBranchesInView();return v.length?v.some(b=>branchDoes(b).some(activityHasCatalog)):isGarmentShopType(SETTINGS.businessType||'both');}
 function showsRetail(){const v=activeBranchesInView();return v.length?v.some(branchIsRetail):isRetailType(SETTINGS.businessType||'both');}
-function businessHasRetail(){return getBranches().filter(b=>b.active!==false).some(branchIsRetail);}
-function salesVisible(){return canSwitchBranch()?showsRetail():businessHasRetail();}
+/* Anything that keeps stock takes money over the counter, so the Sales tab follows
+   the SHOP, not the trade's kind. Footwear and bags & leather are kind:'bespoke' and
+   carry catalog:true — they were given a Shop and a 'Record a sale' button, then shown
+   no takings, because branchIsRetail() only looked at kind. */
+function branchSells(b){return branchDoes(b).some(k=>activityKind(k)==='retail'||activityHasCatalog(k));}
+function businessHasRetail(){return getBranches().filter(b=>b.active!==false).some(branchSells);}
+function salesVisible(){if(!canSwitchBranch())return businessHasRetail();const v=activeBranchesInView();return v.length?v.some(branchSells):isRetailType(SETTINGS.businessType||'both');}
 function applyBizVisibility(){
   const rtw=showsRTW(),bsp=showsBespoke(),ret=showsRetail();
   show('navProducts',can('products')&&rtw);show('msProducts',can('products')&&rtw);
@@ -4344,7 +4349,7 @@ function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?ME
 function jobSheetInner(o){
   const cust=getCustomers()[nameKey(o.client)]||{};
   const meas=((latestMeasOf(nameKey(o.client))||{}).meas)||o.meas||{};
-  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.name||x.type||'Item')}${x.style?`<br><span style="color:#888;font-size:12px">${esc(x.style)}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.fabric||'')}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.finish||'')}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888;padding:6px 0">No items listed.</td></tr>';
+  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.name||x.type||'Item')}${x.style?`<br><span style="color:#888;font-size:12px">${esc(x.style)}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc((x.materials||[]).join(' · ')||x.fabric||'')}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.finish||'')}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888;padding:6px 0">No items listed.</td></tr>';
   const makers=(o.commissions||[]).filter(c=>c.kind==='maker'&&c.staffId).map(c=>esc(staffName(c.staffId))+(c.work?' ('+esc(c.work)+')':'')).filter(Boolean).join(', ');
   const due=o.due?new Date(o.due).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Not set';
   return `<div style="font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;max-width:680px;margin:0 auto;background:#fff;padding:30px">
@@ -4354,7 +4359,7 @@ function jobSheetInner(o){
       <div style="text-align:right"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Order</div><div>${esc(o.id)}</div><div style="color:#666">Stage: ${esc(STAGES[o.stageIndex]||'')}</div><div style="color:#b23b2e">Due: ${due}</div></div>
     </div>
     <div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Pieces to make</div>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px"><thead><tr><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Item</th><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Fabric</th><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Finish</th></tr></thead><tbody>${items}</tbody></table>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px"><thead><tr><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Item</th><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Material</th><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Finish</th></tr></thead><tbody>${items}</tbody></table>
     ${makers?`<div style="font-size:13px;margin-bottom:14px"><b>Assigned to:</b> ${makers}</div>`:''}
     <div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Measurements</div>
     ${measTableHtml(meas,true)}
