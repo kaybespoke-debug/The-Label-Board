@@ -5,48 +5,79 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 7 September 2026
+Last updated: 10 September 2026
+
+## How this run works
+
+**Prototype first.** Anything that changes a workflow or a data model gets its
+shape shown and agreed before it is built.
+
+**Nothing ships until Kayode says so.** Commits are fine. Pushing, merging to
+`main`, deploying an Edge Function and applying a migration to the live
+Supabase project all wait, and happen at the END of the run rather than after
+each change. Gates still run every time.
+
+---
+
+## Already built — do not spend a day rebuilding these
+
+Checked in the code, not assumed.
+
+| Thought to be missing | What is actually there |
+|---|---|
+| Fabric costing for solo studios with no inventory | Every order has `costs[]` — label, amount, supplier — feeding profit per order. No stock record needed |
+| Tenant switching the currency they are paid in | Per-order **"Client pays in"** dropdown plus an fx rate. Studio base currency in Settings |
+| Payment by cash tracking | Studio-editable payment-method list; every money path asks how it moved. Money with no method reads "Not recorded" rather than being guessed |
+| Shop purchase → sale, stock down, revenue | `recordSale()` checks stock by size/colour, refuses if short, decrements the variant, captures unit cost, logs the movement, posts the income |
+| Expense structuring | 13 categories, departments, vendors, projects, branches, and recurring bills |
+| Invoice carrying discount, deposit, balance, logistics | All present, and a receipt is generated on completion |
+| **QC checklist** | Exists and is editable per studio: measurements, stitching & seams, fit confirmed, finishing & detailing, embellishment/monogram, pressed & packaged. Ticked per item, pass/fail with who and when, fail sends it back for rework |
 
 ---
 
 ## Waiting on Kayode
 
-Things I cannot do: they need an account password, a dashboard setting on a
-live service, or a commercial decision.
+Needs a password, a dashboard setting on a live service, or a commercial call.
 
 | | What | Why it matters |
 |---|---|---|
-| 1 | **Supabase → Auth → URL Configuration.** Set Site URL and add redirect URLs with `/**` | Password resets and email confirmations land on the wrong page, or nowhere, until this is set |
-| 2 | **SMTP for auth email** | The partner portal signs people in with a one-time code. Without SMTP those emails go to spam or do not arrive, and nobody can sign in |
-| 3 | **Auth → Policies → leaked-password protection: ON** | Currently off. It checks new passwords against known breached ones. Free, one toggle |
-| 4 | **Move Supabase off Free before real subscribers** | Free gives 500MB database and 5GB egress. That is roughly **15 studio-months of data and 3 of traffic** — it cannot carry a launch. Pro is $25/mo ≈ ₦33,300, about one Basic subscriber |
-| 5 | **Delete the old Supabase project `gcdrkoitjqwbidcfgyzl`** | Two projects, one live. The wrong one is easy to point something at by mistake |
-| 6 | **Set each Netlify site's publish directory in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose and a clean merge silently serves the admin console to every studio. There is a recipe in CLAUDE.md, but a setting is safer than a habit |
+| 1 | **Supabase → Auth → URL Configuration.** Site URL + redirect URLs with `/**` | Password resets and email confirmations land nowhere until this is set |
+| 2 | **SMTP for auth email** | The partner portal signs people in with a one-time code. Without SMTP nobody can sign in |
+| 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
+| 4 | **Move Supabase off Free before real subscribers** | Free is 500MB database and 5GB egress — about **15 studio-months of data and 3 of traffic**. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber |
+| 5 | **Delete the old project `gcdrkoitjqwbidcfgyzl`** | Two projects, one live. Easy to point something at the wrong one |
+| 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
 | 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
-| 8 | **Change the account password that appeared in a screenshot** | It was visible in an image shared into a session |
-| 9 | **Decide the accessories question** | See *Open questions* below. Depends on Engineering #3 |
+| 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 9 | **Decide accessories** | Depends on #3 below |
 
 ---
 
-## Engineering, in the order I would do them
+## Broken now
 
-### 0. LIVE BUG: footwear and leather studios cannot see their own sales
-They get the Shop (`catalog: true`), and the Shop toolbar has "Record a sale".
-But `kind: 'bespoke'` makes `showsRetail()` false, so the **Sales tab is
-hidden** and navigating to it redirects to the dashboard. They can take money
-all day and never see the screen that reports daily, weekly and monthly
-takings.
+### 0a. Footwear and leather studios cannot see their own sales
+They get the Shop (`catalog: true`) and its toolbar carries "Record a sale",
+but `kind: 'bespoke'` makes `showsRetail()` false, so the **Sales tab is
+hidden** and navigating to it redirects to the dashboard. They take money and
+never see the screen that reports takings.
 
-Fix, independent of any redesign: **if you have a Shop with stock, you can see
-Sales** — make `showsRetail()` true for any activity with `catalog: true`.
-Two lines.
+Fix, independent of any redesign: if you have a Shop with stock, you can see
+Sales. **Two lines.**
 
-### 1. Incremental sync — the one that changes the shape of the curve
+### 0b. The job sheet's Fabric column is dead
+It reads `x.fabric`; the field was renamed to `materials` and the sheet was
+never updated. Prints blank on every bespoke job sheet. **Two lines.**
+
+---
+
+## Foundations — these unblock other things
+
+### 1. Incremental sync
 Orders, transactions, staff, tasks and settings still sync as **whole JSON
 blobs**: one row per studio per key, rewritten in full on every change and
-re-read in full on every sign-in. The photos came out of that blob, which cut
-it roughly a hundredfold, but the shape is unchanged and it still scales as
-*library size × headcount*.
+re-read in full on every sign-in. Photos came out of that blob, which cut it
+roughly a hundredfold, but the shape is unchanged and it still scales as
+*library × headcount*.
 
 | Staff | Cost to serve | % of ₦65,000 |
 |---|---|---|
@@ -54,37 +85,15 @@ it roughly a hundredfold, but the shape is unchanged and it still scales as
 | 100 | ~₦21,100 | 33% |
 | 200 | ~₦79,000 | **122%, loss-making** |
 
-Pulling only rows changed since the last sync would flatten that almost
-entirely and make 200 staff cost about what 20 does. **Large**: it touches
-every read and write path, needs a per-key watermark, and needs conflict
-handling for two devices editing the same list offline. Wants its own session
-and a plan first. Until it is done, Pro is comfortable to ~50 staff and should
-become a Bespoke conversation somewhere around 120.
+**Large — its own session, with a plan first.** Until then Pro is comfortable
+to ~50 staff and should become a Bespoke conversation around 120.
 
-### 2. The fabric check — small, and it prevents a real, expensive mistake
-Each item on an order already carries a **Material(s)** picker and its own
-**"Photos of this item / fabric"**, and those photos now live in Storage. Three
-things are missing:
-
-- **The printed job sheet's Fabric column is dead.** It reads `x.fabric`; the
-  field was renamed to `materials` and the sheet was never updated. It prints
-  blank on every bespoke job sheet, and `fabric:` is only ever assigned in one
-  place, always to an empty string. **Two-line fix.**
-- **The job sheet carries no photo.** The person about to cut holds a page with
-  a client name, a blank fabric column and no picture.
-- **Nothing says whose fabric it is, and nothing asks anyone to check it.**
-  Proposed: one field per item (studio-supplied / client brought it / client
-  sent it ahead), and a tick on the first production stage — *"fabric checked
-  against the photo"*, with who ticked it and when.
-
-Half a day with a gate.
-
-### 3. Craft × mode — the trade list is modelling two things as one
+### 2. Craft × mode
 `DEFAULT_ACTIVITIES` conflates **what a studio works in** (garments, footwear,
 bags & leather, fabrics, accessories) with **how it reaches the customer**
-(made to order, ready made, both). `bespoke` is a craft named after a mode,
+(made to order / ready made / both). `bespoke` is a craft named after a mode,
 `rtw` is a mode named as a craft, and footwear and leather have the mode
-decided for them — hardcoded to *both*:
+decided for them and hardcoded to *both*:
 
 ```
 bespoke     board: true   shop: false   sales: false
@@ -94,85 +103,121 @@ leather     board: true   shop: true    sales: FALSE   <- both, and broken
 fabrics     board: false  shop: false   sales: true
 ```
 
-So a shoe shop that only stocks gets a production board with Clicking and
-Lasting; a bespoke shoemaker gets a Shop with stock levels.
+Carry both halves in `does`: `garments:made`, `footwear:ready`, and so on. The
+craft half picks stages, wording and QC defaults; the mode half decides the
+board, the Shop and Sales. Migration changes nobody's setup:
+`bespoke`→`garments:made`, `rtw`→`garments:ready`, `footwear`/`leather`→both
+halves, `fabrics`→`fabrics:ready`.
 
-**Contains a live bug — see the top of the Engineering list.**
+**~1 day.** Contains 0a. **Do before accessories** — against the current model
+accessories would need its mode hardcoded to *both*, repeating the footwear
+mistake exactly.
 
-Fix: carry both halves in `does`, as `garments:made`, `footwear:ready` and so
-on. The craft half picks the stages and the word; the mode half decides the
-board, the Shop and Sales. Migration is clean and changes nobody's setup:
-`bespoke`→`garments:made`, `rtw`→`garments:ready`, `footwear`→both halves,
-`leather`→both halves, `fabrics`→`fabrics:ready`.
+### 3. Production batches — made-in-house ready-to-wear
+The sharpest thing on Kayode's list, and the right question was asked with it:
+*how do we do this without the data conflicting?*
 
-**About a day** with gates. Touches `activityKind`, `activityHasCatalog`,
-`branchDoes`, `summaryType`, `showsBespoke/RTW/Retail`, stage selection, the
-first-run screen and the branch editor, plus audit_trades, audit_first_run,
-audit_channels, audit_branch_scope and audit_simplicity.
+A production run that creates stock is **neither an order nor a purchase** —
+there is no client, and you did not buy it. Today it can only be faked as one
+or the other, and both lie.
 
-**Do this before accessories.** Against the current model, accessories would
-have to have its mode hardcoded to *both*, repeating the footwear mistake
-exactly. After this it is a one-line addition.
+**The rule that resolves it: a batch records COST only, never revenue.** It
+consumes materials, occupies the production board, and its output becomes
+stock units. Revenue happens later, when a unit sells. Book it at both ends
+and every RTW brand's numbers are wrong by the cost of goods.
 
-### 3b. Bespoke vs made to measure, on the ORDER
-The website sells to **Made to measure** as one of its trades — its own tab,
-its own photo, a whole pane on the homepage. The app has no concept of it.
-The only trace is one comment inferring it from the presence of measurements
-on an imported website order.
+Without this an RTW brand cannot know what a garment cost to make, so cannot
+know its margin — the central question this software exists to answer.
 
-It is deliberately **not** a third mode on #3. Structurally bespoke and
-made-to-measure behave identically — production board, measurements,
-fittings — while ready-made needs none of them, so the studio axis stays
-binary. What differs is which stages, the price and the lead time.
+**~1 day. Prototype the record shape first.**
+
+### 4. Quoted → Confirmed order state
+Kayode's invoice-first flow: invoice a new client, their payment confirms the
+order, production starts.
+
+**Do not build invoices as a separate record.** That creates a second thing to
+reconcile against orders, which is the same data-conflict problem as #3. An
+invoice-first flow is just **an order that has not been confirmed yet** — add a
+state before the first production stage. It reuses client, items, prices,
+discount, deposit, logistics and the receipt, and answers "was it paid, how
+much, what is the balance" for free.
+
+Also delivers the "paid invoice prompts you to start the order" automation
+almost free. **~half a day.**
+
+---
+
+## Real value, well defined
+
+### 5. Fabric check
+Each item already carries a **Material(s)** picker and its own **"Photos of
+this item / fabric"**, now in Storage. Missing:
+- the job sheet prints neither (see 0b — it prints a blank Fabric column)
+- nothing records **whose** fabric it is (studio-supplied / client brought it /
+  client sent it ahead) — mix-ups are nearly always client-brought
+- nothing asks anyone to **check it before cutting**
+
+Proposed: the two fixes above, plus a tick on the first production stage —
+*"fabric checked against the photo"* — with who ticked it and when.
+**Half a day.**
+
+### 6. In-house vs outsourced work
+Embellishment, monogram, beading. Outsourced work needs a vendor, a cost, sent
+and due dates, and a **"waiting on them"** state that does not make the
+workroom look idle. Vendors and maker commissions already exist; this extends
+them. **Half a day.**
+
+### 7. QC checklist per trade, and per item
+The checklist exists and is editable, but it is **one flat list for the whole
+studio**. A shoemaker checks symmetry of a pair and sole attachment; a bag
+maker checks hardware and edge finishing; a tailor checks drape and balance.
+
+- Add **construction** and **symmetry** to the tailoring default (from
+  Kayode's own management training document — the two his supervisor checks
+  that the app does not list)
+- Per-trade defaults, driven by the craft half of #2
+- On a multi-item order, QC per item rather than per order
+
+**Small once #2 lands.**
+
+### 8. Bespoke / made to measure / from stock — on the ORDER
+The website sells to **Made to measure** as a trade; the app has no concept of
+it. Deliberately not a third mode on #2: bespoke and made-to-measure behave
+identically in the app (board, measurements, fittings) while ready-made needs
+none of them.
 
 And it is not a property of a studio at all. A shoemaker cuts a bespoke last
 for one client, adjusts a standard last for the next, and sells ready-made off
-the shelf — same week, same workshop. Same for a bag maker. Made a studio
-setting, they would have to pick one and be wrong most of the time.
+the shelf — same week, same workshop. One field per order, which also finally
+answers what share of revenue is bespoke versus made to measure. **Small.**
 
-So: one field per order (or per item on it) — **Bespoke / Made to measure /
-From stock**. It picks that order's stages, lets the form ask for fewer
-measurements on a made-to-measure job, and gives a studio the split of
-revenue between the two, which nothing can answer today.
+### 9. Per-item production stages
+`outfits[].stageIndex` already exists per item; the per-item stage **set** does
+not. A bag and a belt on one order do not share stages. **Fold into #2.**
 
-**Small**, and independent of #3.
+### 10. About Us rewrite
+Ten years of it. Four years of running a business from another country. The
+confusion of trying to build structure with no system. Not another SaaS.
 
-### 4. Buttons that do not exist yet
-Wired, gated and callable, with no UI calling them:
-- `liveRecordPayment` — recording a payment against a studio
-- `liveSetStorageCap` — granting one studio extra space after agreeing a price
+The one thing no competitor can copy and no funded company can fake, and the
+cheapest item on this list. **1 hour**, website session.
 
-Both work today via SQL. Each is about an hour of form.
+---
 
-### 5. Sign-in events are not surfaced
-Registrations, activity, last-seen and app version all reach the console.
-*Who signed in and when* lives in Supabase Auth and nothing reads it. Asked for
-as part of "all logins".
+## Housekeeping
 
-### 6. Nothing expires a trial
-The console flags a trial that has run out; no job acts on it. At current
-volume that is a weekly glance rather than a problem, but it is a decision, not
-an oversight.
-
-### 7. Console demo-data paths still assume every plan has a price
-Live paths are correct. These four are not, and would misprice a real Bespoke
-customer converted through the console UI:
-- `formConvert` prints "Bespoke — ₦0/mo"
-- `doChangePlan` / `doConvert` / `formNewSubscriber` set `mrr` from
-  `p.monthly`, so moving a studio to Bespoke books **₦0 MRR**
-- `core.js` MRR forecast sums `planById(s.plan).monthly`, so Bespoke
-  contributes nothing
-- the plan editor's seat field accepts 0 with no hint that it means unlimited
-
-### 8. Product photos are still inline base64
-Order, outfit, progress and client photos moved to Storage. Catalogue product
-photos did not. Bounded by catalogue size rather than trading volume, so it is
-much smaller — a 500-product shop is about 60MB — but it is the same 7.8×
-overpayment on those bytes.
-
-### 9. `migrateRoles()` marker
-A latent bug flagged in an earlier session and deliberately not patched. Needs
-re-reading before it bites.
+| | Item | Size |
+|---|---|---|
+| 11 | Buttons with no UI: record a payment, grant extra storage | 1hr each |
+| 12 | Sign-in events into the console | small |
+| 13 | Console demo paths book ₦0 MRR for Bespoke (`formConvert`, `doChangePlan`, `doConvert`, `formNewSubscriber`, `core.js` forecast, plan editor seat field) | small |
+| 14 | Trial expiry: flagged, nothing acts on it | small |
+| 15 | Per-currency revenue reporting — orders hold currency, Finance converts everything to naira | medium |
+| 16 | Expense cadence: quarterly and annual (recurring is a boolean today) | small |
+| 17 | Multi-currency invoices — largely works, needs confirming | small |
+| 18 | Product photos still inline base64 | small |
+| 19 | `migrateRoles()` latent bug | unknown |
+| 20 | Stale `audit_trades` description in `verify.js` (still lists haberdashery as a trade) | trivial |
 
 ---
 
@@ -180,47 +225,33 @@ re-reading before it bites.
 
 - **The service worker's outbound fetch** could not be exercised in a real
   browser — the preview environment blocks worker-initiated cross-origin
-  requests. The *cache-serving* path was proven for real: three different
-  signed tokens, one long expired, all returned the same photo byte for byte
-  with the network never touched.
-- **A live photo upload end to end** needs a signed-in studio, which needs a
-  password. Covered by the harness; the last leg wants five minutes with
-  somebody signed in.
-- **Four test enquiries are in the live console** (Ada Obi, Test Two, Grant
-  Check, Bimpe Adeyinka). Mine, from building the pipeline. Marking them Spam
-  or Closed is a fair first use of the feature.
-
----
-
-## Open questions
-
-**Accessories.** Gele, fila, beadwork, jewellery, scarves, belts. They already
-work as a Shop product with sizes and stock, as a line on a bespoke order, and
-as an inventory category — a tailor selling fila today can already do it. What
-does not exist is a **trade** for a studio whose *whole* business is
-accessories; at first run they must currently describe themselves as bespoke
-tailoring, which is the exact wrongness the first-run screen was built to
-remove.
-
-**Do Engineering #3 first.** Against the current model an accessories trade
-would need its mode hardcoded to *both*, exactly repeating the footwear
-mistake. Afterwards it is one line. And accessories is not one workflow —
-millinery, beadwork and jewellery share no stages with each other — so its
-stages should be a deliberately generic made-to-order set the studio renames,
-not a pretence that we know them.
+  requests. The cache-serving path *was* proven: three different signed tokens,
+  one long expired, all returned the same photo byte for byte with the network
+  never touched.
+- **A live photo upload end to end** needs a signed-in studio, so a password.
+  Covered by the harness; the last leg wants five minutes with somebody
+  signed in.
+- **Four test enquiries sit in the live console** (Ada Obi, Test Two, Grant
+  Check, Bimpe Adeyinka). Mine, from building the pipeline.
 
 ---
 
 ## Decided against
 
-- **A sixth "haberdashery" trade.** Dropped as a business type: the shops are
-  small and the workflow is a subset of a fabric shop's. It survives as an
-  inventory category, which every tailor uses. (Recorded in the code at
-  `DEFAULT_ACTIVITIES`.)
+- **Beauticians — hairdressers, makeup, manicure, pedicure.** Not a new trade,
+  a different core loop: appointment-first, a service not a good, no materials
+  per job, no production stages, no measurements. It would add a third
+  dimension — *makes things* vs *does things to people* — to a model already
+  failing at two (see #2). And commercially: adding a second industry before
+  proving the first is how a product becomes mediocre at both. If it is still
+  attractive in a year it is a separate product sharing a codebase, not a trade
+  in this one.
+- **A sixth "haberdashery" trade.** Small shops, workflow a subset of a fabric
+  shop's. Survives as an inventory category, which every tailor uses.
 - **Taking payments in-app.** No gateway, no card, no webhook. An operator
-  records a payment that already happened, the same way a studio records how
-  its own customer paid.
+  records a payment that already happened.
 - **Enforcing the Basic/Pro receivables split server-side.** Chasing is a
-  `wa.me` link with no server in the path, so there is nothing to authorise.
-  It is a commercial nudge, and honest about it. It becomes enforceable the day
-  reminders go through our own WhatsApp sender.
+  `wa.me` link with no server in the path. It is a commercial nudge and honest
+  about it. It becomes enforceable the day reminders go through our own sender.
+- **Invoices as a separate record type.** See #4 — an unconfirmed order does
+  the same job without a second set of books to reconcile.
