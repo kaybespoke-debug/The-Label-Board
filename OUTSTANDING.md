@@ -53,20 +53,49 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 
 ---
 
-## Broken now
+## Fixed this run
 
-### 0a. Footwear and leather studios cannot see their own sales
-They get the Shop (`catalog: true`) and its toolbar carries "Record a sale",
-but `kind: 'bespoke'` makes `showsRetail()` false, so the **Sales tab is
-hidden** and navigating to it redirects to the dashboard. They take money and
-never see the screen that reports takings.
+Committed on `admin-deploy`, gated, and **not pushed**.
 
-Fix, independent of any redesign: if you have a Shop with stock, you can see
-Sales. **Two lines.**
+- **0a. Footwear and leather could not see their own sales.** They were given a
+  Shop and a "Record a sale" button, then had the Sales tab hidden, because
+  visibility asked whether the trade’s *kind* was retail and theirs is
+  `bespoke`. Sales now follows the Shop. `showsRetail()` untouched, so nothing
+  else changed meaning. Gated in `audit_trades.js`; the old code fails it four
+  times.
+- **0b. The job sheet’s Fabric column was dead.** It read `x.fabric`, renamed to
+  `materials` long ago, so every bespoke work order printed that column blank.
+  Now prints the materials, falls back to any legacy `fabric` value, and the
+  heading reads **Material** — a shoemaker was being handed a column called
+  Fabric. Gated in `audit_print.js`; the old code fails it.
 
-### 0b. The job sheet's Fabric column is dead
-It reads `x.fabric`; the field was renamed to `materials` and the sheet was
-never updated. Prints blank on every bespoke job sheet. **Two lines.**
+All 42 gates green after both.
+
+---
+
+## Waiting on a decision — prototype ready
+
+### 2. Craft × mode
+
+The shape is drawn and reviewable, with a live picker, the full migration table
+and the three open questions:
+**https://claude.ai/code/artifact/083b814a-4473-4d27-81a4-774c8537abb3**
+
+Nothing is built. The three answers needed:
+
+1. A studio doing garments **made** and **ready** — one Shop and one board, or
+   two? *(Recommended: one of each; whether a piece was cut for a client or for
+   stock is a property of the order — item #8.)*
+2. Should adding a custom type ask for a craft as well as a mode?
+   *(Recommended: yes, craft optional — "Rentals" should not have to be filed
+   under a craft.)*
+3. Keep `SETTINGS.businessType` as a read-only fallback? *(Recommended: yes.
+   It is the only thing standing behind a device whose branch list has not
+   synced yet.)*
+
+One row of the migration is a deliberate change rather than a no-op: a **fabric
+shop gains a Shop**. It sells cloth by length off a shelf and has been carrying
+stock with no catalogue to hold it. Say so if you would rather leave it.
 
 ---
 
@@ -109,7 +138,7 @@ board, the Shop and Sales. Migration changes nobody's setup:
 `bespoke`→`garments:made`, `rtw`→`garments:ready`, `footwear`/`leather`→both
 halves, `fabrics`→`fabrics:ready`.
 
-**~1 day.** Contains 0a. **Do before accessories** — against the current model
+**~1 day.** 0a is already fixed separately. **Do before accessories** — against the current model
 accessories would need its mode hardcoded to *both*, repeating the footwear
 mistake exactly.
 
