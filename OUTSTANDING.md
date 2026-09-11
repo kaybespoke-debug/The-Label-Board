@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (seventh session)
+Last updated: 11 September 2026 (eighth session)
 
 ## How this run works
 
@@ -213,56 +213,74 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     cost line has to be named there, and now is, with a comment saying why.
   - New gate `audit_outwork.js`.
 
-All 49 gates green after each, plus the 1,793-check website gate. Seventy-three mutations run
+- **10. About Us.** Rewritten as the story only Kayode can tell: ten years in the trade,
+  four of them running the studio from another country, and the line the rest of the page
+  hangs off — *nothing was being stolen and nothing was being done badly, there was just no
+  system, and without one a studio cannot see itself.*
+- **Housekeeping 11 to 20**, all ten. Two gateway actions got the buttons they had been
+  waiting weeks for; Bespoke stopped booking `0` of revenue in five places; an ended trial
+  stopped reading as one ending today; recurring bills come round on their own period;
+  product photos moved to Storage; role migration stopped depending on the order of the
+  Settings screen; and the money now says which currency it arrived in.
+- **1. Incremental sync, solved from the other end.** Measured rather than estimated: an
+  order is ~1.7KB of JSON, and a busy label after three years rebroadcasts a 5,400-order
+  blob on every stage move. Six moves an order across fifty devices is **~426GB a month,
+  about ₦51,800 of egress against a ₦65,000 subscription**. A factory comes out near
+  ₦368,000, five times what it pays. Worse than the estimate that used to sit here.
+  - Almost all of it is finished work, so the store splits: open work in `layi_dash_orders`,
+    finished work in `layi_dash_orders_done`. A stage move sends only the first.
+    **Year 1: 142GB → 9GB. Year 3: 426GB → 9GB. Year 5: 711GB → 9GB.**
+  - No migration, no Edge Function, nothing to deploy: `app_state` takes any key. A device
+    still holding one blob reads it unchanged and splits on its next save.
+  - An order **delivered but still owed for stays live**, because it is the one that needs
+    chasing. So does a quote. So does anything the test cannot judge: archiving an order
+    that is not finished stops it syncing, so unsure costs money rather than losing work.
+  - New gate `audit_orderstore.js`.
+
+All 50 gates green after each, plus the 1,827-check website gate. Ninety-nine mutations run
 against the two gates; all seventeen caught.
 
 ---
 
-## Foundations — these unblock other things
+## Still open
 
-### 1. Incremental sync
-Orders, transactions, staff, tasks and settings still sync as **whole JSON
-blobs**: one row per studio per key, rewritten in full on every change and
-re-read in full on every sign-in. Photos came out of that blob, which cut it
-roughly a hundredfold, but the shape is unchanged and it still scales as
-*library × headcount*.
+Nothing here is blocking. The list of half-day items is empty.
 
-| Staff | Cost to serve | % of ₦65,000 |
-|---|---|---|
-| 50 | ~₦6,200 | 10% |
-| 100 | ~₦21,100 | 33% |
-| 200 | ~₦79,000 | **122%, loss-making** |
+### A. Sign-in events in the console  —  needs a deploy
+The console says **Last synced**, which is honestly what it measures: the last time any
+data reached the cloud. Actual sign-ins live in Supabase's `auth` schema, which the console
+cannot read without a new SQL function **and** a new `admin-api` action. That is a migration
+and an Edge Function deploy, so it waits for Kayode. Half a day once it is wanted.
 
-**Large — its own session, with a plan first.** Until then Pro is comfortable
-to ~50 staff and should become a Bespoke conversation around 120.
+### B. Per-record sync  —  the full version, if it is ever needed
+Splitting the orders store took the worst case from ~426GB a month to ~9GB, which is under
+`₦1,100` of egress on a `₦65,000` subscription at three years. **Pro is comfortable well past
+200 staff now.** Moving each store into real relational tables with per-row upserts would be
+the textbook answer and is weeks of work, a migration per store, RLS per store and a
+migration path for every device. **Not worth starting until a real studio's numbers say so.**
+The measurements are in `audit_orderstore.js`, so the day they do, they will say it plainly.
 
----
+### C. What to do about "Ready to post"  —  Kayode's call
+Raised 11 Sep. The panel shows finished work with the photos already on it and offers a
+caption to copy. It stores **nothing extra**: those are the photos already on the order.
 
-## Real value, well defined
+Storage is not the reason to drop it. At the shipped compression a reference photo is about
+200KB, so **20GB is roughly 97,000 photos** — a studio doing 40 orders a month with five
+photos each would take **41 years** to fill Basic, and a 100-order-a-month studio with eight
+photos each takes **10 years**. Finished photos are not what fills a cap.
 
-### 10. About Us rewrite
-Ten years of it. Four years of running a business from another country. The
-confusion of trying to build structure with no system. Not another SaaS.
+The real question is the one Kayode asked: it only earns its place if it either **posts to
+Instagram or Facebook**, or the photo goes into the **"your order is ready" message to the
+client**. Right now it is a copy-and-paste helper. Three ways to go:
 
-The one thing no competitor can copy and no funded company can fake, and the
-cheapest item on this list. **1 hour**, website session.
+1. **Put the photo in the ready-to-collect message.** Smallest, uses what is already there,
+   and it is a message the studio already sends.
+2. **Connect Instagram/Facebook.** A real integration: app review, tokens, a publishing
+   flow. Not small, and it is a second product surface.
+3. **Drop the panel.** Costs nothing to remove and nothing is lost, since the photos stay
+   on the orders.
 
----
-
-## Housekeeping
-
-| | Item | Size |
-|---|---|---|
-| 11 | Buttons with no UI: record a payment, grant extra storage | 1hr each |
-| 12 | Sign-in events into the console | small |
-| 13 | Console demo paths book ₦0 MRR for Bespoke (`formConvert`, `doChangePlan`, `doConvert`, `formNewSubscriber`, `core.js` forecast, plan editor seat field) | small |
-| 14 | Trial expiry: flagged, nothing acts on it | small |
-| 15 | Per-currency revenue reporting — orders hold currency, Finance converts everything to naira | medium |
-| 16 | Expense cadence: quarterly and annual (recurring is a boolean today) | small |
-| 17 | Multi-currency invoices — largely works, needs confirming | small |
-| 18 | Product photos still inline base64 | small |
-| 19 | `migrateRoles()` latent bug | unknown |
-| 20 | Stale `audit_trades` description in `verify.js` (still lists haberdashery as a trade) | trivial |
+*Recommended: 1, then decide about 2 once a studio has asked for it twice.*
 
 ---
 
