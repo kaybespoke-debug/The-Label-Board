@@ -34,8 +34,13 @@ So do not hold up your testing for this. Run them in parallel.
 Steps 0 to 3 are **done**. The project exists, the schema is on it, and both
 Edge Functions are deployed and verified.
 
+**There is now one project.** The old hand-built `gcdrkoitjqwbidcfgyzl` was
+deleted on 11 Sep 2026, and the survivor was renamed from `the-label-board` to
+`The Label Board` the same day. A rename changes nothing that matters: the ref
+and the URL are fixed for the life of a project, so no config was touched.
+
 ```
-Project     the-label-board
+Project     The Label Board   (was "the-label-board" until 11 Sep 2026)
 Ref         eskubrbgbcbaejynjxvh
 Org         The Label Board (free tier)
 Region      eu-west-2 (London — the shorter hop to Lagos than Frankfurt,
@@ -43,29 +48,17 @@ Region      eu-west-2 (London — the shorter hop to Lagos than Frankfurt,
 URL         https://eskubrbgbcbaejynjxvh.supabase.co
 ```
 
-**Two projects still exist, and the names are the wrong way round.** Check the
-ref, never the name, before touching either:
+**Identify it by the ref, not the name.** The deleted project also ended up
+called "The Label Board" at one point, which is how a pair of near-identical
+names came to sit in one dashboard in the first place. If a second project ever
+appears again, `eskubrbgbcbaejynjxvh` is the real one and the only one any app
+points at.
 
-| On screen | Region | Ref | What it is |
-|---|---|---|---|
-| `the-label-board` | eu-west-2 | `eskubrbgbcbaejynjxvh` | **The live one.** All four apps point here |
-| `The Label Board` | eu-central-1 | `gcdrkoitjqwbidcfgyzl` | The old hand-built one. **Delete this** |
-
-The prettier name is the dead one. Read the ref.
-
-The old project is the hand-built one: `memberships` never existed on it, so
-nothing was isolated, and half the app's tables were missing. It holds one
-business, `11111111-1111-1111-1111-111111111111`, which is the hardcoded
-`LAYI_BIZ` placeholder, with 18 state rows and 11 customers of demo data.
-Nothing real. **No app code points at it any more** — that was true when this
-was written and is not now, so do not go looking for a reference to remove.
-
-**The Supabase CLI on this machine is still linked to the old one.**
-`supabase/.temp/linked-project.json` names `gcdrkoitjqwbidcfgyzl`, so a
-`supabase db push` or `supabase functions deploy` from this repo would land on
-the dead project and quietly appear to work. The file is gitignored, so it is
-per-machine and nobody else's checkout is affected. Fix it before running
-either command:
+**Check the CLI link before running anything.** `supabase/.temp/linked-project.json`
+was pointing at the deleted project, so on a machine that has not been relinked a
+`supabase db push` or `supabase functions deploy` now fails, or worse, half-works
+against nothing. The file is gitignored, so it is per-machine and each checkout
+fixes its own:
 
 ```bash
 supabase link --project-ref eskubrbgbcbaejynjxvh
@@ -343,10 +336,10 @@ The console and the portal ship blank on purpose: with these empty they run a
 self-contained worked example, which is what you want for a demo. Filling
 them in is what switches them to real data. Nothing else changes.
 
-Once the customer app is pointed at the new project and you have signed in
-once to confirm it works, **delete `gcdrkoitjqwbidcfgyzl`**. Leaving a second
-project answering the same schema names is how the wrong one gets debugged
-for an afternoon.
+**Done, 11 Sep 2026.** `gcdrkoitjqwbidcfgyzl` is deleted. Leaving a second
+project answering the same schema names is how the wrong one gets debugged for
+an afternoon, and having two of them with near-identical names nearly cost
+exactly that. One project now: `eskubrbgbcbaejynjxvh`.
 
 ---
 
