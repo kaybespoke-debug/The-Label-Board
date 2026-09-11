@@ -3850,7 +3850,37 @@ function tenantCode(){
 }
 function nextStaffId(){const list=getStaff();let max=0;list.forEach(s=>{const m=String(s.staffId||'').match(/(\d+)$/);if(m)max=Math.max(max,+m[1]);});return tenantCode()+'-S'+String(max+1).padStart(3,'0');}
 function staffActiveFromStatus(st){return st!=='Left Company';}
-function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[]};}
+/* Whose cloth is it. The question exists because of one failure mode: cutting into the
+   wrong piece. Studio stock can be replaced by walking to the shelf. A client's own
+   fabric cannot be replaced at any price — it was bought on a trip, it was a gift, it is
+   the last of that dye lot — and that is the cloth that gets mixed up, because it arrives
+   loose, in a bag, looking like everybody else's. */
+const FABRIC_SOURCES=[
+  {k:'studio', label:'We supplied it',         hint:'From our own stock'},
+  {k:'vendor', label:'Ordered in for this',    hint:'Coming from a supplier'},
+  {k:'brought',label:'Client brought it in',   hint:'Theirs, handed over in person', theirs:true},
+  {k:'sent',   label:'Client sent it ahead',   hint:'Theirs, by courier or dropped off', theirs:true}
+];
+function fabricSource(k){return FABRIC_SOURCES.find(x=>x.k===k)||null;}
+function fabricSourceLabel(k){const f=fabricSource(k);return f?f.label:'';}
+function itemIsTheirs(x){const f=fabricSource(x&&x.fabricFrom);return !!(f&&f.theirs);}
+/* True when ANY item on the order is cut from cloth the studio cannot replace. */
+function orderHasTheirFabric(o){return (o&&o.outfits||[]).some(itemIsTheirs);}
+/* There is something to check when the order says what it is made of, or carries a photo
+   of it, or says whose it is. With none of those there is nothing to check it against, and
+   a prompt would just be a nag. */
+function orderHasFabric(o){return ((o&&o.outfits)||[]).some(function(x){
+  return (x.materials&&x.materials.length)||(x.photos&&x.photos.length)||x.fabricFrom;});}
+/* Asked once, while it still matters: after the work has started and before quality
+   control, which is far too late to find out the wrong cloth was cut. */
+function fabricCheckNeeded(o){
+  if(!o||(o.fabricCheck&&o.fabricCheck.ok))return false;
+  const qc=STAGES.indexOf('Quality Check');
+  if((+o.stageIndex||0)<1)return false;
+  if(qc>=0&&(+o.stageIndex||0)>=qc)return false;
+  return orderHasFabric(o);
+}
+function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:''};}
 function outfitMaterialsHtml(i){
   const o=(draft&&draft.outfits&&draft.outfits[i])||{};const sel=o.materials||[];
   const opts=materialOptionsFor(o.type);
@@ -3860,6 +3890,17 @@ function outfitMaterialsHtml(i){
   return `${hint}<div class="matchips">${chips}</div><div style="display:flex;gap:8px;margin-top:8px"><input class="fld" id="of_matadd_${i}" placeholder="Add other material…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addOutfitMat(${i});}"><button type="button" class="btn ghost sm" onclick="addOutfitMat(${i})">Add</button></div>`;
 }
 function renderOutfitMaterials(i){const el=document.getElementById('of_mat_'+i);if(el)el.innerHTML=outfitMaterialsHtml(i);}
+function fabricSourceChips(i){
+  const o=(draft&&draft.outfits&&draft.outfits[i])||{};
+  const Q=String.fromCharCode(39);
+  return '<div class="matchips">'+FABRIC_SOURCES.map(function(f){
+    const on=o.fabricFrom===f.k;
+    return '<span class="matchip'+(on?' on':'')+'" title="'+esc(f.hint)+'" onclick="setOutfitFabricFrom('+i+','+Q+f.k+Q+')">'+esc(f.label)+'</span>';
+  }).join('')+'</div>'
+  +(itemIsTheirs(o)?'<div class="sd" style="color:var(--amber);margin-top:6px">Their own cloth, and there is no second piece. It prints in bold on the work order, and somebody has to check it against the photo before anything is cut.</div>':'');
+}
+function renderFabricSource(i){const el=document.getElementById('of_src_'+i);if(el)el.innerHTML=fabricSourceChips(i);}
+function setOutfitFabricFrom(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i].fabricFrom=(draft.outfits[i].fabricFrom===k?'':k);renderFabricSource(i);}
 function toggleOutfitMat(i,m){if(!draft||!draft.outfits[i])return;const arr=draft.outfits[i].materials=draft.outfits[i].materials||[];const k=arr.indexOf(m);if(k>=0)arr.splice(k,1);else arr.push(m);renderOutfitMaterials(i);}
 function addOutfitMat(i){const inp=document.getElementById('of_matadd_'+i);if(!inp||!draft||!draft.outfits[i])return;const v=(inp.value||'').trim();if(!v)return;const arr=draft.outfits[i].materials=draft.outfits[i].materials||[];if(!arr.includes(v))arr.push(v);renderOutfitMaterials(i);}
 function ofTypeChanged(i){if(!draft||!draft.outfits[i])return;const t=fvOther('of_type_'+i);if(t!==undefined)draft.outfits[i].type=t;draft.outfits[i].materials=[];renderOutfitMaterials(i);}
@@ -3974,6 +4015,7 @@ function syncOrderDraft(){
     if(fv('of_price_'+i)!==undefined)o.price=parseAmt(fv('of_price_'+i));
     if(fv('of_style_'+i)!==undefined)o.style=fv('of_style_'+i);
     if(fv('of_finish_'+i)!==undefined)o.finish=fv('of_finish_'+i);
+    // fabricFrom is set by a chip rather than a field, so it is already on the draft
     if(fv('of_person_'+i)!==undefined)o.person=fv('of_person_'+i);
     if(fv('ofm_fit_'+i)!==undefined)o.measFit=fv('ofm_fit_'+i);
     if(fv('ofm_posture_'+i)!==undefined)o.measPosture=fv('ofm_posture_'+i);
@@ -4206,6 +4248,7 @@ function renderOrderModal(){
         <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()"><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${(ocur(draft)!==SETTINGS.currency&&+o.price)?'≈ '+cur((+o.price||0)*ofx(draft)):''}</div></div>
       </div>
       <div class="field" style="margin-bottom:10px"><label>Material(s) <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(tap to pick one or more)</span></label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
+      <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
       <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="e.g. Wedding agbada, size 43 mules…"></div>
       <div class="field" style="margin-bottom:10px"><label>Photos of this item / fabric</label>${outfitPhotoGrid(i,o.photos)}</div>
       <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, fabric, size, inspiration…">${esc(o.style)}</textarea></div>
@@ -4353,6 +4396,13 @@ function orderAttention(o){
   const du=daysUntil(o.due);const out=orderOutstanding(o);
   if(o.qc&&o.qc.status==='failed'&&o.stageIndex<READY)return {sev:'var(--red)',text:'Failed quality check. Send it back for rework.',act:can('canQC')?{label:'Open QC',fn:`openQC('${o.id}')`}:(can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null)};
   if(du!==null&&du<0&&o.stageIndex<READY)return {sev:'var(--red)',text:`${-du} day${-du===1?'':'s'} overdue, still at ${STAGES[o.stageIndex]}.`,act:can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null};
+  /* Above quality control on purpose. QC finds the wrong cloth after it has been cut,
+     which is the expensive way to find out. */
+  if(fabricCheckNeeded(o)){const theirs=orderHasTheirFabric(o);
+    return {sev:theirs?'var(--red)':'var(--amber)',
+      text:theirs?'Working on the client\u2019s own fabric and nobody has checked it against the photo yet.'
+                 :'Nobody has checked the fabric against the photo yet.',
+      act:can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null};}
   if(o.stageIndex===QC&&!(o.qc&&o.qc.status==='passed'))return {sev:'var(--gold)',text:'Awaiting quality check before it can move on.',act:can('canQC')?{label:'Run QC',fn:`openQC('${o.id}')`}:null};
   if(o.stageIndex===READY)return {sev:'var(--green)',text:'Ready to collect. Let the client know it is done.',act:(can('customers')||can('orders'))?{label:'Message client',fn:`openMsgHelper('${o.id}')`}:null};
   if(o.stageIndex>=DISP&&o.stageIndex<DELI)return {sev:'var(--amber)',text:'Out for delivery. Mark it delivered once it reaches the client.',act:(can('canDispatch')||can('orders')||can('update'))?{label:'Mark delivered',fn:`markDelivered('${o.id}')`}:null};
@@ -4578,7 +4628,15 @@ function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?ME
 function jobSheetInner(o){
   const cust=getCustomers()[nameKey(o.client)]||{};
   const meas=((latestMeasOf(nameKey(o.client))||{}).meas)||o.meas||{};
-  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.name||x.type||'Item')}${x.style?`<br><span style="color:#888;font-size:12px">${esc(x.style)}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc((x.materials||[]).join(' · ')||x.fabric||'')}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.finish||'')}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888;padding:6px 0">No items listed.</td></tr>';
+  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.name||x.type||'Item')}${x.style?`<br><span style="color:#888;font-size:12px">${esc(x.style)}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc((x.materials||[]).join(' · ')||x.fabric||'')}${x.fabricFrom?`<br><span style="font-size:11px;${itemIsTheirs(x)?'color:#b23b2e;font-weight:700':'color:#888'}">${esc(fabricSourceLabel(x.fabricFrom))}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.finish||'')}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888;padding:6px 0">No items listed.</td></tr>';
+  /* One line, at the top, in the only colour on the page. Somebody reading this sheet has
+     a stack of cloth in front of them and no way of telling which piece cannot be replaced. */
+  const theirCloth=orderHasTheirFabric(o)
+    ? `<div style="margin-bottom:14px;padding:10px 12px;border:2px solid #b23b2e;border-radius:6px;background:#fdf3f1"><div style="color:#b23b2e;font-weight:700;font-size:13px;letter-spacing:.4px">THE CLIENT&rsquo;S OWN FABRIC</div><div style="font-size:12.5px;color:#5c3a35;margin-top:3px">Check it against the photo on this order before cutting. If it is wrong there is no second piece.</div></div>`
+    : '';
+  const fabricChecked=(o.fabricCheck&&o.fabricCheck.ok)
+    ? `<div style="font-size:12px;color:#4f6b48;margin-bottom:12px">Fabric checked by ${esc(o.fabricCheck.by||'')}${o.fabricCheck.at?' on '+new Date(o.fabricCheck.at).toLocaleDateString('en-GB'):''}</div>`
+    : '';
   const makers=(o.commissions||[]).filter(c=>c.kind==='maker'&&c.staffId).map(c=>esc(staffName(c.staffId))+(c.work?' ('+esc(c.work)+')':'')).filter(Boolean).join(', ');
   const due=o.due?new Date(o.due).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Not set';
   return `<div style="font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;max-width:680px;margin:0 auto;background:#fff;padding:30px">
@@ -4587,13 +4645,15 @@ function jobSheetInner(o){
       <div><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Client</div><div style="font-weight:700;font-size:15px">${esc(o.client)}</div>${cust.whatsapp?`<div style="color:#666">${esc(cust.whatsapp)}</div>`:''}</div>
       <div style="text-align:right"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Order</div><div>${esc(o.id)}</div><div style="color:#666">Stage: ${esc(STAGES[o.stageIndex]||'')}</div><div style="color:#b23b2e">Due: ${due}</div></div>
     </div>
+    ${theirCloth}
+    ${fabricChecked}
     <div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Pieces to make</div>
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px"><thead><tr><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Item</th><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Material</th><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;border-bottom:2px solid #ddd;padding-bottom:5px">Finish</th></tr></thead><tbody>${items}</tbody></table>
     ${makers?`<div style="font-size:13px;margin-bottom:14px"><b>Assigned to:</b> ${makers}</div>`:''}
     <div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Measurements</div>
     ${measTableHtml(meas,true)}
     ${o.notes?`<div style="margin-top:16px;padding:12px;background:#faf6ee;border-radius:8px;font-size:13px"><b>Notes:</b> ${esc(o.notes)}</div>`:''}
-    <div style="margin-top:28px;display:flex;justify-content:space-between;font-size:12px;color:#666"><div>Cut by: ____________</div><div>Sewn by: ____________</div><div>QC: ____________</div></div>
+    <div style="margin-top:28px;display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#666"><div>Fabric checked by: ________</div><div>Cut by: ________</div><div>Sewn by: ________</div><div>QC: ________</div></div>
   </div>`;
 }
 function measSheetInner(key,recId){
@@ -4695,6 +4755,17 @@ function renderUpdateModal(){
     <div class="field"><label>Current stage</label><select class="fld" id="u_stage" onchange="syncUpdate();renderUpdateModal()">${stageOpts}</select></div>
     ${(updateDraft.stage===_delIdx&&_uOut>0&&can('money'))?`<div class="field"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0"><input type="checkbox" id="u_collectBalance" checked style="width:16px;height:16px;flex:0 0 auto"> Collect remaining ${curO(_uOut,_uo)} now</label>${payMethodField('u_balMethod','','How was the balance paid?')}<div class="sd" style="color:var(--text-faint);margin-top:4px">Tick if the client paid the balance on ${_isDeliv?'delivery':'pickup'}. It'll be recorded as income and the order marked paid.</div></div>`:''}
     <div class="field"><label>Who did this work?</label><select class="fld" id="u_worker">${workerOpts}</select><div class="sd" style="color:var(--text-faint);margin-top:6px">Credited for traceability &amp; performance: who cut, sewed, finished, etc.</div></div>
+    ${(function(){
+      if(!fabricCheckNeeded(_uo))return '';
+      const theirs=orderHasTheirFabric(_uo);
+      const mats=[];(_uo.outfits||[]).forEach(function(x){(x.materials||[]).forEach(function(m){if(mats.indexOf(m)<0)mats.push(m);});});
+      return '<div class="field" style="border:1px solid '+(theirs?'var(--amber)':'var(--line)')+';border-radius:10px;padding:12px 14px;background:var(--panel-2)">'
+        +'<label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="u_fabricOk" style="width:16px;height:16px;flex:0 0 auto"> Fabric checked against the photo</label>'
+        +(mats.length?'<div class="sd" style="color:var(--text-dim);margin-top:7px">Should be: <b>'+esc(mats.join(' \u00b7 '))+'</b></div>':'')
+        +'<div class="sd" style="color:'+(theirs?'var(--amber)':'var(--text-faint)')+';margin-top:5px">'
+        +(theirs?'This is the client\u2019s own cloth. If it is cut wrong there is no second piece.':'Tick once somebody has laid the cloth against the photo on this order.')
+        +'</div></div>';
+    })()}
     <div class="field"><label>Note (visible to everyone)</label><textarea class="fld" id="u_note" placeholder="e.g. First fitting done, taking in the waist 2cm">${esc(updateDraft.note)}</textarea></div>
     <div class="field"><label>Progress photos (optional)</label>${photoGrid(updateDraft.photos,'photo','addUpdatePhotos','removeUpdatePhoto')}</div>
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveUpdate()">Post update</button></div>`);
@@ -4707,8 +4778,21 @@ function saveUpdate(){
   if(o.stageIndex===STAGES.indexOf('Dispatched')&&o.delivery&&o.delivery.enabled&&o.delivery.status!=='Delivered')o.delivery.status='Dispatched';
   if(o.stageIndex>=STAGES.indexOf('Dispatched')&&o.stageIndex<STAGES.indexOf('Delivered')&&!o.dispatchedAt)o.dispatchedAt=new Date().toISOString();
   if(o.stageIndex>=STAGES.indexOf('Delivered')){if(!o.deliveredAt)o.deliveredAt=new Date().toISOString();if(o.delivery&&o.delivery.enabled)o.delivery.status='Delivered';const _cb=document.getElementById('u_collectBalance');if(_cb&&_cb.checked){const _balMethod=document.getElementById('u_balMethod')?readPayMethod('u_balMethod'):'';const _out=orderOutstanding(o);if(_out>0){o.paid=(+o.paid||0)+_out;try{const _t=getTxns();_t.push({id:uid('t'),dir:'in',method:_balMethod||'',label:(o.client||'')+' \u00b7 balance on '+((o.delivery&&o.delivery.enabled)?'delivery':'pickup')+(ocur(o)!==SETTINGS.currency?' ('+curC(_out,ocur(o))+')':''),amount:_out*ofx(o),at:new Date().toISOString().slice(0,10),orderId:o.id,branch:branchOf(o)});setTxns(_t);}catch(e){}}}}
+  /* Signed and dated, because the point of the check is being able to say later who
+     looked at it. Recorded before the update line is pushed, so the line can mention it. */
+  let _fabricJustChecked=false;
+  const _fc=document.getElementById('u_fabricOk');
+  if(_fc&&_fc.checked&&!(o.fabricCheck&&o.fabricCheck.ok)){
+    o.fabricCheck={ok:true,by:userLabel(),at:new Date().toISOString(),
+      workerId:updateDraft.worker||'',theirs:orderHasTheirFabric(o)};
+    _fabricJustChecked=true;
+    logAudit('Fabric checked',(o.client||'')+' \u00b7 '+(o.garment||''));
+  }
   const wname=updateDraft.worker?staffName(updateDraft.worker):'';
-  o.updates.push({at:new Date().toISOString(),stage:STAGES[updateDraft.stage],note:updateDraft.note||('Moved to '+STAGES[updateDraft.stage]),by:userLabel(),workerId:updateDraft.worker||'',worker:wname,photos:updateDraft.photos});
+  const _uNote=updateDraft.note||('Moved to '+STAGES[updateDraft.stage]);
+  o.updates.push({at:new Date().toISOString(),stage:STAGES[updateDraft.stage],
+    note:_uNote+(_fabricJustChecked?' \u00b7 Fabric checked against the photo':''),
+    by:userLabel(),workerId:updateDraft.worker||'',worker:wname,photos:updateDraft.photos});
   if(!saveSafe('layi_dash_orders',list)){alert('Storage is full. Too many photos to save. Remove a few and try again.');return;}
   pushActivity('status','Status updated · '+(o.client||'')+' · '+STAGES[o.stageIndex]);
   if(typeof waOnEvent==='function'&&o.stageIndex===STAGES.indexOf('Ready for Delivery'))waOnEvent('ready',o); // auto-WhatsApp on ready (dormant until go-live)
