@@ -728,6 +728,10 @@ body.modal-open{overflow:hidden}
 .opill.gold{background:rgba(184,142,42,.18);color:var(--gold)}
 .opill.amber{background:rgba(214,150,32,.18);color:var(--amber)}
 .opill.red{background:rgba(212,72,72,.16);color:var(--red)}
+/* A quote is the one status that is not about the studio's own progress: it is waiting on
+   somebody else. Deliberately the quietest pill on the screen, outlined rather than filled,
+   so a list of real work is not visually competing with a list of maybes. */
+.opill.quote{background:transparent;color:var(--text-faint);box-shadow:inset 0 0 0 1px var(--line)}
 @media(max-width:760px){.oledger .hide-sm{display:none}.oledger th,.oledger td{padding:11px 8px}}
 /* ===== DASHBOARD (mirrored layout) ===== */
 .dash-top{display:grid;grid-template-columns:minmax(280px,1.1fr) 1fr .9fr;gap:16px;margin-bottom:16px}
@@ -2304,7 +2308,47 @@ function logMove(item,type,qty,note,ref){if(!item)return;qty=+qty||0;if(qty<=0)r
 const nameKey=n=>String(n||'').trim().toLowerCase();
 const orderNet=o=>Math.max(0,(+o.value||0)-(+o.discount||0));          // in the order's own currency (client-facing)
 const orderNetBase=o=>orderNet(o)*ofx(o);                              // converted to base ₦ for business totals
-const orderOutstanding=o=>Math.max(0,orderNet(o)-(+o.paid||0));        // order currency
+/* ---- Quoted, then confirmed --------------------------------------------------------
+   The invoice-first flow: price the job, send it, and their payment is the yes. Until
+   that yes there is a job on paper and nothing in the workroom.
+
+   An invoice is NOT a second kind of record. Building invoices separately would leave two
+   sets of books to reconcile, which is the same mistake production runs avoided. A quote is
+   an ORDER that has not been confirmed, so it already has the client, the items, the
+   prices, the discount, the deposit terms, the logistics and the invoice document, and it
+   answers 'was it paid, how much, what is the balance' without a line of new code.
+
+   A quote stays out of the workroom, off the receivables list and out of the work booked,
+   because none of that is true yet. Confirming it changes one field and it is an ordinary
+   order from that moment. */
+function isQuote(o){return !!(o&&o.quoted&&!o.confirmedAt);}
+function isConfirmed(o){return !!o&&!isQuote(o);}
+/* The yes. Called by hand when a client says go ahead, and called on its own the moment any
+   money arrives against the quote, because a deposit IS the yes and asking somebody to
+   confirm an order they have just been paid for is a step that only ever gets forgotten. */
+function confirmOrder(id,how){
+  const list=rawOrders();const o=list.find(x=>x.id===id);
+  if(!o||!isQuote(o))return false;
+  o.confirmedAt=new Date().toISOString();
+  o.confirmedBy=userLabel();
+  o.updates=o.updates||[];
+  o.updates.push({at:o.confirmedAt,stage:STAGES[+o.stageIndex||0],
+    note:'Order confirmed'+(how?' · '+how:''),by:userLabel(),photos:[]});
+  saveSafe('layi_dash_orders',list);
+  logAudit('Order confirmed',(o.client||'')+' · '+o.id+(how?' ('+how+')':''));
+  return true;
+}
+function confirmOrderFromButton(id){
+  if(!can('orders')&&!can('money')){if(typeof toast==='function')toast('You do not have permission to confirm an order.');return;}
+  if(confirmOrder(id,'said yes')){
+    if(typeof toast==='function')toast('Confirmed. It is on the production board now.');
+    closeModal();renderAll();
+  }
+}
+/* Nobody owes you for a job they have not agreed to. This is the one place it has to be
+   said: every receivables list, every chase, every total owed and every overdue nudge reads
+   through here, so saying it once keeps a quote out of all of them. */
+const orderOutstanding=o=>isQuote(o)?0:Math.max(0,orderNet(o)-(+o.paid||0));        // order currency
 const orderOutstandingBase=o=>orderOutstanding(o)*ofx(o);             // base ₦
 const orderCost=o=>(o.costs||[]).reduce((s,c)=>s+(+c.amount||0),0);   // costs recorded in base ₦
 const orderCommTotal=o=>(o.commissions||[]).reduce((s,c)=>s+(+c.amount||0),0);
@@ -4003,7 +4047,7 @@ function itemIsMeasured(x){const m=makeMethod(itemMethod(x));return m?!!m.measur
 function methodMix(period,custom){
   const out={};MAKE_METHODS.forEach(m=>{out[m.k]={value:0,count:0};});
   out['']={value:0,count:0};
-  getOrders().filter(inBranch).filter(o=>isClientOrder(o))
+  getOrders().filter(inBranch).filter(o=>isClientOrder(o)&&!isQuote(o))
     .filter(o=>(period===undefined||inPeriod(o.createdAt,period,custom)))
     .forEach(function(o){
       const rate=(typeof ofx==='function')?ofx(o):1;
@@ -4209,6 +4253,20 @@ function syncOrderDraft(){
   if(fv('f_currency')!==undefined)draft.currency=fv('f_currency');
   if(fv('f_fx')!==undefined)draft.fx=+fv('f_fx')||1;
   if(fv('f_due')!==undefined)draft.due=fv('f_due')||'';
+  /* Unticking the box is a confirmation, so it is stamped like any other.
+
+     Ticking it again on an order that was already confirmed does NOT un-confirm it. The
+     real guard is in isQuote(), which reads confirmedAt, so this condition changes no
+     behaviour on its own: it is here to keep the record clean rather than leaving a
+     confirmed order carrying quoted:true, which would read as a contradiction to the next
+     person looking at it. */
+  {const _qb=document.getElementById('f_quoted');
+   if(_qb){
+     if(_qb.checked&&!draft.confirmedAt)draft.quoted=true;
+     else if(!_qb.checked&&draft.quoted&&!draft.confirmedAt){
+       draft.confirmedAt=new Date().toISOString();draft.confirmedBy=userLabel();
+     }
+   }}
   if(document.getElementById('f_branch'))draft.branch=fvOther('f_branch')||defaultBranchName();
   if(fv('f_stage')!==undefined)draft.stageIndex=+(fv('f_stage')||0);
   if(document.getElementById('f_batch_on')){const on=document.getElementById('f_batch_on').checked;const qty=Math.max(1,+fv('f_batch_qty')||(draft.batch&&draft.batch.qty)||1);draft.batch={on:on,qty:qty,reached:(draft.batch&&draft.batch.reached)||[]};}
@@ -4531,6 +4589,11 @@ function renderOrderModal(){
     ${potSection}
     <div class="bd-sub" style="margin-top:6px">Delivery</div>
     ${deliverySection}
+    <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+      <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" ${draft.quoted&&!draft.confirmedAt?'checked':''} style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet &mdash; this is a quote</label>
+      <div class="sd" style="color:var(--text-faint);margin-top:6px">Price it, send the invoice, and it becomes a real order the moment they pay or you confirm it. Until then it stays off the production board, out of what anyone owes you, and out of the work booked.</div>
+      ${draft.confirmedAt?`<div class="sd" style="color:var(--green);margin-top:6px">Confirmed ${esc(new Date(draft.confirmedAt).toLocaleDateString('en-GB'))}${draft.confirmedBy?' by '+esc(draft.confirmedBy):''}.</div>`:''}
+    </div>
     <div class="field"><label>Due date</label><input class="fld" type="date" id="f_due" value="${draft.due||''}"></div>
     ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:''}
     ${isBatch(draft)?'<div class="sd" style="color:var(--text-faint);margin:6px 0">📦 This is a batch. Move pieces through the stages wave-by-wave from the Production card after saving.</div>':`<div class="field"><label>Stage</label><select class="fld" id="f_stage">${stageOpts}</select></div>`}
@@ -4620,6 +4683,12 @@ function deleteOrder(){if(!can('del')||!editingOrderId)return;if(!confirm('Delet
 function orderAttention(o){
   const READY=STAGES.indexOf('Ready for Delivery'),QC=STAGES.indexOf('Quality Check'),DISP=STAGES.indexOf('Dispatched'),DELI=STAGES.indexOf('Delivered');
   const du=daysUntil(o.due);const out=orderOutstanding(o);
+  /* First, and it short-circuits everything below. A quote is not late, has failed no
+     quality check and owes nobody a fabric check: none of it has been agreed. The only
+     thing it is waiting on is an answer. */
+  if(isQuote(o))return {sev:'var(--text-faint)',
+    text:'Quoted '+curO(orderNet(o),o)+', waiting on them. It starts when they pay, or confirm it yourself.',
+    act:(can('orders')||can('money'))?{label:'Confirm order',fn:`confirmOrderFromButton('${o.id}')`}:null};
   if(o.qc&&o.qc.status==='failed'&&o.stageIndex<READY)return {sev:'var(--red)',text:'Failed quality check. Send it back for rework.',act:can('canQC')?{label:'Open QC',fn:`openQC('${o.id}')`}:(can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null)};
   if(du!==null&&du<0&&o.stageIndex<READY)return {sev:'var(--red)',text:`${-du} day${-du===1?'':'s'} overdue, still at ${STAGES[o.stageIndex]}.`,act:can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null};
   /* A finished run is not done until it is on the shelf. Until somebody presses the button
@@ -4795,7 +4864,12 @@ function invoiceFigures(o){
   return {subtotal,discount,shipping,total,paid,balance};
 }
 function ensureInvoiceNo(o){if(!o.invoiceNo){const list=rawOrders();const t=list.find(x=>x.id===o.id);const n=(SETTINGS.invoiceNo||1000)+1;SETTINGS.invoiceNo=n;if(t)t.invoiceNo=n;o.invoiceNo=n;save('layi_dash_orders',list);save('layi_dash_settings',SETTINGS);}return o.invoiceNo;}
+/* The line that makes the invoice-first flow actually work. Without it the client is
+   holding a bill for work that has not started and no idea what makes it start. */
 function invoiceInner(o,kind){const _R=kind==='receipt';
+  const _quoteNote=(!_R&&isQuote(o))
+    ? '<div style="margin:10px 0 14px;padding:9px 12px;border-left:3px solid #b88e2a;background:#faf6ee;font-size:12.5px;color:#5c5240">This confirms your order once payment is received. Nothing is cut until then.</div>'
+    : '';
   const co=SETTINGS.company||{};const cust=getCustomers()[nameKey(o.client)]||{};
   const f=invoiceFigures(o);const no=o.invoiceNo||'—';
   const cs=CUR_SYM[ocur(o)]||(ocur(o)+' ');
@@ -4808,6 +4882,7 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
       <div style="display:flex;gap:14px;align-items:center">${co.logo?`<img src="${co.logo}" style="width:64px;height:64px;object-fit:contain">`:''}<div><div style="font-size:24px;font-weight:700;letter-spacing:1px">${esc(co.name||tenantName())}</div>${co.address?`<div style="font-size:12px;color:#666;white-space:pre-line">${esc(co.address)}</div>`:''}<div style="font-size:12px;color:#666">${[co.email,co.phone].filter(Boolean).map(esc).join(' · ')}</div>${co.reg?`<div style="font-size:11px;color:#999">${esc(co.reg)}</div>`:''}</div></div>
       <div style="text-align:right"><div style="font-size:20px;letter-spacing:2px;color:#c9a86a">${_R?'RECEIPT':'INVOICE'}</div>${_R&&f.balance<=0?'<div style="display:inline-block;margin-top:5px;font-size:10px;letter-spacing:1.5px;color:#3f7344;border:1px solid #3f7344;border-radius:4px;padding:2px 8px">PAID IN FULL</div>':''}<div style="font-size:13px;color:#444">#${no}</div><div style="font-size:12px;color:#888">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div></div>
     </div>
+    ${_quoteNote}
     <div style="display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px">
       <div><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Billed to</div><div style="font-weight:700">${esc(o.client)}</div>${cust.address?`<div style="color:#666;white-space:pre-line">${esc(cust.address)}</div>`:''}<div style="color:#666">${[cust.email,cust.whatsapp].filter(Boolean).map(esc).join(' · ')}</div></div>
       <div style="text-align:right"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Order</div><div>${esc(o.id)}</div>${o.due?`<div style="color:#666">Due ${new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>`:''}</div>
@@ -5391,7 +5466,11 @@ function openPayment(id){if(!can('money'))return;const o=getOrders().find(x=>x.i
     <div class="field"><label>Payment method</label>${selOther('p_method',PAY_METHODS,PAY_METHODS[0],'How were you paid?')}</div>
     ${ocur(o)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint)">Recorded in Finance as ${cur(owed*ofx(o))} at this order's rate (1 ${ocur(o)} = ${fmtNum(ofx(o))} ${SETTINGS.currency}).</div>`:''}
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="savePayment('${id}')">Save payment</button></div>`);}
-function savePayment(id){const a=amt('p_amt');if(!a){closeModal();return;}const _m=(typeof fvOther==='function'?fvOther('p_method'):'')||'';const list=rawOrders();const o=list.find(x=>x.id===id);o.paid=(o.paid||0)+a;logAudit('Payment recorded',(o.client||'')+' · '+curC(a,ocur(o))+(_m?' · '+_m:''));save('layi_dash_orders',list);const t=getTxns();t.push({id:uid('t'),dir:'in',label:o.client+' · payment'+(_m?' ('+_m+')':'')+(ocur(o)!==SETTINGS.currency?' ('+curC(a,ocur(o))+')':''),amount:a*ofx(o),at:new Date().toISOString(),orderId:id,branch:branchOf(o),method:_m});setTxns(t);closeModal();renderAll();}
+function savePayment(id){const a=amt('p_amt');if(!a){closeModal();return;}
+  /* Money against a quote is the client saying yes, so it confirms the order before the
+     payment is written. Do it first: a payment recorded against something still marked a
+     quote would sit outside every total it belongs in. */
+  {const _q=getOrders().find(x=>x.id===id);if(_q&&isQuote(_q))confirmOrder(id,'paid '+curC(a,ocur(_q)));}const _m=(typeof fvOther==='function'?fvOther('p_method'):'')||'';const list=rawOrders();const o=list.find(x=>x.id===id);o.paid=(o.paid||0)+a;logAudit('Payment recorded',(o.client||'')+' · '+curC(a,ocur(o))+(_m?' · '+_m:''));save('layi_dash_orders',list);const t=getTxns();t.push({id:uid('t'),dir:'in',label:o.client+' · payment'+(_m?' ('+_m+')':'')+(ocur(o)!==SETTINGS.currency?' ('+curC(a,ocur(o))+')':''),amount:a*ofx(o),at:new Date().toISOString(),orderId:id,branch:branchOf(o),method:_m});setTxns(t);closeModal();renderAll();}
 const EXPENSE_CATS=['Rent','Utilities','Materials & supplies','Marketing & advertising','Equipment','Transport & logistics','Software & subscriptions','Professional fees','Maintenance','Staff welfare','Tax','Bank charges','Other'];
 const FIN_DEPARTMENTS=['Production','Sales','Marketing','Operations','Admin'];
 /* ===== HOW THE MONEY MOVED ====================================================
@@ -8896,6 +8975,11 @@ function custDrill(kind){
   openListModal(title,list.length+' customer'+(list.length===1?'':'s'),list.length?`<div class="clist">${rows}</div>`:'<div class="kv" style="color:var(--text-faint)">Nothing here right now.</div>');
 }
 function dashDrill(kind,arg){
+  if(kind==='quotes'){
+    const list=getOrders().filter(inBranch).filter(o=>isClientOrder(o)&&isQuote(o));
+    openOrderListModal('Quotes out',list,'waiting on a yes — each starts when the client pays, or when you confirm it');
+    return;
+  }
   const orders=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);
   const READY=STAGES.indexOf('Ready for Delivery'),DELI=STAGES.indexOf('Delivered'),DISP=STAGES.indexOf('Dispatched');
   let title='',list=[];
@@ -9179,9 +9263,14 @@ function renderActivity(){
   if(_mode==='maker'||_mode==='cre'){if(_ownerD)_ownerD.style.display='none';if(_altD)_altD.style.display='';if(_mode==='maker')renderMakerDash();else renderCreDash();return;}
   if(_ownerD)_ownerD.style.display='';if(_altD){_altD.style.display='none';_altD.innerHTML='';}
   renderOwnerFinance();
-  const orders=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);
+  /* Quotes are counted apart from everything else on this screen. 'Active Orders' has to
+     mean work in hand, or the number is a wish list and nobody trusts the rest of it. */
+  const allClient=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);
+  const quotes=allClient.filter(isQuote);
+  const orders=allClient.filter(o=>!isQuote(o));
   const READY=STAGES.indexOf('Ready for Delivery'),DELI=STAGES.indexOf('Delivered'),DISP=STAGES.indexOf('Dispatched');
   const active=orders.filter(o=>o.stageIndex<READY).length;
+  const quoteValue=quotes.reduce((s,o)=>s+orderNetBase(o),0);
   const ready=orders.filter(o=>o.stageIndex>=READY&&o.stageIndex<DELI).length;
   const delivered=orders.filter(o=>o.stageIndex>=DELI).length;
   const now=new Date();const weekAgo=new Date(now.getTime()-7*864e5);
@@ -9201,6 +9290,11 @@ function renderActivity(){
     can('money')?{cls:'pink',label:'Payments Pending',val:pendingPay,sub:'awaiting balance',click:"dashDrill('unpaid')"}:{cls:'pink',label:'Ready to Collect',val:ready,sub:'awaiting clients',click:"dashDrill('ready')"},
     {cls:'teal',label:'Appointments',val:apptsUpcoming,sub:'sessions lined up',click:"openApptList()"}
   ];
+  /* Only when there are any. A studio that has never quoted should not carry an empty tile
+     for a feature it does not use, and one that HAS quoted should not have to remember. */
+  if(quotes.length)cells.push({cls:'pink',label:'Quotes Out',val:quotes.length,
+    sub:can('money')?cur(quoteValue)+' waiting on a yes':'waiting on a yes',click:"dashDrill('quotes')"});
+
   mini.innerHTML=cells.map(c=>`<div class="mini-stat ${c.cls}" onclick="${c.click}"><div class="mini-l">${c.label}</div><div class="mini-n">${c.val}</div><div class="mini-s">${c.sub}</div></div>`).join('');}
   // order status donut
   const donut=document.getElementById('dashDonut');
@@ -9554,7 +9648,9 @@ function isMyJob(o){const sid=currentUser&&currentUser.staffId;if(!sid)return fa
 /* The board shows runs alongside client orders, because a run occupies the same bench and
    the same people. Leaving it off would show a workroom with nothing in it on the week it
    is making next season's rail. */
-function prodOrders(){const all=getOrders().filter(o=>isClientOrder(o)||isRun(o)).filter(inBranch);return ownJobsOnly()?all.filter(o=>isMyJob(o)&&o.stageIndex<STAGES.indexOf('Dispatched')):all;}
+/* Quotes are not on the board. Nothing has been agreed, so nothing has been started, and a
+   board full of maybes is a board nobody trusts. */
+function prodOrders(){const all=getOrders().filter(o=>(isClientOrder(o)&&!isQuote(o))||isRun(o)).filter(inBranch);return ownJobsOnly()?all.filter(o=>isMyJob(o)&&o.stageIndex<STAGES.indexOf('Dispatched')):all;}
 function prodFilterTo(f){prodFilter=f;document.querySelectorAll('#view-production .chip[data-f]').forEach(c=>c.classList.toggle('active',c.dataset.f===f));renderProduction();}
 function orderPace(o){const ups=(o.updates||[]).filter(u=>u.at).map(u=>new Date(u.at)).sort((a,b)=>a-b);if(ups.length>=2){const span=(ups[ups.length-1]-ups[0])/864e5,steps=ups.length-1;if(steps>0&&span>0)return Math.max(0.5,span/steps);}return 2;}
 function stageAgeDays(o){let start=o.stageStartedAt;if(!start){const cur=STAGES[o.stageIndex];const u=(o.updates||[]).filter(x=>x.stage===cur&&x.at).map(x=>x.at).sort().slice(-1)[0];if(u)start=u;}if(!start)start=o.createdAt;if(!start)return null;return Math.max(0,Math.floor((Date.now()-new Date(start))/864e5));}
@@ -9747,6 +9843,9 @@ function openOrdersMoney(kind,inP,plabel,scope){
 function ledgerStatus(o){
   const DELI=STAGES.indexOf('Delivered'),DIS=STAGES.indexOf('Dispatched'),RFD=STAGES.indexOf('Ready for Delivery');
   const du=daysUntil(o.due);
+  /* Before anything else: a quote is not late, not in progress and not due today. It is
+     waiting on somebody else, and chasing a due date nobody agreed to is noise. */
+  if(isQuote(o))return{cls:'quote',txt:'Quote'};
   if(o.stageIndex>=DELI)return{cls:'green',txt:'Delivered'};
   if(o.stageIndex>=DIS)return{cls:'blue',txt:'Dispatched'};
   if(o.qc&&o.qc.status==='failed')return{cls:'red',txt:'Rework'};
