@@ -357,6 +357,101 @@ if(run("getBranches()[0].does").join(',')!=='garments:make,garments:stock')
   F('unticking the last craft was not refused cleanly, left '+JSON.stringify(run("getBranches()[0].does")));
 run("branchDraft=null;beDraft=null;setupDraft=null;");
 
+/* 13) Quality control follows the craft. -------------------------------------------
+   It was one flat list for every studio: a shoemaker was asked whether the garment had
+   been pressed, and nobody was asked about construction or symmetry, which are two of
+   the five things Kayode's own supervisors check on the floor. Nothing covered QC at
+   all before this, so the pass/fail machinery is checked here too. */
+const OLD_FLAT=['Measurements match the spec','Stitching & seams clean','Fit confirmed / tried on',
+  'Finishing & detailing correct','Embellishment / monogram correct','Pressed & packaged neatly'];
+const qcOf=c=>run("qcFromCrafts(['"+c+"'])");
+
+// The two checks the training document has and the app did not.
+const qcGarments=qcOf('garments');
+[[/construction/i,'construction'],[/symmetr/i,'symmetry']].forEach(pair=>{
+  if(!qcGarments.some(x=>pair[0].test(x)))F('the garment checklist still does not ask about '+pair[1]);
+});
+// and not one of the checks a studio already relied on was dropped to make room
+OLD_FLAT.forEach(x=>{
+  if(qcGarments.indexOf(x)<0)F('the garment checklist lost a check studios were already using: "'+x+'"');
+});
+// every craft has one, and it is written in that craft's own language
+const QC_LANG={
+  garments:{wants:/fit|drape|press/i, banned:/sole|last|hardware|dye shading/i},
+  footwear:{wants:/sole|last|insole|burnish/i, banned:/pressed|drape|dye shading/i},
+  leather: {wants:/hardware|edge|lining|panel/i, banned:/sole|pressed|tried on/i},
+  fabrics: {wants:/length|cut edge|shading|folded/i, banned:/sole|hardware|tried on/i}
+};
+CRAFT_KEYS.forEach(c=>{
+  const list=qcOf(c);
+  if(!list.length)return F('a '+c+' studio starts with no quality checks at all');
+  const rule=QC_LANG[c];
+  if(!rule)return;
+  if(!list.some(x=>rule.wants.test(x)))F('the '+c+' checklist is not written in that craft’s language: '+list.join(' | '));
+  const borrowed=list.filter(x=>rule.banned.test(x));
+  if(borrowed.length)F('the '+c+' checklist borrows a check that belongs to another craft: '+borrowed.join(', '));
+});
+// a studio in two crafts gets both lists, once each
+const both=run("qcFromCrafts(['footwear','leather'])");
+if(both.length!==new Set(both).size)F('a studio in two crafts gets the same check listed twice');
+['sole','hardware'].forEach(w=>{
+  if(!both.some(x=>new RegExp(w,'i').test(x)))F('a studio doing shoes and bags lost the '+w+' check');
+});
+
+// The checks on one order follow the studio that made it, not an average of the business.
+run("SETTINGS.branches=[{id:'b1',name:'The bench',active:true,does:['footwear:make']},{id:'b2',name:'The workroom',active:true,does:['garments:make']}];delete SETTINGS.qcChecklist;");
+const qcBench=run("qcChecklistFor({branch:'The bench'})");
+const qcRoom=run("qcChecklistFor({branch:'The workroom'})");
+if(!qcBench.some(x=>/sole/i.test(x)))F('an order made at the shoe bench is not checked for its sole');
+if(qcRoom.some(x=>/sole/i.test(x)))F('an order made in the tailoring workroom is being checked for a sole');
+if(!qcRoom.some(x=>/tried on/i.test(x)))F('an order made in the tailoring workroom is not tried on');
+// an order that names no studio falls back to everything the business does, not to nothing
+const qcAny=run("qcChecklistFor({})");
+if(!qcAny.length)F('an order with no studio on it gets no quality checks at all');
+
+// An edited list is the studio's own answer and wins everywhere.
+run("SETTINGS.qcChecklist=['Only this one'];");
+if(JSON.stringify(run("qcChecklistFor({branch:'The bench'})"))!=='["Only this one"]')
+  F('a studio edited its checklist and the app went on using the craft’s');
+// Emptying the box asks for the craft's checks back, and must never leave zero checks.
+run("document.getElementById('set_qc').value='';saveQCChecklist();");
+if(run("SETTINGS.qcChecklist!==undefined&&SETTINGS.qcChecklist!==null&&SETTINGS.qcChecklist.length>0"))
+  F('clearing the checklist saved an empty one instead of restoring the craft’s');
+if(!run("qcChecklist().length"))F('clearing the checklist left a studio with no quality control');
+
+/* The pass/fail machinery: who ticked it, when, and where a failed piece goes. */
+run("delete SETTINGS.qcChecklist;loadExampleAs('bespoke');currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
+const qcId=run("(getOrders().find(o=>o.kind!=='sale')||{}).id");
+if(!qcId){F('no order to run quality control against');}
+else{
+  run("openQC('"+qcId+"');");
+  const items=run("qcDraft.items.length");
+  if(!items)F('the QC modal opened with no checks to tick');
+  if(!run("renderQCModal()||true"))F('the QC modal failed to render');
+  const mk=run("document.getElementById('modal').innerHTML")||'';
+  if(mk.indexOf(run("qcDraft.items[0].label"))<0)F('the QC modal does not show the checks it is asking about');
+  handlersExist(mk,'the QC modal');
+  /* Tick the boxes rather than the draft: passQC calls syncQC first, which reads the
+     form. Setting qcDraft directly would test a path no person can take. */
+  // a pass is signed and dated, and moves the piece on
+  run("qcDraft.items.forEach((it,i)=>{document.getElementById('qc_'+i).checked=true;});document.getElementById('qc_note').value='';passQC();");
+  const o=run("getOrders().find(o=>o.id==='"+qcId+"')");
+  if(!o.qc||o.qc.status!=='passed')F('a passed order does not record that it passed');
+  if(!o.qc||!o.qc.by)F('a passed order does not record who passed it');
+  if(!o.qc||!o.qc.at)F('a passed order does not record when it was passed');
+  if(!(o.qc.items||[]).length||!(o.qc.items||[]).every(i=>i.ok))
+    F('the ticks the person actually made were not the ones recorded');
+  if(o.stageIndex<run("STAGES.indexOf('Ready for Delivery')"))F('a passed order was not moved on to Ready for Delivery');
+  if(!(o.updates||[]).some(u=>/QC passed/.test(u.note||'')))F('passing QC leaves nothing in the order’s history');
+  // a fail goes back for rework, before the check it failed
+  run("openQC('"+qcId+"');document.getElementById('qc_0').checked=false;document.getElementById('qc_note').value='Left sleeve short';failQC();");
+  const f2=run("getOrders().find(o=>o.id==='"+qcId+"')");
+  if(!f2.qc||f2.qc.status!=='failed')F('a failed order does not record that it failed');
+  if(f2.stageIndex>=run("STAGES.indexOf('Quality Check')"))F('a failed order was not sent back for rework');
+  if(!(f2.updates||[]).some(u=>/rework/i.test(u.note||'')))F('a failed order does not say why in its history');
+  if(!(f2.updates||[]).some(u=>/Left sleeve short/.test(u.note||'')))F('the note explaining the failure was thrown away');
+}
+
 console.log('Multi-trade audit:');
 console.log('  crafts: '+CRAFT_KEYS.join(' · ')+'   modes: '+MODE_KEYS.join(' · '));
 console.log('  presets: '+run("Object.keys(STAGE_PRESETS).join(' · ')"));

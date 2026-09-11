@@ -1447,8 +1447,9 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setCatalog">
           <div class="panel-head"><h3>Quality control checklist</h3></div>
-          <p class="page-sub" style="margin-bottom:14px">The checks your team ticks off before an order passes QC. One per line.</p>
-          <div class="field"><textarea class="fld" id="set_qc" rows="6" placeholder="Measurements match the spec&#10;Stitching & seams clean&#10;Fit confirmed"></textarea></div>
+          <p class="page-sub" style="margin-bottom:6px">The checks your team ticks off before an order passes QC. One per line.</p>
+          <div class="sd" id="qcWhere" style="color:var(--text-faint);margin-bottom:12px"></div>
+          <div class="field"><textarea class="fld" id="set_qc" rows="8" placeholder="Construction sound&#10;Measurements match the spec&#10;Symmetry — left matches right"></textarea></div>
           <button class="btn" id="qcSaveBtn" onclick="saveQCChecklist()">Save checklist</button>
         </div>
         <div class="panel" data-setperm="setCatalog">
@@ -1553,7 +1554,7 @@ try{ if(SUPA_URL && SUPA_KEY && window.supabase && window.supabase.createClient)
 const DEFAULTS={ownerPassword:'layi2025',currency:'NGN',tiers:[{name:'Starter',min:0},{name:'Bronze',min:1000},{name:'Silver',min:5000},{name:'Gold',min:15000},{name:'Platinum',min:50000}],
   company:{name:'LAYI',address:'',email:'',phone:'',reg:'',logo:'',payInstructions:'',showPhotos:true,banks:[]},
   suppliers:[],invoiceNo:1000,stagesV2:false,
-  qcChecklist:['Measurements match the spec','Stitching & seams clean','Fit confirmed / tried on','Finishing & detailing correct','Embellishment / monogram correct','Pressed & packaged neatly'],
+  qcChecklist:['Construction sound (seams, linings, interfacing)','Measurements match the spec','Stitching & seams clean','Symmetry \u2014 left matches right','Fit confirmed / tried on','Finishing & detailing correct','Embellishment / monogram correct','Pressed & packaged neatly'],
   defaults:{depositPct:50,leadDays:21,deliveryFee:0,lowStock:5},
   templates:{
     confirm:'Hello {client}, thank you for your order with {brand}. Your order {order} is confirmed. We will be in touch as it progresses.',
@@ -3267,6 +3268,47 @@ const CRAFTS=[
   {key:'leather', label:'Bags & leather',desc:'Bags, belts & leather goods',word:'piece',  meas:'bag', stages:{make:'leather', stock:'rtw'}},
   {key:'fabrics', label:'Fabrics',       desc:'Cloth sold by length',       word:'piece',  meas:'',    stages:{make:'fabrics', stock:''}}
 ];
+/* Quality control is a CRAFT question, and it was one flat list for every studio. A
+   shoemaker was handed a suit's checks; a bag maker was asked about drape. Worse, the
+   list was missing two of the five things Kayode's own supervisors check on the floor:
+   CONSTRUCTION and SYMMETRY. Every item the old single list had is still here on the
+   garments list, so no studio loses a check it relies on — it gains the two that were
+   missing, and the other crafts stop borrowing a tailor's.
+   A studio that has edited its own list always wins; this is only where it starts. */
+const QC_BY_CRAFT={
+  garments:[
+    'Construction sound (seams, linings, interfacing)',
+    'Measurements match the spec',
+    'Stitching & seams clean',
+    'Symmetry — left matches right',
+    'Fit confirmed / tried on',
+    'Finishing & detailing correct',
+    'Embellishment / monogram correct',
+    'Pressed & packaged neatly'],
+  footwear:[
+    'Construction sound (welt, shank, stiffener)',
+    'Last & size correct',
+    'Pair symmetry — left matches right',
+    'Sole attachment secure',
+    'Upper stitching clean',
+    'Edges trimmed & burnished',
+    'Insole & lining seated',
+    'Boxed with the spare laces'],
+  leather:[
+    'Construction sound (reinforcement at stress points)',
+    'Dimensions match the spec',
+    'Panel symmetry',
+    'Edge finishing & burnishing',
+    'Hardware secure and aligned',
+    'Lining & pockets clean',
+    'Stitch line straight',
+    'Dust bag & packed'],
+  fabrics:[
+    'Length measured twice',
+    'Cut edge square',
+    'No flaws or dye shading across the run',
+    'Folded & wrapped']
+};
 const MODES=[
   {key:'make', label:'We make these here',      desc:'Opens the production board'},
   {key:'stock',label:'We sell them ready made', desc:'Opens the Shop and Sales'}
@@ -3437,6 +3479,29 @@ function branchDoes(b){
 }
 function branchCrafts(b){const out=[],seen={};branchDoes(b).forEach(k=>{const c=craftOf(k);if(!seen[c]){seen[c]=1;out.push(c);}});return out;}
 /* The mode half, and only the mode half, decides which tabs open. */
+/* The checks for one order come from the craft of the studio that made it, so a label
+   with a shoe bench in Aba and a workroom in Lagos gets the right list on each order
+   rather than one list averaged over both. Per ITEM would be better still on a
+   multi-item order, and waits on items carrying a craft of their own. */
+function qcCraftsFor(o){
+  const b=(o&&o.branch)?getBranches().find(x=>x.name===o.branch):null;
+  if(b)return branchCrafts(b);
+  const out=[],seen={};
+  getBranches().filter(x=>x.active!==false).forEach(x=>branchCrafts(x).forEach(c=>{if(!seen[c]){seen[c]=1;out.push(c);}}));
+  return out;
+}
+function qcFromCrafts(crafts){
+  const out=[],seen={};
+  (crafts||[]).forEach(c=>(QC_BY_CRAFT[c]||[]).forEach(l=>{if(!seen[l]){seen[l]=1;out.push(l);}}));
+  return out;
+}
+/* An edited list is the studio's own answer and beats the craft every time. */
+function qcChecklistFor(o){
+  if(SETTINGS.qcChecklist&&SETTINGS.qcChecklist.length)return SETTINGS.qcChecklist.slice();
+  const byCraft=qcFromCrafts(qcCraftsFor(o));
+  return byCraft.length?byCraft:DEFAULTS.qcChecklist.slice();
+}
+function qcChecklist(){return qcChecklistFor(null);}
 function branchMakes(b){return branchDoes(b).some(k=>modeOf(k)==='make');}
 function branchStocks(b){return branchDoes(b).some(k=>modeOf(k)==='stock');}
 function summaryType(does){const d=normaliseDoes(does);const mk=d.some(k=>modeOf(k)==='make'),st=d.some(k=>modeOf(k)==='stock');return (mk&&st)?'both':(mk?'bespoke':(st?'rtw':'both'));}
@@ -4654,7 +4719,7 @@ function setSatisfaction(id,n){if(!can('orders'))return;const list=rawOrders();c
 /* ===== QUALITY CONTROL ===== */
 let qcDraft=null;
 function qcBadge(o){if(!o.qc||!o.qc.status||o.qc.status==='pending')return '';return o.qc.status==='passed'?'<span class="sup-status ok">✓ QC passed</span>':'<span class="sup-status out">↻ Needs rework</span>';}
-function openQC(id){if(!can('canQC'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;const tmpl=(SETTINGS.qcChecklist&&SETTINGS.qcChecklist.length?SETTINGS.qcChecklist:DEFAULTS.qcChecklist);const existing=(o.qc&&o.qc.items&&o.qc.items.length)?o.qc.items:tmpl.map(l=>({label:l,ok:false}));qcDraft={id,client:o.client,garment:o.garment,items:existing.map(i=>({label:i.label,ok:!!i.ok})),note:(o.qc&&o.qc.note)||''};renderQCModal();}
+function openQC(id){if(!can('canQC'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;const tmpl=qcChecklistFor(o);const existing=(o.qc&&o.qc.items&&o.qc.items.length)?o.qc.items:tmpl.map(l=>({label:l,ok:false}));qcDraft={id,client:o.client,garment:o.garment,items:existing.map(i=>({label:i.label,ok:!!i.ok})),note:(o.qc&&o.qc.note)||''};renderQCModal();}
 function syncQC(){if(!qcDraft)return;qcDraft.items.forEach((it,i)=>{const c=document.getElementById('qc_'+i);if(c)it.ok=c.checked;});const n=document.getElementById('qc_note');if(n)qcDraft.note=n.value;}
 function renderQCModal(){
   const items=qcDraft.items.map((it,i)=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" id="qc_${i}" ${it.ok?'checked':''} style="width:18px;height:18px;accent-color:var(--gold)"> <span>${esc(it.label)}</span></label>`).join('');
@@ -5836,7 +5901,15 @@ function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSetti
   const ph=document.getElementById('co_photos');if(ph)ph.checked=co.showPhotos!==false;
   renderLogoPreview();
   companyBanks=JSON.parse(JSON.stringify(co.banks||[]));renderBankRows();
-  const qc=document.getElementById('set_qc');if(qc)qc.value=(SETTINGS.qcChecklist||DEFAULTS.qcChecklist).join('\n');
+  const qc=document.getElementById('set_qc');if(qc)qc.value=qcChecklist().join('\n');
+  const qcw=document.getElementById('qcWhere');
+  if(qcw){
+    const edited=!!(SETTINGS.qcChecklist&&SETTINGS.qcChecklist.length);
+    const crafts=qcCraftsFor(null).map(activityLabel).filter(Boolean);
+    qcw.textContent=edited
+      ? 'This is your own list. Clear it and save to go back to the '+(crafts.join(' + ')||'default')+' checks.'
+      : 'These are the '+(crafts.join(' + ')||'default')+' checks. Edit them and they become yours.';
+  }
   renderStagesSettings();
   recipeDraft=null;renderRecipesSettings();
   branchDraft=null;renderBranchesSettings();
@@ -5857,7 +5930,17 @@ function renderBankRows(){const el=document.getElementById('bankRows');if(!el)re
 function syncBanks(){companyBanks.forEach((bk,i)=>{const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};if(g('bk_cur_'+i)!==undefined)bk.currency=g('bk_cur_'+i);if(g('bk_bank_'+i)!==undefined)bk.bank=g('bk_bank_'+i);if(g('bk_name_'+i)!==undefined)bk.name=g('bk_name_'+i);if(g('bk_no_'+i)!==undefined)bk.no=g('bk_no_'+i);});}
 function addBankRow(){syncBanks();companyBanks.push({currency:'NGN',bank:'',name:'',no:''});renderBankRows();}
 function removeBankRow(i){syncBanks();companyBanks.splice(i,1);renderBankRows();}
-function saveQCChecklist(){const raw=fv('set_qc')||'';SETTINGS.qcChecklist=raw.split('\n').map(s=>s.trim()).filter(Boolean);if(!SETTINGS.qcChecklist.length)SETTINGS.qcChecklist=DEFAULTS.qcChecklist.slice();save('layi_dash_settings',SETTINGS);flashSaved('qcSaveBtn','Save checklist');}
+/* Emptying the box is a way of asking for the craft's own checks back, not a way of
+   ending up with no quality control. */
+function saveQCChecklist(){
+  const raw=fv('set_qc')||'';
+  const list=raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(list.length)SETTINGS.qcChecklist=list; else delete SETTINGS.qcChecklist;
+  save('layi_dash_settings',SETTINGS);
+  const qc=document.getElementById('set_qc');if(qc)qc.value=qcChecklist().join('\n');
+  if(typeof logAudit==='function')logAudit('QC checklist updated',qcChecklist().length+' checks');
+  flashSaved('qcSaveBtn','Save checklist');
+}
 /* Only offer the presets that belong to what this studio actually does, so a
    shoemaker is led to Lasting and Soling rather than Fabric Received. Presets for
    other trades stay available under "Other trades" instead of disappearing. */
