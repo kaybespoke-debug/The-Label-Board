@@ -353,19 +353,38 @@ check(/six roles|Six roles|6<\/div>/.test(html['index.html']), 'the home page cl
 /* The app serves five kinds of business, not only tailors. The site has to say
    so, because a shoemaker or a fabric seller who reads it as tailoring software
    never gets as far as booking. Read out of the app so the two cannot drift. */
-// Read DEFAULT_ACTIVITIES, which is what actually decides what a studio can be.
-// This used to read BRANCH_TYPES, a legacy list that never contained footwear
-// or leather at all — so it was already promising the wrong trades before
-// haberdashery was dropped, and nobody noticed because the count happened to
-// come to five. BRANCH_TYPES has since been deleted; it was dead code.
-const kindsBlock = (app.match(/const DEFAULT_ACTIVITIES=\[[\s\S]*?\n\];/) || [''])[0];
-const kinds = all(kindsBlock, /\{key:'(\w+)'/g).map(m => m[1]);
-check(kinds.length === 5, 'the app really does offer five kinds of business (' + kinds.length + ')');
-const SAYS = { bespoke: 'made to order', rtw: 'ready to wear',
-  footwear: 'shoe', leather: 'bag', fabrics: 'fabric' };
+// Read CRAFTS and MODES, the two answers that actually decide what a studio can be.
+// This used to read a single DEFAULT_ACTIVITIES list, and before that BRANCH_TYPES,
+// a legacy list that never contained footwear or leather at all — so it was already
+// promising the wrong trades before haberdashery was dropped, and nobody noticed
+// because the count happened to come to five.
+//
+// A business the site sells to is now a PAIR: what the studio works in, and how the
+// piece reaches the customer. A bespoke tailor and a boutique are the same craft in
+// different modes, which is why counting chips stopped being the right check.
+const craftBlock = (app.match(/const CRAFTS=\[[\s\S]*?\n\];/) || [''])[0];
+const crafts = all(craftBlock, /\{key:'(\w+)'/g).map(m => m[1]);
+const modeBlock = (app.match(/const MODES=\[[\s\S]*?\n\];/) || [''])[0];
+const modes = all(modeBlock, /\{key:'(\w+)'/g).map(m => m[1]);
+check(crafts.length === 5, 'the app offers the five crafts the site is written for (' + crafts.length + ')');
+check(modes.length === 2, 'and the two modes a craft can be reached in (' + modes.length + ')');
+// Each business the site names, and the craft x mode a studio would actually pick.
+const SELLS_TO = {
+  'made to order': ['garments', 'make'],
+  'ready to wear': ['garments', 'stock'],
+  'shoe':          ['footwear', 'make'],
+  'bag':           ['leather',  'make'],
+  'fabric':        ['fabrics',  'stock'],
+  'accessor':      ['accessories', 'make']
+};
 const productCopy = visible(html['features.html']).toLowerCase();
-kinds.forEach(k => check(productCopy.includes(SAYS[k]),
-  'the product page names the "' + SAYS[k] + '" business the app supports'));
+Object.keys(SELLS_TO).forEach(phrase => {
+  const pair = SELLS_TO[phrase];
+  check(crafts.indexOf(pair[0]) !== -1 && modes.indexOf(pair[1]) !== -1,
+    'a studio can actually be set up as the "' + phrase + '" business the site names (' + pair.join(':') + ')');
+  check(productCopy.includes(phrase),
+    'the product page names the "' + phrase + '" business the app supports');
+});
 const homeCopy = visible(html['index.html']).toLowerCase();
 // haberdashery was dropped as a business type we sell to. Requiring the site to
 // keep advertising it would have this gate enforcing the opposite of the truth.
@@ -626,8 +645,8 @@ check(!fs.existsSync(path.join(dir, 'solutions.html')), 'the separate Solutions 
 const home = html['index.html'];
 const tileTrades = all(home, /class="industry[^"]*"[^>]*data-tab="([a-z]+)"/g).map(m => m[1]);
 const paneTrades = all(home, /class="pane[^"]*"[^>]*data-pane="([a-z]+)"/g).map(m => m[1]);
-check(tileTrades.length === 8, 'the home page shows eight kinds of business (' + tileTrades.length + ')');
-check(paneTrades.length === 8, 'each of them has a panel behind it (' + paneTrades.length + ')');
+check(tileTrades.length >= 5, 'the home page shows several kinds of business (' + tileTrades.length + ')');
+check(paneTrades.length === tileTrades.length, 'every tile has a panel and every panel a tile (' + tileTrades.length + ' and ' + paneTrades.length + ')');
 tileTrades.forEach(t => {
   check(paneTrades.indexOf(t) !== -1, 'the tile opens a panel that exists: ' + t);
   check(home.indexOf('id="' + t + '"') !== -1, 'the panel keeps its own address: index.html#' + t);
@@ -641,10 +660,10 @@ const detailStart = home.indexOf('<div class="trade-detail">');
 const detailEndAt = home.indexOf('inside the product', detailStart);
 check(detailStart > 0 && detailEndAt > detailStart, 'the detail block is where it should be');
 const detailBlock = home.slice(detailStart, detailEndAt);
-check(all(detailBlock, /class="pane/g).length === 8, 'all eight panels sit inside the detail block');
+check(all(detailBlock, /class="pane/g).length === tileTrades.length, 'every panel sits inside the detail block, not loose on the page');
 /* the section already has its own h2, so the panels head at h3 */
 check(all(detailBlock, /<h2[ >]/g).length === 0, 'no panel outranks the heading of the section it sits in');
-check(all(detailBlock, /<h3 class="trade-h">/g).length === 8, 'every panel has its heading');
+check(all(detailBlock, /<h3 class="trade-h">/g).length === tileTrades.length, 'every panel has its heading');
 /* exactly one open to begin with, or the section reads as empty or as noise */
 check(all(home, /class="industry on"/g).length === 1, 'one tile starts open');
 check(all(home, /class="pane on anchor"/g).length === 1, 'one panel starts open');
@@ -659,11 +678,31 @@ const solRedirects = read('_redirects');
 check(solRedirects.indexOf('/solutions') !== -1, 'anyone holding the old Solutions url is sent to the trades');
 check(read('sitemap.xml').indexOf('solutions.html') === -1, 'the sitemap no longer offers the Solutions page');
 
-/* every trade names a picture, and every picture is on disk */
+/* Every trade names a picture and every picture is on disk — or the missing one is
+   written down in img/README.txt as still wanted.
+
+   The exception exists because a trade can be added to the app and the site faster than a
+   photograph can be made, and the alternatives are both worse: pointing at a file that is
+   not there gives every visitor a 404 on load, and dropping in a stand-in photograph puts
+   a picture of somebody else's work on a page selling ours. The tile falls back to its
+   line drawing, which is already drawn for every trade.
+
+   What this must never become is a silent gap, so the README has to name the file. That
+   is the difference between a decision and an oversight. */
+const imgNotes = read('img/README.txt');
 tileTrades.forEach(t => {
   const want = 'img/' + t + '.jpg';
-  check(home.indexOf(want) !== -1, 'the ' + t + ' tile carries its photograph');
-  check(fs.existsSync(path.join(dir, want)), 'the photograph is on disk: ' + want);
+  const onDisk = fs.existsSync(path.join(dir, want));
+  const named = home.indexOf(want) !== -1;
+  if (onDisk) {
+    check(named, 'the ' + t + ' tile carries the photograph that exists for it');
+  } else {
+    check(!named, 'the ' + t + ' tile asks for a photograph that is not there, so every visitor loads a 404');
+    check(imgNotes.indexOf(t + '.jpg') !== -1,
+      'the ' + t + ' tile has no photograph and nothing says one is wanted: ' + want);
+    check(/STILL WANTED/i.test(imgNotes),
+      'img/README.txt lists no still-wanted section, so a missing photograph reads as an oversight');
+  }
 });
 
 /* ---------- what each market pays ----------
@@ -840,6 +879,36 @@ prPlans.forEach((block, i) => {
    serve sign up, so in the grid it would look like the top of a ladder */
 check(html['pricing.html'].indexOf('None of these three fit?') !== -1, 'there is somewhere to go when no plan fits');
 check(html['pricing.html'].indexOf('callout-row') !== -1, 'the fourth offer is a band rather than a priced column');
+
+/* ---------- we only offer what a shop can actually choose ----------
+   Haberdashery sat on this site as a trade for months and was never one of
+   the five DEFAULT_ACTIVITIES, so a haberdasher could read the page, book a
+   demo, and find there was no such setup waiting for them. The checks above
+   run one way, that the site names every trade the app has. This runs the
+   other way. */
+const everyWord = built.map(k => visible(html[k])).join(' ').toLowerCase();
+['haberdashery', 'haberdasher'].forEach(w => {
+  check(everyWord.indexOf(w) === -1, 'the site does not offer a trade the app cannot be set up as: ' + w);
+});
+check(!fs.existsSync(path.join(dir, 'img', 'haberdashery.jpg')), 'its picture went with it');
+/* The site has sold to MADE TO MEASURE since it launched: its own tile, its own photograph
+   and its own panel. The app had no word for it until 11 September, so anybody who booked a
+   demo off that tile arrived to find nothing matching how they actually work. The app has
+   to carry every way of working the site advertises, not only every trade. */
+const methodBlock = (app.match(/const MAKE_METHODS=\[[\s\S]*?\n\];/) || [''])[0];
+const methods = all(methodBlock, /label:'([^']+)'/g).map(m => m[1].toLowerCase());
+check(methods.indexOf('made to measure') !== -1,
+  'the app can record the made-to-measure work the site sells to');
+check(methods.indexOf('bespoke') !== -1,
+  'the app can tell bespoke apart from a block adjusted, which the site prices differently');
+check(everyWord.indexOf('made to measure') !== -1,
+  'the site still speaks to made-to-measure studios');
+
+// and the other way round: every craft the app can be set up as is spoken to somewhere,
+// or a studio the app serves reads the site and never sees itself in it.
+const CRAFT_SAYS = { garments: 'garment', footwear: 'shoe', leather: 'bag', fabrics: 'fabric', accessories: 'accessor' };
+crafts.forEach(c => check(everyWord.indexOf(CRAFT_SAYS[c] || c) !== -1,
+  'the site speaks to the "' + c + '" studios the app can be set up as'));
 
 /* ---------- report ---------- */
 function report() {

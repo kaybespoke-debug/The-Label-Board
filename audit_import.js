@@ -73,6 +73,30 @@ const cardCount=(cardsHtml.match(/imp-card/g)||[]).length;
 if(cardCount<6)F('the import screen did not render 6 cards (got '+cardCount+')');
 if(cardsHtml.indexOf('Customers &amp; measurements')<0&&cardsHtml.indexOf('Customers & measurements')<0)F('import cards missing the customers title');
 
+/* Every record an importer makes has to be able to tell itself apart from the others.
+   uid() used to be Date.now() plus three random base-36 characters: 46,656 values inside
+   one millisecond, which is a birthday problem, not a margin. A 200-row import collided
+   32% of the time. It matters because every edit, delete and lookup in this app is
+   list.find(x => x.id === id), which returns the FIRST match, so a shared id means editing
+   one record edits the other and deleting one deletes the other. It is also how the same
+   payment could appear in two studios at once, which the branch-scope gate caught about
+   once in twenty-five runs and nobody could reproduce.
+
+   A burst here is deliberately larger than any real import, run several times, because the
+   failure was probabilistic and a single small sample is how it hid for so long. */
+[[200,'a 200-row CSV import'],[1200,'the biggest burst the counter is meant to cover']].forEach(function(cse){
+  const n=cse[0];
+  for(let attempt=0;attempt<25;attempt++){
+    const ids=run("(function(){var a=[];for(var i=0;i<"+n+";i++)a.push(uid('t'));return a;})()");
+    const dup=ids.length-new Set(ids).size;
+    if(dup){F(cse[1]+' produced '+dup+' duplicate id(s); every edit and delete finds the wrong record');break;}
+  }
+});
+// ids from different record types must never be confused for one another either
+const mixed=run("(function(){var a=[];for(var i=0;i<300;i++){a.push(uid('t'));a.push(uid('o'));}return a;})()");
+if(mixed.length!==new Set(mixed).size)F('two different kinds of record were given the same id');
+if(!run("uid('t')").indexOf('t-')===0)F('an id no longer says what kind of record it is');
+
 console.log('Import / migrate audit:');
 console.log('  importers: '+imps.map(i=>i.key).join(', '));
 console.log('  customers: +'+c1.added+' new, re-run updated '+c2.updated+'; order deposit kept: '+(ord?ord.paid:'n/a'));

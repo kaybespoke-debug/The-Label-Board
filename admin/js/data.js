@@ -109,6 +109,32 @@ const PLANS = [
 ];
 const planById = id => PLANS.find(p => p.id === id);
 
+/* What a subscriber on this plan is worth a month.
+
+   Five places used to read p.monthly straight, which books ZERO for Bespoke, because an
+   invoice-only plan has no list price to read. The operator's own books were then quietly
+   wrong by the size of their largest customer, and the mistake is invisible: a Bespoke
+   studio simply contributes nothing to MRR, ARR, ARPU and the forecast.
+
+   There is no number to look up, so somebody has to type the one that was agreed. */
+function planIsInvoiced(p) { return !!(p && p.invoiceOnly); }
+function planMrr(p, cycle, agreed) {
+  if (!p || p.id === 'trial') return 0;
+  if (planIsInvoiced(p)) return Math.max(0, Math.round(+agreed || 0));
+  return cycle === 'annual' ? Math.round(p.annual / 12) : p.monthly;
+}
+/* The field, and the toggle that shows it only when the chosen plan needs it. */
+function agreedPriceField(planSelId, wrapId, inputId, current, visible) {
+  return '<div class="fg" id="' + wrapId + '" style="display:' + (visible ? '' : 'none') + '">' +
+    '<label>Agreed price (₦ a month)</label>' +
+    '<input id="' + inputId + '" type="number" min="0" value="' + (current || '') + '" placeholder="What this business agreed to pay">' +
+    '<p class="hint">Bespoke has no list price, so this is the figure it counts for in MRR, ARR and the forecast. Leave it blank and it counts for nothing.</p></div>';
+}
+function togglePlanPrice(planSelId, wrapId) {
+  const w = document.getElementById(wrapId); if (!w) return;
+  w.style.display = planIsInvoiced(planById(document.getElementById(planSelId).value)) ? '' : 'none';
+}
+
 /* ---------------- subscriber generation ---------------- */
 const BIZ_A = ['Lux', 'Weaver', 'Desert Rose', 'Stella', 'Artisan', 'House of', 'Ada', 'Thread', 'Regal', 'Velvet',
   'Golden', 'Ivory', 'Sable', 'Crown', 'Zuri', 'Amara', 'Kofi', 'Nala', 'Obi', 'Tiwa', 'Bespoke', 'Atelier',

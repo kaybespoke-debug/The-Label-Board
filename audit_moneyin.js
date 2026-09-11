@@ -122,6 +122,48 @@ const ovTot=(((cache['modal']&&cache['modal'].innerHTML)||'').match(/bd-total[\s
 if(!ovTot) F('dashboard channel overview opened no total');
 else if(Math.abs(dn(ovTot)-Math.round(sumAll))>1) F('dashboard overview total ('+dn(ovTot)+') does not reconcile with the channel sums ('+Math.round(sumAll)+')');
 
+/* What the money arrived in. --------------------------------------------------------
+   Every inflow is stored converted to the studio's own currency, which is right for the
+   books: one P&L, one number, no arguing about a rate. What it lost was the question a
+   studio taking pounds actually asks, which is how much of the business is in pounds. The
+   naira figure has to stay the one every total reads, so this checks both at once. */
+(function(){
+  const base=run('SETTINGS.currency');
+  // an order priced in pounds, paid in two goes
+  run("(function(){var l=rawOrders(),o=l.filter(isClientOrder)[0];o.currency='GBP';o.fx=2000;o.paid=0;o.quoted=false;delete o.confirmedAt;save('layi_dash_orders',l);})();");
+  const oid=run("rawOrders().filter(isClientOrder)[0].id");
+  const txBefore=run('getTxns().length');
+  run("openPayment('"+oid+"');document.getElementById('p_amt').value='100';savePayment('"+oid+"');");
+  if(run('getTxns().length')-txBefore!==1)fails.push('the payment did not reach the ledger');
+  const t=JSON.parse(run("JSON.stringify(getTxns().slice(-1)[0])"));
+  if(t.ccy!=='GBP')fails.push('a payment made in pounds does not record that it was pounds, it says '+t.ccy);
+  if(+t.amtCcy!==100)fails.push('the amount the client actually handed over was not kept: '+t.amtCcy);
+  if(Math.round(+t.amount)!==200000)fails.push('the books did not convert the payment: '+t.amount+', expected 100 x 2000');
+
+  const by=JSON.parse(run('JSON.stringify(moneyInByCurrency())'));
+  if(!by.GBP)fails.push('the breakdown has no line for the pounds that came in');
+  else{
+    if(Math.round(by.GBP.amount)!==100)fails.push('the pounds line says '+by.GBP.amount+' rather than 100');
+    if(Math.round(by.GBP.base)!==200000)fails.push('the pounds line converts to '+by.GBP.base+' rather than 200,000');
+  }
+  // the naira column still adds up to every naira received, which is what the rest of the
+  // screen reads. If these two ever disagree the breakdown is inventing money.
+  const sumBase=Object.keys(by).reduce((s,k)=>s+by[k].base,0);
+  const allIn=run("getTxns().filter(inBranch).filter(t=>t.dir==='in').reduce(function(s,x){return s+(+x.amount||0);},0)");
+  if(Math.round(sumBase)!==Math.round(allIn))
+    fails.push('the currency breakdown comes to '+Math.round(sumBase)+' but the money received is '+Math.round(allIn));
+  // an inflow with nothing recorded is the studio's own currency, not a missing one
+  if(run("txnCurrency({dir:'in',amount:5000})")!==base)
+    fails.push('a payment with no currency on it is not being read as '+base);
+  if(run("txnInOriginal({dir:'in',amount:5000})")!==5000)
+    fails.push('a payment with no original amount on it loses its value');
+  // and one currency is not a breakdown
+  if(run("manyCurrencies({NGN:{amount:1,base:1,count:1}})")!==false)
+    fails.push('a studio paid only in its own currency is shown a breakdown of one row');
+  if(run("manyCurrencies({NGN:{},GBP:{}})")!==true)
+    fails.push('a studio paid in two currencies is not shown the breakdown');
+})();
+
 console.log('Money In hub audit:');
 console.log('  channels: '+chans.join(' · '));
 console.log('  logged ₦50,000 WhatsApp/Transfer → accrual P&L unchanged ('+accrualBefore+'), cash-in +50,000, channel reconciles with drill');

@@ -116,6 +116,24 @@ section('Every photo-bearing record is swept, and none is invented');
       (src.match(/async function sweepInlinePhotos[\s\S]*?\n\}/) || [''])[0])));
   const sweep = (src.match(/async function sweepInlinePhotos[\s\S]*?\n\}/) || [''])[0];
   ok('and customer photos', /getCustomers\(\)/.test(sweep));
+  /* The Shop was the last category still inline, and it was the worst one to leave: the
+     products blob syncs whole, so changing a price rebroadcast every photo in the
+     catalogue. It was missed originally because allPhotoRefs() did not know about product
+     photos either, so moving them would have shown blanks — the two have to move together. */
+  // both paths: the product's own photo and its variants, and the extra photos array. Asking
+  // only that 'product' appears somewhere let a mutation break the main one and still pass.
+  ok('and the Shop\u2019s own photos', /getProducts\(\)/.test(sweep)
+      && /saveImageAsset\(holder\[key\],'product'\)/.test(sweep)
+      && /saveImageAsset\(pr\.photos\[i\],'product'\)/.test(sweep),
+     'product photos stay in the database, and every price change rebroadcasts the lot');
+  const refs = (src.match(/function allPhotoRefs[\s\S]*?\n\}/) || [''])[0];
+  ok('and a stored product photo can actually be resolved',
+     /getProducts\(\)/.test(refs) && /add\(pr\.photo\)/.test(refs) && /v && v\.photo|v&&v\.photo/.test(refs),
+     'nothing fetches a signed url for them, so a moved photo would render as a blank pixel');
+  ['rtw-thumb', 'ppPhotoFile'].forEach(where =>
+    ok('the Shop renders photos through the resolver (' + where + ')',
+      new RegExp('photoSrc\\(p\\.photo\\)').test(src),
+      'a stored reference would be put straight into an img src and show nothing'));
 
   /* Every place a photo is ADDED has to route through storage, or that one
      category quietly keeps writing base64 into the database and costs 7.8x
@@ -123,12 +141,29 @@ section('Every photo-bearing record is swept, and none is invented');
   [['progress photos', "updateDraft.photos.push(await saveImageAsset(await compressFor(f,'progress'),'progress'))"],
    ['a client\'s own photos', "draft.clientPhotos.push(await saveImageAsset(await compressFor(f,'reference'),'client'))"],
    ['outfit photos', "draft.outfits[i].photos.push(await saveImageAsset(await compressFor(f,'reference'),'outfit'))"],
-   ['photos added on the client record', "cust.photos.push(await saveImageAsset(await compressFor(f,'reference'),'client'))"]
+   ['photos added on the client record', "cust.photos.push(await saveImageAsset(await compressFor(f,'reference'),'client'))"],
+   ['product photos', "productDraft.photo=await saveImageAsset(await compressFor(f,'reference'),'product')"]
   ].forEach(([label, needle]) =>
     ok(label + ' are compressed and put in storage', src.indexOf(needle) !== -1,
       'this category is still being written into the database as base64'));
+  /* No photo leaves the studio. ------------------------------------------------------
+     A client's finished piece was briefly sent to them as a signed link in the ready
+     message. Kayode pulled it on 11 Sep, so the rule is now the simpler one: every photo
+     in here is the studio's, seen by people the studio signed in, and nothing hands one
+     to an address outside. A url signed for a month, mailed out and then forwarded is a
+     photograph of somebody's wedding outfit on the open web, and this is the check that
+     would have to be deleted deliberately to do it again. */
+  const shareTtl = (src.match(/createSignedUrl\([^)]*\)/g) || [])
+    .filter(c => c.indexOf('MEDIA_URL_TTL') === -1);
+  ok('nothing signs a link on a longer clock than the app\u2019s own',
+     shareTtl.length === 0,
+     'a url signed for longer than the app needs is one meant to leave the studio: ' + shareTtl.join(', '));
+  ok('no photo is put in a message to a client',
+     src.indexOf('{photo}') === -1 && src.indexOf('sharePhotoLink') === -1,
+     'a link in a message can be forwarded to anybody, and the client never agreed to that');
+
   ok('the counter counts the same places the sweep moves',
-    ['clientPhotos', 'outfits', 'updates', 'getCustomers'].every(f =>
+    ['clientPhotos', 'outfits', 'updates', 'getCustomers', 'count\\(pr\\.photo\\)'].every(f =>
       new RegExp(f).test((src.match(/function inlinePhotoCount[\s\S]*?\n\}/) || [''])[0])));
 }
 

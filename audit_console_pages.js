@@ -369,6 +369,79 @@ section('Website enquiries reach the screen');
      xssDet.indexOf('<script>bad()') < 0);
 }
 
+/* Two gateway actions had no button for weeks: the only way to record a payment or grant a
+   studio extra storage was to open the console and call the function by hand. A door with
+   no handle is the same as no door. */
+{
+  const det = fs.readFileSync(path.join(root, "admin/js/detail.js"), "utf8");
+  const act = fs.readFileSync(path.join(root, "admin/js/actions.js"), "utf8");
+  [["formRecordPayment", "liveRecordPayment", "recording a payment"],
+   ["formStorageCap", "liveSetStorageCap", "granting extra storage"]].forEach(function (t) {
+    ok(t[2] + " has a button somewhere", det.indexOf(t[0] + "(") !== -1,
+       "the gateway serves it and nothing on screen reaches it");
+    ok(t[2] + " opens a form", act.indexOf("function " + t[0] + "(") !== -1);
+    ok(t[2] + " reaches the gateway", act.indexOf(t[1] + "(") !== -1);
+  });
+  // plain string search: the shell mangles a regex on its way into a file, every time
+  const liveGuard = det.indexOf("s.live ?");
+  const payBtn = det.indexOf("formRecordPayment");
+  ok("both are offered only on a real studio",
+     liveGuard !== -1 && payBtn > liveGuard && payBtn - liveGuard < 240,
+     "an example subscriber would be sent to the Edge Function and fail there");
+}
+/* Read a console source file. The one inside boot() is scoped to that loop. */
+const srcOf = f => fs.readFileSync(path.join(root, "admin", f), "utf8");
+/* Our own books. -------------------------------------------------------------------
+   Bespoke is invoice-only, so it has no list price to read, and five places used to read
+   p.monthly straight. A Bespoke subscriber then contributed nothing to MRR, ARR, ARPU and
+   the forecast: the operator's own revenue quietly understated by the size of their largest
+   customer, with no symptom anywhere. */
+{
+  const bespoke = run("planById('premium')");
+  ok('Bespoke is still the invoice-only plan', !!(bespoke && bespoke.invoiceOnly));
+  ok('and still has no list price to read', !bespoke.monthly && !bespoke.annual);
+
+  // the one function every one of those five places now goes through
+  ok('a plan with a list price is worth its list price',
+     run("planMrr(planById('starter'),'monthly',0)") === run("planById('starter').monthly"));
+  ok('an annual cycle is a twelfth of the annual price',
+     run("planMrr(planById('pro'),'annual',0)") === Math.round(run("planById('pro').annual") / 12));
+  ok('a trial is worth nothing, whatever is typed',
+     run("planMrr(planById('trial'),'monthly',999999)") === 0);
+  ok('Bespoke is worth what was agreed, not zero',
+     run("planMrr(planById('premium'),'monthly',250000)") === 250000,
+     'a Bespoke subscriber still books nothing, so the books understate by their whole fee');
+  ok('and a Bespoke subscriber with nothing agreed books nothing rather than a made-up figure',
+     run("planMrr(planById('premium'),'monthly','')") === 0);
+  ok('a negative agreed price cannot be typed in',
+     run("planMrr(planById('premium'),'monthly',-5000)") === 0);
+
+  /* Nothing may read p.monthly to work out what a subscriber is worth any more. This is the
+     check that stops the bug coming back somewhere new. */
+  const actions = srcOf('js/actions.js');
+  ok('no action computes what a subscriber is worth from the plan price',
+     !/mrr\s*[:=][^,;\n]*p\.monthly/.test(actions),
+     'an action is reading the list price straight, which books zero for Bespoke');
+  ['doAddSubscriber', 'doChangePlan', 'doConvert'].forEach(fn =>
+    ok(fn + '() goes through planMrr()',
+       new RegExp(fn + '[\\s\\S]{0,2400}planMrr\\(').test(actions)));
+  ok('churn counts what they were paying, not what the plan lists now',
+     !/churnedMrr[\s\S]{0,200}planById\(s\.plan\)\.monthly/.test(srcOf('js/core.js')),
+     'every churned Bespoke subscriber counts as zero churn');
+
+  /* A trial that has already ended is a different thing from one about to end: it is a
+     business using the software that was never asked for the money. */
+  ok('an ended trial is its own list', run('typeof Q.trialEnded') === 'function');
+  ok('and one still running is another', run('typeof Q.trialEnding') === 'function');
+  ok('the two do not overlap',
+     run('Q.trialEnded().filter(function(s){return Q.trialEnding().some(function(x){return x.id===s.id;});}).length') === 0);
+  ok('nothing in the ended list is still in date',
+     run('Q.trialEnded().every(function(s){return s.renewIn < 0;})'));
+  ok('the dashboard says an ended trial ended, rather than that it ends today',
+     /Trial ended, not converted/.test(srcOf('js/pages.js')),
+     'a trial that ended a week ago reads as ending today');
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass + ' passed, ' + failures.length + ' FAILED:');

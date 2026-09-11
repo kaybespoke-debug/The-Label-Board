@@ -168,7 +168,13 @@ body.menu-open .drawer{display:flex}
 .device{position:relative}
 
 /* ---------- industries strip ---------- */
-.industries{display:grid;grid-template-columns:repeat(4,minmax(0,272px));gap:14px;justify-content:center}
+/* Flex rather than grid, so a last row that is not full is centred instead of
+   pushed against the left. The container is capped at four tiles wide, and the
+   tiles grow to fill a line but never past 272, which is what the photographs
+   were cut for. */
+.industries{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;
+  max-width:1124px;margin-left:auto;margin-right:auto}
+.industry{flex:1 1 240px;max-width:272px}
 .industry{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
   overflow:hidden;display:block;color:var(--text);transition:border-color .2s ease,transform .2s ease;
   padding:0;font:inherit;text-align:center;cursor:pointer;width:100%}
@@ -208,9 +214,7 @@ body.menu-open .drawer{display:flex}
 .mini div{border:1px solid var(--line);background:var(--panel-2);border-radius:var(--r-sm);
   padding:10px 12px;font-size:13px;color:var(--dim)}
 
-.showcase{display:grid;grid-template-columns:1.25fr .75fr;gap:16px;align-items:start}
 .panel{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:16px}
-.stack{display:grid;gap:16px}
 
 .row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(24px,3.4vw,46px);align-items:center}
 .row2+.row2{margin-top:clamp(32px,4vw,58px)}
@@ -492,11 +496,13 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    the page sideways, which is what a fixed 200px did between 938 and 681. */
 
 @media (max-width:1000px){
+  /* three a row rather than two, which would make seven tiles four rows deep */
+  .industry{flex-basis:200px}
   .hdr-nav{display:none}
   .hdr-act .login{display:none}
   .burger{display:block}
   .hero-grid{grid-template-columns:minmax(0,1fr);gap:34px;min-height:0}
-  .showcase,.row2{grid-template-columns:minmax(0,1fr)}
+  .row2{grid-template-columns:minmax(0,1fr)}
   .row2.flip .row2-text{order:0}
   .g3,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .plans{grid-template-columns:minmax(0,1fr);max-width:460px;margin:0 auto}
@@ -641,7 +647,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    written here silently wins over both of them, and the phone ends up with a
    164px picture in a 134px wide swipe tile. That is exactly what happened. */
 
-.industries{gap:12px}
 .industry .pic{position:relative}
 /* a navy wash over every tile, so a bright studio and a dark workshop sit together */
 .industry .pic::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -701,6 +706,5 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   border-radius:var(--r);box-shadow:var(--shadow)}
 .shot-phone{position:absolute;right:-38px;bottom:-34px;width:158px;height:auto;
   border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);z-index:3}
-.shot-cap{margin-top:10px;font-size:12.5px;color:var(--faint)}
 @media (max-width:1000px){.shot-phone{width:128px;right:-10px;bottom:-20px}}
 @media (max-width:680px){.shot-phone{display:none}}

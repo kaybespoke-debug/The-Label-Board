@@ -115,7 +115,7 @@ PAGES.support = function () {
       '<div class="pnl"><div class="ph"><div><h3>Most active subscribers</h3>' +
       '<div class="ph-sub">Volume is the best early signal of who will renew</div></div></div>' +
       '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th class="num">Orders (30d)</th>' +
-      '<th class="num hide-sm">Seats used</th><th class="hide-sm">Last seen</th><th></th></tr></thead><tbody>' +
+      '<th class="num hide-sm">Seats used</th><th class="hide-sm">Last synced</th><th></th></tr></thead><tbody>' +
       Q.active().slice().sort((a, b) => b.ordersLast30 - a.ordersLast30).slice(0, 12).map(s =>
         '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')"><td class="t-main">' + esc(s.name) + '</td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td><td class="num">' + s.ordersLast30 + '</td>' +
@@ -133,7 +133,7 @@ PAGES.support = function () {
       moneyShort(risk.reduce((t, s) => t + s.mrr, 0)) + ' of MRR is exposed here.</div></div>' +
       '<button class="btn" onclick="exportRisk()">Export CSV</button></div>' +
       (risk.length ? '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th>Why</th>' +
-        '<th class="num hide-sm">Orders 30d</th><th class="hide-sm">Last seen</th>' +
+        '<th class="num hide-sm">Orders 30d</th><th class="hide-sm">Last synced</th>' +
         '<th class="num">MRR</th><th></th></tr></thead><tbody>' +
         risk.slice().sort((a, b) => b.mrr - a.mrr).map(s => '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +

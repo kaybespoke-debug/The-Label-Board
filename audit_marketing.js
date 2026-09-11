@@ -14,10 +14,12 @@
 //      fill in, no list to maintain by hand.
 //   2. A segment nobody can be reached in is not offered. A row that goes
 //      nowhere costs a tap and teaches somebody the tab is useless.
-//   3. Nothing posts on the studio's behalf. Auto-posting means Meta app
-//      review, tokens that expire, and a breakage every few months for a
-//      feature nobody asked to be automatic. We write the caption and hand it
-//      over — the same shape as the WhatsApp hand-off that already works.
+//   3. Nothing posts on the studio's behalf, and nothing here pretends to.
+//      There was a "Ready to post" panel that wrote a caption for finished work
+//      and handed it over to be pasted. Kayode took it out on 11 Sep: a nice
+//      addition, not worth the time, and posting properly means Meta app review
+//      and tokens that expire. This gate now holds it out: no social API, and
+//      no half of the old panel left behind to break something on a tap.
 const fs=require('fs'),vm=require('vm');
 const appPath=process.argv[2] || 'site/layi_dashboard.html';
 const html=fs.readFileSync(appPath,'utf8');
@@ -84,67 +86,52 @@ run("marketingSegments()").forEach(s=>{
     F('somebody who ordered last week is in the six-month list');
 }
 
-/* 4) Finished work with photos becomes something to post. -------------------- */
-const ideas=run("postIdeas()");
-if(!ideas.length)F('no finished work is offered to post, so the panel is dead on arrival');
-ideas.forEach(x=>{
-  if(!x.photos||!x.photos.length)F('an order with no photos is being offered as a post');
-});
-// unfinished work must not be offered: posting a garment that is still on the
-// bench is how a studio promises something it has not delivered
-{
-  run("var l=rawOrders();l.push({id:'MK-WIP',client:'Work In Progress',createdAt:new Date().toISOString(),"
-    +"garment:'Half-made kaftan',stageIndex:1,branch:defaultBranchName(),outfits:[],value:1,paid:0,"
-    +"clientPhotos:['data:image/png;base64,AAAA']});save('layi_dash_orders',l);");
-  if(run("postIdeas().some(x=>x.id==='MK-WIP')"))
-    F('an order still in production is being offered as finished work to post');
-}
-
-/* 5) The caption is usable, and does not name the client. -------------------- */
-{
-  const cap=run("postCaption(postIdeas()[0])");
-  if(!cap||cap.length<30)F('the generated caption is too thin to be worth copying');
-  const client=run("postIdeas()[0].client");
-  if(client&&cap.indexOf(client)>=0)
-    F('the caption names the client, which posts a customer’s name without asking them');
-  if(cap.indexOf(run("(SETTINGS.company&&SETTINGS.company.name)||tenantName()"))<0)
-    F('the caption does not name the studio, so it markets nobody');
-}
-
-/* 6) Nothing posts on the studio's behalf. ----------------------------------- */
+/* 4) Nothing posts on the studio's behalf. ----------------------------------- */
 // If this ever changes, it is a decision with an app review and a token
 // refresh behind it, not something that should arrive quietly in a diff.
 [/graph\.facebook\.com/i,/api\.instagram\.com/i,/api\.twitter\.com/i,/\/v\d+\/me\/media/i]
   .forEach(rx=>{if(rx.test(html))F('the app is calling a social platform API directly: '+rx);});
-if(!/Nothing here posts on your behalf/.test(html))
-  F('the post screen does not tell the studio it has to post it themselves');
 
-/* 7) A planned post lands in the calendar as content, with the caption. ------ */
+/* 5) The panel that was taken out left nothing behind. -----------------------
+   This is the check that matters when a feature is pulled. A leftover onclick
+   is invisible: the button draws, the tab renders, every other gate passes,
+   and it throws the first time a studio taps it. Half a feature is worse than
+   either having it or not. */
+['postIdeas','postCaption','renderPostIdeas','openPostDraft','copyPostCaption','planThisPost',
+ 'markPosted','postedAt','postSub','Ready to post','SHARE_URL_TTL','finishedPhotoOf',
+ 'sharePhotoLink','_msgPhotoLink','_msgPhotoPending','_msgOpenFor','renderMsgHelper','{photo}']
+  .forEach(n=>{if(html.indexOf(n)!==-1)
+    F('"'+n+'" is still in the app after the post panel was removed, so half of it is left');});
+// and the tab it lived on still works
+run("renderMarketing();");
+if(!run("(document.getElementById('mktSegments')||{}).innerHTML"))
+  F('the Marketing tab draws nothing now the post panel is gone');
+
+/* 6) The client message still works, and carries no link. --------------------
+   Both ways out are asserted separately. Asking whether there is "some" way to
+   send passes with either one broken, which is half the feature gone and a gate
+   that says nothing. */
 {
-  run("setPlanner([]);");
-  const id=run("postIdeas()[0].id");
-  run("openPostDraft("+JSON.stringify(id)+");planThisPost("+JSON.stringify(id)+");");
-  const list=run("getPlanner()");
-  if(list.length!==1)F('planning a post did not create a calendar entry');
-  else{
-    const e=list[0];
-    if(e.type!=='content')F('a planned post went into the calendar as "'+e.type+'" rather than content');
-    if(!e.notes||e.notes.length<20)F('the planned post did not carry the caption, so it has to be written again');
-    if(!e.date)F('the planned post has no date');
-    if(e.branch!==run("defaultBranchName()")&&run("activeBranchView")==='all')
-      F('the planned post was not attributed to a studio');
-  }
+  // its own order and its own client, so nothing above is rewritten underneath
+  run("var l=rawOrders();l.push({id:'MK-MSG',client:'Reachable Rotimi',createdAt:new Date().toISOString(),"
+    +"garment:'Agbada',stageIndex:0,branch:defaultBranchName(),outfits:[],value:1,paid:0});save('layi_dash_orders',l);"
+    +"var c=getCustomers();c['reachable rotimi']={name:'Reachable Rotimi',whatsapp:'+234 800 000 0003',"
+    +"email:'rotimi@example.com',meas:{},measHistory:[]};setCustomers(c);");
+  const id='MK-MSG';
+  run("openMsgHelper("+JSON.stringify(id)+");");
+  const modal=run("(document.getElementById('modal')||{}).innerHTML")||'';
+  if(!modal)F('the message helper draws nothing');
+  if(/Getting the link/.test(modal))F('the message helper is still waiting on a photo link');
+  if(/\{photo\}/.test(modal))F('a client would be sent the word {photo}');
+  if(!/wa\.me/.test(modal))F('the message helper no longer offers WhatsApp');
+  if(!/mailto:/.test(modal))F('the message helper no longer offers email');
+  run("closeModal();");
 }
 
-/* 8) It is scoped like everything else. -------------------------------------- */
+/* 7) Segments are scoped like everything else. ------------------------------- */
 {
   const names=run("getBranches().map(b=>b.name)");
   if(names.length>1){
-    run("activeBranchView='all';");
-    const all=run("postIdeas().length");
-    run("activeBranchView="+JSON.stringify(names[1])+";");
-    const one=run("postIdeas().length");
-    if(one>all)F('a single studio is offered more work to post than the whole business has');
     run("activeBranchView='all';");
     const segAll=run("marketingSegments().find(s=>s.key==='all').list.length");
     run("activeBranchView="+JSON.stringify(names[1])+";");
@@ -156,6 +143,5 @@ if(!/Nothing here posts on your behalf/.test(html))
 
 console.log('Marketing audit:');
 console.log('  segments: '+run("marketingSegments().map(s=>s.name).join(' \\u00b7 ')"));
-console.log('  ready to post: '+ideas.length);
 if(fails.length){console.log('\n✗ '+fails.length+' problem(s):');fails.forEach(x=>console.log('   - '+x));process.exit(1);}
-console.log('  ✓ segments made of what the studio already recorded, no empty lists, and nothing posts on its behalf');
+console.log('  ✓ segments made of what the studio already recorded, no empty lists, nothing posts on its behalf, and the panel that was pulled left nothing behind');

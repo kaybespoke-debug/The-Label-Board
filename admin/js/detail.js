@@ -47,7 +47,7 @@ DETAIL.sub = function (id) {
       kv('Status', statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '')) +
       kv('Health', statusPill(s.health)) +
       kv('Joined', fmtD(s.joined)) + kv('Subscriber for', tenureLbl) +
-      kv('Last seen', ago(s.lastSeen)) + kv('Orders in last 30 days', s.ordersLast30) +
+      kv('Last synced', ago(s.lastSeen)) + kv('Orders in last 30 days', s.ordersLast30) +
       (referrer ? kv('Referred by', '<button class="lnk" onclick="openDetail(\'sub\',\'' + referrer.id + '\')">' + esc(referrer.name) + ' &rsaquo;</button>') : kv('Referred by', '<span class="note">Direct signup</span>'));
   }
 
@@ -151,7 +151,12 @@ DETAIL.sub = function (id) {
     '<div class="dhead"><div class="dav">' + initials(s.name) + '</div>' +
     '<div style="flex:1;min-width:220px"><h2>' + esc(s.name) + ' ' + statusPill(s.status) + '</h2>' +
     '<div class="dmeta">TLB-S' + String(s.id).padStart(4, '0') + ' · ' + esc(s.owner) + ' · ' + s.planName + ' · ' + esc(s.city) + '</div></div>' +
-    '<div style="display:flex;gap:8px"><button class="btn" onclick="formEditSubscriber(' + s.id + ')">Edit</button>' +
+    /* Recording a payment and granting extra storage both reach real rows through the
+       gateway, so they are only offered on a real studio. On an example subscriber they
+       would fail at the Edge Function, which is a worse way to learn it. */
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="formEditSubscriber(' + s.id + ')">Edit</button>' +
+    (s.live ? '<button class="btn" onclick="formRecordPayment(' + s.id + ')">Record a payment</button>' +
+              '<button class="btn" onclick="formStorageCap(' + s.id + ')">Storage</button>' : '') +
     '<button class="btn gold" onclick="formChangePlan(' + s.id + ')">Change plan</button></div></div>' +
     '<div class="dstats">' +
     dstat(s.mrr ? money(s.mrr) : '—', 'MRR', 'm') +
