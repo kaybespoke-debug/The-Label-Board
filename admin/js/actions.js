@@ -218,9 +218,10 @@ function formAddSubscriber() {
     '<div class="fg"><label>Owner</label><input id="asOwner" placeholder="Full name"></div></div>' +
     '<div class="f2"><div class="fg"><label>Email</label><input id="asEmail" type="email" placeholder="owner@business.com"></div>' +
     '<div class="fg"><label>Phone</label><input id="asPhone" placeholder="+234 …"></div></div>' +
-    '<div class="f2"><div class="fg"><label>Plan</label><select id="asPlan">' +
-    DB.plans.map(p => '<option value="' + p.id + '">' + p.name + (p.monthly ? ' — ' + money(p.monthly) + '/mo' : '') + '</option>').join('') +
+    '<div class="f2"><div class="fg"><label>Plan</label><select id="asPlan" onchange="togglePlanPrice(\'asPlan\',\'asPriceWrap\')">' +
+    DB.plans.map(p => '<option value="' + p.id + '">' + p.name + (p.monthly ? ' — ' + money(p.monthly) + '/mo' : (p.invoiceOnly ? ' — invoiced' : '')) + '</option>').join('') +
     '</select></div><div class="fg"><label>Billing cycle</label><select id="asCycle"><option value="monthly">Monthly</option><option value="annual">Annual</option></select></div></div>' +
+    agreedPriceField('asPlan', 'asPriceWrap', 'asPrice', '', false) +
     '<div class="fg"><label>City</label><input id="asCity" placeholder="Lagos"></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doAddSubscriber()">Create account</button>');
@@ -243,7 +244,7 @@ function doAddSubscriber() {
     health: planId === 'trial' ? 'onboarding' : 'healthy',
     users: 1, seats: p.seats, joined: iso(DB.today), renewsOn: iso(dAgo(planId === 'trial' ? -DB.settings.trialDays : -30)),
     renewIn: planId === 'trial' ? DB.settings.trialDays : 30,
-    mrr: planId === 'trial' ? 0 : (cycle === 'annual' ? Math.round(p.annual / 12) : p.monthly),
+    mrr: planMrr(p, cycle, document.getElementById('asPrice') && document.getElementById('asPrice').value),
     channel: 'Added by admin', businesses: [{ name: 'Main outlet', city: document.getElementById('asCity').value || 'Lagos', staff: 1, openedOn: iso(DB.today) }],
     referredBy: null, referrals: [], referralLedger: [], referralEarned: 0, referralPaid: 0, referralPending: 0, referralConverted: 0,
     lastSeen: iso(DB.today), ordersLast30: 0, notes: []
@@ -281,11 +282,12 @@ function doEditSubscriber(id) {
 function formChangePlan(id) {
   const s = Q.sub(id);
   modal('Change plan', s.name + ' · currently ' + s.planName + ' (' + s.cycle + ')',
-    '<div class="f2"><div class="fg"><label>New plan</label><select id="cpPlan">' +
+    '<div class="f2"><div class="fg"><label>New plan</label><select id="cpPlan" onchange="togglePlanPrice(\'cpPlan\',\'cpPriceWrap\')">' +
     DB.plans.map(p => '<option value="' + p.id + '"' + (s.plan === p.id ? ' selected' : '') + '>' + p.name + (p.monthly ? ' — ' + money(p.monthly) + '/mo' : '') + '</option>').join('') +
     '</select></div><div class="fg"><label>Billing cycle</label><select id="cpCycle">' +
     '<option value="monthly"' + (s.cycle === 'monthly' ? ' selected' : '') + '>Monthly</option>' +
     '<option value="annual"' + (s.cycle === 'annual' ? ' selected' : '') + '>Annual</option></select></div></div>' +
+    agreedPriceField('cpPlan', 'cpPriceWrap', 'cpPrice', planIsInvoiced(planById(s.plan)) ? s.mrr : '', planIsInvoiced(planById(s.plan))) +
     '<div class="fg"><label>Reason (goes on the audit log)</label><input id="cpWhy" placeholder="e.g. Upgrade requested by owner"></div>' +
     '<p class="hint">Current MRR ' + (s.mrr ? money(s.mrr) : '—') + '. The change takes effect on the next renewal, ' + fmtD(s.renewsOn) + '.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
@@ -300,7 +302,8 @@ function doChangePlan(id) {
   s.plan = pid; s.planName = p.name; s.cycle = pid === 'trial' ? 'trial' : cycle;
   s.seats = p.seats;
   s.status = pid === 'trial' ? 'trial' : 'active';
-  s.mrr = pid === 'trial' ? 0 : (cycle === 'annual' ? Math.round(p.annual / 12) : p.monthly);
+  s.mrr = planMrr(p, cycle, document.getElementById('cpPrice') && document.getElementById('cpPrice').value);
+  if (planIsInvoiced(p) && !s.mrr) { toast('Bespoke has no list price. Type what ' + s.name + ' agreed to pay, or it counts for nothing.'); return; }
   logAction('plan_change', 'Subscription plan changed',
     'Kayode Ojomo moved ' + s.name + ' from ' + oldName + ' to ' + p.name +
     (document.getElementById('cpWhy').value ? ' — ' + document.getElementById('cpWhy').value : ''), 'subscriber:' + s.id);
@@ -309,9 +312,10 @@ function doChangePlan(id) {
 function formConvert(id) {
   const s = Q.sub(id);
   modal('Convert to paid', s.name + ' · trial ends ' + fmtD(s.renewsOn),
-    '<div class="fg"><label>Plan</label><select id="cvPlan">' +
-    DB.plans.filter(p => p.id !== 'trial').map(p => '<option value="' + p.id + '">' + p.name + ' — ' + money(p.monthly) + '/mo</option>').join('') +
-    '</select></div><div class="fg"><label>Billing cycle</label><select id="cvCycle"><option value="monthly">Monthly</option><option value="annual">Annual (2 months free)</option></select></div>',
+    '<div class="fg"><label>Plan</label><select id="cvPlan" onchange="togglePlanPrice(\'cvPlan\',\'cvPriceWrap\')">' +
+    DB.plans.filter(p => p.id !== 'trial').map(p => '<option value="' + p.id + '">' + p.name + (p.invoiceOnly ? ' — invoiced' : ' — ' + money(p.monthly) + '/mo') + '</option>').join('') +
+    '</select></div><div class="fg"><label>Billing cycle</label><select id="cvCycle"><option value="monthly">Monthly</option><option value="annual">Annual (2 months free)</option></select></div>' +
+    agreedPriceField('cvPlan', 'cvPriceWrap', 'cvPrice', '', false),
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doConvert(' + id + ')">Convert</button>');
 }
@@ -320,7 +324,8 @@ function doConvert(id) {
   const p = planById(document.getElementById('cvPlan').value);
   const cycle = document.getElementById('cvCycle').value;
   s.plan = p.id; s.planName = p.name; s.cycle = cycle; s.status = 'active'; s.health = 'healthy';
-  s.mrr = cycle === 'annual' ? Math.round(p.annual / 12) : p.monthly;
+  s.mrr = planMrr(p, cycle, document.getElementById('cvPrice') && document.getElementById('cvPrice').value);
+  if (planIsInvoiced(p) && !s.mrr) { toast('Bespoke has no list price. Type what ' + s.name + ' agreed to pay, or it counts for nothing.'); return; }
   s.seats = p.seats;
   DB.onboarding = DB.onboarding.filter(o => o.subId !== s.id);
   logAction('plan_change', 'Trial converted', 'Kayode Ojomo converted ' + s.name + ' to ' + p.name, 'subscriber:' + s.id);
@@ -332,9 +337,12 @@ function formPlan(id) {
   const p = id ? planById(id) : null;
   modal(p ? 'Edit ' + p.name : 'Create plan', p ? (Q.planSplit().find(x => x.id === id).count + ' subscribers on this plan') : 'A new tier subscribers can buy',
     '<div class="fg"><label>Plan name</label><input id="plName" value="' + (p ? esc(p.name) : '') + '" placeholder="e.g. Enterprise"></div>' +
-    '<div class="f2"><div class="fg"><label>Monthly price (₦)</label><input id="plM" type="number" value="' + (p ? p.monthly : '') + '"></div>' +
-    '<div class="fg"><label>Annual price (₦)</label><input id="plA" type="number" value="' + (p ? p.annual : '') + '"></div></div>' +
-    '<div class="fg"><label>Team seats included</label><input id="plS" type="number" value="' + (p ? p.seats : 5) + '"></div>' +
+    (p && p.invoiceOnly
+      ? '<p class="hint">This plan is invoiced per business, so it has no list price here. What each subscriber pays is set on their own record.</p>'
+      : '<div class="f2"><div class="fg"><label>Monthly price (₦)</label><input id="plM" type="number" value="' + (p ? p.monthly : '') + '"></div>' +
+        '<div class="fg"><label>Annual price (₦)</label><input id="plA" type="number" value="' + (p ? p.annual : '') + '"></div></div>') +
+    '<div class="fg"><label>Team seats included</label><input id="plS" type="number" min="0" value="' + (p ? p.seats : 5) + '">' +
+    '<p class="hint">Zero means unlimited, which is what Pro and Bespoke are.</p></div>' +
     '<div class="fg"><label>Features, one per line</label><textarea id="plF">' + (p ? p.features.join('\n') : '') + '</textarea></div>' +
     (p ? '<p class="hint">Changing the price does not re-charge anyone. Existing subscribers keep their current price until their next renewal.</p>' : ''),
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
@@ -343,16 +351,25 @@ function formPlan(id) {
 function doPlan(id) {
   const name = document.getElementById('plName').value.trim();
   if (!name) { toast('Give the plan a name'); return; }
-  const m = +document.getElementById('plM').value || 0;
-  const a = +document.getElementById('plA').value || 0;
-  const s = +document.getElementById('plS').value || 5;
+  /* An invoiced plan renders no price inputs, so read what it already has rather than
+     zero. Reading a field that is not there and saving the zero is how a plan loses its
+     price by being opened and saved with nothing changed. */
+  const existing = id ? planById(id) : null;
+  const plM = document.getElementById('plM'), plA = document.getElementById('plA');
+  const m = plM ? (+plM.value || 0) : (existing ? existing.monthly : 0);
+  const a = plA ? (+plA.value || 0) : (existing ? existing.annual : 0);
+  /* Zero seats means unlimited and is a real answer, so it cannot fall through to five. */
+  const seatRaw = document.getElementById('plS').value;
+  const s = seatRaw === '' ? (existing ? existing.seats : 5) : Math.max(0, +seatRaw || 0);
   const f = document.getElementById('plF').value.split('\n').map(x => x.trim()).filter(Boolean);
   if (id) {
     const p = planById(id);
     const old = p.monthly;
     p.name = name; p.monthly = m; p.annual = a; p.seats = s; p.features = f.length ? f : p.features;
     DB.subscribers.filter(x => x.plan === id).forEach(x => { x.planName = name; x.seats = s; });
-    logAction('change_plan', 'Plan edited', 'Kayode Ojomo changed ' + name + ' from ' + money(old) + ' to ' + money(m) + ' a month');
+    logAction('change_plan', 'Plan edited', p.invoiceOnly
+      ? 'Kayode Ojomo edited ' + name + ', which is invoiced per business'
+      : 'Kayode Ojomo changed ' + name + ' from ' + money(old) + ' to ' + money(m) + ' a month');
     toast(name + ' updated');
   } else {
     DB.plans.push({ id: name.toLowerCase().replace(/[^a-z0-9]+/g, '_'), name, monthly: m, annual: a, seats: s, live: true, features: f.length ? f : ['New plan'] });

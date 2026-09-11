@@ -41,8 +41,14 @@ PAGES.dashboard = function () {
       return { t: 'Payment failed', d: s.name, when: ovd ? ago(ovd.date) : 'this cycle',
         go: "openDetail('sub','" + s.id + "')" };
     }))
-    .concat(Q.trial().filter(s => s.renewIn <= 4).slice(0, 2).map(s =>
-      ({ t: 'Trial ending', d: s.name, when: s.renewIn <= 0 ? 'today' : 'in ' + s.renewIn + 'd',
+    /* Ended first, and above the ones still running: an expired trial nobody converted is
+      the one actually costing money. It used to say 'today' however long ago it ended. */
+    .concat(Q.trialEnded().slice(0, 2).map(s =>
+      ({ t: 'Trial ended, not converted', d: s.name,
+         when: (-s.renewIn) + 'd ago',
+         go: "openDetail('sub','" + s.id + "')" })))
+    .concat(Q.trialEnding().slice(0, 2).map(s =>
+      ({ t: 'Trial ending', d: s.name, when: s.renewIn === 0 ? 'today' : 'in ' + s.renewIn + 'd',
          go: "openDetail('sub','" + s.id + "')" })))
     .concat(recent.slice(0, 1).map(s => ({ t: 'New subscriber', d: s.name, when: ago(s.joined),
       go: "openDetail('sub','" + s.id + "')" })))

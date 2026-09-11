@@ -154,6 +154,12 @@ const Q = {
   newSubsPrev() { return DB.subscribers.filter(s => inPrev(s.joined)); },
   active() { return Q.subsAsOf().filter(s => s.status === 'active'); },
   trial() { return Q.subsAsOf().filter(s => s.status === 'trial'); },
+  /* A trial still running, and one whose date has passed with nobody doing anything about
+     it. They were the same list, so a trial that ended a week ago read as ending today and
+     then dropped off the alerts entirely once it was four days old. That is a business that
+     tried the software, was never asked for the money, and is still using it. */
+  trialEnding() { return Q.trial().filter(s => s.renewIn >= 0 && s.renewIn <= 4); },
+  trialEnded() { return Q.trial().filter(s => s.renewIn < 0).sort((a, b) => a.renewIn - b.renewIn); },
   expired() { return Q.subsAsOf().filter(s => s.status === 'expired'); },
   renewing() { return Q.active().filter(s => s.renewIn >= 0 && s.renewIn <= 7); },
   pastDue() { return Q.active().filter(s => s.pastDue); },
@@ -167,9 +173,12 @@ const Q = {
   },
   arr() { return Q.mrr() * 12; },
   arpu() { const a = Q.active().length; return a ? Q.mrr() / a : 0; },
+  /* What they were actually paying, which is s.mrr, not what their plan lists today. The
+     old reading lost every Bespoke subscriber from churn entirely (list price zero), and
+     mis-stated anyone on an annual cycle or on a price that has since moved. */
   churnedMrr() {
     return Q.expired().filter(s => inPeriod(s.renewsOn) || PERIOD.key === 'all' || PERIOD.key === 'last12m' || PERIOD.key === 'year')
-      .reduce((t, s) => t + planById(s.plan).monthly, 0);
+      .reduce((t, s) => t + (+s.mrr || 0), 0);
   },
 
   payments(status) {
