@@ -1120,7 +1120,7 @@ body.modal-open{overflow:hidden}
       </section>
       <section class="view" id="view-products">
         <div class="stat-grid" id="prodStats"></div>
-        <div class="toolbar"><input type="text" class="fld search" id="rtwSearch" placeholder="Search products…" oninput="renderProducts()"><select class="fld sortsel" id="sort_products" onchange="setSort('products',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_products" onclick="toggleSortDir('products')" title="Reverse order">↑</button><span style="flex:1"></span><button class="btn sm ghost" onclick="openSale()">＋ Record a sale</button><button class="btn sm" onclick="openProduct()">+ Add product</button></div>
+        <div class="toolbar"><input type="text" class="fld search" id="rtwSearch" placeholder="Search products…" oninput="renderProducts()"><select class="fld sortsel" id="sort_products" onchange="setSort('products',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_products" onclick="toggleSortDir('products')" title="Reverse order">↑</button><span style="flex:1"></span><button class="btn sm ghost" onclick="openRun()" title="Make stock yourself: materials in, pieces out, each carrying what it cost">＋ Production run</button><button class="btn sm ghost" onclick="openSale()">＋ Record a sale</button><button class="btn sm" onclick="openProduct()">+ Add product</button></div>
         <div class="panel"><div class="panel-head"><h3>In stock</h3><span class="page-sub" id="rtwSub"></span></div><div id="rtwList"></div></div>
       </section>
       <section class="view" id="view-sales">
@@ -1741,7 +1741,26 @@ function normalizeReached(arr,qty){const n=STAGES.length;let r=Array.isArray(arr
 function batchFrontier(o){if(!o.batch||!o.batch.on)return o.stageIndex||0;const q=o.batch.qty,r=o.batch.reached||[];let f=0;for(let i=0;i<STAGES.length;i++){if((r[i]||0)>=q)f=i;else break;}return f;}
 function batchAt(o,i){const r=(o.batch&&o.batch.reached)||[];return (r[i]||0)-((i<STAGES.length-1)?(r[i+1]||0):0);}
 function batchPct(o){if(!o.batch||!o.batch.on)return Math.round((((o.stageIndex||0)+1)/STAGES.length)*100);const q=o.batch.qty||1,r=o.batch.reached||[];let sum=0;for(let i=1;i<STAGES.length;i++)sum+=(r[i]||0);return Math.round(sum/(q*(STAGES.length-1))*100);}
+/* Three kinds of record live in the orders store, because they share almost everything:
+   the production board, the stages, quality control, the update history, branch scoping
+   and the sync. What they do not share is money.
+
+     (none)  a client order. Somebody is paying for it.
+     'sale'  a counter sale. Stock left the shelf and money came in.
+     'run'   a PRODUCTION RUN. Materials turned into stock. No client, no revenue.
+
+   A run is neither an order nor a purchase, which is why it could not be recorded before
+   without lying about one or the other. Its cost is already in the books the moment it is
+   made — either because the materials were drawn from Supplies, which were paid for when
+   they were restocked, or because they were typed on the run as a direct cost, which is
+   how a client order does it too. The units it produces carry that cost, so the shelf
+   shows what each piece cost to make. Revenue comes later, when one sells. Booking it at
+   both ends is how an RTW brand's numbers end up wrong by the cost of goods. */
 function isBatch(o){return !!(o&&o.batch&&o.batch.on);}
+function isRun(o){return !!(o&&o.kind==='run');}
+/* Somebody is paying for it: not a counter sale, not a run for the shelf. Every list about
+   money owed, customers, invoices and receivables means THIS. */
+function isClientOrder(o){const k=o&&o.kind;return !!o&&k!=='sale'&&k!=='run';}
 function isGroup(o){return !!(o&&o.group&&o.group.on);}
 /* ---- One order, two things that are not made the same way ----------------------------
    A bag and a belt. A gown and the gele that goes with it. They share a client, a price
@@ -3989,6 +4008,28 @@ function fabricSourceChips(i){
   +(itemIsTheirs(o)?'<div class="sd" style="color:var(--amber);margin-top:6px">Their own cloth, and there is no second piece. It prints in bold on the work order, and somebody has to check it against the photo before anything is cut.</div>':'');
 }
 function renderFabricSource(i){const el=document.getElementById('of_src_'+i);if(el)el.innerHTML=fabricSourceChips(i);}
+/* Which craft this piece is, and therefore which stages it walks and which quality checks
+   it gets. Asked only of a studio that works in more than one craft, because a tailor who
+   only makes garments would be answering the same question on every item forever. */
+function studioCrafts(){const out=[],seen={};activeBranchesInView().forEach(b=>branchCrafts(b).forEach(c=>{if(!seen[c]){seen[c]=1;out.push(c);}}));return out;}
+function itemCraftChips(i){
+  const list=studioCrafts();
+  if(list.length<2)return '';
+  const o=(draft&&draft.outfits&&draft.outfits[i])||{};
+  const Q=String.fromCharCode(39);
+  const chip=(k,label,on)=>'<span class="matchip'+(on?' on':'')+'" onclick="setOutfitCraft('+i+','+Q+k+Q+')">'+esc(label)+'</span>';
+  return '<div class="field" style="margin-bottom:10px"><label>What kind of piece is this</label>'
+    +'<div class="matchips">'+chip('','Same as the studio',!itemCraft(o))
+    +list.map(k=>chip(k,activityLabel(k),itemCraft(o)===k)).join('')+'</div>'
+    +'<div class="sd" style="color:var(--text-faint);margin-top:6px">'
+    +(itemCraft(o)?'Walks its own stages: '+esc(itemStages(o).slice(1,-1).join(' · ')):'Walks the studio\u2019s production stages.')
+    +'</div></div>';
+}
+function renderItemCraft(i){const el=document.getElementById('of_craft_'+i);if(el)el.innerHTML=itemCraftChips(i);}
+/* Changing what a piece is changes the list it walks, so its position on the old list
+   means nothing. Back to the start rather than landing on whatever stage happens to share
+   that index. */
+function setOutfitCraft(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i].craft=k||'';draft.outfits[i].stageIndex=0;renderItemCraft(i);}
 function setOutfitFabricFrom(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i].fabricFrom=(draft.outfits[i].fabricFrom===k?'':k);renderFabricSource(i);}
 function toggleOutfitMat(i,m){if(!draft||!draft.outfits[i])return;const arr=draft.outfits[i].materials=draft.outfits[i].materials||[];const k=arr.indexOf(m);if(k>=0)arr.splice(k,1);else arr.push(m);renderOutfitMaterials(i);}
 function addOutfitMat(i){const inp=document.getElementById('of_matadd_'+i);if(!inp||!draft||!draft.outfits[i])return;const v=(inp.value||'').trim();if(!v)return;const arr=draft.outfits[i].materials=draft.outfits[i].materials||[];if(!arr.includes(v))arr.push(v);renderOutfitMaterials(i);}
@@ -4355,6 +4396,7 @@ function renderOrderModal(){
       </div>
       <div class="field" style="margin-bottom:10px"><label>Material(s) <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(tap to pick one or more)</span></label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
       <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
+      <div id="of_craft_${i}">${itemCraftChips(i)}</div>
       <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="e.g. Wedding agbada, size 43 mules…"></div>
       <div class="field" style="margin-bottom:10px"><label>Photos of this item / fabric</label>${outfitPhotoGrid(i,o.photos)}</div>
       <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, fabric, size, inspiration…">${esc(o.style)}</textarea></div>
@@ -4502,6 +4544,12 @@ function orderAttention(o){
   const du=daysUntil(o.due);const out=orderOutstanding(o);
   if(o.qc&&o.qc.status==='failed'&&o.stageIndex<READY)return {sev:'var(--red)',text:'Failed quality check. Send it back for rework.',act:can('canQC')?{label:'Open QC',fn:`openQC('${o.id}')`}:(can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null)};
   if(du!==null&&du<0&&o.stageIndex<READY)return {sev:'var(--red)',text:`${-du} day${-du===1?'':'s'} overdue, still at ${STAGES[o.stageIndex]}.`,act:can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null};
+  /* A finished run is not done until it is on the shelf. Until somebody presses the button
+     the stock does not exist, so nothing can be sold and the cost is sitting nowhere. */
+  if(isRun(o)&&runReadyToStock(o))
+    return {sev:'var(--green)',text:'Finished. Put the '+runUnits(o)+' pieces on the shelf at '+cur(runUnitCost(o))+' each.',
+      act:can('products')?{label:'Add to stock',fn:`runToStock('${o.id}')`}:null};
+  if(isRun(o)&&runIsStocked(o))return null;
   /* Above quality control on purpose. QC finds the wrong cloth after it has been cut,
      which is the expensive way to find out. */
   if(fabricCheckNeeded(o)){const theirs=orderHasTheirFabric(o);
@@ -4619,7 +4667,7 @@ function openDetail(id){
       ${(can('customers')||can('orders'))?`<button class="btn ghost sm" onclick="openMsgHelper('${o.id}')">Message</button>`:''}
       ${can('orders')?`<button class="btn ghost sm" onclick="openInvoice('${o.id}')">Invoice</button>`:''}
       ${can('orders')?`<button class="btn ghost sm" onclick="openReceipt('${o.id}')">Receipt</button>`:''}
-      ${o.kind!=='sale'&&(can('orders')||can('update'))?`<button class="btn ghost sm" onclick="printJobSheet('${o.id}')">Job sheet</button>`:''}
+      ${(isClientOrder(o)||isRun(o))&&(can('orders')||can('update'))?`<button class="btn ghost sm" onclick="printJobSheet('${o.id}')">Job sheet</button>`:''}
       ${can('update')&&isBatch(o)?`<button class="btn ghost sm" onclick="closeModal();openBatch('${o.id}')">Track progress</button>`:''}
       ${can('update')&&hasOwnPieces(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each ${isGroup(o)?'person':'piece'}</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openQC('${o.id}')">Quality check</button>`:''}
@@ -4841,6 +4889,233 @@ function printInvoice(id){const o=getOrders().find(x=>x.id===id);if(!o)return;en
 function sendInvoiceWhatsApp(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(invoiceText(o)),'_blank');}
 function sendInvoiceEmail(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const subj='Invoice #'+(o.invoiceNo||'')+' · '+(SETTINGS.company||{}).name;location.href='mailto:'+(cust.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(invoiceText(o));}
 function copyInvoiceText(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const t=invoiceText(o);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>alert('Invoice text copied.'),()=>alert('Copy failed. Select and copy manually.'));}else{alert(t);}}
+
+/* ===== PRODUCTION RUNS — materials in, stock out ==============================
+   What a run is for: an RTW brand cannot know what a garment cost to make, so cannot know
+   its margin, which is the central question this software exists to answer.
+
+   Where the money is. A run posts no money of its own. It does not need to: the cost is
+   already in the books by the time the run exists.
+     · Materials drawn from Supplies were paid for when they were restocked, and drawing
+       them down never charges twice. That is how a client order already works.
+     · Materials typed on the run as a direct cost are booked against the run, exactly as
+       the costs on a client order are.
+   What the run adds is the DIVISION: total cost over units made, stamped on each unit, so
+   the shelf shows what a piece cost. When one sells, the till charges no stock cost for it
+   — that money is already spent and already counted. Anything bought in rather than made
+   is charged at the till as before, because nothing else ever booked it.
+   ===================================================================================== */
+let runDraft=null;
+function runUnits(o){return ((o&&o.runOut)||[]).reduce((n,r)=>n+(+r.qty||0),0);}
+/* Everything the run consumed: materials typed on it, plus the people who made it. */
+function runTotalCost(o){return orderCost(o)+orderTeamTotal(o);}
+function runUnitCost(o){const n=runUnits(o);return n>0?Math.round(runTotalCost(o)/n):0;}
+function runProduct(o){return getProducts().find(x=>x.id===(o&&o.runProductId))||null;}
+function runIsStocked(o){return !!(o&&o.stockedAt);}
+/* Ready to go on the shelf once it has passed quality control, or once it reaches Ready
+   for Delivery on a studio that does not run QC on its own stock. */
+function runReadyToStock(o){
+  if(!isRun(o)||runIsStocked(o))return false;
+  const rfd=STAGES.indexOf('Ready for Delivery');
+  return (+o.stageIndex||0)>=(rfd<0?STAGES.length-1:rfd);
+}
+/* The one irreversible step: the units appear on the shelf, each carrying what it cost.
+   Idempotent on purpose — stockedAt is set first and checked first, so a double tap or a
+   second device cannot put the same run into stock twice. */
+function runToStock(id){
+  if(!can('products')){if(typeof toast==='function')toast('You do not have permission to change stock.');return;}
+  const list=rawOrders();const o=list.find(x=>x.id===id);
+  if(!o||!isRun(o))return;
+  if(runIsStocked(o)){if(typeof toast==='function')toast('This run is already on the shelf.');return;}
+  const prods=getProducts();const prod=prods.find(x=>x.id===o.runProductId);
+  if(!prod){alert('The product this run makes is no longer in the Shop. Add it back, or edit the run to point at another one.');return;}
+  const unit=runUnitCost(o);
+  const made=runUnits(o);
+  if(made<1){alert('This run does not say how many it made.');return;}
+  const branch=branchOfOr(o,'');
+  /* Blend the new units in with whatever is already on the shelf, so the unit cost stays
+     honest when a second run costs more than the first. */
+  const had=productUnitsTotal(prod), hadCost=+prod.cost||0;
+  (o.runOut||[]).forEach(function(r){
+    const v=(prod.variants||[]).find(x=>x.id===r.variantId);
+    if(v)addVariantQty(v,branch,+r.qty||0);
+  });
+  prod.cost=(had+made)>0?Math.round(((had*hadCost)+(made*unit))/(had+made)):unit;
+  /* These units are paid for already. The till must not charge for them a second time. */
+  prod.costBookedUnits=(+prod.costBookedUnits||0)+made;
+  setProducts(prods);
+  o.stockedAt=new Date().toISOString();
+  o.stockedBy=userLabel();
+  o.runUnitCost=unit;
+  o.updates=o.updates||[];
+  o.updates.push({at:o.stockedAt,stage:'Stocked',
+    note:made+' on the shelf at '+cur(unit)+' each',by:userLabel(),photos:[]});
+  const dl=STAGES.indexOf('Delivered');if(dl>=0)o.stageIndex=dl;
+  saveSafe('layi_dash_orders',list);
+  logAudit('Run stocked',o.id+' · '+made+' × '+(prod.name||'')+' at '+cur(unit)+' each');
+  if(typeof toast==='function')toast(made+' '+(prod.name||'pieces')+' on the shelf at '+cur(unit)+' each');
+  closeModal();renderAll();
+}
+
+function openRun(id){
+  if(!can('orders')&&!can('products')){if(typeof toast==='function')toast('You do not have permission to start a production run.');return;}
+  const ex=id?getOrders().find(x=>x.id===id):null;
+  if(ex&&runIsStocked(ex)){openDetail(ex.id);return;}
+  const prods=getProducts();
+  if(!prods.length){alert('Add a product to the Shop first. A run makes stock, so it needs something to make.');return;}
+  const first=prods[0];
+  runDraft=ex?{
+    id:ex.id,productId:ex.runProductId,craft:ex.runCraft||'',
+    out:(ex.runOut||[]).map(r=>({variantId:r.variantId,qty:+r.qty||0})),
+    costs:(ex.costs||[]).map(c=>({label:c.label,amount:+c.amount||0,supplier:c.supplier||''})),
+    stockUsed:(ex.stockUsed||[]).map(x=>({supplyId:x.supplyId,qty:+x.qty||0})),
+    commissions:(ex.commissions||[]).map(c=>({staffId:c.staffId||'',kind:'maker',work:c.work||'',amount:+c.amount||0,paid:!!c.paid})),
+    due:ex.due||'',branch:branchOfOr(ex,'')
+  }:{
+    id:'',productId:first.id,craft:'',
+    out:(first.variants||[]).map(v=>({variantId:v.id,qty:0})),
+    costs:[{label:'',amount:0,supplier:''}],stockUsed:[],
+    commissions:[{staffId:'',kind:'maker',work:'',amount:0,paid:false}],
+    due:defaultDueDate(),branch:defaultBranchName()
+  };
+  renderRunModal();
+}
+function runDraftProduct(){return getProducts().find(x=>x.id===runDraft.productId)||null;}
+function syncRun(){
+  if(!runDraft)return;
+  const d=document.getElementById('r_due');if(d)runDraft.due=d.value;
+  runDraft.out.forEach(function(r,i){const q=document.getElementById('r_q_'+i);if(q)r.qty=Math.max(0,+q.value||0);});
+  runDraft.costs.forEach(function(c,i){
+    const l=document.getElementById('r_cl_'+i),a=document.getElementById('r_ca_'+i),sp=document.getElementById('r_cs_'+i);
+    if(l)c.label=l.value;if(a)c.amount=parseAmt(a.value);if(sp)c.supplier=sp.value;
+  });
+  runDraft.commissions.forEach(function(c,i){
+    const st=document.getElementById('r_ms_'+i),am=document.getElementById('r_ma_'+i);
+    if(st)c.staffId=st.value;if(am)c.amount=parseAmt(am.value);
+  });
+}
+function runPickProduct(){
+  syncRun();
+  const sel=document.getElementById('r_product');if(!sel)return;
+  runDraft.productId=sel.value;
+  const prod=runDraftProduct();
+  runDraft.out=((prod&&prod.variants)||[]).map(v=>({variantId:v.id,qty:0}));
+  renderRunModal();
+}
+function runSetCraft(k){syncRun();runDraft.craft=(runDraft.craft===k?'':k);renderRunModal();}
+function runAddCost(){syncRun();runDraft.costs.push({label:'',amount:0,supplier:''});renderRunModal();}
+function runRemoveCost(i){syncRun();runDraft.costs.splice(i,1);renderRunModal();}
+function runAddMaker(){syncRun();runDraft.commissions.push({staffId:'',kind:'maker',work:'',amount:0,paid:false});renderRunModal();}
+function runRemoveMaker(i){syncRun();runDraft.commissions.splice(i,1);renderRunModal();}
+function renderRunModal(){
+  const d=runDraft;if(!d)return;
+  const prods=getProducts();
+  const prod=runDraftProduct();
+  const made=d.out.reduce((n,r)=>n+(+r.qty||0),0);
+  const cost=d.costs.reduce((n,c)=>n+(+c.amount||0),0)+d.commissions.reduce((n,c)=>n+(+c.amount||0),0);
+  const unit=made>0?Math.round(cost/made):0;
+  const price=+((prod&&prod.price)||0);
+  const Q=String.fromCharCode(39);
+  const rows=d.out.map(function(r,i){
+    const v=((prod&&prod.variants)||[]).find(x=>x.id===r.variantId)||{};
+    return '<div class="cost-line"><input class="fld" value="'+esc(variantLabel(v))+'" disabled>'
+      +'<input class="fld" type="number" min="0" id="r_q_'+i+'" value="'+(r.qty||'')+'" placeholder="0" oninput="syncRun();renderRunModal()"></div>';
+  }).join('')||'<div class="kv" style="color:var(--text-faint)">This product has no sizes or colours set up yet.</div>';
+  const costRows=d.costs.map(function(c,i){
+    return '<div class="cost-line"><input class="fld" id="r_cl_'+i+'" value="'+esc(c.label||'')+'" placeholder="What it was, e.g. Ankara 40 yards">'
+      +'<input class="fld money" id="r_ca_'+i+'" value="'+(c.amount?fmtNum(c.amount):'')+'" placeholder="0" inputmode="decimal" oninput="syncRun();renderRunModal()">'
+      +'<input class="fld" id="r_cs_'+i+'" value="'+esc(c.supplier||'')+'" placeholder="Supplier">'
+      +'<span class="rm" onclick="runRemoveCost('+i+')">\u2715</span></div>';
+  }).join('');
+  const staff=getStaff().filter(x=>x.active!==false);
+  const makerRows=d.commissions.map(function(c,i){
+    return '<div class="cost-line"><select class="fld" id="r_ms_'+i+'"><option value="">Nobody yet</option>'
+      +staff.map(x=>'<option value="'+x.id+'" '+(c.staffId===x.id?'selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select>'
+      +'<input class="fld money" id="r_ma_'+i+'" value="'+(c.amount?fmtNum(c.amount):'')+'" placeholder="0" inputmode="decimal" oninput="syncRun();renderRunModal()">'
+      +'<span class="rm" onclick="runRemoveMaker('+i+')">\u2715</span></div>';
+  }).join('');
+  const crafts=studioCrafts();
+  const craftRow=crafts.length>1
+    ? '<div class="field"><label>Which craft <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(decides the stages it walks)</span></label><div class="matchips">'
+      +'<span class="matchip'+(d.craft?'':' on')+'" onclick="runSetCraft('+Q+Q+')">Same as the studio</span>'
+      +crafts.map(k=>'<span class="matchip'+(d.craft===k?' on':'')+'" onclick="runSetCraft('+Q+k+Q+')">'+esc(activityLabel(k))+'</span>').join('')
+      +'</div></div>'
+    : '';
+  openModal('<h3>'+(d.id?'Edit production run':'New production run')+'</h3>'
+    +'<div class="msub">Materials in, stock out. No client, no invoice '+'—'+' this is the studio making its own rail.</div>'
+    +'<div class="field"><label>What are you making</label><select class="fld" id="r_product" onchange="runPickProduct()">'
+      +prods.map(x=>'<option value="'+x.id+'" '+(d.productId===x.id?'selected':'')+'>'+esc(x.name||'')+'</option>').join('')+'</select>'
+      +'<div class="sd" style="color:var(--text-faint);margin-top:5px">It goes on this product\u2019s shelf when the run is done.</div></div>'
+    +craftRow
+    +'<div class="field"><label>How many of each</label>'+rows+'</div>'
+    +'<div class="field"><label>Materials bought for this run</label>'+costRows
+      +'<button class="btn ghost sm" style="width:100%" onclick="runAddCost()">＋ Add material</button>'
+      +'<div class="sd" style="color:var(--text-faint);margin-top:6px">Only what you bought <b>for this run</b>. Anything taken from Supplies was already paid for when you restocked it, so leave it out here and draw it down in Inventory.</div></div>'
+    +'<div class="field"><label>Who is making it</label>'+makerRows
+      +'<button class="btn ghost sm" style="width:100%" onclick="runAddMaker()">＋ Add maker</button></div>'
+    +'<div class="field"><label>Wanted by <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(optional)</span></label><input class="fld" type="date" id="r_due" value="'+esc(d.due||'')+'"></div>'
+    +'<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">'
+      +'<div class="profit-line"><span>Total cost of the run</span><b>'+cur(cost)+'</b></div>'
+      +'<div class="profit-line"><span>Pieces made</span><b>'+made+'</b></div>'
+      +'<div class="profit-line"><span><b>Cost per piece</b></span><b style="color:var(--gold)">'+cur(unit)+'</b></div>'
+      +(price>0&&unit>0?'<div class="profit-line"><span>Sells at '+cur(price)+', so margin</span><b style="color:'+(price>unit?'var(--green)':'var(--red)')+'">'+cur(price-unit)+' each'+(made?' · '+cur((price-unit)*made)+' on the run':'')+'</b></div>':'')
+      +'<div class="sd" style="color:var(--text-faint);margin-top:6px">This run posts no money of its own. The cost is already out of your account: either you restocked the material, or you typed it above and it is booked against the run. Each piece carries '+cur(unit)+' to the shelf, and the till does not charge it again.</div></div>'
+    +'<div class="modal-foot">'+(d.id?'<button class="btn danger sm" onclick="deleteRun()">Delete</button>':'')
+      +'<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button>'
+      +'<button class="btn" onclick="saveRun()">'+(d.id?'Save run':'Start the run')+'</button></div>');
+}
+function saveRun(){
+  syncRun();
+  const d=runDraft;if(!d)return;
+  const prod=runDraftProduct();
+  if(!prod){alert('Pick what you are making.');return;}
+  const made=d.out.reduce((n,r)=>n+(+r.qty||0),0);
+  if(made<1){alert('Say how many you are making, or there is nothing to put on the shelf.');return;}
+  const list=rawOrders();
+  let o=d.id?list.find(x=>x.id===d.id):null;
+  const fresh=!o;
+  if(fresh){
+    const n=list.filter(isRun).length+1;
+    o={id:'R-'+String(n).padStart(4,'0'),kind:'run',client:'',createdAt:new Date().toISOString(),
+       stageIndex:0,updates:[],potContribs:[],discount:0,paid:0,
+       currency:SETTINGS.currency,fx:1,batch:{on:false},group:{on:false},clientPhotos:[]};
+    list.push(o);
+  }
+  o.branch=d.branch||defaultBranchName();
+  o.runProductId=prod.id;
+  o.runCraft=d.craft||'';
+  o.runOut=d.out.filter(r=>r.variantId&&+r.qty>0).map(r=>({variantId:r.variantId,qty:+r.qty}));
+  o.costs=d.costs.filter(c=>(c.label||'').trim()||+c.amount>0).map(c=>({label:(c.label||'').trim()||'Materials',amount:+c.amount||0,supplier:(c.supplier||'').trim()}));
+  /* A commission only reaches the books when it names somebody: orderTeam() filters on
+     staffId, because an unassigned commission cannot be paid to anyone. On a run that
+     would silently drop the labour out of the cost per piece while the screen went on
+     showing it, so labour with nobody named becomes a plain cost line instead. The money
+     is real either way; only the question of who gets paid it is open. */
+  o.commissions=d.commissions.filter(c=>c.staffId&&+c.amount>=0).map(c=>({staffId:c.staffId,kind:'maker',work:c.work||'',amount:+c.amount||0,paid:!!c.paid}));
+  const unnamedLabour=d.commissions.filter(c=>!c.staffId&&+c.amount>0).reduce((n,c)=>n+(+c.amount||0),0);
+  if(unnamedLabour>0)o.costs.push({label:'Labour (nobody named yet)',amount:unnamedLabour,supplier:''});
+  o.stockUsed=Array.isArray(d.stockUsed)?d.stockUsed.filter(x=>x.supplyId&&+x.qty>0).map(x=>({supplyId:x.supplyId,qty:+x.qty})):[];
+  o.due=d.due||'';
+  /* No client and no revenue. A run that carried a value would show up as a sale nobody
+     made, in a month nobody sold it. */
+  o.value=0;o.paid=0;o.directorOn=false;o.directorPct=0;o.directorAmount=null;
+  o.garment=made+' × '+(prod.name||'piece');
+  o.outfits=[{type:prod.category||'Ready-to-wear',name:o.garment,price:0,photos:[],style:'',finish:'',
+    materials:o.costs.map(c=>c.label).filter(Boolean),fabricFrom:'studio',craft:d.craft||'',stageIndex:+o.stageIndex||0,meas:{}}];
+  if(!saveSafe('layi_dash_orders',list)){alert('Storage is full. Remove a few photos and try again.');return;}
+  logAudit(fresh?'Production run started':'Production run edited',o.id+' · '+o.garment);
+  runDraft=null;closeModal();renderAll();
+  if(fresh&&typeof toast==='function')toast('Run '+o.id+' started — '+o.garment);
+}
+function deleteRun(){
+  if(!runDraft||!runDraft.id)return;
+  const o=getOrders().find(x=>x.id===runDraft.id);
+  if(o&&runIsStocked(o)){alert('This run is already on the shelf. Adjust the stock in the Shop instead.');return;}
+  if(!confirm('Delete this production run? Nothing has gone on the shelf yet.'))return;
+  logAudit('Production run deleted',runDraft.id);
+  save('layi_dash_orders',rawOrders().filter(x=>x.id!==runDraft.id));
+  runDraft=null;closeModal();renderAll();
+}
 
 /* ===== PRODUCTION UPDATE (all roles, with optional photos) ===== */
 function openUpdate(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;updateDraft={id,stage:o.stageIndex,note:'',photos:[],client:o.client,garment:o.garment,worker:(currentUser&&currentUser.staffId)||''};renderUpdateModal();}
@@ -5567,7 +5842,7 @@ function openApptDetail(id){const a=getAppts().find(x=>x.id===id);if(!a){closeMo
   const stCol={Scheduled:'var(--gold)',Completed:'var(--green)',Cancelled:'var(--text-faint)','No-show':'var(--red)'}[st]||'var(--gold)';
   const fmtD=d=>{try{return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}catch(_){return d||'';}};
   const num=String(a.phone||'').replace(/[^0-9]/g,'');
-  const linkedOrder=getOrders().find(o=>o.kind!=='sale'&&o.client&&nameKey(o.client)===nameKey(a.client||''));
+  const linkedOrder=getOrders().find(o=>isClientOrder(o)&&o.client&&nameKey(o.client)===nameKey(a.client||''));
   const rec=(l,v)=>v?`<div class="field" style="margin-bottom:8px"><label>${l}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);white-space:pre-wrap">${esc(v)}</div></div>`:'';
   const hasRecord=a.outcome||a.adjust||a.feedback;
   const info=[['When',fmtD(a.date)+(a.time?' · '+esc(a.time):'')],['Type',esc(tp)],a.location?['Location',esc(a.location)]:null,(multiBranch()&&apptBranch(a))?['Branch',esc(apptBranch(a))]:null,a.completedAt?['Completed',new Date(a.completedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})]:null].filter(Boolean);
@@ -6450,7 +6725,7 @@ function saveStages(){
   if(!mid.length){alert('Add at least one making stage.');return;}
   const reserved=[STAGE_HEAD].concat(STAGE_TAIL).map(s=>s.toLowerCase());const seen={};const cleaned=[];
   for(const s of mid){const k=s.toLowerCase();if(reserved.includes(k)){alert('"'+s+'" is a built-in stage and is added automatically, so remove it from the list.');return;}if(seen[k]){alert('Duplicate stage: '+s);return;}seen[k]=1;cleaned.push(s);}
-  if(getOrders().filter(o=>o.kind!=='sale').length&&!confirm('Changing the workflow can shift where existing in-progress orders sit in the pipeline. It is best to set this up before you start taking orders. Continue?'))return;
+  if(getOrders().filter(o=>isClientOrder(o)||isRun(o)).length&&!confirm('Changing the workflow can shift where existing in-progress orders sit in the pipeline. It is best to set this up before you start taking orders. Continue?'))return;
   SETTINGS.productionStages=cleaned;save('layi_dash_settings',SETTINGS);applyStages();logAudit('Production workflow updated',cleaned.join(' \u2192 '));renderAll();flashSaved('stageSaveBtn','Save workflow');}
 let recipeType=productTypes()[0];let recipeDraft=null;
 function setRecipeType(t){syncRecipeDraft();recipeType=t;recipeDraft=null;renderRecipesSettings();}
@@ -7658,6 +7933,7 @@ function openProductDetail(id){
     <div class="slist">${salesLog.length?salesLog.slice(0,8).map(x=>`<div class="bd-row"><span class="bl">${esc(x.client)} <span style="color:var(--text-faint)">${x.at?new Date(x.at).toLocaleDateString():''}</span></span><span class="bv">${x.qty} sold${can('money')?' · '+cur(x.price):''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No sales recorded yet.</div>'}</div>
     <div class="detail-actbar" style="margin-top:16px;border:none;padding:0">
       ${can('products')?`<button class="btn sm" onclick="openSale('${p.id}')">Record a sale</button>`:''}
+      ${can('products')?`<button class="btn ghost sm" onclick="closeModal();openRun()">Make more</button>`:''}
       ${can('products')?`<button class="btn ghost sm" onclick="openProduct('${p.id}')">Edit</button>`:''}
       ${can('products')?`<button class="btn danger sm" onclick="delProduct('${p.id}')">Delete</button>`:''}
     </div>`);
@@ -7843,11 +8119,16 @@ function recordSale(){
   if(d.qty>stock){alert('Only '+stock+' in stock for that size/colour.');return;}
   const lineTotal=(+d.price||0)*(+d.qty||0);
   const paid=d.paid===null?lineTotal:Math.max(0,+d.paid||0);
-  const cost=(+p.cost||0)*(+d.qty||0);
+  /* Units made in-house were paid for when the materials were bought, and the production
+     run already divided that cost across them. Charging a stock cost here as well would
+     count the same money twice and make every in-house piece look half as profitable as it
+     is. Bought-in stock is charged as before, because nothing else ever booked it. */
+  const freeUnits=Math.min(+d.qty||0,+p.costBookedUnits||0);
+  const cost=(+p.cost||0)*Math.max(0,(+d.qty||0)-freeUnits);
   const client=(d.client||'').trim()||'Walk-in';
   const label=p.name+' · '+variantLabel(v)+' ×'+d.qty;
-  // decrement stock
-  {const list=getProducts();const tp=list.find(x=>x.id===p.id);if(tp){const tv=(tp.variants||[]).find(x=>x.id===v.id);const b=branchOfOr(d,activeBranchView!=='all'?activeBranchView:'');if(tv)setVariantQty(tv,b,Math.max(0,variantQty(tv,b)-d.qty));}setProducts(list);}
+  // decrement stock, and draw down the pool of units whose cost is already in the books
+  {const list=getProducts();const tp=list.find(x=>x.id===p.id);if(tp){const tv=(tp.variants||[]).find(x=>x.id===v.id);const b=branchOfOr(d,activeBranchView!=='all'?activeBranchView:'');if(tv)setVariantQty(tv,b,Math.max(0,variantQty(tv,b)-d.qty));if(freeUnits>0)tp.costBookedUnits=Math.max(0,(+tp.costBookedUnits||0)-freeUnits);}setProducts(list);}
   // build the sale as an order so it flows through revenue, loyalty, finance & pots
   const orders=rawOrders();
   const saleNo=orders.filter(o=>o.kind==='sale').length+1;
@@ -7860,7 +8141,7 @@ function recordSale(){
     saleItems:[{productId:p.id,variantId:v.id,label:variantLabel(v),qty:d.qty,unitPrice:+d.price||0,unitCost:+p.cost||0}],
     value:lineTotal,paid:paid,discount:0,
     currency:SETTINGS.currency,fx:1,
-    costs:cost>0?[{label:'Stock cost ('+d.qty+' × '+cur(p.cost||0)+')',amount:cost,supplier:''}]:[],
+    costs:cost>0?[{label:'Stock cost ('+(d.qty-freeUnits)+' × '+cur(p.cost||0)+')'+(freeUnits>0?', '+freeUnits+' made in-house and already paid for':''),amount:cost,supplier:''}]:[],
     commissions:[],stockUsed:[],
     directorOn:true,directorPct:25,directorAmount:null,
     stageIndex:STAGES.length-1,
@@ -8265,11 +8546,11 @@ function renderOwnerFinance(){
   const per=(typeof dashApptPeriod!=='undefined')?dashApptPeriod:'month';const perC=(typeof dashApptCustom!=='undefined')?dashApptCustom:'';
   const txns=getTxns().filter(inBranch);
   const inPer=txns.filter(t=>t.dir==='in'&&inPeriod(t.at,per,perC)).reduce((s,t)=>s+(+t.amount||0),0);
-  const outstanding=getOrders().filter(o=>o.kind!=='sale').filter(inBranch).reduce((x,o)=>x+orderOutstandingBase(o),0);
+  const outstanding=getOrders().filter(o=>isClientOrder(o)).filter(inBranch).reduce((x,o)=>x+orderOutstandingBase(o),0);
   const plabel=(typeof periodTextOf==='function')?periodTextOf(per,perC):'this period';
   if(!full){
     // Receivables-only view (e.g. Client Relations): who owes, what's paid in, who to chase — no profit/expenses.
-    const owe=getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)&&orderOutstanding(o)>0);
+    const owe=getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&orderOutstanding(o)>0);
     const chaseClients=new Set(owe.map(o=>nameKey(o.client))).size;
     const overdueClients=new Set(owe.filter(o=>{const du=daysUntil(o.due);return du!==null&&du<0;}).map(o=>nameKey(o.client))).size;
     el.innerHTML=[
@@ -8333,9 +8614,9 @@ function renderCreDash(){
   const RFD=STAGES.indexOf('Ready for Delivery'),DELI=STAGES.indexOf('Delivered');
   const tKey=todayKey();const tmKey=new Date(Date.now()+864e5).toISOString().slice(0,10);
   const apptsToday=getAppts().filter(a=>apptInBranch(a)&&a.date===tKey);
-  const ready=getOrders().filter(o=>o.kind!=='sale'&&o.stageIndex>=RFD&&o.stageIndex<DELI);
+  const ready=getOrders().filter(o=>isClientOrder(o)&&o.stageIndex>=RFD&&o.stageIndex<DELI);
   const custCount=Object.keys(getCustomers()).length;
-  const owe=canReceivables()?getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)&&orderOutstanding(o)>0):[];
+  const owe=canReceivables()?getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&orderOutstanding(o)>0):[];
   const oweTotal=owe.reduce((s,o)=>s+orderOutstandingBase(o),0);
   const chaseClients=new Set(owe.map(o=>nameKey(o.client))).size;
   const cards=[
@@ -8442,7 +8723,7 @@ function openListModal(title,sub,inner){
 }
 function prodDrill(kind){
   const RFD=STAGES.indexOf('Ready for Delivery');
-  const orders=getOrders().filter(o=>o.kind!=='sale'&&(!ownJobsOnly()||isMyJob(o)));
+  const orders=getOrders().filter(o=>isClientOrder(o)&&(!ownJobsOnly()||isMyJob(o)));
   const active=orders.filter(o=>o.stageIndex<RFD);
   let title='In production',list=active;
   if(kind==='overdue'){title='Overdue in production';list=active.filter(o=>{const du=daysUntil(o.due);return du!==null&&du<0;});}
@@ -8499,7 +8780,7 @@ function suprDrill(kind){const all=getSuppliers();let title,list;
   else{title='All vendors';list=all;}
   const rows=list.map(s=>`<div class="bd-row" style="cursor:pointer" onclick="closeModal();openSupplierDetail('${s.id}')"><span class="bl">${esc(s.name)}${s.preferred?' <span style="color:var(--gold)">★</span>':''}<span style="color:var(--text-faint);font-size:12px"> · ${esc(s.type||'Vendor')}</span></span><span class="bv" style="color:var(--gold)">›</span></div>`).join('');
   openListModal(title,list.length+' vendor'+(list.length===1?'':'s'),list.length?rows:'<div class="kv" style="color:var(--text-faint)">None on record.</div>');}
-function calDrill(kind){const mo=new Date().toISOString().slice(0,7);const ords=getOrders().filter(o=>o.kind!=='sale').filter(inBranch);let title,list;
+function calDrill(kind){const mo=new Date().toISOString().slice(0,7);const ords=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);let title,list;
   if(kind==='dues'){title='Orders due this month';list=ords.filter(o=>(o.due||'').slice(0,7)===mo&&o.stageIndex<STAGES.indexOf('Delivered'));}
   else{title='Fittings this month';list=ords.filter(o=>(o.due||'').slice(0,7)===mo&&o.stageIndex<=STAGES.indexOf('Fitting'));}
   const rows=list.sort((a,b)=>(a.due||'').localeCompare(b.due||'')).map(o=>`<div class="bd-row" style="cursor:pointer" onclick="openDetail('${o.id}')"><span class="bl">${esc(o.client)} · ${esc(o.garment||'')} <span style="color:var(--text-faint)">${o.id}</span>${branchTag(branchOf(o))}</span><span class="bv" style="color:var(--text-dim)">${o.due?new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—'}</span></div>`).join('');
@@ -8529,7 +8810,7 @@ function custDrill(kind){
   openListModal(title,list.length+' customer'+(list.length===1?'':'s'),list.length?`<div class="clist">${rows}</div>`:'<div class="kv" style="color:var(--text-faint)">Nothing here right now.</div>');
 }
 function dashDrill(kind,arg){
-  const orders=getOrders().filter(o=>o.kind!=='sale').filter(inBranch);
+  const orders=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);
   const READY=STAGES.indexOf('Ready for Delivery'),DELI=STAGES.indexOf('Delivered'),DISP=STAGES.indexOf('Dispatched');
   let title='',list=[];
   if(kind==='active'){title='Active orders in production';list=orders.filter(o=>o.stageIndex<READY);}
@@ -8547,7 +8828,7 @@ function setBranchCustom(d){branchCustom=d;renderBranchCard();renderBranchRow();
 function branchMetrics(period,customDate){
   period=period||branchPeriod;customDate=(customDate!==undefined)?customDate:branchCustom;
   const RFD=STAGES.indexOf('Ready for Delivery'),DIS=STAGES.indexOf('Dispatched');
-  const txns=getTxns();const orders=getOrders().filter(o=>o.kind!=='sale');
+  const txns=getTxns();const orders=getOrders().filter(o=>isClientOrder(o));
   return branchNames().map(bn=>{
     let rev=0,spend=0;txns.forEach(t=>{if(branchOf(t)!==bn||!inPeriod(t.at,period,customDate))return;const a=+t.amount||0;if(t.dir==='in')rev+=a;else if(t.dir==='out'&&expenseCounts(t))spend+=a;});
     const bo=orders.filter(o=>branchOf(o)===bn);
@@ -8657,16 +8938,16 @@ function openBranchDrill(bn,type){
     body=(list.length?list.map(t=>row(esc(t.label)+(t.category?' <span style="color:var(--text-faint);font-size:11px">\u00b7 '+esc(t.category)+'</span>':''),'\u2212'+cur(t.amount),'var(--red)',`closeModal();openExpense('${t.id}')`)).join(''):'<div class="kv" style="color:var(--text-faint)">No spending '+plabel+'.</div>')
       +`<div class="bd-total"><span>Total spent</span><b style="color:var(--red)">\u2212${cur(total)}</b></div>`;
   }else if(type==='outstanding'){
-    const list=getOrders().filter(o=>o.kind!=='sale'&&inBN(o)&&orderOutstanding(o)>0).sort((a,b)=>(daysUntil(a.due)??9999)-(daysUntil(b.due)??9999));
+    const list=getOrders().filter(o=>isClientOrder(o)&&inBN(o)&&orderOutstanding(o)>0).sort((a,b)=>(daysUntil(a.due)??9999)-(daysUntil(b.due)??9999));
     const total=list.reduce((s,o)=>s+orderOutstandingBase(o),0);title='Outstanding balances';sub=list.length+' order'+(list.length===1?'':'s')+' awaiting payment';
     body=(list.length?list.map(o=>{const du=daysUntil(o.due);const dl=du==null?'':du<0?` <span style="color:var(--red)">(${-du}d overdue)</span>`:du===0?' (due today)':` (due in ${du}d)`;return row(esc(o.client)+dl,cur(orderOutstandingBase(o)),du!=null&&du<0?'var(--red)':'var(--amber)',`closeModal();openDetail('${o.id}')`);}).join(''):'<div class="kv" style="color:var(--text-faint)">All balances settled.</div>')
       +`<div class="bd-total"><span>Total outstanding</span><b style="color:var(--red)">${cur(total)}</b></div>`;
   }else if(type==='active'){
-    const list=getOrders().filter(o=>o.kind!=='sale'&&inBN(o)&&o.stageIndex<RFD).sort((a,b)=>(daysUntil(a.due)??9999)-(daysUntil(b.due)??9999));
+    const list=getOrders().filter(o=>isClientOrder(o)&&inBN(o)&&o.stageIndex<RFD).sort((a,b)=>(daysUntil(a.due)??9999)-(daysUntil(b.due)??9999));
     title='Active orders';sub=list.length+' in production';
     body=list.length?list.map(o=>{const du=daysUntil(o.due);const dtxt=du==null?'':du<0?`<span style="color:var(--red)">${-du}d late</span>`:du===0?'<span style="color:var(--amber)">today</span>':`in ${du}d`;return row(esc(o.client)+' <span style="color:var(--text-faint);font-size:11px">\u00b7 '+esc(STAGES[o.stageIndex])+'</span>',dtxt,'',`closeModal();openDetail('${o.id}')`);}).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing in production.</div>';
   }else if(type==='overdue'){
-    const list=getOrders().filter(o=>o.kind!=='sale'&&inBN(o)&&o.stageIndex<DIS&&(daysUntil(o.due)??0)<0).sort((a,b)=>(daysUntil(a.due)??0)-(daysUntil(b.due)??0));
+    const list=getOrders().filter(o=>isClientOrder(o)&&inBN(o)&&o.stageIndex<DIS&&(daysUntil(o.due)??0)<0).sort((a,b)=>(daysUntil(a.due)??0)-(daysUntil(b.due)??0));
     title='Overdue orders';sub=list.length+' past due date';
     body=list.length?list.map(o=>{const du=daysUntil(o.due);return row(esc(o.client)+' <span style="color:var(--text-faint);font-size:11px">· '+esc(STAGES[o.stageIndex])+'</span>',`<span style="color:var(--red)">${-du}d late</span>`,'',`closeModal();openDetail('${o.id}')`);}).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing overdue.</div>';
   }else if(type==='inventory'){
@@ -8812,7 +9093,7 @@ function renderActivity(){
   if(_mode==='maker'||_mode==='cre'){if(_ownerD)_ownerD.style.display='none';if(_altD)_altD.style.display='';if(_mode==='maker')renderMakerDash();else renderCreDash();return;}
   if(_ownerD)_ownerD.style.display='';if(_altD){_altD.style.display='none';_altD.innerHTML='';}
   renderOwnerFinance();
-  const orders=getOrders().filter(o=>o.kind!=='sale').filter(inBranch);
+  const orders=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);
   const READY=STAGES.indexOf('Ready for Delivery'),DELI=STAGES.indexOf('Delivered'),DISP=STAGES.indexOf('Dispatched');
   const active=orders.filter(o=>o.stageIndex<READY).length;
   const ready=orders.filter(o=>o.stageIndex>=READY&&o.stageIndex<DELI).length;
@@ -8839,7 +9120,7 @@ function renderActivity(){
   const donut=document.getElementById('dashDonut');
   if(donut){const useRev=can('money');const cat={};const inDP=o=>inPeriod(o.createdAt,dashApptPeriod,dashApptCustom); // branch- AND period-aware
     getOrders().filter(inBranch).filter(inDP).filter(o=>o.kind==='sale').forEach(o=>(o.saleItems||[]).forEach(it=>{const pr=getProducts().find(x=>x.id===it.productId);const c=(pr&&pr.category)||'Other';cat[c]=(cat[c]||0)+(useRev?(+it.unitPrice||0)*(+it.qty||0):(+it.qty||0));}));
-    getOrders().filter(inBranch).filter(inDP).filter(o=>o.kind!=='sale').forEach(o=>{const outs=(o.outfits&&o.outfits.length)?o.outfits:[{type:o.garment||'Other',price:o.value}];outs.forEach(of=>{const c=of.type||of.name||'Other';cat[c]=(cat[c]||0)+(useRev?(+of.price||0):1);});});
+    getOrders().filter(inBranch).filter(inDP).filter(o=>isClientOrder(o)).forEach(o=>{const outs=(o.outfits&&o.outfits.length)?o.outfits:[{type:o.garment||'Other',price:o.value}];outs.forEach(of=>{const c=of.type||of.name||'Other';cat[c]=(cat[c]||0)+(useRev?(+of.price||0):1);});});
     const keys=Object.keys(cat).filter(k=>cat[k]>0).sort((a,b)=>cat[b]-cat[a]);
     if(!keys.length){donut.innerHTML=`<div class="ad" style="color:var(--text-faint);padding:18px 2px">No sales ${periodLabel(dashApptPeriod,dashApptCustom)} to break down by category.</div>`;}
     else{const top=keys.slice(0,6),rest=keys.slice(6);const segs=top.map((k,i)=>({label:k,value:cat[k],color:MIX_COLORS[i%MIX_COLORS.length]}));if(rest.length)segs.push({label:'Other',value:rest.reduce((x,k)=>x+cat[k],0),color:MIX_COLORS[6%MIX_COLORS.length]});
@@ -8972,7 +9253,7 @@ function renderTodayStrip(){
   const el=document.getElementById('todayStrip');if(!el)return;
   if(!multiBranch()){el.innerHTML='';return;}
   const tk=todayKey();const DELI=STAGES.indexOf('Delivered');
-  const all=getOrders().filter(inBranch).filter(o=>o.kind!=='sale');
+  const all=getOrders().filter(inBranch).filter(o=>isClientOrder(o));
   const sameDay=d=>d&&String(d).slice(0,10)===tk;
   const deliveredToday=all.filter(o=>sameDay(o.deliveredAt)).length;
   const dispatchedToday=all.filter(o=>sameDay(o.dispatchedAt)&&!sameDay(o.deliveredAt)).length;
@@ -8984,7 +9265,7 @@ function renderTodayStrip(){
 }
 function todayDrill(kind){
   const tk=todayKey();const DELI=STAGES.indexOf('Delivered');
-  const all=getOrders().filter(inBranch).filter(o=>o.kind!=='sale');
+  const all=getOrders().filter(inBranch).filter(o=>isClientOrder(o));
   const sameDay=d=>d&&String(d).slice(0,10)===tk;
   let title='',list=[];
   if(kind==='delivered'){title='Delivered today';list=all.filter(o=>sameDay(o.deliveredAt));}
@@ -9004,7 +9285,7 @@ function renderDashSalesTrio(){
   if(Object.keys(prod).length){
     bs=Object.keys(prod).map(k=>{const p=getProducts().find(x=>x.id===k);return {id:k,hasP:!!p,name:p?p.name:'Item',qty:prod[k].qty,rev:prod[k].rev};}).sort((a,b)=>b.qty-a.qty).slice(0,3);bsLabel='Best sellers';
   }else{
-    const g={};getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)).forEach(o=>{const t=((o.garment||orderItems(o)||'Order')+'').split(',')[0].trim()||'Order';if(!g[t])g[t]={qty:0,rev:0};g[t].qty++;g[t].rev+=orderNetBase(o);});
+    const g={};getOrders().filter(o=>isClientOrder(o)&&inBranch(o)).forEach(o=>{const t=((o.garment||orderItems(o)||'Order')+'').split(',')[0].trim()||'Order';if(!g[t])g[t]={qty:0,rev:0};g[t].qty++;g[t].rev+=orderNetBase(o);});
     bs=Object.keys(g).map(k=>({id:'',hasP:false,name:k,qty:g[k].qty,rev:g[k].rev})).sort((a,b)=>b.rev-a.rev).slice(0,3);bsLabel='Top '+tradeWordPlural();
   }
   const cust={};allO.forEach(o=>{const c=o.client||'Walk-in';if(!cust[c])cust[c]={n:0,rev:0};cust[c].n++;cust[c].rev+=(o.kind==='sale'?(+o.value||0):orderNetBase(o));});
@@ -9015,7 +9296,7 @@ function renderDashSalesTrio(){
 }
 function garmentDrill(name){
   const key=o=>((o.garment||orderItems(o)||'Order')+'').split(',')[0].trim()||'Order';
-  const list=getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)&&key(o)===name);
+  const list=getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&key(o)===name);
   openOrderListModal(esc(name)+(activeBranchView!=='all'?' \u00b7 '+esc(activeBranchView):''),list,list.length+' order'+(list.length===1?'':'s'));
 }
 function custNameDrill(name){
@@ -9094,7 +9375,7 @@ function salesCategoryDrill(){
   const inDP=o=>inPeriod(o.createdAt,dashApptPeriod,dashApptCustom);
   const val={},cnt={};
   getOrders().filter(inBranch).filter(inDP).filter(o=>o.kind==='sale').forEach(o=>(o.saleItems||[]).forEach(it=>{const pr=getProducts().find(x=>x.id===it.productId);const c=(pr&&pr.category)||'Other';val[c]=(val[c]||0)+(useRev?(+it.unitPrice||0)*(+it.qty||0):(+it.qty||0));cnt[c]=(cnt[c]||0)+(+it.qty||0);}));
-  getOrders().filter(inBranch).filter(inDP).filter(o=>o.kind!=='sale').forEach(o=>{const outs=(o.outfits&&o.outfits.length)?o.outfits:[{type:o.garment||'Other',price:o.value}];outs.forEach(of=>{const c=of.type||of.name||'Other';val[c]=(val[c]||0)+(useRev?(+of.price||0):1);cnt[c]=(cnt[c]||0)+1;});});
+  getOrders().filter(inBranch).filter(inDP).filter(o=>isClientOrder(o)).forEach(o=>{const outs=(o.outfits&&o.outfits.length)?o.outfits:[{type:o.garment||'Other',price:o.value}];outs.forEach(of=>{const c=of.type||of.name||'Other';val[c]=(val[c]||0)+(useRev?(+of.price||0):1);cnt[c]=(cnt[c]||0)+1;});});
   const keys=Object.keys(val).filter(k=>val[k]>0).sort((a,b)=>val[b]-val[a]);
   const tot=keys.reduce((s,k)=>s+val[k],0)||1;
   const rows=keys.map((k,i)=>{const pct=Math.round(val[k]/tot*100);const color=MIX_COLORS[i%MIX_COLORS.length];
@@ -9108,7 +9389,7 @@ function salesCategoryItems(cat){
   const inDP=o=>inPeriod(o.createdAt,dashApptPeriod,dashApptCustom);
   const items=[];
   getOrders().filter(inBranch).filter(inDP).filter(o=>o.kind==='sale').forEach(o=>(o.saleItems||[]).forEach(it=>{const pr=getProducts().find(x=>x.id===it.productId);const c=(pr&&pr.category)||'Other';if(c!==cat)return;items.push({orderId:o.id,sale:true,client:o.client||'Walk-in',name:(pr&&pr.name)||'Item',qty:+it.qty||0,value:(+it.unitPrice||0)*(+it.qty||0),photo:(pr&&pr.photo)||'',date:o.createdAt});}));
-  getOrders().filter(inBranch).filter(inDP).filter(o=>o.kind!=='sale').forEach(o=>{const outs=(o.outfits&&o.outfits.length)?o.outfits:[{type:o.garment||'Other',price:o.value,photos:[]}];outs.forEach(of=>{const c=of.type||of.name||'Other';if(c!==cat)return;items.push({orderId:o.id,sale:false,client:o.client||'Client',name:of.name||of.type||'Piece',style:of.style||'',qty:1,value:+of.price||0,photo:(of.photos&&of.photos[0])||(o.clientPhotos&&o.clientPhotos[0])||'',date:o.createdAt});});});
+  getOrders().filter(inBranch).filter(inDP).filter(o=>isClientOrder(o)).forEach(o=>{const outs=(o.outfits&&o.outfits.length)?o.outfits:[{type:o.garment||'Other',price:o.value,photos:[]}];outs.forEach(of=>{const c=of.type||of.name||'Other';if(c!==cat)return;items.push({orderId:o.id,sale:false,client:o.client||'Client',name:of.name||of.type||'Piece',style:of.style||'',qty:1,value:+of.price||0,photo:(of.photos&&of.photos[0])||(o.clientPhotos&&o.clientPhotos[0])||'',date:o.createdAt});});});
   items.sort((a,b)=>b.value-a.value);
   const totV=items.reduce((s,x)=>s+x.value,0),totQ=items.reduce((s,x)=>s+x.qty,0);
   const rows=items.map(it=>{const thumb=it.photo?`<img src="${it.photo}" onclick="event.stopPropagation();lightbox('${it.photo}')" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;cursor:zoom-in" onerror="this.style.visibility='hidden'">`:`<div style="width:44px;height:44px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--text-faint);flex:none;font-size:17px">${it.sale?'🏷':'✂'}</div>`;
@@ -9160,7 +9441,10 @@ try{window.addEventListener('resize',function(){
 function firstPhoto(o){for(const of of o.outfits){if(of.photos&&of.photos.length)return of.photos[0];}return o.clientPhotos&&o.clientPhotos[0]||null;}
 function ownJobsOnly(){const r=currentRole();return !!(r&&r.perms&&r.perms.allOrders===0);}
 function isMyJob(o){const sid=currentUser&&currentUser.staffId;if(!sid)return false;return (o.commissions||[]).some(c=>c.kind==='maker'&&c.staffId===sid)||(o.updates||[]).some(u=>u.workerId===sid);}
-function prodOrders(){const all=getOrders().filter(o=>o.kind!=='sale').filter(inBranch);return ownJobsOnly()?all.filter(o=>isMyJob(o)&&o.stageIndex<STAGES.indexOf('Dispatched')):all;}
+/* The board shows runs alongside client orders, because a run occupies the same bench and
+   the same people. Leaving it off would show a workroom with nothing in it on the week it
+   is making next season's rail. */
+function prodOrders(){const all=getOrders().filter(o=>isClientOrder(o)||isRun(o)).filter(inBranch);return ownJobsOnly()?all.filter(o=>isMyJob(o)&&o.stageIndex<STAGES.indexOf('Dispatched')):all;}
 function prodFilterTo(f){prodFilter=f;document.querySelectorAll('#view-production .chip[data-f]').forEach(c=>c.classList.toggle('active',c.dataset.f===f));renderProduction();}
 function orderPace(o){const ups=(o.updates||[]).filter(u=>u.at).map(u=>new Date(u.at)).sort((a,b)=>a-b);if(ups.length>=2){const span=(ups[ups.length-1]-ups[0])/864e5,steps=ups.length-1;if(steps>0&&span>0)return Math.max(0.5,span/steps);}return 2;}
 function stageAgeDays(o){let start=o.stageStartedAt;if(!start){const cur=STAGES[o.stageIndex];const u=(o.updates||[]).filter(x=>x.stage===cur&&x.at).map(x=>x.at).sort().slice(-1)[0];if(u)start=u;}if(!start)start=o.createdAt;if(!start)return null;return Math.max(0,Math.floor((Date.now()-new Date(start))/864e5));}
@@ -9322,7 +9606,7 @@ function setOrdersCustom(d){ordersCustom=d;renderOrders();}
 function setOrdersFilter(f){ordersFilter=f;renderOrders();}
 // Orders KPI cards drill into the exact orders behind them — same branch + period as the card.
 function ordersDrill(kind){
-  let orders=getOrders().filter(inBranch).filter(o=>showsBespoke()?o.kind!=='sale':o.kind==='sale');
+  let orders=getOrders().filter(inBranch).filter(o=>showsBespoke()?isClientOrder(o):o.kind==='sale');
   if(ownJobsOnly())orders=orders.filter(isMyJob);
   const inP=orders.filter(o=>ordersPeriod==='all'||inPeriod(o.createdAt,ordersPeriod,ordersCustom));
   const DELI=STAGES.indexOf('Delivered'),DIS=STAGES.indexOf('Dispatched'),RFD=STAGES.indexOf('Ready for Delivery');
@@ -9366,7 +9650,7 @@ function orderPieces(o){return isBatch(o)?(+o.batch.qty||1):((o.outfits&&o.outfi
 function orderItemsLabel(o){const names=(o.outfits||[]).map(x=>x.name||x.type).filter(Boolean);if(!names.length)return esc(o.garment||'—');return esc(names[0])+(names.length>1?' <span style="color:var(--text-faint)">+'+(names.length-1)+'</span>':'');}
 function renderOrders(){
   const wrap=document.getElementById('ordersLedger');if(!wrap)return;
-  let orders=getOrders().filter(inBranch).filter(o=>showsBespoke()?o.kind!=='sale':o.kind==='sale');
+  let orders=getOrders().filter(inBranch).filter(o=>showsBespoke()?isClientOrder(o):o.kind==='sale');
   if(ownJobsOnly())orders=orders.filter(isMyJob);
   const opb=document.getElementById('ordersPeriodBar');if(opb)opb.innerHTML=periodControlHTML(ordersPeriod,ordersCustom,'setOrdersPeriod','setOrdersCustom');
   const inP=orders.filter(o=>ordersPeriod==='all'||inPeriod(o.createdAt,ordersPeriod,ordersCustom));
@@ -9517,7 +9801,7 @@ function openDashOutstanding(){openBreakdown('outstanding');}
 // Who to chase: clients with an unpaid balance, most overdue first, with a WhatsApp reminder + record-payment.
 function openChaseList(){
   if(!canReceivables())return;
-  const owe=getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)&&orderOutstanding(o)>0);
+  const owe=getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&orderOutstanding(o)>0);
   const byC={};owe.forEach(o=>{const k=nameKey(o.client);if(!byC[k])byC[k]={name:o.client,owed:0,orders:[],worstDu:9999};byC[k].owed+=orderOutstandingBase(o);byC[k].orders.push(o);const du=daysUntil(o.due);if(du!==null&&du<byC[k].worstDu)byC[k].worstDu=du;});
   const list=Object.keys(byC).map(k=>Object.assign({key:k},byC[k])).sort((a,b)=>a.worstDu-b.worstDu);
   const total=list.reduce((s,c)=>s+c.owed,0);
@@ -9927,7 +10211,7 @@ function openBreakdown(type,period,custom){
       +`<div class="bd-total"><span>Retained business profit</span><b style="color:${T.retained>=0?'var(--green)':'var(--red)'}">${T.retained<0?'−':''}${cur(Math.abs(T.retained))}</b></div>`;
   }else if(type==='outstanding'){
     title='Outstanding Balances';
-    const owe=orders.filter(o=>o.kind!=='sale'&&orderNet(o)-(+o.paid||0)>0).sort((a,b)=>(daysUntil(a.due)??9999)-(daysUntil(b.due)??9999));
+    const owe=orders.filter(o=>isClientOrder(o)&&orderNet(o)-(+o.paid||0)>0).sort((a,b)=>(daysUntil(a.due)??9999)-(daysUntil(b.due)??9999));
     const rowC=(l,v,c,click)=>`<div class="bd-row"${click?` style="cursor:pointer" onclick="${click}"`:''}><span class="bl">${l}${click?' <span style="color:var(--gold)">\u203a</span>':''}</span><span class="bv"${c?` style="color:${c}"`:''}>${v}</span></div>`;
     const oweTot=owe.reduce((s,o)=>s+orderOutstandingBase(o),0);
     body=(owe.length?owe.map(o=>{const du=daysUntil(o.due);const dl=du==null?'':du<0?` (${-du}d overdue)`:du===0?' (due today)':` (due in ${du}d)`;return rowC(esc(o.client)+dl,cur(orderOutstandingBase(o)),du!=null&&du<0?'var(--red)':'',`closeModal();openDetail('${o.id}')`);}).join(''):'<div class="kv">All balances settled.</div>')
@@ -11575,7 +11859,7 @@ function renderRotaBoard(){
     return `<div class="rb-card" draggable="true" ondragstart="rotaDragStart(event,'${o.id}','${fromId}')" onclick="openDetail('${o.id}')"><div class="rb-client">${esc(o.client||'Client')}</div><div class="rb-what">${esc(rotaWhat(o))}</div><div class="rb-meta"><span class="wj-stage">${esc(st)}</span>${late?'<span style="color:var(--red);font-size:11px;font-weight:600">late</span>':(du===0?'<span style="color:var(--amber);font-size:11px;font-weight:600">due today</span>':'')}</div></div>`;};
   const dropAttrs=id=>`ondragover="event.preventDefault();this.classList.add('rb-over')" ondragleave="this.classList.remove('rb-over')" ondrop="this.classList.remove('rb-over');rotaDrop(event,'${id}')"`;
   const dis=STAGES.indexOf('Dispatched');
-  const unJobs=getOrders().filter(o=>o.kind!=='sale'&&inBranch(o)&&(o.stageIndex||0)<dis&&!(o.commissions||[]).some(c=>c.kind==='maker'&&c.staffId));
+  const unJobs=getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&(o.stageIndex||0)<dis&&!(o.commissions||[]).some(c=>c.kind==='maker'&&c.staffId));
   const unCol=`<div class="rb-col rb-unassigned" ${dropAttrs('')}><div class="rb-head"><div><div class="rb-name">Unassigned</div><div class="rb-role">waiting for a maker</div></div><div class="rb-pct">${unJobs.length}</div></div><div class="rb-body">${unJobs.map(o=>card(o,'')).join('')||'<div class="rb-empty">Nothing waiting</div>'}</div></div>`;
   const cols=shown.map(s=>{const jobs=rotaJobsFor(s.id);const pct=Math.round(jobs.length/Math.max(1,+s.maxLoad||10)*100);const lc=pct>=100?'var(--red)':pct>=70?'var(--amber)':'var(--green)';const _shift=staffShiftToday(s.id);const _off=/^off$/i.test(_shift);
     return `<div class="rb-col${_off?' rb-off':''}" ${dropAttrs(s.id)}><div class="rb-head"><div><div class="rb-name">${esc((s.name||'').split(' ')[0])}</div><div class="rb-role">${esc(s.role||'')}${_off?' \u00b7 <span style="color:var(--amber)">Off today</span>':(_shift?' \u00b7 '+esc(_shift):'')}</div></div><div class="rb-pct" style="color:${lc}">${pct}%</div></div><div class="rb-body">${jobs.map(o=>card(o,s.id)).join('')||'<div class="rb-empty">Drop a job here</div>'}</div></div>`;}).join('');

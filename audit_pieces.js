@@ -98,6 +98,33 @@ HP.forEach(c=>{
   if(got!==c[2])F(c[0]+' '+(c[2]?'should':'should not')+' be tracked piece by piece');
 });
 
+/* 4b) The order form actually asks which craft a piece is. ---------------------------
+   This exists because it did not, for a while, and nothing noticed: an edit script rolled
+   back halfway and the picker was never written, while every test of itemStages() went on
+   passing because those read the model directly. A screen no gate renders is a blind
+   spot. */
+run("SETTINGS.branches=[{id:'b1',name:'Solo',active:true,does:['leather:make','garments:make']}];openOrder();");
+const ofForm=run("document.getElementById('modal').innerHTML")||'';
+if(ofForm.indexOf('What kind of piece is this')<0)
+  F('a studio working in two crafts is never asked which craft an item is');
+if(ofForm.indexOf('Bags & leather')<0&&ofForm.indexOf('Bags &amp; leather')<0)
+  F('the item craft picker does not offer the crafts the studio works in');
+// and the chip sets it, and changing it puts the piece back to the start of its new list
+run("draft.outfits[0].stageIndex=3;setOutfitCraft(0,'leather');");
+if(run("draft.outfits[0].craft")!=='leather')F('picking a craft for an item records nothing');
+if(run("draft.outfits[0].stageIndex")!==0)
+  F('changing what a piece IS left it part-way through a list it no longer walks');
+// the picker offers an explicit way back to the studio's own stages, rather than
+// expecting somebody to work out that tapping the same chip again undoes it
+if(ofForm.indexOf('Same as the studio')<0)F('there is no way to put an item back on the studio’s own stages');
+run("setOutfitCraft(0,'');");
+if(run("draft.outfits[0].craft")!=='')F('an item cannot be put back on the studio’s own stages');
+// a studio in ONE craft is not asked at all: it would be the same answer every time
+run("SETTINGS.branches=[{id:'b1',name:'Solo',active:true,does:['garments:make']}];openOrder();");
+if((run("document.getElementById('modal').innerHTML")||'').indexOf('What kind of piece is this')>=0)
+  F('a studio that works in one craft is asked which craft every item is');
+run("closeModal();draft=null;");
+
 /* 5) Stepping a piece walks ITS list and stops where its own dispatch is. ------------- */
 run("loadExampleAs('bespoke');currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
 run("SETTINGS.branches=[{id:'b1',name:getBranches()[0].name,active:true,does:['garments:make','leather:make']}];");
