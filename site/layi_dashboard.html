@@ -1315,9 +1315,9 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" id="bizDoesPanel" data-setperm="settings">
           <div class="panel-head"><h3>What your studio does</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Tick what you work in, then say how each one reaches your customer. We'll show only the tools you need.</p>
+          <p class="page-sub" style="margin-bottom:12px">Tick what you work in, then how each one reaches your customer. We'll show only the tools you need.</p>
           <div id="bizDoesBox" style="display:flex;flex-wrap:wrap;gap:10px"></div>
-          <div class="sd" style="color:var(--text-faint);margin-top:10px">Making these here shows Production &amp; fittings. Selling them ready made shows the Shop &amp; Sales. Both is normal.</div>
+          <div class="sd" style="color:var(--text-faint);margin-top:10px"><b>Made to order</b> shows Production &amp; fittings. <b>Ready made</b> shows the Shop &amp; Sales. Tick both if you make what you sell.</div>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);margin-top:16px;border-top:1px solid var(--line-soft);padding-top:14px"><input type="checkbox" id="set_teamtools" onchange="toggleTeamTools(this.checked)"> <span>I work with a team <span style="color:var(--text-faint);font-weight:400">(shows Team, Rota, Attendance, Leave &amp; Payroll</span></span></label>
           <div class="sd" style="color:var(--text-faint);margin-top:6px">Leave this off if it is just you. These tools appear on their own once you add staff or a second studio.</div>
         </div>
@@ -2938,7 +2938,7 @@ function renderStudioSetup(){
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
     +'<div class="field"><label>Where do you work from <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="su_loc" value="'+esc(d.location)+'" placeholder="City / area"></div>'
     +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label>'
-    +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 8px">Tick what you work in, then say how each one reaches your customer. Both is normal.</div>'
+    +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 8px">Tick what you work in, then how each one reaches your customer. <b>Made to order</b> opens the production board, <b>ready made</b> opens the Shop and Sales. Tick both if you make what you sell.</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:2px">'+chips+'</div></div>'
     +'<div class="field"><label>How do you sell <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label><div style="display:flex;gap:20px;padding-top:4px">'
     +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_show" '+(d.channels.indexOf('showroom')>=0?'checked':'')+'> In person</label>'
@@ -2965,7 +2965,7 @@ function saveStudioSetup(){
   const name=(d.name||'').trim();
   if(!name){alert('What is your label called?');return;}
   if(!d.does.length){alert('Tick at least one thing you do, so the app knows which tabs to show you.');return;}
-  if(!normaliseDoes(d.does).some(k=>modeOf(k))){alert('For each one, say whether you make it here or sell it ready made.');return;}
+  if(!normaliseDoes(d.does).some(k=>modeOf(k))){alert('For each one, say whether it is made to order or sold ready made.');return;}
 
   SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:name});
   const existing=getBranches()[0]||{};
@@ -3310,8 +3310,8 @@ const QC_BY_CRAFT={
     'Folded & wrapped']
 };
 const MODES=[
-  {key:'make', label:'We make these here',      desc:'Opens the production board'},
-  {key:'stock',label:'We sell them ready made', desc:'Opens the Shop and Sales'}
+  {key:'make', label:'Made to order', desc:'Anything you make yourselves. Opens the production board'},
+  {key:'stock',label:'Ready made',    desc:'Finished, on a shelf, nobody measured. Opens the Shop and Sales'}
 ];
 function craftByKey(k){const c=String(k||'').split(':')[0];return CRAFTS.find(x=>x.key===c)||null;}
 function craftOf(k){return String(k||'').split(':')[0];}
@@ -6226,7 +6226,7 @@ function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b
   const missing=named.find(b=>!(b.does&&b.does.length));
   if(missing){alert('Tick what \u201c'+missing.name.trim()+'\u201d does before saving.');return;}
   const modeless=named.find(b=>!normaliseDoes(b.does).some(k=>modeOf(k)));
-  if(modeless){alert('For \u201c'+modeless.name.trim()+'\u201d, say whether each thing is made there or sold ready made.');return;}
+  if(modeless){alert('For \u201c'+modeless.name.trim()+'\u201d, say whether each thing is made to order or sold ready made.');return;}
   const clean=named.map(b=>({id:b.id||uid('br'),name:b.name.trim(),location:(b.location||'').trim(),active:true,does:b.does.slice(),type:summaryType(b.does),channels:Array.isArray(b.channels)&&b.channels.length?b.channels:['showroom']}));
   if(!clean.length){alert('Add at least one branch.');return;}
   const seen={};for(const b of clean){const k=b.name.toLowerCase();if(seen[k]){alert('Duplicate branch: '+b.name);return;}seen[k]=1;}
@@ -8454,7 +8454,7 @@ function renderBranchEdit(){
     ? `<div style="flex:1 1 100%;border:1.5px dashed var(--gold);border-radius:12px;padding:12px;margin-top:4px">
         <input class="fld" id="be_newlabel" value="${esc(b._newlabel||'')}" placeholder="New type name (e.g. Alterations, Uniforms, Rentals)" style="margin-bottom:8px">
         <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px">Do you… <span style="text-transform:none;letter-spacing:0">(both is fine)</span></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${mchip('make','Make these here \u2192 Production')}${mchip('stock','Sell them ready made \u2192 Shop &amp; Sales')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${mchip('make','Made to order \u2192 Production')}${mchip('stock','Ready made \u2192 Shop &amp; Sales')}</div>
         <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px">Closest to <span style="text-transform:none;letter-spacing:0">(optional, and it borrows that craft's wording, measurements and stages)</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${CRAFTS.map(c=>cchip(c.key,esc(c.label))).join('')}${cchip('','Nothing like it')}</div>
         <div style="display:flex;gap:8px"><button class="btn sm" onclick="beAddType()">Add type</button><button class="btn ghost sm" onclick="beCancelAdd()">Cancel</button></div>

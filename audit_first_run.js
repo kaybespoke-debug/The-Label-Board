@@ -172,7 +172,7 @@ section('It refuses the answers it cannot work without');
   b.sb.__alert = '';
   b.run('saveStudioSetup();');
   ok('nor with a craft but no answer to how it reaches the customer',
-     /make it here|ready made/i.test(b.sb.__alert || ''), b.sb.__alert);
+     /made to order|ready made/i.test(b.sb.__alert || ''), b.sb.__alert);
   ok('and is still asked afterwards', b.run('needsStudioSetup()') === true);
 }
 
