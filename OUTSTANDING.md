@@ -40,6 +40,15 @@ deploy. The whole release is static files.
 | 2 | `git push origin admin-deploy` — publishes the **admin console** | Kayode says go |
 | 3 | Merge to `main` — publishes the **customer app**. Use the recipe below, not a plain merge | Kayode says go |
 | 4 | Watch the sign-in screen on a real phone: the build stamp must read **layi-v40**. If it still says v39 the service worker did not swap | after |
+| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | after |
+
+**The release window.** For as long as one phone in a studio is on v40 and
+another has not swapped yet, the old one shows only open orders: it knows one
+storage key and the new build writes the finished half into a second one.
+**Nothing is lost** — the finished orders are in the cloud and on every updated
+device, and they come back the moment the old phone reloads. Found and fixed
+on 11 Sep: the same window used to make the new build count those orders twice,
+which read as ₦696,000 of revenue nobody earned on the demo data alone.
 
 ```bash
 git checkout main && git merge --no-ff --no-commit admin-deploy && git checkout HEAD -- netlify.toml && git commit
