@@ -1184,9 +1184,6 @@ body.modal-open{overflow:hidden}
         <div class="toolbar"><span style="flex:1"></span><button class="btn sm" onclick="openCampaign('all')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>New campaign</button></div>
         <div class="cols">
           <div class="panel"><div class="panel-head"><h3>Customer segments</h3><span class="page-sub">tap to message a group</span></div><div id="mktSegments"></div></div>
-          <div class="panel"><div class="panel-head"><h3>Ready to post</h3><span class="page-sub" id="postSub"></span></div>
-            <p class="page-sub" style="margin-bottom:10px">Work you have finished, with the photos already on it. The caption is a starting point — change it to sound like you, then copy it and post.</p>
-            <div id="postIdeas"></div></div>
           <div class="panel"><div class="panel-head"><h3>Campaign history</h3><span class="page-sub" id="mktHistSub"></span></div><div id="mktHistory"></div></div>
         </div>
       </section>
@@ -1566,9 +1563,7 @@ const DEFAULTS={ownerPassword:'layi2025',currency:'NGN',tiers:[{name:'Starter',m
   defaults:{depositPct:50,leadDays:21,deliveryFee:0,lowStock:5},
   templates:{
     confirm:'Hello {client}, thank you for your order with {brand}. Your order {order} is confirmed. We will be in touch as it progresses.',
-    /* {photo} becomes a link to the finished piece, and the whole line disappears when
-       there is no photo on the order. */
-    ready:'Hello {client}, good news, your order {order} from {brand} is ready for collection/delivery. Please let us know a convenient time.\n\nHere it is: {photo}',
+    ready:'Hello {client}, good news, your order {order} from {brand} is ready for collection/delivery. Please let us know a convenient time.',
     reminder:'Hello {client}, a gentle reminder that a balance of {balance} is outstanding on your order {order} with {brand}. Thank you.'
   }};
 let SETTINGS=Object.assign({},DEFAULTS);
@@ -6639,39 +6634,6 @@ const MEDIA_BUCKET='studio-media';
 const MEDIA_PREFIX='sb:';
 const MEDIA_URL_KEY='layi_dash_media_urls';   // local only; never synced
 const MEDIA_URL_TTL=604800;                   // 7 days
-/* A link that leaves the studio. The bucket is private, so this is a signed URL: it works
-   for whoever has the link and stops working when it expires.
-
-   Thirty days rather than the app's own seven, because a client who opens the message a
-   fortnight later should still see their piece. Not forever, because a link that never
-   expires is a photograph of somebody's wedding outfit sitting on the open web for good,
-   and the client never agreed to that. */
-const SHARE_URL_TTL=2592000;                  // 30 days
-/* The photo to send with 'it is ready': the most recent progress photo, because that is the
-   finished piece, falling back to a photo of the item itself. A client's own reference
-   photo is never sent back to them — they took it, and it is not what they are waiting to
-   see. */
-function finishedPhotoOf(o){
-  if(!o)return '';
-  const ups=(o.updates||[]).filter(u=>u&&Array.isArray(u.photos)&&u.photos.length)
-    .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
-  for(const u of ups){const hit=u.photos.find(Boolean);if(hit)return hit;}
-  for(const x of (o.outfits||[])){const hit=(x.photos||[]).find(Boolean);if(hit)return hit;}
-  return '';
-}
-/* Signed fresh each time rather than reusing the app's own cached url, which is on a much
-   shorter clock and would hand the client a link that dies in a few days. */
-async function sharePhotoLink(ref){
-  if(!ref)return '';
-  if(!isStoredPhoto(ref))return '';           // an inline photo has no link to give out
-  if(!supa||!liveMode)return '';
-  try{
-    const {data,error}=await supa.storage.from(MEDIA_BUCKET).createSignedUrl(storedPath(ref),SHARE_URL_TTL);
-    if(error||!data||!data.signedUrl)return '';
-    return data.signedUrl;
-  }catch(e){return '';}
-}
-
 function isStoredPhoto(s){return typeof s==='string'&&s.slice(0,3)===MEDIA_PREFIX;}
 function storedPath(s){return isStoredPhoto(s)?s.slice(3):'';}
 function isInlinePhoto(s){return typeof s==='string'&&s.slice(0,5)==='data:';}
@@ -7326,15 +7288,7 @@ function applySidebar(){
 function toggleSidebar(){const c=!document.body.classList.contains('sidebar-collapsed');try{localStorage.setItem('layi_sidebar',c?'collapsed':'');}catch(e){}applySidebar();}
 function saveTemplates(){SETTINGS.templates={confirm:fv('tpl_confirm')||'',ready:fv('tpl_ready')||'',reminder:fv('tpl_reminder')||''};save('layi_dash_settings',SETTINGS);logAudit('Message templates updated','');flashSaved('tplSaveBtn','Save templates');}
 function saveDefaults(){const prevCur=SETTINGS.currency;SETTINGS.currency=fv('setCurrency')||SETTINGS.currency||'NGN';SETTINGS.defaults={depositPct:Math.max(0,Math.min(100,Math.round(+fv('def_deposit')||0))),leadDays:Math.max(0,Math.round(+fv('def_lead')||0)),deliveryFee:amt('def_delivery'),lowStock:Math.max(0,Math.round(+fv('def_lowstock')||0)),followUpDays:Math.max(1,Math.round(+fv('def_followup')||90))};save('layi_dash_settings',SETTINGS);logAudit('Defaults updated','');if(SETTINGS.currency!==prevCur){renderAll();}else{renderCustomers();}flashSaved('defSaveBtn','Save defaults');}
-/* {photo} is filled in by whoever is about to send the message, because signing a url is a
-   round trip and this is called from render paths that cannot wait. Given nothing, the
-   token and the line it sits on come out cleanly rather than leaving '{photo}' in a message
-   somebody is about to send to a client. */
-function msgTemplate(kind,o,link){var t=(SETTINGS.templates||{})[kind]||'';var brand=tenantName()||'your studio';var bal=o?curO(Math.max(0,orderNet(o)-(+o.paid||0)),o):'';
-  var out=t.replace(/{client}/g,o?esc0(o.client):'').replace(/{order}/g,o?o.id:'').replace(/{balance}/g,bal).replace(/{brand}/g,brand);
-  if(link)return out.replace(/{photo}/g,link);
-  return out.replace(/[^\n]*{photo}[^\n]*\n?/g,'').replace(/\n{3,}/g,'\n\n').trim();
-}
+function msgTemplate(kind,o){var t=(SETTINGS.templates||{})[kind]||'';var brand=tenantName()||'your studio';var bal=o?curO(Math.max(0,orderNet(o)-(+o.paid||0)),o):'';return t.replace(/{client}/g,o?esc0(o.client):'').replace(/{order}/g,o?o.id:'').replace(/{balance}/g,bal).replace(/{brand}/g,brand);}
 /* ===== WHATSAPP AUTOMATION (groundwork; dormant until go-live) =====
    Today every WhatsApp message is a manual wa.me hand-off — privacy-safe, needs no API. At go-live,
    connect a WhatsApp Business API sender (Meta Cloud API / 360dialog / WATI) behind a Supabase Edge
@@ -7363,49 +7317,15 @@ function renderWASettings(){var c=waCfg();var t=document.getElementById('wa_auto
 function onWAAuto(on){waCfg().auto=!!on;save('layi_dash_settings',SETTINGS);logAudit('Auto WhatsApp '+(on?'enabled':'disabled'),'');renderWASettings();}
 function onWAEvent(k,on){var c=waCfg();c.events=c.events||{};c.events[k]=!!on;save('layi_dash_settings',SETTINGS);}
 function esc0(s){return s==null?'':String(s);}
-/* Held between signing the link and drawing the screen. The order id is held with it so a
-   link signed for one client can never land in another's message when somebody taps twice. */
-let _msgPhotoLink='',_msgPhotoPending=false,_msgOpenFor='';
-/* Draw first, sign second. Waiting on a round trip before opening the screen would leave
-   somebody looking at nothing on a slow morning, and the workroom taps this while holding a
-   garment. So the screen is instant, the ready message says plainly that the link is still
-   coming, and it fills itself in when it arrives — which is why it says so rather than
-   sitting there looking finished and short of a line.
-
-   Offline there is no wait at all: sharePhotoLink returns nothing straight away, and the
-   photo line drops out of the message rather than leaving a dead token in it. */
-function openMsgHelper(id){
-  const o=getOrders().find(x=>x.id===id);if(!o)return;
-  const ref=finishedPhotoOf(o);
-  _msgPhotoLink='';_msgOpenFor=id;
-  _msgPhotoPending=!!(ref&&isStoredPhoto(ref)&&supa&&liveMode);
-  renderMsgHelper(id);
-  if(!_msgPhotoPending)return;
-  sharePhotoLink(ref).then(function(u){
-    if(_msgOpenFor!==id)return;                 // they moved on; this link is not theirs
-    _msgPhotoLink=u||'';_msgPhotoPending=false;renderMsgHelper(id);
-  }).catch(function(){
-    if(_msgOpenFor!==id)return;
-    _msgPhotoPending=false;renderMsgHelper(id);
-  });
-}
-function renderMsgHelper(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const phone=(cust.whatsapp||o.whatsapp||'').replace(/[^0-9]/g,'');
+function openMsgHelper(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const phone=(cust.whatsapp||o.whatsapp||'').replace(/[^0-9]/g,'');
   const email=(cust.email||o.email||'').trim();
-  const block=(label,kind)=>{
-    /* Only the ready message carries the photo. A confirmation is sent before the piece
-       exists and a payment reminder is not the moment to show somebody what they cannot
-       collect yet. */
-    const link=(kind==='ready')?_msgPhotoLink:'';
-    const msg=msgTemplate(kind,o,link);
+  const block=(label,kind)=>{const msg=msgTemplate(kind,o);
     const subj=(kind==='ready'?'Your order is ready':kind==='confirm'?'Your order is confirmed':'A balance on your order')+' \u00b7 '+o.id;
-    /* WhatsApp cannot carry an attachment through a wa.me link and email cannot carry one
-       through mailto, so the photo travels as a link in the text either way. That is the
-       same link in both, and it is why it had to be signed for a month rather than the
-       app's own week. */
+    /* Neither a wa.me link nor a mailto can carry an attachment, so both of these carry
+       the words only. The client is told the piece is ready and comes to see it. */
     const mail=email?`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`:'';
     const wa=phone?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:'';
-    const waiting=(kind==='ready'&&_msgPhotoPending);
-    return `<div class="field"><label>${label}</label><textarea class="fld" rows="${kind==='ready'&&link?5:3}" readonly onclick="this.select()">${esc(msg)}</textarea>${waiting?`<div class="sd" style="color:var(--text-faint);margin-top:5px">Getting the link to the finished piece\u2026 it will appear in the message in a moment.</div>`:''}<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">${mail?`<a class="btn sm" href="${mail}">Email it</a>`:''}${wa?`<a class="btn sm" href="${wa}" target="_blank" rel="noopener">Open in WhatsApp</a>`:'<span style="font-size:12px;color:var(--text-faint)">Add a WhatsApp number to this client to enable the WhatsApp button.</span>'}</div></div>`;};
+    return `<div class="field"><label>${label}</label><textarea class="fld" rows="3" readonly onclick="this.select()">${esc(msg)}</textarea><div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">${mail?`<a class="btn sm" href="${mail}">Email it</a>`:''}${wa?`<a class="btn sm" href="${wa}" target="_blank" rel="noopener">Open in WhatsApp</a>`:'<span style="font-size:12px;color:var(--text-faint)">Add a WhatsApp number to this client to enable the WhatsApp button.</span>'}</div></div>`;};
   /* Confirming an order and telling somebody it is ready are how the studio
      runs; those are on every plan. The payment reminder is the chase. */
   const reminderBlock=planIncludes('chase')?block('Payment reminder','reminder')
@@ -11725,125 +11645,6 @@ function mktDrill(){
   const rows=list.map(c=>`<div class="bd-row"><span class="bl"><b>${esc(c.subject||'(no subject)')}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(c.segmentName||'')} · ${c.recipients||0} recipient${c.recipients===1?'':'s'}</span></span><span class="bv">${c.channel==='whatsapp'?'WhatsApp':'Email'}</span></div>`).join('');
   openListModal('Campaigns this month',list.length+' sent',list.length?rows:'<div class="kv" style="color:var(--text-faint)">No campaigns logged this month.</div>');
 }
-/* ===== READY TO POST =========================================================
-   The best marketing a small studio has is the work it just finished, and it
-   is already in the app: a completed order, the client's name, what it was,
-   and photos somebody took at the fitting.
-
-   What this does NOT do is post anything. Posting means Meta app review,
-   tokens that expire, and a breakage every few months for a feature nobody
-   asked to be automatic. Writing the caption and handing it over is most of
-   the value for a tenth of the work, and it is the same shape as the WhatsApp
-   hand-off that already works here.
-   ========================================================================= */
-function postIdeas(){
-  const DEL=STAGES.indexOf('Delivered'),RFD=STAGES.indexOf('Ready for Delivery');
-  const out=[];
-  getOrders().filter(inBranch).forEach(function(o){
-    if(o.kind==='sale')return;
-    if((o.stageIndex||0)<Math.min(RFD,DEL))return;         // not finished yet
-    // every photo attached to the job, wherever it was taken
-    const photos=[].concat(o.clientPhotos||[]);
-    (o.outfits||[]).forEach(function(of){[].push.apply(photos,of.photos||[]);});
-    (o.updates||[]).forEach(function(u){[].push.apply(photos,u.photos||[]);});
-    if(!photos.length)return;                               // nothing to show
-    const when=o.deliveredAt||o.due||o.createdAt||'';
-    out.push({id:o.id,client:o.client||'',item:o.garment||tradeWord(),
-      photos:photos.slice(0,4),at:when,posted:!!o.postedAt});
-  });
-  // newest finished work first: that is what somebody wants to post today
-  return out.sort(function(a,b){return String(b.at||'').localeCompare(String(a.at||''));}).slice(0,8);
-}
-/* A caption a person would actually send, not a template with holes in it.
-   No client name: posting a customer's name without asking is a good way to
-   lose them, and the studio can add it themselves if they have permission. */
-function postCaption(idea){
-  const co=(SETTINGS.company&&SETTINGS.company.name)||tenantName()||'the studio';
-  const w=tradeWord();
-  const lines=[
-    'Finished this week: '+(idea.item||w)+'.',
-    '',
-    'Made at '+co+(SETTINGS.company&&SETTINGS.company.address?', '+String(SETTINGS.company.address).split('\n')[0]:'')+'.',
-    'Taking orders now \u2014 send us a message to start yours.'
-  ];
-  return lines.join('\n');
-}
-function renderPostIdeas(){
-  const box=document.getElementById('postIdeas');if(!box)return;
-  const ideas=postIdeas();
-  const sub=document.getElementById('postSub');
-  if(sub)sub.textContent=ideas.length?ideas.length+' ready':'';
-  if(!ideas.length){
-    box.innerHTML='<div class="kv" style="color:var(--text-faint);padding:8px 2px">Nothing to post yet. Finished orders with photos on them show up here \u2014 take a picture at the last fitting and it will appear.</div>';
-    return;
-  }
-  box.innerHTML=ideas.map(function(x,i){
-    const thumbs=x.photos.slice(0,3).map(function(ph){
-      return '<img src="'+ph+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">';
-    }).join('');
-    return '<div class="up-line" style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line-soft)">'
-      +'<div style="display:flex;gap:5px;flex:0 0 auto">'+thumbs+'</div>'
-      +'<div style="flex:1;min-width:0">'
-        +'<b>'+esc(x.item)+'</b>'
-        +'<div style="color:var(--text-faint);font-size:12.5px">'+esc(x.id)+(x.at?' \u00b7 '+esc(fmtDateShort(x.at)):'')+(x.posted?' \u00b7 posted':'')+'</div>'
-        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px">'
-          +'<button class="btn sm ghost" onclick="openPostDraft(\''+x.id+'\')">Write the post</button>'
-        +'</div>'
-      +'</div></div>';
-  }).join('');
-}
-function openPostDraft(orderId){
-  const idea=postIdeas().find(function(x){return x.id===orderId;});
-  if(!idea){if(typeof toast==='function')toast('That job is no longer in the list.');return;}
-  const cap=postCaption(idea);
-  openModal('<h3>Write the post</h3><div class="msub">'+esc(idea.item)+' \u00b7 '+esc(idea.id)+'</div>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
-      +idea.photos.map(function(ph){return '<img src="'+ph+'" style="width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">';}).join('')
-    +'</div>'
-    +'<div class="field"><label>Caption</label><textarea class="fld" id="pi_cap" rows="6">'+esc(cap)+'</textarea>'
-      +'<div class="sd" style="color:var(--text-faint);margin-top:5px">We have left the client\u2019s name out on purpose. Add it only if they are happy to be named.</div></div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
-      +'<button class="btn sm ghost" onclick="copyPostCaption()">Copy caption</button>'
-      +'<button class="btn sm ghost" onclick="planThisPost(\''+idea.id+'\')">Plan it in the calendar</button>'
-      +'<button class="btn sm ghost" onclick="markPosted(\''+idea.id+'\')">Mark as posted</button>'
-    +'</div>'
-    +'<div class="sd" style="color:var(--text-faint)">Save the photos from the job, paste the caption, and post it wherever you post. Nothing here posts on your behalf.</div>'
-    +'<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>');
-}
-function copyPostCaption(){
-  const el=document.getElementById('pi_cap');if(!el)return;
-  const txt=el.value||'';
-  try{
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt);}
-    else{el.select&&el.select();document.execCommand&&document.execCommand('copy');}
-    if(typeof toast==='function')toast('Caption copied');
-  }catch(e){if(typeof toast==='function')toast('Select the caption and copy it');}
-}
-/* Straight into the calendar as a content entry, which is what the content
-   type was added for. */
-function planThisPost(orderId){
-  const idea=postIdeas().find(function(x){return x.id===orderId;});
-  // Fall back to the caption we generated if the field reads back empty, so a
-  // planned post is never an empty note somebody has to rewrite from scratch.
-  const el=document.getElementById('pi_cap');
-  const cap=(el&&el.value)||(idea?postCaption(idea):'');
-  const list=getPlanner();
-  list.push({id:uid('pn'),title:'Post: '+((idea&&idea.item)||'finished work'),
-    date:new Date(Date.now()+2*864e5).toISOString().slice(0,10),time:'',
-    type:'content',link:'',repeat:'',invitees:[],notes:cap,
-    branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName(),
-    staffId:'',by:userLabel(),at:new Date().toISOString(),done:false});
-  setPlanner(list);
-  if(typeof logAudit==='function')logAudit('Post planned',(idea&&idea.item)||orderId);
-  closeModal();renderAll();
-  if(typeof toast==='function')toast('Added to the calendar in two days');
-}
-function markPosted(orderId){
-  const list=rawOrders();const o=list.find(function(x){return x.id===orderId;});
-  if(o){o.postedAt=new Date().toISOString();save('layi_dash_orders',list);}
-  closeModal();renderAll();
-  if(typeof toast==='function')toast('Marked as posted');
-}
 function renderMarketing(){
   if(!can('customers'))return;
   const data=buildCustomerData();const segs=marketingSegments();const camps=getCampaigns();
@@ -11856,7 +11657,6 @@ function renderMarketing(){
     stat('Campaigns this month',sentMo,'logged as sent','','mktDrill()')
   ].join('');
   document.getElementById('mktSegments').innerHTML=segs.map(s=>`<div class="bd-row" style="cursor:pointer" onclick="openCampaign('${s.key}')"><span class="bl"><b>${esc(s.name)}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(s.desc)}</span></span><span class="bv"><span class="badge">${s.list.length}</span> <span style="color:var(--gold)">›</span></span></div>`).join('');
-  renderPostIdeas();
   const hist=camps.slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   const hs=document.getElementById('mktHistSub');if(hs)hs.textContent=camps.length?camps.length+' sent':'';
   document.getElementById('mktHistory').innerHTML=hist.length?hist.map(c=>`<div class="up-line"><b>${esc(c.subject||'(no subject)')}</b> <span class="badge" style="font-size:10px">${esc(c.type||'Newsletter')}</span> <span class="sup-status" style="font-size:10px">${c.channel==='whatsapp'?'WhatsApp':'Email'}</span><br><span style="color:var(--text-faint);font-size:12px">${esc(c.segmentName||'')} · ${c.recipients||0} recipients · ${c.at?new Date(c.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}${c.by?' · '+esc(c.by):''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No campaigns logged yet. Create one and tap “Mark as sent” to keep a record here.</div>';

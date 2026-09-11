@@ -236,24 +236,27 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     chasing. So does a quote. So does anything the test cannot judge: archiving an order
     that is not finished stops it syncing, so unsure costs money rather than losing work.
   - New gate `audit_orderstore.js`.
-- **C. The photo goes in the "your order is ready" message.** Option 1, Kayode's call on
-  11 Sep: the finished piece travels to the client, and no Instagram. Neither `wa.me` nor
-  `mailto:` can carry an attachment, so it travels as a link, and there is now an **Email it**
-  button beside the WhatsApp one.
-  - `{photo}` in the ready template becomes a signed link, valid **30 days** — longer than the
-    app's own 7-day URLs, because somebody reads a message a fortnight later, and not forever,
-    because a link that never dies is a wedding outfit on the open web for good.
-  - The photo sent is the **latest progress photo**, or an outfit photo. Never the client's own
-    reference photo, which is theirs and not the studio's work.
-  - **Only the ready message** carries it. A confirmation is sent before the piece exists, and a
-    payment reminder is not the moment to show somebody what they cannot collect yet.
-  - The screen **draws before the link is signed**, because the workroom taps this holding a
-    garment. While it is coming the message says so plainly. Signed for one client, it cannot
-    land in another's message. Offline, or where the photo was saved inline, the whole line
-    drops out rather than sending the word `{photo}` to a client.
-  - Checks added to `audit_media.js` (87). **Ten mutants run against them, all ten caught** —
-    including one that deleted a single copy of a two-line guard and passed, which is why the
-    check now counts both.
+- **C. "Ready to post" is gone, and so is the client photo link.** Built on 11 Sep, taken out
+  the same day on Kayode's call: a nice addition, not worth more time on. Both halves went
+  together, because both existed to move a finished photograph somewhere.
+  - Out of the app: the **Ready to post panel** on Marketing, the caption writer, the post
+    draft screen, "plan it in the calendar", "mark as posted", and the `postedAt` stamp.
+  - Out with it: `SHARE_URL_TTL`, `finishedPhotoOf`, `sharePhotoLink`, the `{photo}` token in
+    the ready template, and the whole signing dance in the message helper. The message helper
+    is a plain synchronous function again.
+  - **Kept:** the **Email it** button beside Open in WhatsApp. It is not part of the photo
+    feature. It puts the same message into email for a client who does not use WhatsApp, and
+    nothing signs a url for it.
+  - No client ever saw any of this. Nothing was pushed, so no device has it.
+  - **The check that matters when a feature is pulled** is that it left nothing behind: a
+    leftover `onclick` draws fine, renders fine, passes every other gate and throws the first
+    time a studio taps it. `audit_marketing.js` now names all eighteen removed identifiers and
+    fails if any survives, then opens the Marketing tab and the message helper for real.
+    `audit_media.js` holds the rule that replaced the feature: nothing signs a url on a longer
+    clock than the app's own, because a url signed for longer is one meant to leave the studio.
+  - **Ten mutants run against the new checks, all ten caught.** Then the app was opened in a
+    browser and all 23 tabs were visited, the Marketing tab drawn and the message helper
+    opened on a phone screen: no console errors, no `{photo}`, both send buttons there.
 
 All 50 gates green after each change, plus the 1,827-check website gate, the 311-check partner
 gate and the 80-check console gate. Every gate written this run was run against a deliberately
@@ -279,16 +282,18 @@ the textbook answer and is weeks of work, a migration per store, RLS per store a
 migration path for every device. **Not worth starting until a real studio's numbers say so.**
 The measurements are in `audit_orderstore.js`, so the day they do, they will say it plainly.
 
-### C. Instagram and Facebook posting  —  answered, not now
-Asked and settled on 11 Sep: the photo goes in the **ready message to the client**, built
-above, and **no Instagram**. Posting to Instagram or Facebook stays off the list until a
-studio asks for it twice: it is app review, tokens and a publishing flow, and it is a second
-product surface rather than a feature.
+### C. Sharing finished work  —  closed, not parked
+Settled on 11 Sep and closed rather than left on a list. The panel, the caption writer and the
+photo link to the client are **all removed**, and posting to Instagram or Facebook is not being
+built: it is app review, tokens that expire and a publishing flow, which is a second product
+rather than a feature. If a studio asks for it twice, it starts from nothing, which is the
+honest position anyway.
 
-For the record, storage was never the reason to be careful here. At the shipped compression a
-reference photo is about 200KB, so **20GB is roughly 97,000 photos** — a studio doing 40
-orders a month with five photos each takes **41 years** to fill Basic, and a 100-order studio
-with eight photos each takes **10 years**. Finished photos are not what fills a cap.
+For the record, storage was never the reason. At the shipped compression a reference photo is
+about 200KB, so **20GB is roughly 97,000 photos** — a studio doing 40 orders a month with five
+photos each takes **41 years** to fill Basic, and a 100-order studio with eight photos each
+takes **10 years**. Finished photos are not what fills a cap. It was removed for the reason
+Kayode gave, which is time, not space.
 
 ---
 
