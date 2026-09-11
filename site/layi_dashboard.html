@@ -1054,7 +1054,10 @@ body.modal-open{overflow:hidden}
           <div class="panel dash-panel" id="dashStatusPanel"><div class="panel-head"><h3 style="cursor:pointer" onclick="salesCategoryDrill()">Sales by category <span style="color:var(--gold);font-size:12px">›</span></h3></div><div id="dashDonut"></div></div>
           <div class="panel dash-panel" id="dashMethodPanel" style="display:none"><div class="panel-head"><h3>How the work was made</h3></div><div class="sd" id="dashMethodSub" style="color:var(--text-faint);margin:-6px 0 10px"></div><div id="dashMethod"></div></div>
         </div>
-        <div class="panel" id="dashMoneyInPanel"><div class="panel-head"><h3 style="cursor:pointer" onclick="openMoneyInOverview(dashApptPeriod,dashApptCustom)">Money in by channel <span style="color:var(--gold);font-size:12px">›</span></h3><span class="page-sub" id="dashMoneyInSub"></span></div><div id="dashMoneyIn"></div></div>
+        <div class="panel" id="dashMoneyInPanel"><div class="panel-head"><h3 style="cursor:pointer" onclick="openMoneyInOverview(dashApptPeriod,dashApptCustom)">Money in by channel <span style="color:var(--gold);font-size:12px">›</span></h3><span class="page-sub" id="dashMoneyInSub"></span></div><div id="dashMoneyIn"></div>
+          <div id="dashMoneyCcyWrap" style="display:none;margin-top:12px;border-top:1px solid var(--line-soft);padding-top:10px">
+            <div class="bd-sub" style="margin:0 0 6px">What it arrived in</div><div id="dashMoneyCcy"></div></div>
+        </div>
         <div id="dashSalesTrio"></div>
         <div class="dash-bottom" id="dashBottomRow">
           <div class="panel"><div class="panel-head"><h3>Appointments</h3><div class="appt-toggle" id="apptToggle"></div></div><div id="dashAppts"></div></div>
@@ -2377,6 +2380,30 @@ function confirmOrderFromButton(id){
 /* Nobody owes you for a job they have not agreed to. This is the one place it has to be
    said: every receivables list, every chase, every total owed and every overdue nudge reads
    through here, so saying it once keeps a quote out of all of them. */
+/* ---- Which currency the money actually arrived in -----------------------------------
+   Every inflow is stored converted to the studio's own currency, which is right for the
+   books: one P&L, one number, no arguing about which rate. What it loses is the question a
+   studio taking pounds actually asks, which is how much of the business is in pounds.
+
+   So an order-linked payment also carries what it was in and how much it was. The naira
+   figure stays the one every total reads, and nothing downstream changes. */
+function txnCurrency(t){return (t&&t.ccy)||SETTINGS.currency;}
+function txnInOriginal(t){return (t&&t.amtCcy!=null)?+t.amtCcy:(+((t||{}).amount)||0);}
+function moneyInByCurrency(period,custom){
+  const out={};
+  getTxns().filter(inBranch).filter(t=>t.dir==='in')
+    .filter(t=>(period===undefined||inPeriod(t.at,period,custom)))
+    .forEach(function(t){
+      const c=txnCurrency(t);
+      if(!out[c])out[c]={amount:0,base:0,count:0};
+      out[c].amount+=txnInOriginal(t);
+      out[c].base+=(+t.amount||0);
+      out[c].count+=1;
+    });
+  return out;
+}
+/* One currency is not a breakdown, it is the only column. */
+function manyCurrencies(by){return Object.keys(by||{}).length>1;}
 const orderOutstanding=o=>isQuote(o)?0:Math.max(0,orderNet(o)-(+o.paid||0));        // order currency
 const orderOutstandingBase=o=>orderOutstanding(o)*ofx(o);             // base ₦
 /* ---- Work sent out ------------------------------------------------------------------
@@ -4794,7 +4821,7 @@ function saveOrder(){
     save('layi_dash_orders',list);}
   // log any newly-paid amount as income
   const delta=(+draft.paid||0)-prevPaid;
-  if(delta>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:draft.client+' · '+(editingOrderId?'payment':'deposit')+(ocur(draft)!==SETTINGS.currency?' ('+curC(delta,ocur(draft))+')':''),amount:delta*ofx(draft),at:new Date().toISOString(),orderId:draft.id,branch:branchOf(draft),method:draft.payMethod||''});setTxns(t);}
+  if(delta>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:draft.client+' · '+(editingOrderId?'payment':'deposit')+(ocur(draft)!==SETTINGS.currency?' ('+curC(delta,ocur(draft))+')':''),amount:delta*ofx(draft),ccy:ocur(draft),amtCcy:delta,at:new Date().toISOString(),orderId:draft.id,branch:branchOf(draft),method:draft.payMethod||''});setTxns(t);}
   closeModal();renderAll();
 }
 function deleteOrder(){if(!can('del')||!editingOrderId)return;if(!confirm('Delete this order permanently?'))return;logAudit('Order deleted',editingOrderId);save('layi_dash_orders',rawOrders().filter(o=>o.id!==editingOrderId));closeModal();renderAll();}
@@ -5454,7 +5481,7 @@ function saveUpdate(){
   o.stageIndex=updateDraft.stage;o.updates=o.updates||[];
   if(o.stageIndex===STAGES.indexOf('Dispatched')&&o.delivery&&o.delivery.enabled&&o.delivery.status!=='Delivered')o.delivery.status='Dispatched';
   if(o.stageIndex>=STAGES.indexOf('Dispatched')&&o.stageIndex<STAGES.indexOf('Delivered')&&!o.dispatchedAt)o.dispatchedAt=new Date().toISOString();
-  if(o.stageIndex>=STAGES.indexOf('Delivered')){if(!o.deliveredAt)o.deliveredAt=new Date().toISOString();if(o.delivery&&o.delivery.enabled)o.delivery.status='Delivered';const _cb=document.getElementById('u_collectBalance');if(_cb&&_cb.checked){const _balMethod=document.getElementById('u_balMethod')?readPayMethod('u_balMethod'):'';const _out=orderOutstanding(o);if(_out>0){o.paid=(+o.paid||0)+_out;try{const _t=getTxns();_t.push({id:uid('t'),dir:'in',method:_balMethod||'',label:(o.client||'')+' \u00b7 balance on '+((o.delivery&&o.delivery.enabled)?'delivery':'pickup')+(ocur(o)!==SETTINGS.currency?' ('+curC(_out,ocur(o))+')':''),amount:_out*ofx(o),at:new Date().toISOString().slice(0,10),orderId:o.id,branch:branchOf(o)});setTxns(_t);}catch(e){}}}}
+  if(o.stageIndex>=STAGES.indexOf('Delivered')){if(!o.deliveredAt)o.deliveredAt=new Date().toISOString();if(o.delivery&&o.delivery.enabled)o.delivery.status='Delivered';const _cb=document.getElementById('u_collectBalance');if(_cb&&_cb.checked){const _balMethod=document.getElementById('u_balMethod')?readPayMethod('u_balMethod'):'';const _out=orderOutstanding(o);if(_out>0){o.paid=(+o.paid||0)+_out;try{const _t=getTxns();_t.push({id:uid('t'),dir:'in',method:_balMethod||'',label:(o.client||'')+' \u00b7 balance on '+((o.delivery&&o.delivery.enabled)?'delivery':'pickup')+(ocur(o)!==SETTINGS.currency?' ('+curC(_out,ocur(o))+')':''),amount:_out*ofx(o),ccy:ocur(o),amtCcy:_out,at:new Date().toISOString().slice(0,10),orderId:o.id,branch:branchOf(o)});setTxns(_t);}catch(e){}}}}
   /* Signed and dated, because the point of the check is being able to say later who
      looked at it. Recorded before the update line is pushed, so the line can mention it. */
   let _fabricJustChecked=false;
@@ -5608,7 +5635,7 @@ function savePayment(id){const a=amt('p_amt');if(!a){closeModal();return;}
   /* Money against a quote is the client saying yes, so it confirms the order before the
      payment is written. Do it first: a payment recorded against something still marked a
      quote would sit outside every total it belongs in. */
-  {const _q=getOrders().find(x=>x.id===id);if(_q&&isQuote(_q))confirmOrder(id,'paid '+curC(a,ocur(_q)));}const _m=(typeof fvOther==='function'?fvOther('p_method'):'')||'';const list=rawOrders();const o=list.find(x=>x.id===id);o.paid=(o.paid||0)+a;logAudit('Payment recorded',(o.client||'')+' · '+curC(a,ocur(o))+(_m?' · '+_m:''));save('layi_dash_orders',list);const t=getTxns();t.push({id:uid('t'),dir:'in',label:o.client+' · payment'+(_m?' ('+_m+')':'')+(ocur(o)!==SETTINGS.currency?' ('+curC(a,ocur(o))+')':''),amount:a*ofx(o),at:new Date().toISOString(),orderId:id,branch:branchOf(o),method:_m});setTxns(t);closeModal();renderAll();}
+  {const _q=getOrders().find(x=>x.id===id);if(_q&&isQuote(_q))confirmOrder(id,'paid '+curC(a,ocur(_q)));}const _m=(typeof fvOther==='function'?fvOther('p_method'):'')||'';const list=rawOrders();const o=list.find(x=>x.id===id);o.paid=(o.paid||0)+a;logAudit('Payment recorded',(o.client||'')+' · '+curC(a,ocur(o))+(_m?' · '+_m:''));save('layi_dash_orders',list);const t=getTxns();t.push({id:uid('t'),dir:'in',label:o.client+' · payment'+(_m?' ('+_m+')':'')+(ocur(o)!==SETTINGS.currency?' ('+curC(a,ocur(o))+')':''),amount:a*ofx(o),ccy:ocur(o),amtCcy:a,at:new Date().toISOString(),orderId:id,branch:branchOf(o),method:_m});setTxns(t);closeModal();renderAll();}
 const EXPENSE_CATS=['Rent','Utilities','Materials & supplies','Marketing & advertising','Equipment','Transport & logistics','Software & subscriptions','Professional fees','Maintenance','Staff welfare','Tax','Bank charges','Other'];
 const FIN_DEPARTMENTS=['Production','Sales','Marketing','Operations','Admin'];
 /* ===== HOW THE MONEY MOVED ====================================================
@@ -9525,6 +9552,27 @@ function renderActivity(){
     else{const top=keys.slice(0,6),rest=keys.slice(6);const segs=top.map((k,i)=>({label:k,value:cat[k],color:MIX_COLORS[i%MIX_COLORS.length]}));if(rest.length)segs.push({label:'Other',value:rest.reduce((x,k)=>x+cat[k],0),color:MIX_COLORS[6%MIX_COLORS.length]});
       const tot=segs.reduce((x,sg)=>x+sg.value,0)||1;
       donut.innerHTML=`<div class="donut-wrap" style="cursor:pointer" onclick="salesCategoryDrill()" title="Tap for the full category breakdown">${donutSVG(segs,useRev?cur(tot):String(tot),useRev?'total sales':'items')}<div class="donut-legend">${segs.map(sg=>`<div class="dleg"><span class="ddot" style="background:${sg.color}"></span>${esc(sg.label)} <b>${useRev?cur(sg.value):sg.value}</b> <span style="color:var(--text-faint)">${Math.round(sg.value/tot*100)}%</span></div>`).join('')}</div><div class="ad" style="color:var(--gold);font-size:12.5px;text-align:center;padding-top:2px">See the full breakdown ›</div></div>`;}}
+  /* What the money arrived in. Only when there is more than one answer: a studio paid
+     entirely in naira does not need telling that its naira came in naira. The naira column
+     is the one every total on the screen reads; the other line is what the client handed
+     over, which is the number they will quote back at you on the phone. */
+  {
+    const wrap=document.getElementById('dashMoneyCcyWrap'),cel=document.getElementById('dashMoneyCcy');
+    const by=moneyInByCurrency(dashApptPeriod,dashApptCustom);
+    const show=can('money')&&manyCurrencies(by);
+    if(wrap)wrap.style.display=show?'':'none';
+    if(cel&&show){
+      const base=SETTINGS.currency;
+      const keys=Object.keys(by).sort((a,b)=>by[b].base-by[a].base);
+      cel.innerHTML=keys.map(function(c){
+        const e=by[c];
+        const native=curC(e.amount,c);
+        return '<div class="bd-row"><span class="bl">'+esc(c)
+          +' <span style="color:var(--text-faint)">· '+e.count+' payment'+(e.count===1?'':'s')+'</span></span>'
+          +'<span class="bv">'+esc(native)+(c===base?'':' <span style="color:var(--text-faint)">= '+cur(e.base)+'</span>')+'</span></div>';
+      }).join('');
+    }
+  }
   // how the work was made: bespoke, a block adjusted, or off the shelf
   {
     const mp=document.getElementById('dashMethodPanel'),me=document.getElementById('dashMethod');
