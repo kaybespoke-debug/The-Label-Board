@@ -7,7 +7,7 @@
        re-signed url is not a fresh miss (bounded, evicts oldest first)
      - other cross-origin (Supabase API, Google Fonts) -> untouched, straight to network
    Bump CACHE on any change to force a clean swap. */
-const CACHE = 'layi-v39';
+const CACHE = 'layi-v40';
 /* Photos live in their own cache, versioned on its own, because it must
    survive a shell release: see the fetch handler below. */
 const MEDIA_CACHE = 'layi-media-v1';

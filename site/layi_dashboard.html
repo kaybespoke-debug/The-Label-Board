@@ -2079,7 +2079,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v39';
+const APP_VERSION='layi-v40';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
