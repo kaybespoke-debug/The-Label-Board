@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (third session)
+Last updated: 11 September 2026 (fourth session)
 
 ## How this run works
 
@@ -147,7 +147,22 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   piece back without touching another piece's pass. A single-piece order is untouched.
   New gate `audit_pieces.js`.
 
-All 45 gates green after each, plus the 1,787-check website gate. Thirty-three mutations run
+- **3. Production runs.** Materials in, stock out, and the money counted once. Buying the
+  fabric is money out the day it leaves, as now. The run posts nothing and divides its cost
+  over the pieces it makes (180,000 over 20 is 9,000 each), blended with what is already on
+  the shelf. The till then charges **no** stock cost for those pieces, because they are
+  already paid for, while bought-in stock is charged as before and a mixed sale charges only
+  the bought part. A run lives in the orders store so it gets the board, stages, QC, history
+  and sync for nothing, which meant the 28 filters reading  now read
+  . New gate .
+  - Found on the way: labour with **nobody named** was dropped from the cost, because
+     filters on . A run showed 9,000 a piece while the books said
+    7,500. Unnamed labour is booked as a cost line now.
+  - Also found: the per-item craft picker from the previous commit **had never been
+    written**. An edit script rolled back halfway and every gate stayed green because none
+    of them rendered the order form.  renders it now.
+
+All 46 gates green after each, plus the 1,790-check website gate. Forty-four mutations run
 against the two gates; all seventeen caught.
 
 ---
@@ -169,24 +184,6 @@ roughly a hundredfold, but the shape is unchanged and it still scales as
 
 **Large — its own session, with a plan first.** Until then Pro is comfortable
 to ~50 staff and should become a Bespoke conversation around 120.
-
-### 3. Production batches — made-in-house ready-to-wear
-The sharpest thing on Kayode's list, and the right question was asked with it:
-*how do we do this without the data conflicting?*
-
-A production run that creates stock is **neither an order nor a purchase** —
-there is no client, and you did not buy it. Today it can only be faked as one
-or the other, and both lie.
-
-**The rule that resolves it: a batch records COST only, never revenue.** It
-consumes materials, occupies the production board, and its output becomes
-stock units. Revenue happens later, when a unit sells. Book it at both ends
-and every RTW brand's numbers are wrong by the cost of goods.
-
-Without this an RTW brand cannot know what a garment cost to make, so cannot
-know its margin — the central question this software exists to answer.
-
-**~1 day. Prototype the record shape first.**
 
 ### 4. Quoted → Confirmed order state
 Kayode's invoice-first flow: invoice a new client, their payment confirms the
