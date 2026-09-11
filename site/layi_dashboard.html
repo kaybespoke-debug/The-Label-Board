@@ -1817,7 +1817,18 @@ function migrate(o){
   o.makerId=o.makerId||'';
   o.referrerId=o.referrerId||'';
   o.referralAmount=+o.referralAmount||0;
-  o.costs=Array.isArray(o.costs)?o.costs.map(c=>({label:c.label||'',amount:+c.amount||0,supplier:c.supplier||''})):[];
+  /* Rebuilt field by field on purpose, so a stray key from an import or an older version
+     cannot ride along. That means anything new has to be named here or it is silently
+     dropped on the next read — which is exactly what happened to the sent-out dates,
+     and the gate found it before anybody lost a week of beading. */
+  o.costs=Array.isArray(o.costs)?o.costs.map(c=>{
+    const out={label:c.label||'',amount:+c.amount||0,supplier:c.supplier||''};
+    if(c.out){out.out=true;
+      if(c.sentAt)out.sentAt=c.sentAt;
+      if(c.dueAt)out.dueAt=c.dueAt;
+      if(c.backAt)out.backAt=c.backAt;}
+    return out;
+  }):[];
   if(o.invoiceNo===undefined)o.invoiceNo=null;
   if(o.satisfaction===undefined)o.satisfaction=0;
   if(o.currency===undefined)o.currency=SETTINGS.currency;
@@ -2350,6 +2361,51 @@ function confirmOrderFromButton(id){
    through here, so saying it once keeps a quote out of all of them. */
 const orderOutstanding=o=>isQuote(o)?0:Math.max(0,orderNet(o)-(+o.paid||0));        // order currency
 const orderOutstandingBase=o=>orderOutstanding(o)*ofx(o);             // base ₦
+/* ---- Work sent out ------------------------------------------------------------------
+   Beading, monogramming, embroidery, soling, printing. The piece leaves the workroom, sits
+   with somebody else for a week, and comes back. Nothing in the app could say that, so a
+   job out at an embroiderer looked exactly like a job nobody had touched: stuck at a stage,
+   going quietly late, with the workroom apparently idle and nobody to ask.
+
+   It does not need a new record. Sending work out is ALREADY a cost with a supplier's name
+   on it, which is how the money reaches profit per order today. Making that same line a job
+   — when it went, when it is due back, when it came — costs nothing in the books and
+   cannot disagree with them, because it IS them. */
+function isOutwork(c){return !!(c&&c.out);}
+function orderOutwork(o){return ((o&&o.costs)||[]).filter(isOutwork);}
+function outworkPending(o){return orderOutwork(o).filter(c=>!c.backAt);}
+function outworkDaysOut(c){if(!c||!c.sentAt)return null;return Math.floor((Date.now()-new Date(c.sentAt).getTime())/864e5);}
+/* Late means late back, against the date the vendor gave. An order's own due date is a
+   different promise to a different person. */
+function outworkLate(c){if(!c||c.backAt||!c.dueAt)return false;return daysUntil(c.dueAt)<0;}
+function orderOutworkLate(o){return outworkPending(o).filter(outworkLate);}
+/* The block on the order itself. Deliberately outside the profit section: a machinist needs
+   to know the beading is with Musa and due Friday, and has no business seeing what it cost. */
+function outworkBlock(o){
+  const rows=orderOutwork(o);
+  if(!rows.length)return '';
+  const body=rows.map(function(c){
+    const idx=(o.costs||[]).indexOf(c);
+    const days=outworkDaysOut(c);
+    const late=outworkLate(c);
+    const when=c.backAt
+      ? '<span style="color:var(--green)">Back '+esc(new Date(c.backAt).toLocaleDateString('en-GB'))+'</span>'
+      : (c.dueAt
+          ? '<span style="color:'+(late?'var(--red)':'var(--text-dim)')+'">'+(late?(-daysUntil(c.dueAt))+' day'+((-daysUntil(c.dueAt))===1?'':'s')+' late back':'Back '+new Date(c.dueAt).toLocaleDateString('en-GB'))+'</span>'
+          : '<span style="color:var(--text-faint)">No date agreed</span>');
+    const act=(!c.backAt&&(can('orders')||can('update')))
+      ? '<button class="btn ghost sm" onclick="markOutworkBack('+String.fromCharCode(39)+o.id+String.fromCharCode(39)+','+idx+')">It came back</button>'
+      : '';
+    return '<div class="bd-row" style="align-items:center"><span class="bl">'+esc(outworkWhat(c))
+      +' <span style="color:var(--text-faint)">with '+esc(outworkWho(c))+'</span>'
+      +(days!==null&&!c.backAt?' <span style="color:var(--text-faint)">· '+days+'d</span>':'')
+      +'</span><span class="bv" style="display:flex;align-items:center;gap:8px">'+when+act+'</span></div>';
+  }).join('');
+  const pending=outworkPending(o).length;
+  return '<div class="bd-sub" style="margin-top:10px">Sent out'+(pending?' · '+pending+' still with them':'')+'</div>'+body;
+}
+function outworkWho(c){return (c&&c.supplier)||'somebody';}
+function outworkWhat(c){return (c&&c.label)||'work';}
 const orderCost=o=>(o.costs||[]).reduce((s,c)=>s+(+c.amount||0),0);   // costs recorded in base ₦
 const orderCommTotal=o=>(o.commissions||[]).reduce((s,c)=>s+(+c.amount||0),0);
 const orderDelivery=o=>(o.delivery&&o.delivery.enabled)?(+o.delivery.fee||0):0;
@@ -4222,6 +4278,37 @@ function onCommChange(i){syncOrderDraft();const c=draft.commissions[i];if(c){if(
 function onCurrencyChange(){syncOrderDraft();if(draft.currency===SETTINGS.currency)draft.fx=1;reRenderOrder();}
 function setDirectorPct(v){syncOrderDraft();if(v!=='custom')draft.directorPct=v;draft.directorAmount=null;reRenderOrder();}
 function recalcDirector(){if(!draft)return;const el=document.getElementById('dirAllocLive');if(el)el.textContent=cur(directorAllocation(draft));recalcProfit();}
+/* Turning it on stamps today as the day it went, because that is what 'sent out' means and
+   nobody wants to type today's date. Turning it off puts the line back to a plain cost
+   rather than leaving dates hanging on something that never left. */
+/* Marking it back is the one action anyone needs on a piece that is out, and it belongs
+   where they are looking at the order rather than inside the edit form. It writes straight
+   to the record and leaves a line in the history, because 'when did the beading come back'
+   is a question somebody asks a week later. */
+function markOutworkBack(id,idx){
+  if(!can('orders')&&!can('update')){if(typeof toast==='function')toast('You do not have permission to update this order.');return;}
+  const list=rawOrders();const o=list.find(x=>x.id===id);
+  if(!o)return;
+  const c=(o.costs||[])[idx];
+  if(!c||!isOutwork(c)||c.backAt)return;
+  c.backAt=new Date().toISOString();
+  o.updates=o.updates||[];
+  const days=outworkDaysOut(c);
+  o.updates.push({at:c.backAt,stage:STAGES[+o.stageIndex||0],
+    note:outworkWhat(c)+' back from '+outworkWho(c)+(days!==null?' after '+days+' day'+(days===1?'':'s'):''),
+    by:userLabel(),photos:[]});
+  saveSafe('layi_dash_orders',list);
+  logAudit('Outwork back',(o.client||'')+' · '+outworkWhat(c)+' · '+outworkWho(c));
+  if(typeof toast==='function')toast(outworkWhat(c)+' back from '+outworkWho(c)+'.');
+  closeModal();renderAll();
+}
+function toggleCostOut(i,on){
+  syncOrderDraft();
+  const c=draft&&draft.costs&&draft.costs[i];if(!c)return;
+  if(on){c.out=true;if(!c.sentAt)c.sentAt=new Date().toISOString().slice(0,10);}
+  else{c.out=false;delete c.sentAt;delete c.dueAt;delete c.backAt;}
+  reRenderOrder();
+}
 function removeCost(i){syncOrderDraft();draft.costs.splice(i,1);reRenderOrder();}
 function addPotContrib(){syncOrderDraft();draft.potContribs.push({potId:'',amount:0});reRenderOrder();}
 function removePotContrib(i){syncOrderDraft();draft.potContribs.splice(i,1);reRenderOrder();}
@@ -4290,6 +4377,10 @@ function syncOrderDraft(){
   (draft.costs||[]).forEach((c,i)=>{
     if(fv('c_label_'+i)!==undefined)c.label=fv('c_label_'+i);
     if(fv('c_supplier_'+i)!==undefined)c.supplier=fv('c_supplier_'+i);
+    if(c.out){
+      if(fv('c_sent_'+i)!==undefined)c.sentAt=fv('c_sent_'+i)||'';
+      if(fv('c_dueb_'+i)!==undefined)c.dueAt=fv('c_dueb_'+i)||'';
+    }
     if(fv('c_amt_'+i)!==undefined)c.amount=parseAmt(fv('c_amt_'+i));
   });
   (draft.commissions||[]).forEach((c,i)=>{
@@ -4490,13 +4581,24 @@ function renderOrderModal(){
   const retained=operating-dalloc-potTotal;
   const stageOpts=STAGES.map((s,i)=>`<option value="${i}" ${draft.stageIndex===i?'selected':''}>${s}</option>`).join('');
   const fabSup=suppliersByType('Fabric Supplier').map(s=>s.business);
+  /* A line that has been sent out offers who has it and when it is due back. Anything the
+     studio bought over a counter stays one plain row, because most of them are. */
+  const allSup=getSuppliers().map(s=>s.business).filter(Boolean);
   const costsHtml=(draft.costs||[]).map((c,i)=>{
-    const cur=c.supplier||'';const opts=[''].concat(fabSup);if(cur&&!opts.includes(cur))opts.push(cur);
-    return `<div class="cost-line">
-    <input class="fld" id="c_label_${i}" value="${esc(c.label)}" placeholder="e.g. Fabric, Lace, Trims">
-    <select class="fld" id="c_supplier_${i}" style="max-width:150px">${opts.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>${o?esc(o):'Supplier'}</option>`).join('')}</select>
+    const cur=c.supplier||'';
+    const opts=[''].concat(c.out?allSup:fabSup);if(cur&&!opts.includes(cur))opts.push(cur);
+    const outBits=c.out?`<div class="row2" style="margin-top:6px">
+      <div class="field" style="margin-bottom:0"><label>Sent</label><input class="fld" type="date" id="c_sent_${i}" value="${esc(c.sentAt||'')}"></div>
+      <div class="field" style="margin-bottom:0"><label>Due back</label><input class="fld" type="date" id="c_dueb_${i}" value="${esc(c.dueAt||'')}"></div>
+    </div>${c.backAt?`<div class="sd" style="color:var(--green);margin-top:5px">Back on ${esc(new Date(c.backAt).toLocaleDateString('en-GB'))}.</div>`:`<div class="sd" style="color:var(--text-faint);margin-top:5px">While it is out, the order reads as with them rather than as sitting untouched in the workroom.</div>`}`:'';
+    return `<div style="border:1px solid ${c.out?'var(--line)':'transparent'};border-radius:10px;padding:${c.out?'10px 12px':'0'};margin-bottom:${c.out?'8px':'0'};background:${c.out?'var(--panel-2)':'transparent'}">
+    <div class="cost-line">
+    <input class="fld" id="c_label_${i}" value="${esc(c.label)}" placeholder="${c.out?'What went out, e.g. Beading':'e.g. Fabric, Lace, Trims'}">
+    <select class="fld" id="c_supplier_${i}" style="max-width:150px">${opts.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>${o?esc(o):(c.out?'Who has it':'Supplier')}</option>`).join('')}</select>
     <input class="fld money price" type="text" inputmode="decimal" id="c_amt_${i}" value="${c.amount?fmtNum(c.amount):''}" placeholder="0" oninput="recalcProfit()">
-    <span class="rm" onclick="removeCost(${i})">✕</span></div>`;}).join('')
+    <span class="rm" onclick="removeCost(${i})">✕</span></div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:var(--text-dim);margin-top:${c.out?'8px':'4px'}"><input type="checkbox" ${c.out?'checked':''} onchange="toggleCostOut(${i},this.checked)" style="width:15px;height:15px"> Sent out to be done</label>
+    ${outBits}</div>`;}).join('')
     +(fabSup.length?'':`<div class="sd" style="color:var(--text-faint);margin-top:2px">Add fabric suppliers under Supplies → Suppliers to pick them here.</div>`);
   const supItems=getSupplies();
   const stockHtml=(draft.stockUsed||[]).map((su,i)=>`<div class="cost-line">
@@ -4704,6 +4806,23 @@ function orderAttention(o){
       text:theirs?'Working on the client\u2019s own fabric and nobody has checked it against the photo yet.'
                  :'Nobody has checked the fabric against the photo yet.',
       act:can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null};}
+  /* A piece that is late back from a vendor is somebody else's delay, and the action is to
+     chase THEM. Above quality control because it is usually the reason the piece has not
+     reached quality control. */
+  {const lateOut=orderOutworkLate(o);
+   if(lateOut.length){
+     const c=lateOut[0];const over=-daysUntil(c.dueAt);const idx=(o.costs||[]).indexOf(c);
+     return {sev:'var(--red)',
+       text:outworkWhat(c)+' is '+over+' day'+(over===1?'':'s')+' late back from '+outworkWho(c)+'. Chase them.',
+       act:(can('orders')||can('update'))?{label:'It came back',fn:`markOutworkBack('${o.id}',${idx})`}:null};
+   }}
+  {const out=outworkPending(o);
+   if(out.length){
+     const c=out[0];const days=outworkDaysOut(c);const idx=(o.costs||[]).indexOf(c);
+     return {sev:'var(--blue)',
+       text:outworkWhat(c)+' is with '+outworkWho(c)+(days!==null?', '+days+' day'+(days===1?'':'s')+' now':'')+(c.dueAt?', back '+new Date(c.dueAt).toLocaleDateString('en-GB'):'')+'.',
+       act:(can('orders')||can('update'))?{label:'It came back',fn:`markOutworkBack('${o.id}',${idx})`}:null};
+   }}
   if(o.stageIndex===QC&&!(o.qc&&o.qc.status==='passed')){
     const left=qcPerPiece(o)?(o.outfits||[]).filter(x=>!(x.qc&&x.qc.status==='passed')).length:0;
     return {sev:'var(--gold)',
@@ -4837,6 +4956,7 @@ function openDetail(id){
       ${clientPhotos}
       ${o.qc&&o.qc.status&&o.qc.status!=='pending'?`<div class="kv">${qcBadge(o)} ${o.qc.by?'<span style="color:var(--text-faint)">by '+esc(o.qc.by)+'</span>':''}${o.qc.note?' · '+esc(o.qc.note):''}</div>`:''}
       <div class="field"><label>Items (${o.outfits.length})</label>${outfits}</div>
+      ${outworkBlock(o)}
       ${costsBreak}
     </div>
     <div class="opane" data-pane="timeline" style="display:none">${buildOrderTimeline(o)}</div>
@@ -7473,6 +7593,12 @@ function loadExample(force){
    if(_byId['L-0004'])_byId['L-0004'].outfits[0].method='mtm';
    if(_byId['L-0010'])_byId['L-0010'].outfits[0].method='bespoke';
    if(_byId['L-0011'])_byId['L-0011'].outfits[0].method='stock';
+   /* One job out at an embellisher and late back, one already returned. Between them they
+      show the two states and stop a studio wondering whether the feature works. */
+   if(_byId['L-0003'])_byId['L-0003'].costs=(_byId['L-0003'].costs||[]).concat([
+     {label:'Beading',amount:30000,supplier:'Musa Beads',out:true,sentAt:dd(-9),dueAt:dd(-2)}]);
+   if(_byId['L-0001'])_byId['L-0001'].costs=(_byId['L-0001'].costs||[]).concat([
+     {label:'Monogram',amount:8000,supplier:'Ade Embroidery',out:true,sentAt:dd(-14),dueAt:dd(-8),backAt:dago(7)}]);
    let _rs=0;const _retailBr=['Abuja outlet','Abuja outlet','Ibadan branch','Abuja outlet','Kano store','Ibadan branch'];exOrders.forEach(o=>{if(o.kind==='sale'){o.branch=_retailBr[_rs%_retailBr.length];o.channel=(_rs%3===2)?'online':'showroom';_rs++;}else{o.branch='Lagos studio';}});}
   save('layi_dash_orders',exOrders);
   setAppts([{id:uid('a'),date:dd(0),time:'10:00',client:'A. Bakare',phone:'+44 7700 900111',location:'Studio',note:'Final fitting'},{id:uid('a'),date:dd(1),time:'14:00',client:'Ngozi Eze',phone:'+234 802 999 1111',location:'Studio',note:'Beadwork review'},{id:uid('a'),date:dd(3),time:'11:30',client:'Chief Adeyemi',phone:'+234 803 888 2222',location:'Studio',note:'Second fitting'}]);
@@ -9849,6 +9975,16 @@ function ledgerStatus(o){
   if(o.stageIndex>=DELI)return{cls:'green',txt:'Delivered'};
   if(o.stageIndex>=DIS)return{cls:'blue',txt:'Dispatched'};
   if(o.qc&&o.qc.status==='failed')return{cls:'red',txt:'Rework'};
+  /* Above the due-date lines, because where the piece IS beats how long it has been there.
+     The due column beside this pill still shows the lateness, so nothing is hidden — what
+     changes is that an order at the embroiderer stops reading as one nobody has touched. */
+  {const out=outworkPending(o);
+   if(out.length){
+     const late=out.filter(outworkLate);
+     const c=late[0]||out[0];
+     return {cls:late.length?'amber':'blue',
+       txt:(out.length>1?out.length+' out':'With '+outworkWho(c))};
+   }}
   if(o.stageIndex>=RFD)return{cls:'blue',txt:'Ready'};
   if(du!==null&&du<0)return{cls:'red',txt:(-du)+'d late'};
   if(du===0)return{cls:'amber',txt:'Due today'};
