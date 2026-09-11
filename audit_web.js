@@ -353,19 +353,37 @@ check(/six roles|Six roles|6<\/div>/.test(html['index.html']), 'the home page cl
 /* The app serves five kinds of business, not only tailors. The site has to say
    so, because a shoemaker or a fabric seller who reads it as tailoring software
    never gets as far as booking. Read out of the app so the two cannot drift. */
-// Read DEFAULT_ACTIVITIES, which is what actually decides what a studio can be.
-// This used to read BRANCH_TYPES, a legacy list that never contained footwear
-// or leather at all — so it was already promising the wrong trades before
-// haberdashery was dropped, and nobody noticed because the count happened to
-// come to five. BRANCH_TYPES has since been deleted; it was dead code.
-const kindsBlock = (app.match(/const DEFAULT_ACTIVITIES=\[[\s\S]*?\n\];/) || [''])[0];
-const kinds = all(kindsBlock, /\{key:'(\w+)'/g).map(m => m[1]);
-check(kinds.length === 5, 'the app really does offer five kinds of business (' + kinds.length + ')');
-const SAYS = { bespoke: 'made to order', rtw: 'ready to wear',
-  footwear: 'shoe', leather: 'bag', fabrics: 'fabric' };
+// Read CRAFTS and MODES, the two answers that actually decide what a studio can be.
+// This used to read a single DEFAULT_ACTIVITIES list, and before that BRANCH_TYPES,
+// a legacy list that never contained footwear or leather at all — so it was already
+// promising the wrong trades before haberdashery was dropped, and nobody noticed
+// because the count happened to come to five.
+//
+// A business the site sells to is now a PAIR: what the studio works in, and how the
+// piece reaches the customer. A bespoke tailor and a boutique are the same craft in
+// different modes, which is why counting chips stopped being the right check.
+const craftBlock = (app.match(/const CRAFTS=\[[\s\S]*?\n\];/) || [''])[0];
+const crafts = all(craftBlock, /\{key:'(\w+)'/g).map(m => m[1]);
+const modeBlock = (app.match(/const MODES=\[[\s\S]*?\n\];/) || [''])[0];
+const modes = all(modeBlock, /\{key:'(\w+)'/g).map(m => m[1]);
+check(crafts.length === 4, 'the app offers the four crafts the site is written for (' + crafts.length + ')');
+check(modes.length === 2, 'and the two modes a craft can be reached in (' + modes.length + ')');
+// Each business the site names, and the craft x mode a studio would actually pick.
+const SELLS_TO = {
+  'made to order': ['garments', 'make'],
+  'ready to wear': ['garments', 'stock'],
+  'shoe':          ['footwear', 'make'],
+  'bag':           ['leather',  'make'],
+  'fabric':        ['fabrics',  'stock']
+};
 const productCopy = visible(html['features.html']).toLowerCase();
-kinds.forEach(k => check(productCopy.includes(SAYS[k]),
-  'the product page names the "' + SAYS[k] + '" business the app supports'));
+Object.keys(SELLS_TO).forEach(phrase => {
+  const pair = SELLS_TO[phrase];
+  check(crafts.indexOf(pair[0]) !== -1 && modes.indexOf(pair[1]) !== -1,
+    'a studio can actually be set up as the "' + phrase + '" business the site names (' + pair.join(':') + ')');
+  check(productCopy.includes(phrase),
+    'the product page names the "' + phrase + '" business the app supports');
+});
 const homeCopy = visible(html['index.html']).toLowerCase();
 // haberdashery was dropped as a business type we sell to. Requiring the site to
 // keep advertising it would have this gate enforcing the opposite of the truth.
@@ -626,8 +644,8 @@ check(!fs.existsSync(path.join(dir, 'solutions.html')), 'the separate Solutions 
 const home = html['index.html'];
 const tileTrades = all(home, /class="industry[^"]*"[^>]*data-tab="([a-z]+)"/g).map(m => m[1]);
 const paneTrades = all(home, /class="pane[^"]*"[^>]*data-pane="([a-z]+)"/g).map(m => m[1]);
-check(tileTrades.length === 8, 'the home page shows eight kinds of business (' + tileTrades.length + ')');
-check(paneTrades.length === 8, 'each of them has a panel behind it (' + paneTrades.length + ')');
+check(tileTrades.length >= 5, 'the home page shows several kinds of business (' + tileTrades.length + ')');
+check(paneTrades.length === tileTrades.length, 'every tile has a panel and every panel a tile (' + tileTrades.length + ' and ' + paneTrades.length + ')');
 tileTrades.forEach(t => {
   check(paneTrades.indexOf(t) !== -1, 'the tile opens a panel that exists: ' + t);
   check(home.indexOf('id="' + t + '"') !== -1, 'the panel keeps its own address: index.html#' + t);
@@ -641,10 +659,10 @@ const detailStart = home.indexOf('<div class="trade-detail">');
 const detailEndAt = home.indexOf('inside the product', detailStart);
 check(detailStart > 0 && detailEndAt > detailStart, 'the detail block is where it should be');
 const detailBlock = home.slice(detailStart, detailEndAt);
-check(all(detailBlock, /class="pane/g).length === 8, 'all eight panels sit inside the detail block');
+check(all(detailBlock, /class="pane/g).length === tileTrades.length, 'every panel sits inside the detail block, not loose on the page');
 /* the section already has its own h2, so the panels head at h3 */
 check(all(detailBlock, /<h2[ >]/g).length === 0, 'no panel outranks the heading of the section it sits in');
-check(all(detailBlock, /<h3 class="trade-h">/g).length === 8, 'every panel has its heading');
+check(all(detailBlock, /<h3 class="trade-h">/g).length === tileTrades.length, 'every panel has its heading');
 /* exactly one open to begin with, or the section reads as empty or as noise */
 check(all(home, /class="industry on"/g).length === 1, 'one tile starts open');
 check(all(home, /class="pane on anchor"/g).length === 1, 'one panel starts open');
@@ -840,6 +858,23 @@ prPlans.forEach((block, i) => {
    serve sign up, so in the grid it would look like the top of a ladder */
 check(html['pricing.html'].indexOf('None of these three fit?') !== -1, 'there is somewhere to go when no plan fits');
 check(html['pricing.html'].indexOf('callout-row') !== -1, 'the fourth offer is a band rather than a priced column');
+
+/* ---------- we only offer what a shop can actually choose ----------
+   Haberdashery sat on this site as a trade for months and was never one of
+   the five DEFAULT_ACTIVITIES, so a haberdasher could read the page, book a
+   demo, and find there was no such setup waiting for them. The checks above
+   run one way, that the site names every trade the app has. This runs the
+   other way. */
+const everyWord = built.map(k => visible(html[k])).join(' ').toLowerCase();
+['haberdashery', 'haberdasher'].forEach(w => {
+  check(everyWord.indexOf(w) === -1, 'the site does not offer a trade the app cannot be set up as: ' + w);
+});
+check(!fs.existsSync(path.join(dir, 'img', 'haberdashery.jpg')), 'its picture went with it');
+// and the other way round: every craft the app can be set up as is spoken to somewhere,
+// or a studio the app serves reads the site and never sees itself in it.
+const CRAFT_SAYS = { garments: 'garment', footwear: 'shoe', leather: 'bag', fabrics: 'fabric' };
+crafts.forEach(c => check(everyWord.indexOf(CRAFT_SAYS[c] || c) !== -1,
+  'the site speaks to the "' + c + '" studios the app can be set up as'));
 
 /* ---------- report ---------- */
 function report() {

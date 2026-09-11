@@ -114,15 +114,22 @@ section('The answers become the studio');
   ok('the name does not arrive pre-filled with the demo tenant\'s',
      b.run('setupDraft.name') === '', b.run('setupDraft.name'));
 
-  b.run("setupToggleDoes('footwear');");
+  // Two answers now, not one: what they work in, then how it reaches the customer.
+  // Okoro & Sons bench-make shoes AND keep a stocked rail, so both modes.
+  b.run("setupToggleCraft('footwear');");
+  b.run("setupToggleMode('footwear','stock');");
   fillSetup(b, { name: 'Okoro & Sons Shoes', location: 'Aba, Abia', online: true });
   b.run('saveStudioSetup();');
 
   ok('the studio is called what they said',
      b.run('(SETTINGS.company&&SETTINGS.company.name)') === 'Okoro & Sons Shoes',
      b.run('(SETTINGS.company&&SETTINGS.company.name)'));
-  ok('it does what they said', JSON.stringify(b.run('getBranches()[0].does')) === '["footwear"]',
+  ok('it does what they said, both halves of it',
+     JSON.stringify(b.run('getBranches()[0].does')) === '["footwear:make","footwear:stock"]',
      JSON.stringify(b.run('getBranches()[0].does')));
+  ok('making opens the production board', b.run('showsBespoke()') === true);
+  ok('and the stocked rail opens the Shop and its Sales',
+     b.run('showsRTW()') === true && b.run('salesVisible()') === true);
   ok('it sells how they said',
      b.run('getBranches()[0].channels').indexOf('online') >= 0,
      JSON.stringify(b.run('getBranches()[0].channels')));
@@ -158,6 +165,15 @@ section('It refuses the answers it cannot work without');
   b.run('saveStudioSetup();');
   ok('nor with nothing ticked for what it does',
      /at least one/i.test(b.sb.__alert || ''), b.sb.__alert);
+
+  /* A craft with no mode opens no tab. Storing it would leave a studio looking
+     set up and finding an app with nothing in it, so the screen asks again. */
+  b.run("setupDraft.does=['garments'];");
+  b.sb.__alert = '';
+  b.run('saveStudioSetup();');
+  ok('nor with a craft but no answer to how it reaches the customer',
+     /make it here|ready made/i.test(b.sb.__alert || ''), b.sb.__alert);
+  ok('and is still asked afterwards', b.run('needsStudioSetup()') === true);
 }
 
 // ---------------------------------------------------------------------
@@ -180,20 +196,31 @@ section('Two trades, and the tabs that follow');
 {
   const b = freshStudio();
   b.run('openStudioSetup();');
-  b.run("setupToggleDoes('rtw');");
+  // A boutique that buys its rail in: garments, sold ready made, nothing made here.
+  b.run("setupToggleCraft('garments');");
+  b.run("setupToggleMode('garments','stock');");
+  b.run("setupToggleMode('garments','make');");
   fillSetup(b, { name: 'House of Nneka', online: false });
   b.run('saveStudioSetup();');
   ok('a studio that only stocks and sells is retail', b.run('showsRetail()') === true);
   ok('and is not given a production board it has no use for',
      b.run('showsBespoke()') === false, 'ready-to-wear only should not show Production');
+  ok('turning off the last mode of a craft unticks the craft rather than leaving it idle',
+     JSON.stringify(b.run('getBranches()[0].does')) === '["garments:stock"]',
+     JSON.stringify(b.run('getBranches()[0].does')));
 
+  /* One craft, both modes: a label that sews its own rail. This is the studio the
+     old single-answer list could not describe at all. */
   const c = freshStudio();
   c.run('openStudioSetup();');
-  c.run("setupToggleDoes('rtw');");
-  c.run("setupToggleDoes('bespoke');");
+  c.run("setupToggleCraft('garments');");
+  c.run("setupToggleMode('garments','stock');");
   fillSetup(c, { name: 'Both Ways' });
   c.run('saveStudioSetup();');
-  ok('a studio that does both gets both', c.run('showsRetail()') && c.run('showsBespoke()'));
+  ok('a studio that makes what it sells gets both', c.run('showsRetail()') && c.run('showsBespoke()'));
+  ok('and that is one craft in two modes, not two crafts',
+     JSON.stringify(c.run('getBranches()[0].does')) === '["garments:make","garments:stock"]',
+     JSON.stringify(c.run('getBranches()[0].does')));
 }
 
 // ---------------------------------------------------------------------
@@ -231,7 +258,7 @@ section('How many of you, and how many outlets');
   // saying nothing must still work, and must change nothing
   const q = freshStudio();
   q.run('openStudioSetup();');
-  q.run("setupToggleDoes('bespoke');");
+  q.run("setupToggleCraft('garments');");
   fillSetup(q, { name: 'Quiet Studio' });
   q.run('saveStudioSetup();');
   ok('a studio that answers neither count is still set up', q.run("SETTINGS.setupDone") === true);
@@ -239,7 +266,7 @@ section('How many of you, and how many outlets');
 
   const b = freshStudio();
   b.run('openStudioSetup();');
-  b.run("setupToggleDoes('bespoke');");
+  b.run("setupToggleCraft('garments');");
   b.run("setupPick('team','many');setupPick('outlets','two');");
   fillSetup(b, { name: 'Six Of Us' });
   const staffBefore = b.run('getStaff().length');
@@ -262,7 +289,7 @@ section('How many of you, and how many outlets');
   // a solo studio is left exactly as it was
   const s = freshStudio();
   s.run('openStudioSetup();');
-  s.run("setupToggleDoes('bespoke');");
+  s.run("setupToggleCraft('garments');");
   s.run("setupPick('team','solo');setupPick('outlets','one');");
   fillSetup(s, { name: 'Just Me' });
   s.run('saveStudioSetup();');

@@ -1315,12 +1315,9 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" id="bizDoesPanel" data-setperm="settings">
           <div class="panel-head"><h3>What your studio does</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Tick everything your business does. We'll show only the tools you need.</p>
-          <div id="bizTypeSeg" style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="chip" data-biz="bespoke" onclick="toggleBizDoes('bespoke')">Making (bespoke / made-to-order)</button>
-            <button class="chip" data-biz="rtw" onclick="toggleBizDoes('rtw')">Selling (ready-to-wear / retail)</button>
-          </div>
-          <div class="sd" style="color:var(--text-faint);margin-top:10px">Making shows Production &amp; fittings. Selling shows Stock styles &amp; Sales. Tick both if you do both.</div>
+          <p class="page-sub" style="margin-bottom:12px">Tick what you work in, then say how each one reaches your customer. We'll show only the tools you need.</p>
+          <div id="bizDoesBox" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+          <div class="sd" style="color:var(--text-faint);margin-top:10px">Making these here shows Production &amp; fittings. Selling them ready made shows the Shop &amp; Sales. Both is normal.</div>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);margin-top:16px;border-top:1px solid var(--line-soft);padding-top:14px"><input type="checkbox" id="set_teamtools" onchange="toggleTeamTools(this.checked)"> <span>I work with a team <span style="color:var(--text-faint);font-weight:400">(shows Team, Rota, Attendance, Leave &amp; Payroll</span></span></label>
           <div class="sd" style="color:var(--text-faint);margin-top:6px">Leave this off if it is just you. These tools appear on their own once you add staff or a second studio.</div>
         </div>
@@ -1595,11 +1592,14 @@ const STAGE_PRESETS={
 /* A preset only makes sense for the trade that uses those words. Each one names the
    activities it belongs to so Settings can lead with the right suggestion instead of
    offering a shoemaker 'Fabric Received'. */
+/* A preset only makes sense for the craft that uses those words, so each one names
+   the CRAFTS it belongs to. 'for' holds craft keys, never craft:mode keys — a
+   shoemaker gets Shoemaking whether the pairs are cut for a client or for the rail. */
 const STAGE_PRESET_META={
-  bespoke:{label:'Bespoke tailoring',for:['bespoke']},
-  bridal:{label:'Bridal & occasion',for:['bespoke']},
-  rtw:{label:'Ready-to-wear run',for:['rtw']},
-  factory:{label:'Factory / bulk',for:['rtw','bespoke']},
+  bespoke:{label:'Bespoke tailoring',for:['garments']},
+  bridal:{label:'Bridal & occasion',for:['garments']},
+  rtw:{label:'Ready-to-wear run',for:['garments','footwear','leather']},
+  factory:{label:'Factory / bulk',for:['garments']},
   footwear:{label:'Shoemaking',for:['footwear']},
   leather:{label:'Bags & leather goods',for:['leather']},
   fabrics:{label:'Fabric cutting',for:['fabrics']}
@@ -2274,12 +2274,18 @@ const MEAS_FOOT=['Shoe size','Foot length (L)','Foot length (R)','Foot width (L)
 const MEAS_BAG=['Bag height','Bag width','Bag depth','Strap length','Strap drop','Handle length','Gusset','Hardware finish'];
 const MEAS_FIELDS=MEAS_BODY;
 const MEAS_ALL=MEAS_BODY.concat(MEAS_FOOT,MEAS_BAG);
-const MEAS_SETS={bespoke:MEAS_BODY,rtw:MEAS_BODY,footwear:MEAS_FOOT,leather:MEAS_BAG};
+const MEAS_SETS={body:MEAS_BODY,foot:MEAS_FOOT,bag:MEAS_BAG};
 /* Which sets to offer for entry, based on what the studio does. */
+/* Measurements belong to the craft, and only to a craft the studio actually MAKES.
+   Nobody is measured for a pair off the shelf. */
 function measFields(){
-  const does={};activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>does[k]=1));
+  const sets={};
+  activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>{
+    if(modeOf(k)!=='make')return;
+    const c=craftByKey(k);if(c&&c.meas)sets[c.meas]=1;
+  }));
   const out=[],seen={};
-  Object.keys(does).forEach(k=>{(MEAS_SETS[k]||[]).forEach(f=>{if(!seen[f]){seen[f]=1;out.push(f);}});});
+  Object.keys(sets).forEach(k=>{(MEAS_SETS[k]||[]).forEach(f=>{if(!seen[f]){seen[f]=1;out.push(f);}});});
   return out.length?out:MEAS_BODY;
 }
 /* Entry list plus anything already recorded on this client that the list would miss. */
@@ -2913,12 +2919,8 @@ function setupBandN(field,opts,fallback){
   const hit=opts.find(function(o){return o.k===setupDraft[field];});
   return hit?hit.n:fallback;
 }
-function setupToggleDoes(k){
-  setupSync();
-  const i=setupDraft.does.indexOf(k);
-  if(i>=0)setupDraft.does.splice(i,1); else setupDraft.does.push(k);
-  renderStudioSetup();
-}
+function setupToggleCraft(c){setupSync();setupDraft.does=doesToggleCraft(setupDraft.does,c);renderStudioSetup();}
+function setupToggleMode(c,m){setupSync();setupDraft.does=doesToggleMode(setupDraft.does,c,m);renderStudioSetup();}
 function setupSync(){
   if(!setupDraft)return;
   const n=document.getElementById('su_name'),l=document.getElementById('su_loc');
@@ -2930,17 +2932,12 @@ function setupSync(){
 }
 function renderStudioSetup(){
   const d=setupDraft;if(!d)return;
-  const chips=branchActivities().map(function(a){
-    const on=d.does.indexOf(a.key)>=0;
-    return '<div onclick="setupToggleDoes(\'' + a.key + '\')" style="cursor:pointer;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--panel-2)':'transparent')+';border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px">'
-      +'<div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:5px;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--gold)':'transparent')+';color:#1a1206;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">'+(on?'✓':'')+'</span><b style="font-size:14px">'+esc(a.label)+'</b></div>'
-      +(a.desc?'<div style="font-size:11.5px;color:var(--text-faint);margin-top:4px">'+esc(a.desc)+'</div>':'')
-      +'</div>';
-  }).join('');
+  const chips=craftPickerHtml(d.does,'setupToggleCraft','setupToggleMode','');
   openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
     +'<div class="field"><label>Where do you work from <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="su_loc" value="'+esc(d.location)+'" placeholder="City / area"></div>'
     +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label>'
+    +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 8px">Tick what you work in, then say how each one reaches your customer. Both is normal.</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:2px">'+chips+'</div></div>'
     +'<div class="field"><label>How do you sell <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label><div style="display:flex;gap:20px;padding-top:4px">'
     +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_show" '+(d.channels.indexOf('showroom')>=0?'checked':'')+'> In person</label>'
@@ -2967,6 +2964,7 @@ function saveStudioSetup(){
   const name=(d.name||'').trim();
   if(!name){alert('What is your label called?');return;}
   if(!d.does.length){alert('Tick at least one thing you do, so the app knows which tabs to show you.');return;}
+  if(!normaliseDoes(d.does).some(k=>modeOf(k))){alert('For each one, say whether you make it here or sell it ready made.');return;}
 
   SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:name});
   const existing=getBranches()[0]||{};
@@ -2979,10 +2977,12 @@ function saveStudioSetup(){
     type:summaryType(d.does),
     channels:d.channels.slice()
   }];
-  /* The production board should be the right board the first time they open
-     it. Stages come from the first trade they picked that has its own; a
-     studio doing two keeps the first one's and can change it in Settings. */
-  const withStages=d.does.map(function(k){return (branchActivities().find(function(a){return a.key===k;})||{}).stages;}).filter(Boolean);
+  /* The production board should be the right board the first time they open it.
+     Stages come from the first craft they said they MAKE, because 'make' is what
+     opens the board at all; a studio doing two keeps the first one's and can change
+     it in Settings. */
+  const withStages=normaliseDoes(d.does).filter(function(k){return modeOf(k)==='make';})
+    .map(function(k){const c=craftByKey(k);return (c&&c.stages)?c.stages.make:'';}).filter(Boolean);
   if(withStages.length&&STAGE_PRESETS[withStages[0]]){
     SETTINGS.productionStages=STAGE_PRESETS[withStages[0]].slice();
     if(typeof applyStages==='function')applyStages();
@@ -3005,7 +3005,7 @@ function saveStudioSetup(){
   if(typeof smallestPlanFitting==='function')SETTINGS.plan=smallestPlanFitting(outletsN,teamN).id;
   SETTINGS.setupDone=true;
   save('layi_dash_settings',SETTINGS);
-  if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+d.does.join(', ')+(d.team?' · team '+d.team:'')+(d.outlets?' · outlets '+d.outlets:''));
+  if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+normaliseDoes(d.does).map(doesLabel).join(', ')+(d.team?' · team '+d.team:'')+(d.outlets?' · outlets '+d.outlets:''));
   setupDraft=null;closeModal();
   if(typeof applyBranding==='function')applyBranding();
   if(typeof applyBizVisibility==='function')applyBizVisibility();
@@ -3238,18 +3238,77 @@ const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantNam
     if(multiBranch()&&activeBranchView==='all')return 'Today across your studios';
     if(multiBranch()&&activeBranchView&&activeBranchView!=='all')return 'Today at '+activeBranchView;
     return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Calendar','Tasks, fittings, meetings, content & what is due'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
-function branchTypeOf(name){const b=getBranches().find(x=>x.name===name);if(!b)return SETTINGS.businessType||'both';const bk=branchIsBespoke(b),rt=branchIsRetail(b);return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
+function branchTypeOf(name){const b=getBranches().find(x=>x.name===name);if(!b)return SETTINGS.businessType||'both';const bk=branchMakes(b),rt=branchStocks(b);return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
 function isBespokeType(t){return t==='bespoke'||t==='both';}
 function isGarmentShopType(t){return t==='rtw'||t==='both';}
 function isRetailType(t){return t==='rtw'||t==='both'||t==='fabrics';}
-// ---- What a studio does: a multi-select set of activities. Each maps to a capability that drives the app. ----
-const DEFAULT_ACTIVITIES=[
-  {key:'bespoke',label:'Bespoke tailoring',desc:'Clothing made to order',kind:'bespoke',stages:'bespoke'},
-  {key:'footwear',label:'Footwear',desc:'Shoes & sandals, made to order or stocked',kind:'bespoke',catalog:true,stages:'footwear'},
-  {key:'leather',label:'Bags & leather',desc:'Bags, belts & leather goods',kind:'bespoke',catalog:true,stages:'leather'},
-  {key:'rtw',label:'Ready-to-wear',desc:'Finished garments sold off the rack',kind:'retail',catalog:true,stages:'rtw'},
-  {key:'fabrics',label:'Fabrics',desc:'Cloth sold by length',kind:'retail',stages:'fabrics'}
+/* ---- What a studio does, in two halves --------------------------------------
+   One tick used to answer two questions at once, and got both wrong at the edges:
+   'bespoke' was a craft named after a mode, 'rtw' was a mode named as a craft, and
+   footwear and leather never got asked the second question at all — their mode was
+   decided for them, here, in a constant.
+
+   CRAFT is what the studio works in. It decides the word for one piece of work,
+   which measurements are offered for entry, which production presets are suggested,
+   and what quality control starts as.
+
+   MODE is how the piece reaches the customer, and decides which tabs open. Nothing
+   else. Neither half ever decides the other, which is the mistake being undone.
+
+   Stored on the branch as 'craft:mode' in the same does[] array as before, so there
+   is nothing new to sync and nothing to migrate on the server.
+
+   What MODE is NOT: it does not say where stock came from. A boutique buying
+   wholesale and a label sewing its own both tick 'stock' — the label also ticks
+   'make'. What a unit actually cost belongs on the unit, not on the studio. */
+const CRAFTS=[
+  {key:'garments',label:'Garments',      desc:'Clothing of any kind',       word:'garment',meas:'body',stages:{make:'bespoke', stock:'rtw'}},
+  {key:'footwear',label:'Footwear',      desc:'Shoes, sandals & boots',     word:'pair',   meas:'foot',stages:{make:'footwear',stock:'rtw'}},
+  {key:'leather', label:'Bags & leather',desc:'Bags, belts & leather goods',word:'piece',  meas:'bag', stages:{make:'leather', stock:'rtw'}},
+  {key:'fabrics', label:'Fabrics',       desc:'Cloth sold by length',       word:'piece',  meas:'',    stages:{make:'fabrics', stock:''}}
 ];
+const MODES=[
+  {key:'make', label:'We make these here',      desc:'Opens the production board'},
+  {key:'stock',label:'We sell them ready made', desc:'Opens the Shop and Sales'}
+];
+function craftByKey(k){const c=String(k||'').split(':')[0];return CRAFTS.find(x=>x.key===c)||null;}
+function craftOf(k){return String(k||'').split(':')[0];}
+function modeOf(k){const p=String(k||'').split(':');return p.length>1?p[1]:'';}
+function modeLabel(m){const x=MODES.find(o=>o.key===m);return x?x.label:'';}
+/* Every studio already on a device stored bare keys. They expand on read, the same
+   way branchDoes() already expands a branch that only ever had a type string. Nobody
+   is asked to set themselves up again, and nobody's tabs move. */
+const LEGACY_DOES={
+  bespoke: ['garments:make'],
+  rtw:     ['garments:stock'],
+  footwear:['footwear:make','footwear:stock'],
+  leather: ['leather:make','leather:stock'],
+  fabrics: ['fabrics:stock']
+};
+/* A studio that added its own type answered 'Making or Selling?', and that answer is
+   in SETTINGS.branchActivities in the old shape. Read it rather than guessing. */
+function legacyCustom(k){const a=SETTINGS.branchActivities;return (Array.isArray(a)?a:[]).find(x=>x&&x.key===k)||null;}
+function expandDoesKey(k){
+  k=String(k||'');
+  if(!k)return [];
+  if(k.indexOf(':')>=0)return [k];
+  if(LEGACY_DOES[k])return LEGACY_DOES[k].slice();
+  const a=legacyCustom(k);
+  if(a&&Array.isArray(a.modes)&&a.modes.length)return [k+':'+(a.modes.indexOf('make')>=0?'make':a.modes[0])];
+  if(a&&a.kind==='bespoke')return [k+':make'];
+  if(a&&a.kind==='retail')return [k+':stock'];
+  if(a)return [k];                 // 'just a label' — no tabs, and that was deliberate
+  /* A bare CRAFT key is not a studio from an older version — no device ever stored one.
+     It is a craft ticked with no mode chosen, so it stays mode-less and the screen that
+     is collecting it asks the second question instead of guessing an answer. */
+  if(CRAFTS.some(c=>c.key===k))return [k];
+  return [k+':stock'];             // unknown key from a future version: safest is a shelf
+}
+function normaliseDoes(list){
+  const out=[],seen={};
+  (list||[]).forEach(k=>expandDoesKey(k).forEach(x=>{if(!seen[x]){seen[x]=1;out.push(x);}}));
+  return out;
+}
 /* Haberdashery was once a sixth trade here. It was dropped as a business type
    we sell to — the shops are small, the workflow is a subset of a fabric shop's,
    and it muddied the trade list. It survives as an inventory CATEGORY, which is
@@ -3259,12 +3318,13 @@ const DEFAULT_ACTIVITIES=[
 /* What one piece of work is called in each trade. A tailor makes a garment, a
    shoemaker makes a pair, a bag maker makes a piece. The studio can override this
    in Settings; when a studio does more than one thing, the neutral word wins. */
-const ACTIVITY_WORDS={bespoke:'garment',rtw:'garment',footwear:'pair',leather:'piece',fabrics:'piece'};
+const ACTIVITY_WORDS=(function(){const o={};CRAFTS.forEach(c=>{o[c.key]=c.word;});return o;})();
+function craftWord(k){const c=craftByKey(k);return c?c.word:'item';}
 function tradeWord(){
   const set=(SETTINGS.itemWord||'').trim();
   if(set)return set.toLowerCase();
   const seen={};
-  activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>{seen[ACTIVITY_WORDS[k]||'item']=1;}));
+  activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>{seen[craftWord(k)]=1;}));
   const words=Object.keys(seen);
   if(words.length===1)return words[0];
   if(!words.length)return 'garment';
@@ -3285,31 +3345,118 @@ function applyTradeWording(){
   const mp=document.getElementById('matPerTypeSub');
   if(mp)mp.textContent='Set the materials each '+w+' type uses, as a reference for what each piece consumes.';
 }
-function branchActivities(){const a=SETTINGS.branchActivities;return (Array.isArray(a)&&a.length)?a:DEFAULT_ACTIVITIES.slice();}
-// The chips shown for a branch = the current option list, plus any activity this branch already
-// uses that has since been removed from the list (so nothing a branch does silently vanishes).
-function activitiesForDraft(does){const list=branchActivities().slice();const have={};list.forEach(a=>have[a.key]=1);(does||[]).forEach(k=>{if(!have[k]){const base=activityByKey(k);list.push(base?Object.assign({},base):{key:k,label:activityLabel(k),kind:activityKind(k),custom:true});have[k]=1;}});return list;}
-function activityByKey(k){return branchActivities().find(x=>x.key===k)||DEFAULT_ACTIVITIES.find(x=>x.key===k)||null;}
-function activityKind(k){const a=activityByKey(k);if(a)return a.kind;if(k==='bespoke')return 'bespoke';return 'retail';}
-function activityHasCatalog(k){const a=activityByKey(k);return a?!!a.catalog:(k==='rtw');}
-function activityLabel(k){const a=activityByKey(k);return a?a.label:k;}
-function branchDoes(b){if(!b)return [];if(Array.isArray(b.does)&&b.does.length)return b.does.slice();const t=b.type||SETTINGS.businessType||'both';if(t==='both')return ['bespoke','rtw'];return [t];}
-function branchIsBespoke(b){return branchDoes(b).some(k=>activityKind(k)==='bespoke');}
-function branchIsRetail(b){return branchDoes(b).some(k=>activityKind(k)==='retail');}
-function summaryType(does){const bk=(does||[]).some(k=>activityKind(k)==='bespoke');const rt=(does||[]).some(k=>activityKind(k)==='retail');return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
+/* A studio can add its own type and can remove one it will never be, so the option
+   list is whatever it last saved, read through the new shape, with the two legacy
+   garment keys folding into the one craft they always were. */
+function normaliseCraft(x){
+  if(!x||!x.key)return null;
+  const built=CRAFTS.find(c=>c.key===x.key);
+  if(built)return built;
+  if(x.key==='bespoke'||x.key==='rtw')return CRAFTS.find(c=>c.key==='garments');
+  return {key:x.key,label:x.label||x.key,desc:x.desc||'',custom:true,
+    word:x.word||'',meas:x.meas||'',
+    stages:(x.stages&&typeof x.stages==='object')?x.stages:{make:'',stock:''},
+    modes:Array.isArray(x.modes)?x.modes.slice():(x.kind==='bespoke'?['make']:(x.kind==='retail'?['stock']:[]))};
+}
+function branchActivities(){
+  const a=SETTINGS.branchActivities;
+  if(!Array.isArray(a)||!a.length)return CRAFTS.slice();
+  const out=[],seen={};
+  a.forEach(x=>{const c=normaliseCraft(x);if(c&&!seen[c.key]){seen[c.key]=1;out.push(c);}});
+  return out.length?out:CRAFTS.slice();
+}
+/* Which modes a craft may be in. Every built-in craft can be either or both; a custom
+   type is held to what it was added as, and one added as 'just a label' has neither. */
+function craftModes(k){const a=activityByKey(k);if(a&&Array.isArray(a.modes))return a.modes.slice();return MODES.map(m=>m.key);}
+function craftCanMode(k,m){return craftModes(k).indexOf(m)>=0;}
+/* Editing a does[] list. Pure, so the same three functions serve the first-run screen,
+   Settings and the branch editor, and so a gate can exercise them without a DOM.
+   Ticking a craft turns on the mode it is most often reached by; turning off a craft's
+   last mode unticks the craft, because a craft in no mode opens no tab and would sit
+   there looking chosen while doing nothing. */
+function doesHasCraft(does,c){return normaliseDoes(does).some(k=>craftOf(k)===c);}
+function doesHasMode(does,c,m){return normaliseDoes(does).indexOf(c+':'+m)>=0;}
+function doesToggleCraft(does,c){
+  const d=normaliseDoes(does);
+  if(d.some(k=>craftOf(k)===c))return d.filter(k=>craftOf(k)!==c);
+  const ms=craftModes(c);
+  if(!ms.length)return d.concat([c]);
+  return d.concat([c+':'+(ms.indexOf('make')>=0?'make':ms[0])]);
+}
+function doesToggleMode(does,c,m){
+  const d=normaliseDoes(does),k=c+':'+m,i=d.indexOf(k);
+  if(i<0)return d.concat([k]);
+  const out=d.slice();out.splice(i,1);return out;
+}
+/* The chip. One per craft, with its two modes inside it once it is ticked, so the
+   second question is asked where the first was answered rather than on another screen. */
+function craftPickerHtml(does,fnCraft,fnMode,fnRemove,pre){
+  const Q=String.fromCharCode(39);
+  pre=pre||'';
+  const d=normaliseDoes(does);
+  return activitiesForDraft(d).map(function(a){
+    const on=d.some(k=>craftOf(k)===a.key);
+    const ms=craftModes(a.key);
+    let modeRow='';
+    if(on&&ms.length){
+      modeRow='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">'+ms.map(function(m){
+        const mon=d.indexOf(a.key+':'+m)>=0;
+        const meta=MODES.find(x=>x.key===m)||{};
+        return '<span onclick="event.stopPropagation();'+fnMode+'('+pre+Q+a.key+Q+','+Q+m+Q+')" title="'+esc(meta.desc||'')+'"'
+          +' style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:1.5px solid '+(mon?'var(--gold)':'var(--line)')+';background:'+(mon?'var(--panel-2)':'transparent')+';border-radius:999px;padding:5px 10px;font-size:12px;color:'+(mon?'var(--text)':'var(--text-faint)')+'">'
+          +'<span style="width:13px;height:13px;border-radius:3px;border:1.5px solid '+(mon?'var(--gold)':'var(--line)')+';background:'+(mon?'var(--gold)':'transparent')+';color:#1a1206;display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0">'+(mon?'\u2713':'')+'</span>'
+          +esc(modeLabel(m))+'</span>';
+      }).join('')+'</div>';
+    }
+    const rm=fnRemove?('<span title="Remove this option" onclick="event.stopPropagation();'+fnRemove+'('+Q+a.key+Q+')" style="position:absolute;top:6px;right:8px;color:var(--text-faint);font-size:13px;line-height:1">\u2715</span>'):'';
+    return '<div onclick="'+fnCraft+'('+pre+Q+a.key+Q+')" style="cursor:pointer;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--panel-2)':'transparent')+';border-radius:12px;padding:10px 12px;min-width:190px;flex:1 1 190px;position:relative">'
+      +'<div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:5px;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--gold)':'transparent')+';color:#1a1206;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">'+(on?'\u2713':'')+'</span><b style="font-size:14px">'+esc(a.label)+'</b></div>'
+      +(a.desc?'<div style="font-size:11.5px;color:var(--text-faint);margin-top:4px'+(rm?';padding-right:14px':'')+'">'+esc(a.desc)+'</div>':'')
+      +modeRow+rm+'</div>';
+  }).join('');
+}
+// The chips shown for a branch = the current option list, plus any craft this branch
+// already works in that has since been removed from the list (so nothing a branch does
+// silently vanishes).
+function activitiesForDraft(does){
+  const list=branchActivities().slice();const have={};list.forEach(a=>have[a.key]=1);
+  normaliseDoes(does).forEach(k=>{const c=craftOf(k);if(!have[c]){const base=activityByKey(c);list.push(base?Object.assign({},base):{key:c,label:c,custom:true,word:'',meas:'',stages:{},modes:MODES.map(m=>m.key)});have[c]=1;}});
+  return list;
+}
+function activityByKey(k){const c=craftOf(k);return branchActivities().find(x=>x.key===c)||CRAFTS.find(x=>x.key===c)||null;}
+function activityLabel(k){const a=activityByKey(k);return a?a.label:craftOf(k);}
+/* 'Garments · we make these here' — for an audit line or a summary row, where
+   the mode is the half that tells you what actually changed. */
+function doesLabel(k){const m=modeOf(k);return activityLabel(k)+(m?' \u00b7 '+modeLabel(m).toLowerCase():'');}
+function branchDoes(b){
+  if(!b)return [];
+  if(Array.isArray(b.does)&&b.does.length)return normaliseDoes(b.does);
+  const t=b.type||SETTINGS.businessType||'both';
+  if(t==='both')return ['garments:make','garments:stock'];
+  return normaliseDoes([t]);
+}
+function branchCrafts(b){const out=[],seen={};branchDoes(b).forEach(k=>{const c=craftOf(k);if(!seen[c]){seen[c]=1;out.push(c);}});return out;}
+/* The mode half, and only the mode half, decides which tabs open. */
+function branchMakes(b){return branchDoes(b).some(k=>modeOf(k)==='make');}
+function branchStocks(b){return branchDoes(b).some(k=>modeOf(k)==='stock');}
+function summaryType(does){const d=normaliseDoes(does);const mk=d.some(k=>modeOf(k)==='make'),st=d.some(k=>modeOf(k)==='stock');return (mk&&st)?'both':(mk?'bespoke':(st?'rtw':'both'));}
 function activeBranchesInView(){const all=getBranches().filter(b=>b.active!==false);if(typeof activeBranchView!=='undefined'&&activeBranchView&&activeBranchView!=='all')return all.filter(b=>b.name===activeBranchView);return all;}
 function activeTypeList(){return activeBranchesInView().map(b=>branchTypeOf(b.name));}
 function bizType(){const b=showsBespoke(),r=showsRetail();return (b&&r)?'both':(b?'bespoke':'rtw');}
-function showsBespoke(){const v=activeBranchesInView();return v.length?v.some(branchIsBespoke):isBespokeType(SETTINGS.businessType||'both');}
-function showsRTW(){const v=activeBranchesInView();return v.length?v.some(b=>branchDoes(b).some(activityHasCatalog)):isGarmentShopType(SETTINGS.businessType||'both');}
-function showsRetail(){const v=activeBranchesInView();return v.length?v.some(branchIsRetail):isRetailType(SETTINGS.businessType||'both');}
-/* Anything that keeps stock takes money over the counter, so the Sales tab follows
-   the SHOP, not the trade's kind. Footwear and bags & leather are kind:'bespoke' and
-   carry catalog:true — they were given a Shop and a 'Record a sale' button, then shown
-   no takings, because branchIsRetail() only looked at kind. */
-function branchSells(b){return branchDoes(b).some(k=>activityKind(k)==='retail'||activityHasCatalog(k));}
-function businessHasRetail(){return getBranches().filter(b=>b.active!==false).some(branchSells);}
-function salesVisible(){if(!canSwitchBranch())return businessHasRetail();const v=activeBranchesInView();return v.length?v.some(branchSells):isRetailType(SETTINGS.businessType||'both');}
+/* Three tabs, one question each, and all three read the mode half only.
+     make  -> the production board
+     stock -> the Shop, and the Sales tab that reports what the Shop took
+   showsRTW and showsRetail are now the same question under two older names. Both
+   stay: thirty call sites read them, each name is honest about the tab it guards,
+   and keeping them apart leaves room to diverge again without another sweep. */
+function showsBespoke(){const v=activeBranchesInView();return v.length?v.some(branchMakes):isBespokeType(SETTINGS.businessType||'both');}
+function showsRTW(){const v=activeBranchesInView();return v.length?v.some(branchStocks):isGarmentShopType(SETTINGS.businessType||'both');}
+function showsRetail(){const v=activeBranchesInView();return v.length?v.some(branchStocks):isRetailType(SETTINGS.businessType||'both');}
+function businessHasRetail(){return getBranches().filter(b=>b.active!==false).some(branchStocks);}
+/* A manager pinned to one studio sees Sales if the BUSINESS sells anywhere, because
+   they cannot switch away to go and find it. Anybody who can switch sees it for the
+   studio in view. */
+function salesVisible(){if(!canSwitchBranch())return businessHasRetail();const v=activeBranchesInView();return v.length?v.some(branchStocks):isRetailType(SETTINGS.businessType||'both');}
 function applyBizVisibility(){
   const rtw=showsRTW(),bsp=showsBespoke(),ret=showsRetail();
   show('navProducts',can('products')&&rtw);show('msProducts',can('products')&&rtw);
@@ -3348,15 +3495,32 @@ function toggleTeamTools(on){
   else{if(['team','rota','attendance','leave','companylog','payroll'].indexOf(activeView)>=0)go('activity');if(typeof toast==='function')toast('Simplified. Team tools hidden.');}
   renderAll();
 }
-function setBizType(t){
-  SETTINGS.businessType=t;save('layi_dash_settings',SETTINGS);
-  bizChipState(t);
-  applyBizVisibility();renderAll();
-  if((activeView==='production'&&!showsBespoke())||(activeView==='products'&&!showsRTW())||(activeView==='sales'&&!salesVisible()))go('activity');
-  toast('Set up for '+(t==='bespoke'?'making':t==='rtw'?'selling':'making & selling')+'.');
+/* This panel is the shortcut a one-studio business finds first, and it is hidden as soon
+   as there is more than one studio (there is no single answer then). It used to write
+   SETTINGS.businessType and nothing else — a field read only when a business has no
+   branches at all, which never happens, because getBranches() always returns one. So
+   tapping 'Selling' opened no Shop and no Sales and gave no sign that it had not worked.
+   It edits the studio's own does[] now, which is the record the whole app reads. */
+function bizBranch(){return getBranches().filter(b=>b.active!==false)[0]||getBranches()[0]||null;}
+function renderBizDoes(){
+  const box=document.getElementById('bizDoesBox');if(!box)return;
+  const b=bizBranch();
+  box.innerHTML=b?craftPickerHtml(branchDoes(b),'bizToggleCraft','bizToggleMode',''):'';
 }
-function bizChipState(t){const mk=isBespokeType(t),sl=isRetailType(t);document.querySelectorAll('#bizTypeSeg .chip').forEach(c=>{c.classList.toggle('active',c.dataset.biz==='bespoke'?mk:sl);});}
-function toggleBizDoes(kind){const cur=SETTINGS.businessType||'both';let mk=isBespokeType(cur),sl=isRetailType(cur);if(kind==='bespoke')mk=!mk;else sl=!sl;if(!mk&&!sl){if(kind==='bespoke')sl=true;else mk=true;}setBizType((mk&&sl)?'both':(mk?'bespoke':'rtw'));}
+function bizApplyDoes(next){
+  const b=bizBranch();if(!b)return;
+  if(!next.length||!next.some(k=>modeOf(k))){
+    if(typeof toast==='function')toast('A studio has to do at least one thing, one way or another.');
+    return renderBizDoes();
+  }
+  const list=getBranches().map(x=>x===b?Object.assign({},x,{does:next,type:summaryType(next)}):x);
+  SETTINGS.branches=list;save('layi_dash_settings',SETTINGS);
+  logAudit('Studio activity changed',b.name+': '+next.map(doesLabel).join(', '));
+  renderBizDoes();applyBizVisibility();renderAll();
+  if((activeView==='production'&&!showsBespoke())||(activeView==='products'&&!showsRTW())||(activeView==='sales'&&!salesVisible()))go('activity');
+}
+function bizToggleCraft(c){const b=bizBranch();if(!b)return;bizApplyDoes(doesToggleCraft(branchDoes(b),c));}
+function bizToggleMode(c,m){const b=bizBranch();if(!b)return;bizApplyDoes(doesToggleMode(branchDoes(b),c,m));}
 function go(view){
   if(view==='production'&&!showsBespoke())view='activity';
   if((view==='products'&&!showsRTW())||(view==='sales'&&!salesVisible()))view='activity';
@@ -5665,7 +5829,7 @@ function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSetti
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
-  document.getElementById('setCurrency').value=SETTINGS.currency;const st=document.getElementById('setTheme');if(st)st.value=effectiveTheme();const T=tierList();const setv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};const defN=['Starter','Bronze','Silver','Gold','Platinum'];setv('tier_n0',(T[0]&&T[0].name)||'Starter');for(let i=1;i<=4;i++){setv('tier_n'+i,(T[i]&&T[i].name)||defN[i]);setv('tier_m'+i,T[i]?fmtNum(T[i].min):'');}var le=document.getElementById('set_loyalty');if(le)le.checked=loyaltyOn();bizChipState(SETTINGS.businessType||bizType());invCatDraft=null;renderInvCatsSettings();
+  document.getElementById('setCurrency').value=SETTINGS.currency;const st=document.getElementById('setTheme');if(st)st.value=effectiveTheme();const T=tierList();const setv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};const defN=['Starter','Bronze','Silver','Gold','Platinum'];setv('tier_n0',(T[0]&&T[0].name)||'Starter');for(let i=1;i<=4;i++){setv('tier_n'+i,(T[i]&&T[i].name)||defN[i]);setv('tier_m'+i,T[i]?fmtNum(T[i].min):'');}var le=document.getElementById('set_loyalty');if(le)le.checked=loyaltyOn();renderBizDoes();invCatDraft=null;renderInvCatsSettings();
   var bdp=document.getElementById('bizDoesPanel');if(bdp)bdp.style.display=multiBranch()?'none':'';
   const co=SETTINGS.company||{};const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   setV('co_name',co.name);setV('co_email',co.email);setV('co_phone',co.phone);setV('co_address',co.address);setV('co_reg',co.reg);setV('co_pay',co.payInstructions);
@@ -5699,7 +5863,7 @@ function saveQCChecklist(){const raw=fv('set_qc')||'';SETTINGS.qcChecklist=raw.s
    other trades stay available under "Other trades" instead of disappearing. */
 function renderStagePresetChips(){
   const box=document.getElementById('stagePresetChips');if(!box)return;
-  const does={};activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>does[k]=1));
+  const does={};activeBranchesInView().forEach(b=>branchCrafts(b).forEach(c=>does[c]=1));
   const keys=Object.keys(STAGE_PRESETS);
   const mine=keys.filter(k=>((STAGE_PRESET_META[k]||{}).for||[]).some(a=>does[a]));
   const rest=keys.filter(k=>mine.indexOf(k)<0);
@@ -5935,7 +6099,7 @@ function renderBranchesSettings(){const box=document.getElementById('branchBox')
   if(!branchDraft)branchDraft=getBranches().map(b=>({id:b.id||uid('br'),name:b.name,location:b.location||'',does:branchDoes(b),channels:Array.isArray(b.channels)&&b.channels.length?b.channels.slice():['showroom']}));
   const lbl='font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:6px';
   box.innerHTML=branchDraft.map((b,i)=>{
-    const chips=activitiesForDraft(b.does).map(a=>{const on=(b.does||[]).includes(a.key);return `<span onclick="branchDraftToggle(${i},'${a.key}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:1.5px solid ${on?'var(--gold)':'var(--line)'};background:${on?'var(--panel-2)':'transparent'};border-radius:999px;padding:6px 12px;font-size:13px"><span style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${on?'var(--gold)':'var(--line)'};background:${on?'var(--gold)':'transparent'};color:#1a1206;display:inline-flex;align-items:center;justify-content:center;font-size:11px">${on?'\u2713':''}</span>${esc(a.label)}<span title="Remove this option" onclick="event.stopPropagation();bsRemoveType('${a.key}')" style="color:var(--text-faint);margin-left:3px">\u2715</span></span>`;}).join('');
+    const chips=craftPickerHtml(b.does,'bsToggleCraft','bsToggleMode','bsRemoveType',i+',');
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:14px 14px 10px;margin-bottom:12px">
      <div class="cost-line"><input class="fld" id="br_name_${i}" value="${esc(b.name)}" placeholder="Branch / outlet name"><input class="fld" id="br_loc_${i}" value="${esc(b.location)}" placeholder="Location (optional)"><span class="rm" onclick="removeBranchRow(${i})">\u2715</span></div>
      <div style="margin-top:12px"><label style="${lbl}">What it does <span style="text-transform:none;letter-spacing:0">(tick all that apply)</span></label><div style="display:flex;flex-wrap:wrap;gap:8px">${chips}<span onclick="bsAddType(${i})" style="cursor:pointer;border:1.5px dashed var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--gold)">\uff0b Add type</span></div></div>
@@ -5946,9 +6110,25 @@ function renderBranchesSettings(){const box=document.getElementById('branchBox')
     </div>`;}).join('')
     +`<button class="btn ghost sm" style="width:100%;margin:6px 0" onclick="addBranchRow()">\uff0b Add branch / outlet</button><button class="btn" id="branchSaveBtn" onclick="saveBranches()">Save branches</button>`;
 }
-function branchDraftToggle(i,key){syncBranchDraft();const b=branchDraft[i];if(!b)return;b.does=b.does||[];const j=b.does.indexOf(key);if(j>=0)b.does.splice(j,1);else b.does.push(key);renderBranchesSettings();}
-function bsAddType(i){const label=(prompt('New type name (e.g. Alterations, Uniforms, Rentals):','')||'').trim();if(!label)return;const kind=((prompt('Is it Making (like bespoke) or Selling (like retail)? Type M or S:','S')||'S').trim().toUpperCase().indexOf('M')===0)?'bespoke':'retail';const key=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('type-'+Date.now());const acts=branchActivities().slice();if(acts.find(a=>a.key===key||(a.label||'').toLowerCase()===label.toLowerCase())){alert('You already have a type called '+label+'.');return;}acts.push({key,label,kind,custom:true});SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);syncBranchDraft();if(branchDraft[i]){branchDraft[i].does=branchDraft[i].does||[];if(!branchDraft[i].does.includes(key))branchDraft[i].does.push(key);}logAudit('Studio activity added',label+' ('+kind+')');renderBranchesSettings();}
-function bsRemoveType(key){if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>k!==key);});renderBranchesSettings();}
+function bsToggleCraft(i,c){syncBranchDraft();const b=branchDraft[i];if(!b)return;b.does=doesToggleCraft(b.does,c);renderBranchesSettings();}
+function bsToggleMode(i,c,m){syncBranchDraft();const b=branchDraft[i];if(!b)return;b.does=doesToggleMode(b.does,c,m);renderBranchesSettings();}
+/* Adding your own type asks both halves now, and both can be true — a studio that
+   makes uniforms and also sells them off a rail is one type, not two. */
+function bsAddType(i){
+  const label=(prompt('New type name (e.g. Alterations, Uniforms, Rentals):','')||'').trim();if(!label)return;
+  const ans=(prompt('Do you MAKE these, SELL them ready made, or BOTH?\n\nType M, S or B \u2014 or L for just a label with no tabs of its own:','B')||'B').trim().toUpperCase().charAt(0);
+  const modes=ans==='M'?['make']:ans==='S'?['stock']:ans==='L'?[]:['make','stock'];
+  const key=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('type-'+Date.now());
+  const acts=branchActivities().slice();
+  if(acts.find(a=>a.key===key||(a.label||'').toLowerCase()===label.toLowerCase())){alert('You already have a type called '+label+'.');return;}
+  acts.push({key,label,custom:true,modes,word:'',meas:'',stages:{make:'',stock:''}});
+  SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);
+  syncBranchDraft();
+  if(branchDraft[i])branchDraft[i].does=doesToggleCraft((branchDraft[i].does||[]).filter(k=>craftOf(k)!==key),key);
+  logAudit('Studio activity added',label+(modes.length?' ('+modes.map(modeLabel).join(' + ')+')':' (label only)'));
+  renderBranchesSettings();
+}
+function bsRemoveType(key){if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>craftOf(k)!==key);});renderBranchesSettings();}
 function syncBranchDraft(){if(!branchDraft)return;branchDraft.forEach((b,i)=>{const n=document.getElementById('br_name_'+i),l=document.getElementById('br_loc_'+i);if(n)b.name=n.value;if(l)b.location=l.value;const sh=document.getElementById('br_ch_show_'+i),on=document.getElementById('br_ch_onl_'+i);if(sh||on){const cs=[];if(sh&&sh.checked)cs.push('showroom');if(on&&on.checked)cs.push('online');b.channels=cs.length?cs:['showroom'];}});}
 function addBranchRow(){
   syncBranchDraft();branchDraft=branchDraft||[];
@@ -5962,6 +6142,8 @@ function removeBranchRow(i){syncBranchDraft();branchDraft.splice(i,1);renderBran
 function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim());
   const missing=named.find(b=>!(b.does&&b.does.length));
   if(missing){alert('Tick what \u201c'+missing.name.trim()+'\u201d does before saving.');return;}
+  const modeless=named.find(b=>!normaliseDoes(b.does).some(k=>modeOf(k)));
+  if(modeless){alert('For \u201c'+modeless.name.trim()+'\u201d, say whether each thing is made there or sold ready made.');return;}
   const clean=named.map(b=>({id:b.id||uid('br'),name:b.name.trim(),location:(b.location||'').trim(),active:true,does:b.does.slice(),type:summaryType(b.does),channels:Array.isArray(b.channels)&&b.channels.length?b.channels:['showroom']}));
   if(!clean.length){alert('Add at least one branch.');return;}
   const seen={};for(const b of clean){const k=b.name.toLowerCase();if(seen[k]){alert('Duplicate branch: '+b.name);return;}seen[k]=1;}
@@ -6255,31 +6437,31 @@ const EXAMPLE_STUDIOS=[
   {key:'multi',    label:'Multi-studio label',   blurb:'Four studios, bespoke and ready-to-wear',
    solo:false},
   {key:'bespoke',  label:'Bespoke tailor',        blurb:'One workroom, made to order',
-   solo:true, company:'Adé Bespoke', does:['bespoke'], stages:'bespoke',
+   solo:true, company:'Adé Bespoke', does:['garments:make'], stages:'bespoke',
    branch:{name:'The workroom',location:'Yaba, Lagos'},
    items:['Three-piece suit','Agbada','Kaftan','Wedding gown','Senator set','Linen shirt'],
    catalogue:[['Three-piece suit','Garment'],['Agbada','Garment'],['Kaftan','Garment'],['Wedding gown','Garment'],['Senator set','Garment']]},
 
   {key:'footwear', label:'Shoemaker',             blurb:'Bench-made shoes, plus a stocked rail',
-   solo:true, company:'Okoro & Sons Shoes', does:['footwear'], stages:'footwear',
+   solo:true, company:'Okoro & Sons Shoes', does:['footwear:make','footwear:stock'], stages:'footwear',
    branch:{name:'The bench',location:'Aba, Abia'},
    items:['Oxford brogues','Leather sandals','Chelsea boots','Loafers','Bridal mules','Derby shoes'],
    catalogue:[['Oxford brogues','Footwear'],['Chelsea boots','Footwear'],['Loafers','Footwear'],['Leather sandals','Footwear'],['Bridal mules','Footwear']]},
 
   {key:'leather',  label:'Bag & leather maker',   blurb:'Bags, belts and small leather goods',
-   solo:true, company:'Ìfé Leather', does:['leather'], stages:'leather',
+   solo:true, company:'Ìfé Leather', does:['leather:make','leather:stock'], stages:'leather',
    branch:{name:'The studio',location:'Lekki, Lagos'},
    items:['Tote bag','Weekender holdall','Belt','Card wallet','Laptop sleeve','Crossbody bag'],
    catalogue:[['Tote bag','Bag'],['Weekender holdall','Bag'],['Crossbody bag','Bag'],['Belt','Accessory'],['Card wallet','Accessory']]},
 
   {key:'rtw',      label:'Ready-to-wear boutique',blurb:'A rail, sizes and colours, sold off the shelf',
-   solo:true, company:'House of Nneka', does:['rtw'], stages:'rtw',
+   solo:true, company:'House of Nneka', does:['garments:stock'], stages:'rtw',
    branch:{name:'The boutique',location:'Ikoyi, Lagos'},
    items:['Ankara bomber','Linen co-ord','Silk slip dress','Cotton shirt dress','Wide-leg trousers','Wrap skirt'],
    catalogue:[['Ankara bomber','Garment'],['Linen co-ord','Garment'],['Silk slip dress','Garment'],['Cotton shirt dress','Garment'],['Wide-leg trousers','Garment']]},
 
   {key:'fabrics',  label:'Fabric shop',           blurb:'Cloth sold by the yard, over a counter',
-   solo:true, company:'Balogun Fabrics', does:['fabrics'], stages:'fabrics',
+   solo:true, company:'Balogun Fabrics', does:['fabrics:stock'], stages:'fabrics',
    branch:{name:'The shop',location:'Balogun Market, Lagos'},
    items:['Aso-oke (5 yards)','Swiss lace (5 yards)','Ankara (6 yards)','Guinea brocade (4 yards)','Silk georgette (3 yards)','Atiku (5 yards)'],
    catalogue:[['Aso-oke','Fabric'],['Swiss lace','Fabric'],['Ankara','Fabric'],['Guinea brocade','Fabric'],['Silk georgette','Fabric']]}
@@ -6488,7 +6670,7 @@ function loadExample(force){
   exTxns.push({id:uid('t'),dir:'out',label:'Kano fabric restock · aso-oke rolls',amount:240000,at:dd(-16),cat:'supply',category:'Materials & supplies',dept:'Sales',vendor:'Aso-oke weaver',method:'Bank transfer',approval:'Approved',branch:'Kano store'});
   setTxns(exTxns);
   SETTINGS.budgets={Production:600000,Marketing:150000,Operations:400000,Sales:120000};
-  SETTINGS.branches=[{id:'br-lag',name:'Lagos studio',location:'Surulere, Lagos',active:true,type:'bespoke',channels:['showroom']},{id:'br-abj',name:'Abuja outlet',location:'Wuse, Abuja',active:true,type:'rtw',channels:['showroom','online']},{id:'br-ib',name:'Ibadan branch',location:'Bodija, Ibadan',active:true,type:'rtw',does:['rtw','leather'],channels:['showroom']},{id:'br-kan',name:'Kano store',location:'Nassarawa, Kano',active:true,type:'fabrics',channels:['showroom','online']}];
+  SETTINGS.branches=[{id:'br-lag',name:'Lagos studio',location:'Surulere, Lagos',active:true,type:'bespoke',channels:['showroom']},{id:'br-abj',name:'Abuja outlet',location:'Wuse, Abuja',active:true,type:'rtw',channels:['showroom','online']},{id:'br-ib',name:'Ibadan branch',location:'Bodija, Ibadan',active:true,type:'rtw',does:['garments:stock','leather:make','leather:stock'],channels:['showroom']},{id:'br-kan',name:'Kano store',location:'Nassarawa, Kano',active:true,type:'fabrics',channels:['showroom','online']}];
   setCampaigns([
     {id:uid('cmp'),at:dd(-4)+'T10:00:00.000Z',by:'Kay Ojomo',subject:'Festive agbada collection is here',message:'Our new festive pieces just dropped.',type:'Launch',channel:'whatsapp',segment:'all',segmentName:'All reachable',recipients:6},
     {id:uid('cmp'),at:dd(-18)+'T10:00:00.000Z',by:'Kay Ojomo',subject:'10% off for our VIP clients',message:'A thank-you to our top clients.',type:'Promotion',channel:'email',segment:'vip',segmentName:'VIP, top tier',recipients:2}
@@ -8152,35 +8334,46 @@ function openBranchEdit(id){
   renderBranchEdit();
 }
 function beSync(){if(!beDraft)return;const n=document.getElementById('be_name'),l=document.getElementById('be_loc');if(n)beDraft.name=n.value;if(l)beDraft.location=l.value;const sh=document.getElementById('be_show'),on=document.getElementById('be_onl');if(sh||on){const c=[];if(sh&&sh.checked)c.push('showroom');if(on&&on.checked)c.push('online');beDraft.channels=c.length?c:['showroom'];}const nl=document.getElementById('be_newlabel');if(nl)beDraft._newlabel=nl.value;}
-function beToggleDoes(k){beSync();const i=beDraft.does.indexOf(k);if(i>=0)beDraft.does.splice(i,1);else beDraft.does.push(k);renderBranchEdit();}
-function beStartAdd(){beSync();beDraft.adding=true;beDraft._newkind='retail';renderBranchEdit();}
+function beToggleCraft(c){beSync();beDraft.does=doesToggleCraft(beDraft.does,c);renderBranchEdit();}
+function beToggleMode(c,m){beSync();beDraft.does=doesToggleMode(beDraft.does,c,m);renderBranchEdit();}
+function beStartAdd(){beSync();beDraft.adding=true;beDraft._newmodes=['make','stock'];beDraft._newcraft='';renderBranchEdit();}
 function beCancelAdd(){beSync();beDraft.adding=false;beDraft._newlabel='';renderBranchEdit();}
-function beSetNewKind(kd){beSync();beDraft._newkind=kd;renderBranchEdit();}
+/* Both halves, and both can be true: a studio that sews uniforms and also sells them
+   off a rail is one type doing two things, not two types. */
+function beToggleNewMode(m){beSync();const a=beDraft._newmodes=beDraft._newmodes||[];const i=a.indexOf(m);if(i>=0)a.splice(i,1);else a.push(m);renderBranchEdit();}
+function beSetNewCraft(c){beSync();beDraft._newcraft=(beDraft._newcraft===c?'':c);renderBranchEdit();}
 function beAddType(){beSync();const label=(beDraft._newlabel||'').trim();if(!label){alert('Give the new type a name.');return;}
-  const kind=beDraft._newkind||'retail';const catalog=(kind==='retail'&&/ready|rtw|garment|wear/i.test(label))?true:false;
+  const modes=(beDraft._newmodes||[]).slice();
   const key=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('type-'+Date.now());
   const acts=branchActivities().slice();
   if(acts.find(a=>a.key===key||(a.label||'').toLowerCase()===label.toLowerCase())){alert('You already have a type called '+label+'.');beDraft.adding=false;return renderBranchEdit();}
-  acts.push({key,label,kind,catalog,custom:true});SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);
-  if(!beDraft.does.includes(key))beDraft.does.push(key);logAudit('Studio activity added',label+' ('+kind+')');
-  beDraft.adding=false;beDraft._newlabel='';renderBranchEdit();}
+  /* Closest craft is optional. Given one, the new type borrows its word, its measurements
+     and its stages, which is the whole reason to say so. Left blank it inherits the
+     studio's own wording and only the mode does any work — which is right for Rentals or
+     Alterations, things that are not a craft at all. */
+  const base=CRAFTS.find(c=>c.key===beDraft._newcraft)||null;
+  acts.push({key,label,custom:true,modes,
+    word:base?base.word:'',meas:base?base.meas:'',
+    stages:base?base.stages:{make:'',stock:''}});
+  SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);
+  beDraft.does=doesToggleCraft((beDraft.does||[]).filter(k=>craftOf(k)!==key),key);
+  logAudit('Studio activity added',label+(modes.length?' ('+modes.map(modeLabel).join(' + ')+')':' (label only)')+(base?' · like '+base.label:''));
+  beDraft.adding=false;beDraft._newlabel='';beDraft._newcraft='';renderBranchEdit();}
 function beRemoveType(key){beSync();if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;
   const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));
-  beDraft.does=beDraft.does.filter(k=>k!==key);renderBranchEdit();}
+  beDraft.does=beDraft.does.filter(k=>craftOf(k)!==key);renderBranchEdit();}
 function renderBranchEdit(){
-  const b=beDraft;const kindTag={bespoke:'making',retail:'selling',other:''};
-  const chips=activitiesForDraft(b.does).map(a=>{const on=b.does.includes(a.key);const tag=kindTag[a.kind]||'';
-    return `<div onclick="beToggleDoes('${a.key}')" style="cursor:pointer;border:1.5px solid ${on?'var(--gold)':'var(--line)'};background:${on?'var(--panel-2)':'transparent'};border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px;position:relative">
-      <div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:5px;border:1.5px solid ${on?'var(--gold)':'var(--line)'};background:${on?'var(--gold)':'transparent'};color:#1a1206;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${on?'\u2713':''}</span><b style="font-size:14px">${esc(a.label)}</b>${tag?`<span style="font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);margin-left:auto;padding-right:14px">${tag}</span>`:''}</div>
-      ${a.desc?`<div style="font-size:11.5px;color:var(--text-faint);margin-top:4px">${esc(a.desc)}</div>`:''}
-      <span title="Remove this option" onclick="event.stopPropagation();beRemoveType('${a.key}')" style="position:absolute;top:6px;right:8px;color:var(--text-faint);font-size:13px;line-height:1">\u2715</span>
-    </div>`;}).join('');
-  const kchip=(kd,l)=>`<span onclick="beSetNewKind('${kd}')" style="cursor:pointer;padding:6px 12px;border-radius:999px;border:1.5px solid ${b._newkind===kd?'var(--gold)':'var(--line)'};background:${b._newkind===kd?'var(--panel-2)':'transparent'};font-size:12.5px">${l}</span>`;
+  const b=beDraft;
+  const chips=craftPickerHtml(b.does,'beToggleCraft','beToggleMode','beRemoveType');
+  const mchip=(m,l)=>{const on=(b._newmodes||[]).indexOf(m)>=0;return `<span onclick="beToggleNewMode('${m}')" style="cursor:pointer;padding:6px 12px;border-radius:999px;border:1.5px solid ${on?'var(--gold)':'var(--line)'};background:${on?'var(--panel-2)':'transparent'};font-size:12.5px">${l}</span>`;};
+  const cchip=(c,l)=>`<span onclick="beSetNewCraft('${c}')" style="cursor:pointer;padding:5px 11px;border-radius:999px;border:1.5px solid ${b._newcraft===c?'var(--gold)':'var(--line)'};background:${b._newcraft===c?'var(--panel-2)':'transparent'};font-size:12px">${l}</span>`;
   const addBlock=b.adding
     ? `<div style="flex:1 1 100%;border:1.5px dashed var(--gold);border-radius:12px;padding:12px;margin-top:4px">
         <input class="fld" id="be_newlabel" value="${esc(b._newlabel||'')}" placeholder="New type name (e.g. Alterations, Uniforms, Rentals)" style="margin-bottom:8px">
-        <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px">Is it…</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${kchip('bespoke','Making (like bespoke) \u2192 Production')}${kchip('retail','Selling (like retail) \u2192 Sales')}${kchip('other','Just a label')}</div>
+        <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px">Do you… <span style="text-transform:none;letter-spacing:0">(both is fine)</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${mchip('make','Make these here \u2192 Production')}${mchip('stock','Sell them ready made \u2192 Shop &amp; Sales')}</div>
+        <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px">Closest to <span style="text-transform:none;letter-spacing:0">(optional, and it borrows that craft's wording, measurements and stages)</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${CRAFTS.map(c=>cchip(c.key,esc(c.label))).join('')}${cchip('','Nothing like it')}</div>
         <div style="display:flex;gap:8px"><button class="btn sm" onclick="beAddType()">Add type</button><button class="btn ghost sm" onclick="beCancelAdd()">Cancel</button></div>
       </div>`
     : `<div onclick="beStartAdd()" style="cursor:pointer;border:1.5px dashed var(--line);border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:13.5px">\uff0b Add a type</div>`;
