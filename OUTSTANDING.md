@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026
+Last updated: 11 September 2026 (second session)
 
 ## How this run works
 
@@ -103,7 +103,27 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   checks that every function named in an `onclick` exists — which catches the whole class,
   not this one instance.
 
-All 42 gates green after each, plus the 1,758-check website gate. Seventeen mutations run
+- **The mode labels** read **Made to order** and **Ready made**, Kayode's own words. The
+  hint above the chips states what each one opens, because a label sewing its own rail is
+  not making to *order* and would otherwise skip the tick that gives it a production board.
+- **5. Fabric check.** An item records **whose** the material is (we supplied it, ordered
+  in for this, client brought it in, client sent it ahead). The last two are irreplaceable,
+  and one such item makes the whole order careful. The work order carries a red block
+  saying THE CLIENT'S OWN FABRIC, the source under each material, and a line to sign on
+  paper. Somebody is asked to check the cloth against the photo in the progress update they
+  already post, after work starts and before QC, signed and dated, never asked twice. No
+  prompt when there is nothing to check against. New gate `audit_fabric.js`.
+- **Two records made in the same millisecond could share an id.** The branch-scope gate had
+  been failing about **once in twenty-five runs** with *"txns: 2 record(s) show in more
+  than one studio"*, and passing every time it was run alone. Not a scope leak: `uid()` was
+  `Date.now()` plus three random base-36 characters, 46,656 values inside one millisecond.
+  Measured, a burst of 60 collided **4.0%** of the time and a **200-row CSV import 31.6%**.
+  Every edit, delete and lookup is `list.find(x => x.id === id)`, which returns the first
+  match, so a shared id means editing one record edits the other. Fixed with a
+  per-millisecond counter and a wider random tail; saved ids untouched. Gated in
+  `audit_import.js`. Ten consecutive full verify runs green, against roughly one in six.
+
+All 43 gates green after each, plus the 1,758-check website gate. Twenty-one mutations run
 against the two gates; all seventeen caught.
 
 ---
@@ -161,18 +181,6 @@ almost free. **~half a day.**
 ---
 
 ## Real value, well defined
-
-### 5. Fabric check
-Each item already carries a **Material(s)** picker and its own **"Photos of
-this item / fabric"**, now in Storage. Missing:
-- the job sheet prints neither (see 0b — it prints a blank Fabric column)
-- nothing records **whose** fabric it is (studio-supplied / client brought it /
-  client sent it ahead) — mix-ups are nearly always client-brought
-- nothing asks anyone to **check it before cutting**
-
-Proposed: the two fixes above, plus a tick on the first production stage —
-*"fabric checked against the photo"* — with who ticked it and when.
-**Half a day.**
 
 ### 6. In-house vs outsourced work
 Embellishment, monogram, beading. Outsourced work needs a vendor, a cost, sent
