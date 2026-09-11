@@ -1277,7 +1277,7 @@ body.modal-open{overflow:hidden}
           <div class="toolbar"><span style="flex:1"></span><button class="btn sm ghost" onclick="openBill()">+ Recurring bill</button><button class="btn sm" onclick="openExpense()">+ Add expense</button></div>
           <div class="stat-grid" id="expStats"></div>
           <div id="expPending"></div>
-          <div class="panel"><div class="panel-head"><h3>Recurring bills &amp; overheads</h3><button class="btn sm" onclick="logBillsThisMonth()">Log this month</button></div><div id="billsList"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Recurring bills &amp; overheads</h3><button class="btn sm" onclick="logBillsThisMonth()">Log what is due</button></div><div id="billsList"></div></div>
           <div class="panel"><div class="panel-head"><h3>Expenses &amp; money out</h3><span id="expPeriodBar"></span></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><input type="text" class="fld search" id="expSearch" placeholder="Search expenses…" oninput="renderExpensesView()" style="margin:0;flex:1"><span class="page-sub" id="expSub"></span></div><div id="expList"></div></div>
         </div>
       </section>
@@ -6091,28 +6091,64 @@ function openMoneyInOverview(period,custom){
 function openBill(id){if(!can('money'))return;const b=id?getBills().find(x=>x.id===id):null;
   openModal(`<h3>${b?'Edit bill':'Recurring bill'}</h3><div class="msub">Regular overheads: rent, electricity, subscriptions, salaries</div>
     <div class="field"><label>Bill name</label><input class="fld" id="b_label" value="${b?esc(b.label):''}" placeholder="e.g. Studio rent, NEPA, Adobe"></div>
-    <div class="field"><label>Amount per month (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="b_amt" value="${b&&b.amount?fmtNum(b.amount):''}" placeholder="0"></div>
+    <div class="field"><label>Amount each time (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="b_amt" value="${b&&b.amount?fmtNum(b.amount):''}" placeholder="0"></div>
+    <div class="field"><label>How often</label><select class="fld" id="b_every">${BILL_CADENCES.map(c=>`<option value="${c.k}" ${billCadence(b).k===c.k?'selected':''}>${esc(c.label)}</option>`).join('')}</select>
+      <div class="sd" style="color:var(--text-faint);margin-top:5px">A yearly bill is logged once a year, not twelve times. Change it and the next period starts fresh.</div></div>
     ${multiBranch()?'<div class="field"><label>Which studio pays this</label><select class="fld" id="b_branch"><option value="">The whole business</option>'+branchNames().map(function(n){return '<option value="'+esc(n)+'" '+((b&&b.branch===n)?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select><div class="sd" style="color:var(--text-faint);margin-top:4px">Rent and electricity belong to a studio. A subscription usually belongs to the whole business.</div></div>':''}
     <div class="field"><label>Note (optional)</label><input class="fld" id="b_note" value="${b?esc(b.note||''):''}" placeholder="Due date, account…"></div>
     <div class="modal-foot">${b?`<button class="btn danger sm" onclick="delBill('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveBill('${b?b.id:''}')">${b?'Update':'Save'}</button></div>`);}
 function b_existingBranch(id){const b=id?getBills().find(x=>x.id===id):null;return b?(b.branch||''):'';}
-function saveBill(id){const label=(fv('b_label')||'').trim();if(!label){alert('Bill name is required.');return;}const amount=amt('b_amt');const list=getBills();const data={label,amount,note:fv('b_note')||'',branch:(document.getElementById('b_branch')?fv('b_branch'):(b_existingBranch(id)||''))};if(id){Object.assign(list.find(x=>x.id===id),data);}else{list.push(Object.assign({id:uid('b'),lastLogged:''},data));}setBills(list);closeModal();renderExpensesView();}
+/* How often a bill comes round. Rent is monthly, an accountant is often quarterly, a
+   business permit or a domain is annual. Everything was monthly, so the annual ones were
+   either logged twelve times or not at all.
+
+   A bill is due when the period it is in is not the period it was last logged in, which is
+   why the marker is a period KEY rather than a date. An old bill has a month key on it and
+   goes on behaving exactly as it did. */
+const BILL_CADENCES=[
+  {k:'month',  label:'Every month',   per:'month'},
+  {k:'quarter',label:'Every quarter', per:'quarter'},
+  {k:'year',   label:'Once a year',   per:'year'}
+];
+function billCadence(b){const k=(b&&b.every)||'month';return BILL_CADENCES.find(c=>c.k===k)||BILL_CADENCES[0];}
+/* Every part of this key is read in LOCAL time, which is what a studio means by 'this
+   month'. toISOString() converts to UTC first, so for the first hour of the first of the
+   month in Lagos it still answered with last month, and a bill logged in that hour would
+   have been counted against a period that had already closed. The quarter and the year were
+   already local, so the month was also the odd one out. */
+function billPeriodKey(every,d){
+  d=d||new Date();
+  const y=d.getFullYear();
+  if(every==='year')return String(y);
+  if(every==='quarter')return y+'-Q'+(Math.floor(d.getMonth()/3)+1);
+  return y+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function billIsDue(b,d){return !!b&&(+b.amount||0)>0&&b.lastLogged!==billPeriodKey((b&&b.every)||'month',d);}
+function billsDue(d){return getBills().filter(b=>billIsDue(b,d));}
+function saveBill(id){const label=(fv('b_label')||'').trim();if(!label){alert('Bill name is required.');return;}const amount=amt('b_amt');const list=getBills();const data={label,amount,every:(fv('b_every')||'month'),note:fv('b_note')||'',branch:(document.getElementById('b_branch')?fv('b_branch'):(b_existingBranch(id)||''))};if(id){Object.assign(list.find(x=>x.id===id),data);}else{list.push(Object.assign({id:uid('b'),lastLogged:''},data));}setBills(list);closeModal();renderExpensesView();}
 function delBill(id){if(!confirm('Delete this recurring bill? Past logged entries stay in your transactions.'))return;setBills(getBills().filter(b=>b.id!==id));closeModal();renderExpensesView();}
-function logBillsThisMonth(){if(!can('money'))return;const month=new Date().toISOString().slice(0,7);const bills=getBills();const due=bills.filter(b=>b.lastLogged!==month&&+b.amount>0);
+/* Logs whatever is due, which is no longer the same as whatever is monthly. A quarterly
+   bill logged in July is not due again until October, and an annual one not until next
+   year, so each bill is stamped with ITS OWN period rather than with the month. */
+function logBillsThisMonth(){
+  if(!can('money'))return;
+  const bills=getBills();const due=bills.filter(b=>billIsDue(b));
   if(!bills.length){alert('No recurring bills yet. Add one with “+ Recurring bill”.');return;}
-  if(!due.length){alert('All recurring bills are already logged for this month.');return;}
+  if(!due.length){alert('Nothing is due. Every recurring bill has been logged for the period it is in.');return;}
   const total=due.reduce((s,b)=>s+(+b.amount||0),0);
-  if(!confirm('Log '+due.length+' bill(s) for this month, totalling '+cur(total)+'? They’ll be added to overheads.'))return;
+  const what=due.map(b=>b.label+' ('+billCadence(b).label.toLowerCase()+')').join(', ');
+  if(!confirm('Log '+due.length+' bill(s) now, totalling '+cur(total)+'?\n\n'+what+'\n\nThey will be added to overheads.'))return;
   const t=getTxns();const today=new Date().toISOString().slice(0,10);
-  due.forEach(b=>{t.push({id:uid('t'),dir:'out',label:b.label,amount:+b.amount||0,at:today,cat:'expense',recurring:true,billId:b.id,method:b.method||'',branch:b.branch||''});b.lastLogged=month;});
+  due.forEach(b=>{t.push({id:uid('t'),dir:'out',label:b.label,amount:+b.amount||0,at:today,cat:'expense',recurring:true,billId:b.id,every:billCadence(b).k,method:b.method||'',branch:b.branch||''});b.lastLogged=billPeriodKey(billCadence(b).k);});
   setTxns(t);setBills(bills);renderFinance();renderActivity();renderExpensesView();
-  alert('Logged '+cur(total)+' across '+due.length+' bill(s).');}
+  alert('Logged '+cur(total)+' across '+due.length+' bill(s).');
+}
 function renderBills(){const el=document.getElementById('billsList');if(!el)return;
   // Rent belongs to a studio; a subscription belongs to the label. A bill with no
   // branch on it is the whole business's and shows everywhere.
-  const bills=getBills().filter(inBranch);const month=new Date().toISOString().slice(0,7);
-  if(!bills.length){el.innerHTML='<div class="kv" style="color:var(--text-faint)">No recurring bills yet. Add rent, electricity, subscriptions and salaries here. Tap “Log this month” to post them to overheads.</div>';return;}
-  el.innerHTML=`<table class="oledger"><tr><th>Bill</th><th class="hide-sm">Note</th><th class="num">Amount / month</th><th>This month</th></tr>${bills.map(b=>{const logged=b.lastLogged===month;return`<tr class="orow" style="cursor:pointer" onclick="openBill('${b.id}')"><td><div class="oref">${esc(b.label)}</div></td><td class="hide-sm" style="color:var(--text-dim)">${b.note?esc(b.note):'<span style=\'color:var(--text-faint)\'>—</span>'}</td><td class="num" style="font-weight:600">${cur(b.amount)}</td><td>${logged?'<span class="sup-status ok">logged</span>':'<span class="sup-status low">not yet</span>'}</td></tr>`;}).join('')}</table>`;}
+  const bills=getBills().filter(inBranch);
+  if(!bills.length){el.innerHTML='<div class="kv" style="color:var(--text-faint)">No recurring bills yet. Add rent, electricity, subscriptions and salaries here, monthly, quarterly or once a year. Tap “Log what is due” to post them to overheads.</div>';return;}
+  el.innerHTML=`<table class="oledger"><tr><th>Bill</th><th class="hide-sm">How often</th><th class="num">Amount</th><th>This period</th></tr>${bills.map(b=>{const logged=!billIsDue(b);return`<tr class="orow" style="cursor:pointer" onclick="openBill('${b.id}')"><td><div class="oref">${esc(b.label)}</div></td><td class="hide-sm" style="color:var(--text-dim)">${esc(billCadence(b).label)}${b.note?' · '+esc(b.note):''}</td><td class="num" style="font-weight:600">${cur(b.amount)}</td><td>${logged?'<span class="sup-status ok">logged</span>':'<span class="sup-status low">not yet</span>'}</td></tr>`;}).join('')}</table>`;}
 function openAppt(id){if(!can('appts'))return;const e=id?getAppts().find(x=>x.id===id):null;openModal(`<h3>${e?'Edit appointment':'Add fitting / appointment'}</h3><div class="msub">Shows on the calendar and the dashboard</div>
   <div class="row2"><div class="field"><label>Type</label>${selOther('a_type',APPT_TYPES,apptTypeOf(e),'What kind of session?')}</div><div class="field"><label>Status</label><select class="fld" id="a_status">${APPT_STATUSES.map(s=>`<option ${apptStatus(e)===s?'selected':''}>${s}</option>`).join('')}</select></div></div>
   <div class="row2"><div class="field"><label>Date</label><input class="fld" type="date" id="a_date" value="${e?e.date||'':new Date().toISOString().slice(0,10)}"></div><div class="field"><label>Time</label><input class="fld" type="time" id="a_time" value="${e?e.time||'10:00':'10:00'}"></div></div>
