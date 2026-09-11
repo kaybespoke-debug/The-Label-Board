@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (fourth session)
+Last updated: 11 September 2026 (fifth session)
 
 ## How this run works
 
@@ -163,7 +163,22 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     written**. An edit script rolled back halfway and every gate stayed green because none
     of them rendered the order form. `audit_pieces.js` renders it now.
 
-All 46 gates green after each, plus the 1,790-check website gate. Forty-four mutations run
+- **8. Bespoke, made to measure, or off the shelf.** Recorded on the **piece**, never on the
+  studio: a shoemaker does all three in a week at the same bench. Not a third mode on craft
+  × mode either, because bespoke and made to measure behave identically in the app.
+  - The **work order** tells the bench which it is, because that decides what they pick up.
+  - A shelf piece needs no measurements; a piece nobody recorded still does, because
+    assuming otherwise is how a measurement gets skipped.
+  - The **dashboard** answers the question the field exists for: of the work booked this
+    period, at this studio, what share was cut from scratch. Counted on the order rather
+    than on money received, converted at each order’s own rate, with pieces nobody
+    recorded on their own line rather than spread across the others.
+  - The website gate now checks the app carries every **way of working** the site
+    advertises, not only every trade. That is what would have caught this: the site has sold
+    to made-to-measure studios since launch and the app had no word for it.
+  - New gate `audit_method.js`.
+
+All 47 gates green after each, plus the 1,793-check website gate. Fifty-two mutations run
 against the two gates; all seventeen caught.
 
 ---
@@ -209,17 +224,6 @@ Embellishment, monogram, beading. Outsourced work needs a vendor, a cost, sent
 and due dates, and a **"waiting on them"** state that does not make the
 workroom look idle. Vendors and maker commissions already exist; this extends
 them. **Half a day.**
-
-### 8. Bespoke / made to measure / from stock — on the ORDER
-The website sells to **Made to measure** as a trade; the app has no concept of
-it. Deliberately not a third mode on #2: bespoke and made-to-measure behave
-identically in the app (board, measurements, fittings) while ready-made needs
-none of them.
-
-And it is not a property of a studio at all. A shoemaker cuts a bespoke last
-for one client, adjusts a standard last for the next, and sells ready-made off
-the shelf — same week, same workshop. One field per order, which also finally
-answers what share of revenue is bespoke versus made to measure. **Small.**
 
 ### 10. About Us rewrite
 Ten years of it. Four years of running a business from another country. The
