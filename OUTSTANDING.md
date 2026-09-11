@@ -33,10 +33,15 @@ each change. Gates still run every time. *This run: said on 11 Sep, and
 | | Step | State |
 |---|---|---|
 | 1 | `APP_VERSION` and the service worker `CACHE` moved to `layi-v40` | done |
-| 2 | `git push origin admin-deploy` → `5b3d452`, publishes the **admin console** and the partner portal | done |
-| 3 | Merge to `main` → `d0c50b5`, publishes the **customer app** | done |
-| 4 | Watch the sign-in screen on a real phone: the build stamp must read **layi-v40**. If it still says v39 the service worker did not swap | **Kayode, now** |
-| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | **Kayode, now** |
+| 2 | `git push origin admin-deploy` → `5b3d452`, publishes the **admin console**. Netlify site `thelabelboard-admin`, built and published | done |
+| 3 | Merge to `main` → `d0c50b5`, publishes the **customer app**. Netlify site `thelabelboard`, built and published | done |
+| 4 | Build stamp on a real phone reads **layi-v40** | **confirmed by Kayode** |
+| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | **Kayode, when convenient** |
+
+**Correction:** step 2 does *not* publish the partner portal. Only two Netlify
+sites deploy from GitHub, `thelabelboard` and `thelabelboard-admin`, and the
+admin one publishes `admin/` alone. **`partners/` is deployed nowhere.** See
+the Netlify section below.
 
 **Nothing in this release touched the database.** `supabase/` was unchanged
 against `main`, so no migration was applied and no Edge Function deployed. The
@@ -102,9 +107,49 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
-| 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
-| 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
-| 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 7 | Netlify: **over 75% of the monthly credit allowance used** on 11 Sep | Check Usage & billing for whether it is builds or bandwidth. Four pushes in one hour on 11 Sep each rebuilt the admin site, which did not help. Batch pushes |
+
+---
+
+## Netlify — two apps of four are deployed
+
+| App | Netlify site | Deploys from | State |
+|---|---|---|---|
+| Customer app | `thelabelboard` | GitHub, `main` | **live**, `layi-v40` |
+| Admin console | `thelabelboard-admin` | GitHub, `admin-deploy` | **live** |
+| Partner portal | — | — | **nowhere** |
+| Public website | — | — | **nowhere** |
+
+Also on the account: `layi-website` (Netlify Drop, 4 Aug) and
+`loquacious-pika-32f045` (Netlify Drop, 5 Jul), neither connected to this repo.
+Confirm whether `layi-website` still serves the LAYI tenant before deleting
+either.
+
+**Both undeployed apps are already wired to Supabase**, at the surviving project
+`eskubrbgbcbaejynjxvh` with the public anon key. Supabase is not what is holding
+either of them back. Each has exactly one blocker:
+
+- **Partner portal — blocked on SMTP (item 2 above).** It signs people in with
+  an emailed one-time code. Deploy it today and you get a site that nobody,
+  including you, can get into. Costs nothing to wait: there are no partners yet.
+- **Public website — blocked on the domain and a real phone number.** It is the
+  only one of the four meant to be found by Google. Today `web/js/config.js`
+  carries `+234 800 000 0000` and `wa.me/2348000000000`, so "WhatsApp us" goes
+  nowhere, and `domain: 'thelabelboard.com'` drives every canonical tag,
+  `robots.txt` and `sitemap.xml`. Publishing before that is settled tells Google
+  the real copy of every page lives at an address that may not be yours.
+  - *If you want a live URL sooner:* connect it with `robots.txt` set to
+    disallow everything. A real link to look at and share, no search damage, and
+    one line to lift when the details are settled. Say the word and it is a
+    two-minute change.
+
+**Optional tidying, not urgent:** set base directories (`site` and `admin`) on
+the two live sites and delete the root `netlify.toml`. It only bites at the
+moment of merging `admin-deploy` into `main`, the recipe for doing that safely
+is in `CLAUDE.md` and in the file itself, and it was followed correctly on
+11 Sep. `site/netlify.toml` was fixed the same day so this job will actually
+work when somebody does it.
 
 ---
 
