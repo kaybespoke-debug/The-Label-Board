@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (second session)
+Last updated: 11 September 2026 (third session)
 
 ## How this run works
 
@@ -55,7 +55,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
 | 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
 | 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
-| 9 | **Decide accessories** | Now a **one-line change** — a fifth entry in `CRAFTS` and nothing else. But a studio has to read the website and see itself, so the copy goes in the same breath: a web session, not an app one |
+| 9 | **A photograph for `web/img/accessories.jpg`** | 1000x667, a bench with caps, gele, beadwork and a jeweller's pliers, to match the other seven. The accessories tile reads as a line drawing until it exists |
 
 ---
 
@@ -123,7 +123,31 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   per-millisecond counter and a wider random tail; saved ids untouched. Gated in
   `audit_import.js`. Ten consecutive full verify runs green, against roughly one in six.
 
-All 43 gates green after each, plus the 1,758-check website gate. Twenty-one mutations run
+- **Accessories is a craft.** Caps, gele, scarves, beadwork and jewellery, with its own
+  measurements (head, cap size, neck, wrist, ring size, belt length), its own stages
+  (Design, Materials Ready, Cutting & Shaping, Assembly, Beading & Trims, Fastenings,
+  Finishing), its own quality checks, and an example studio. **The website says it in the
+  same commit**: a trade tile and pane, a product-page card, the footer link on all twelve
+  pages and both meta descriptions.
+  - **Still wanted: `web/img/accessories.jpg`.** The tile keeps its line drawing until that
+    photograph exists. `img/README.txt` names it, and the website gate now enforces the
+    rule rather than letting it pass quietly: a tile either carries a photograph that
+    exists, or names none and the README says one is wanted.
+  - Two bugs fell out of it. A **necklace** was filed as Fabric (`lace` matched inside it)
+    and an **aso-oke cap** was filed as Fabric too, because the fabric test ran before the
+    accessory one and matched what the cap is made *of*. What a thing IS now beats what it
+    is made from.
+- **9 + 7. Per-piece stages and per-piece QC.** A piece can name its craft and walks that
+  craft's pipeline; unnamed, it walks the studio's, which is every order in existence. The
+  order sits where its **least advanced piece** sits, measured as a fraction, because that
+  is the only way to compare a 12-stage bag with a 10-stage agbada. The gate checks every
+  pair of positions and requires exactly the old answer, so nothing on any device moves.
+  Quality control follows: each piece checked as its own craft, passing one moves on to the
+  next unchecked piece, the order passes only when all have, and failing one sends **that**
+  piece back without touching another piece's pass. A single-piece order is untouched.
+  New gate `audit_pieces.js`.
+
+All 45 gates green after each, plus the 1,787-check website gate. Thirty-three mutations run
 against the two gates; all seventeen caught.
 
 ---
@@ -188,11 +212,6 @@ and due dates, and a **"waiting on them"** state that does not make the
 workroom look idle. Vendors and maker commissions already exist; this extends
 them. **Half a day.**
 
-### 7. QC per ITEM
-Per-craft checks are done. What remains is the multi-item order, which can still only be
-passed or failed as a whole — a bag and a belt on one order get one verdict between them.
-**Folds into #9**, because both want an item to carry a craft of its own.
-
 ### 8. Bespoke / made to measure / from stock — on the ORDER
 The website sells to **Made to measure** as a trade; the app has no concept of
 it. Deliberately not a third mode on #2: bespoke and made-to-measure behave
@@ -203,15 +222,6 @@ And it is not a property of a studio at all. A shoemaker cuts a bespoke last
 for one client, adjusts a standard last for the next, and sells ready-made off
 the shelf — same week, same workshop. One field per order, which also finally
 answers what share of revenue is bespoke versus made to measure. **Small.**
-
-### 9. Per-item production stages
-`outfits[].stageIndex` already exists per item; the per-item stage **set** does not. A bag
-and a belt on one order do not share stages.
-
-**Unblocked now.** Craft × mode gives an item somewhere to read its craft from, which is
-what both this and QC-per-item were waiting for. Give each item an optional craft,
-defaulting to the studio's, and the stage set and the QC list both follow it.
-**Carries #7 with it.**
 
 ### 10. About Us rewrite
 Ten years of it. Four years of running a business from another country. The
