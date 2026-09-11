@@ -25,6 +25,38 @@ each change. Gates still run every time.
 
 ---
 
+## The deploy itself — what is left
+
+The code side is finished. Everything below is either one command or Kayode's
+hands on a dashboard.
+
+**Nothing in this batch touches the database.** `supabase/` is unchanged
+against `main`, so there is no migration to apply and no Edge Function to
+deploy. The whole release is static files.
+
+| | Step | Who |
+|---|---|---|
+| 1 | **Done.** `APP_VERSION` and the service worker `CACHE` moved to `layi-v40`. Without this every installed phone keeps serving v39 after the deploy | done |
+| 2 | `git push origin admin-deploy` — publishes the **admin console** | Kayode says go |
+| 3 | Merge to `main` — publishes the **customer app**. Use the recipe below, not a plain merge | Kayode says go |
+| 4 | Watch the sign-in screen on a real phone: the build stamp must read **layi-v40**. If it still says v39 the service worker did not swap | after |
+
+```bash
+git checkout main && git merge --no-ff --no-commit admin-deploy && git checkout HEAD -- netlify.toml && git commit
+```
+
+That `git checkout HEAD -- netlify.toml` is the whole trick. The file says
+`publish = "admin"` on this branch and `publish = "site"` on `main`, the merge
+is clean, and without that line every studio opens the app and gets the
+operator console. Item 6 under **Waiting on Kayode** removes the trap for good.
+
+**Not blocking the deploy, but true:** the marketing site `web/` has
+uncommitted work in the tree from another session (screenshots, `WEBSITE.md`,
+`.claude/launch.json`). It is untouched and unstaged. `web/` is connected to no
+Netlify site, so it publishes nowhere either way.
+
+---
+
 ## Already built — do not spend a day rebuilding these
 
 Checked in the code, not assumed.
