@@ -1711,7 +1711,22 @@ function canAnySettings(){return can('settings')||can('users')||can('setCatalog'
 function userLabel(){return currentUser?currentUser.name:'—';}
 function fmtNum(n){n=Number(n||0);const neg=n<0;n=Math.abs(n);const parts=(n%1?n.toFixed(2):String(Math.round(n))).split('.');parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');return(neg?'-':'')+parts.join('.');}
 const cur=n=>(CUR_SYM[SETTINGS.currency]||SETTINGS.currency)+fmtNum(n);
-const uid=p=>p+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+/* Record ids. Two records made in the same millisecond used to be told apart by three
+   random base-36 characters — 46,656 values, which is a birthday problem, not a margin:
+   a burst of 60 records collided 4% of the time and a 200-row CSV import 32% of the time.
+
+   A shared id is not cosmetic. Every edit, delete and lookup in this app is
+   list.find(x=>x.id===id), which returns the FIRST match, so editing one record edits the
+   other and deleting one deletes the other. It is how the same payment could show up in
+   two studios at once, which is what the branch-scope gate kept catching about once in
+   twenty-five runs.
+
+   The counter makes the same millisecond safe on its own up to 1,296 records. The random
+   tail stays, widened to five characters, so two DEVICES creating a record in the same
+   millisecond offline still differ (1 in 60 million rather than 1 in 46 thousand).
+   Ids already saved are untouched: this only changes the ones made from now on. */
+let _uidSeq=0;
+const uid=p=>{_uidSeq=(_uidSeq+1)%1296;return p+'-'+Date.now().toString(36)+('0'+_uidSeq.toString(36)).slice(-2)+Math.random().toString(36).slice(2,7);};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* money inputs: parse (strip commas) + live comma formatting */
 const parseAmt=v=>{const n=parseFloat(String(v==null?'':v).replace(/,/g,'').replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n;};
