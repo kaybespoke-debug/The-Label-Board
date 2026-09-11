@@ -5,12 +5,18 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 10 September 2026
+Last updated: 11 September 2026
 
 ## How this run works
 
 **Prototype first.** Anything that changes a workflow or a data model gets its
 shape shown and agreed before it is built.
+
+**Answered, 11 Sep.** One Shop and one board for a studio doing both halves of a craft.
+A custom type is asked for its craft *and* its mode, and **both modes can be true**.
+`SETTINGS.businessType` stays as a read-only fallback — it is the last thing standing
+behind a device whose branch list has not arrived yet, and deleting it to be tidy is how
+somebody signs in to an app with no tabs.
 
 **Nothing ships until Kayode says so.** Commits are fine. Pushing, merging to
 `main`, deploying an Edge Function and applying a migration to the live
@@ -31,7 +37,7 @@ Checked in the code, not assumed.
 | Shop purchase → sale, stock down, revenue | `recordSale()` checks stock by size/colour, refuses if short, decrements the variant, captures unit cost, logs the movement, posts the income |
 | Expense structuring | 13 categories, departments, vendors, projects, branches, and recurring bills |
 | Invoice carrying discount, deposit, balance, logistics | All present, and a receipt is generated on completion |
-| **QC checklist** | Exists and is editable per studio: measurements, stitching & seams, fit confirmed, finishing & detailing, embellishment/monogram, pressed & packaged. Ticked per item, pass/fail with who and when, fail sends it back for rework |
+| **QC checklist** | Exists, is editable per studio, and since 11 Sep starts from the craft. Ticked per check, pass/fail with who and when, a fail sends it back for rework. Still one verdict per order rather than per item — see #7 |
 
 ---
 
@@ -49,7 +55,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
 | 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
 | 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
-| 9 | **Decide accessories** | Depends on #3 below |
+| 9 | **Decide accessories** | Now a **one-line change** — a fifth entry in `CRAFTS` and nothing else. But a studio has to read the website and see itself, so the copy goes in the same breath: a web session, not an app one |
 
 ---
 
@@ -69,33 +75,36 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   heading reads **Material** — a shoemaker was being handed a column called
   Fabric. Gated in `audit_print.js`; the old code fails it.
 
-All 42 gates green after both.
+- **2. Craft × mode.** `does[]` carries `craft:mode` in the same array, so nothing new
+  syncs. **Craft** (garments, footwear, bags & leather, fabrics) decides the word for one
+  piece, the measurements offered, the stage presets suggested and the QC checks. **Mode**
+  (`make`, `stock`) decides which tabs open, and nothing else. The gate proves neither half
+  decides the other, both ways round.
+  - Every studio on a device migrates on read: `bespoke`→`garments:make`,
+    `rtw`→`garments:stock`, `footwear` and `leather`→both halves. A studio that had saved
+    its own option list has `bespoke` and `rtw` folded into the one craft they always were.
+  - **One deliberate change:** a fabric shop gains a Shop. It sells cloth by length off a
+    shelf and was carrying stock with no catalogue to hold it.
+  - Adding your own type asks both halves, and **both can be true** — a studio that sews
+    uniforms and also sells them off a rail is one type doing two things, not two types.
+- **7. QC per craft.** **Construction** and **symmetry** added (the two your supervisors
+  check that the app did not list), and each craft gets its own list: a shoemaker checks
+  pair symmetry and sole attachment, a bag maker hardware and edge finishing, a fabric shop
+  dye shading across the run. Every item the old list had survives on the garments list, so
+  nobody loses a check they relied on. The checks on an order come from the studio that
+  made it. Nothing covered QC before, so pass/fail is gated too.
+- **The “What your studio does” panel was inert.** It wrote `SETTINGS.businessType`, a
+  field read only when a business has no branches at all — which never happens, because
+  `getBranches()` always returns one. Tapping “Selling” opened no Shop, no Sales, and gave
+  no sign it had not worked. It edits the studio's own `does[]` now.
+- **A near-miss worth recording.** A batch of edits to the branch editor rolled back
+  halfway, leaving markup calling four renamed functions. **Every gate stayed green**,
+  because nothing ever rendered that screen. The gate now renders all three pickers and
+  checks that every function named in an `onclick` exists — which catches the whole class,
+  not this one instance.
 
----
-
-## Waiting on a decision — prototype ready
-
-### 2. Craft × mode
-
-The shape is drawn and reviewable, with a live picker, the full migration table
-and the three open questions:
-**https://claude.ai/code/artifact/083b814a-4473-4d27-81a4-774c8537abb3**
-
-Nothing is built. The three answers needed:
-
-1. A studio doing garments **made** and **ready** — one Shop and one board, or
-   two? *(Recommended: one of each; whether a piece was cut for a client or for
-   stock is a property of the order — item #8.)*
-2. Should adding a custom type ask for a craft as well as a mode?
-   *(Recommended: yes, craft optional — "Rentals" should not have to be filed
-   under a craft.)*
-3. Keep `SETTINGS.businessType` as a read-only fallback? *(Recommended: yes.
-   It is the only thing standing behind a device whose branch list has not
-   synced yet.)*
-
-One row of the migration is a deliberate change rather than a no-op: a **fabric
-shop gains a Shop**. It sells cloth by length off a shelf and has been carrying
-stock with no catalogue to hold it. Say so if you would rather leave it.
+All 42 gates green after each, plus the 1,758-check website gate. Seventeen mutations run
+against the two gates; all seventeen caught.
 
 ---
 
@@ -116,31 +125,6 @@ roughly a hundredfold, but the shape is unchanged and it still scales as
 
 **Large — its own session, with a plan first.** Until then Pro is comfortable
 to ~50 staff and should become a Bespoke conversation around 120.
-
-### 2. Craft × mode
-`DEFAULT_ACTIVITIES` conflates **what a studio works in** (garments, footwear,
-bags & leather, fabrics, accessories) with **how it reaches the customer**
-(made to order / ready made / both). `bespoke` is a craft named after a mode,
-`rtw` is a mode named as a craft, and footwear and leather have the mode
-decided for them and hardcoded to *both*:
-
-```
-bespoke     board: true   shop: false   sales: false
-rtw         board: false  shop: true    sales: true
-footwear    board: true   shop: true    sales: FALSE   <- both, and broken
-leather     board: true   shop: true    sales: FALSE   <- both, and broken
-fabrics     board: false  shop: false   sales: true
-```
-
-Carry both halves in `does`: `garments:made`, `footwear:ready`, and so on. The
-craft half picks stages, wording and QC defaults; the mode half decides the
-board, the Shop and Sales. Migration changes nobody's setup:
-`bespoke`→`garments:made`, `rtw`→`garments:ready`, `footwear`/`leather`→both
-halves, `fabrics`→`fabrics:ready`.
-
-**~1 day.** 0a is already fixed separately. **Do before accessories** — against the current model
-accessories would need its mode hardcoded to *both*, repeating the footwear
-mistake exactly.
 
 ### 3. Production batches — made-in-house ready-to-wear
 The sharpest thing on Kayode's list, and the right question was asked with it:
@@ -196,18 +180,10 @@ and due dates, and a **"waiting on them"** state that does not make the
 workroom look idle. Vendors and maker commissions already exist; this extends
 them. **Half a day.**
 
-### 7. QC checklist per trade, and per item
-The checklist exists and is editable, but it is **one flat list for the whole
-studio**. A shoemaker checks symmetry of a pair and sole attachment; a bag
-maker checks hardware and edge finishing; a tailor checks drape and balance.
-
-- Add **construction** and **symmetry** to the tailoring default (from
-  Kayode's own management training document — the two his supervisor checks
-  that the app does not list)
-- Per-trade defaults, driven by the craft half of #2
-- On a multi-item order, QC per item rather than per order
-
-**Small once #2 lands.**
+### 7. QC per ITEM
+Per-craft checks are done. What remains is the multi-item order, which can still only be
+passed or failed as a whole — a bag and a belt on one order get one verdict between them.
+**Folds into #9**, because both want an item to carry a craft of its own.
 
 ### 8. Bespoke / made to measure / from stock — on the ORDER
 The website sells to **Made to measure** as a trade; the app has no concept of
@@ -221,8 +197,13 @@ the shelf — same week, same workshop. One field per order, which also finally
 answers what share of revenue is bespoke versus made to measure. **Small.**
 
 ### 9. Per-item production stages
-`outfits[].stageIndex` already exists per item; the per-item stage **set** does
-not. A bag and a belt on one order do not share stages. **Fold into #2.**
+`outfits[].stageIndex` already exists per item; the per-item stage **set** does not. A bag
+and a belt on one order do not share stages.
+
+**Unblocked now.** Craft × mode gives an item somewhere to read its craft from, which is
+what both this and QC-per-item were waiting for. Give each item an optional craft,
+defaulting to the studio's, and the stage set and the QC list both follow it.
+**Carries #7 with it.**
 
 ### 10. About Us rewrite
 Ten years of it. Four years of running a business from another country. The
