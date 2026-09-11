@@ -1631,11 +1631,30 @@ function _writeOrders(list,safe){
   if(doneMoved)syncPush(ORDERS_DONE_KEY);
   return ok;
 }
+/* Concatenating the two halves is only safe while every device is writing both of them.
+   A device still on the previous build knows one key and puts EVERY order in it, so for
+   the length of a release the same order arrives from both sides and the books count it
+   twice. Measured on the demo data: 28 orders became 40 and revenue read 7,637,000 against
+   a true 6,941,000. So the merge is by id.
+
+   The open key wins a collision, for the same reason the split itself leans that way:
+   the finished half is only ever orders a device judged settled, so if the two copies
+   disagree, the open one is the copy that still says this needs attention. Showing a
+   delivered order as open costs a glance. Filing away one that still needs chasing costs
+   money. Either way it self-corrects the moment any device saves. */
+function mergeOrderKeys(live,done){
+  const seen=Object.create(null),out=[];
+  const take=list=>{for(const o of (list||[])){const id=o&&o.id;
+    if(id){if(seen[id])continue;seen[id]=1;}
+    out.push(o);}};
+  take(live);take(done);
+  return out;
+}
 function load(k,fb){
   if(k===ORDERS_KEY){
     const live=_rawKey(ORDERS_KEY,null),done=_rawKey(ORDERS_DONE_KEY,null);
     if(live==null&&done==null)return fb;
-    return (live||[]).concat(done||[]);
+    return mergeOrderKeys(live,done);
   }
   try{const v=JSON.parse(store.get(k));return v==null?fb:v;}catch(e){return fb;}
 }

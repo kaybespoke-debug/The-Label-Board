@@ -175,6 +175,70 @@ if(run("STATE_KEYS.indexOf('"+DONE+"')")<0)
   F('the finished half is not in STATE_KEYS, so it never leaves the device and a new phone sees half the history');
 if(run("STATE_KEYS.indexOf('"+LIVE+"')")<0)F('the open half is not in STATE_KEYS');
 
+/* 8) The release window, when the studio is running two versions at once. ------------
+   This is the one that was missed. The split is safe once every device is on the new
+   build, but a release is not instant: a phone that has not swapped its service worker
+   yet knows one key and writes EVERY order into it. For that window the same order
+   arrives from both keys, and a plain concat counts it twice. On the demo data 28 orders
+   became 40 and revenue read 7,637,000 against a true 6,941,000 — a studio would open
+   the app mid-release and find money it had not earned. */
+{
+  run('demoLogin();currentUser=getUsers().find(u=>u.roleId==="owner");');
+  run('save("'+LIVE+'",rawOrders());');                        // a new device: split in two
+  const truth=J('rawOrders()').length;
+  const trueMoney=run('rawOrders().reduce((s,o)=>s+(orderNetBase(o)||0),0)');
+  if(!JSON.parse(_ls[DONE]||'[]').length)
+    F('the demo data has nothing settled, so this check proves nothing — seed a delivered order');
+  // now an old device writes the whole blob back into the key it knows
+  run('var all=rawOrders();localStorage.setItem("'+LIVE+'",JSON.stringify(all));');
+  const ids=J('rawOrders().map(o=>o.id)');
+  const dupes=[...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];
+  if(dupes.length)
+    F('a device still on the old build duplicates '+dupes.length+' order(s) for everyone else: '+dupes.slice(0,4).join(', '));
+  if(ids.length!==truth)
+    F('the order count changes when an old device writes ('+truth+' became '+ids.length+')');
+  const money=run('rawOrders().reduce((s,o)=>s+(orderNetBase(o)||0),0)');
+  if(money!==trueMoney)
+    F('the books change when an old device writes: '+trueMoney+' became '+money);
+  // and the same order reopened after being settled is not two orders either
+  run('localStorage.setItem("'+LIVE+'",JSON.stringify(rawOrders().slice(0,1).map(function(o){return Object.assign({},o,{stageIndex:1});})));');
+  const reIds=J('rawOrders().map(o=>o.id)');
+  if(reIds.length!==[...new Set(reIds)].length)
+    F('an order that goes back onto the board while a copy is still in the finished half shows up twice');
+
+  /* When the two copies disagree, the open one wins. Not a coin toss: the finished half
+     holds only what a device judged settled, so the open copy is the one still saying
+     this needs attention. Showing a delivered order as open costs a glance; filing away
+     one that still needs chasing costs money. */
+  run('demoLogin();currentUser=getUsers().find(u=>u.roleId==="owner");save("'+LIVE+'",rawOrders());');
+  const filed=JSON.parse(_ls[DONE]||'[]');
+  if(!filed.length)F('nothing is in the finished half, so precedence cannot be tested');
+  else{
+    const id=filed[0].id;
+    run('var d=JSON.parse(localStorage.getItem("'+DONE+'"));'
+      +'var one=Object.assign({},d[0],{stageIndex:1,__from:"open"});'
+      +'d[0]=Object.assign({},d[0],{__from:"finished"});'
+      +'localStorage.setItem("'+DONE+'",JSON.stringify(d));'
+      +'var l=JSON.parse(localStorage.getItem("'+LIVE+'"));l.push(one);'
+      +'localStorage.setItem("'+LIVE+'",JSON.stringify(l));');
+    const got=J('rawOrders().filter(function(o){return o.id==='+JSON.stringify(id)+';})');
+    if(got.length!==1)F('a disagreeing pair became '+got.length+' orders rather than one');
+    else if(got[0].__from!=='open')
+      F('the finished copy won, so an order that still needs attention gets filed away as done');
+  }
+
+  /* An order with no id cannot be deduped, and must not be used to dedupe anything else.
+     Imports and hand-edited backups are where these come from. */
+  run('demoLogin();currentUser=getUsers().find(u=>u.roleId==="owner");save("'+LIVE+'",rawOrders());');
+  const n0=run('rawOrders().length');
+  run('var l=JSON.parse(localStorage.getItem("'+LIVE+'"));'
+    +'l.push({client:"No Id One",stageIndex:0,outfits:[]});'
+    +'l.push({client:"No Id Two",stageIndex:0,outfits:[]});'
+    +'localStorage.setItem("'+LIVE+'",JSON.stringify(l));');
+  const n1=run('rawOrders().length');
+  if(n1!==n0+2)F('orders with no id eat each other: '+(n0+2)+' expected, '+n1+' read back');
+}
+
 console.log('Order store audit:');
 {
   run('demoLogin();currentUser=getUsers().find(u=>u.roleId==="owner");save("'+LIVE+'",rawOrders());');
@@ -186,3 +250,4 @@ console.log('Order store audit:');
 if(fails.length){console.log('\n✗ '+fails.length+' problem(s):');fails.forEach(x=>console.log('   - '+x));process.exit(1);}
 console.log('  ✓ every order survives the split, the halves cannot disagree, and unsure stays live');
 console.log('  ✓ a stage move leaves the finished half untouched, and both halves sync');
+console.log('  ✓ a device still on the old build during a release cannot duplicate an order, or the money on it');
