@@ -14,9 +14,15 @@ took the hero down to nearly black and lost the dress form and the rack.
   bags.jpg           1000x667   a maker at the machine, finished bags laid out
   readytowear.jpg    1000x667   a retail floor, rails and a till
   fabrics.jpg        1000x699   a fabric shop, rolls and a swatch book
-  haberdashery.jpg   1000x667   thread, buttons, trims and shears
   madetomeasure.jpg  1000x667   a fitting room, cloth books and a jacket
   multilocation.jpg  1000x667   an owner's desk, five outlets on one screen
+
+STILL WANTED:
+  accessories.jpg    1000x667   a bench with caps, gele, beadwork and a jeweller's
+                                pliers. Added with the accessories trade on
+                                2026-09-11; the page works without it (the picture
+                                takes itself out of the way if it fails to load) but
+                                the tab reads as a line drawing until it arrives.
 
 Every one is JPEG at quality 84, and the whole set is about 1.1MB. hero.jpg is
 also the sharing card, so it is the one a link pasted into WhatsApp shows.

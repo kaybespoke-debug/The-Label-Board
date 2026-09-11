@@ -25,7 +25,7 @@ const CRAFT_KEYS=run("CRAFTS.map(c=>c.key)");
 const MODE_KEYS=run("MODES.map(m=>m.key)");
 
 /* 1) The two halves exist, and are two. ----------------------------------------------- */
-['garments','footwear','leather','fabrics'].forEach(k=>{
+['garments','footwear','leather','fabrics','accessories'].forEach(k=>{
   if(CRAFT_KEYS.indexOf(k)<0)F('a studio cannot say it works in "'+k+'"');
 });
 ['make','stock'].forEach(k=>{if(MODE_KEYS.indexOf(k)<0)F('a studio cannot say it "'+k+'"');});
@@ -42,7 +42,9 @@ const AUDIENCES=[
   {who:'a bench shoemaker',      does:['footwear:make'],                      board:true,  shop:false},
   {who:'a shoemaker with a rail',does:['footwear:make','footwear:stock'],     board:true,  shop:true},
   {who:'a bag & leather maker',  does:['leather:make'],                       board:true,  shop:false},
-  {who:'a fabric shop',          does:['fabrics:stock'],                      board:false, shop:true}
+  {who:'a fabric shop',          does:['fabrics:stock'],                      board:false, shop:true},
+  {who:'a bench accessories maker',does:['accessories:make'],                 board:true,  shop:false},
+  {who:'an accessories maker with a rail',does:['accessories:make','accessories:stock'],board:true,shop:true}
 ];
 const setDoes=list=>run("SETTINGS.branches=[{id:'b1',name:'Solo',active:true,does:"+JSON.stringify(list)+"}];SETTINGS.itemWord='';");
 AUDIENCES.forEach(a=>{
@@ -214,8 +216,47 @@ run("measGrid('t1',{});");
 setDoes(['footwear:make']);
 if(run("_measRendered['t1'].indexOf('Chest / Bust')>=0")!==true)F('a measurement form would read back against the wrong field list');
 
+/* 8b) Every field anybody can have on file appears exactly once. ---------------------- */
+// The sets overlap on purpose (a cap size is a body measurement and an accessory one), so
+// a duplicate in MEAS_ALL would render that field's input twice and read back the second,
+// silently losing whatever was typed in the first.
+const allMeas=run("MEAS_ALL");
+if(allMeas.length!==new Set(allMeas).size){
+  const dup=allMeas.filter((f,i)=>allMeas.indexOf(f)!==i);
+  F('a measurement field is listed twice, so its input renders twice: '+dup.join(', '));
+}
+['MEAS_BODY','MEAS_FOOT','MEAS_BAG','MEAS_ACC'].forEach(function(setName){
+  run(setName).forEach(function(f){
+    if(allMeas.indexOf(f)<0)F(setName+' has "'+f+'", which is not on the master list, so it would vanish from a client on file');
+  });
+});
+// an accessories studio is offered a head, not a trouser inseam
+setDoes(['accessories:make']);
+const accFields=run("measFields()");
+if(accFields.indexOf('Head / hat size')<0)F('a milliner cannot record a head');
+if(accFields.indexOf('Ring size')<0)F('a jeweller cannot record a ring size');
+if(accFields.indexOf('Inseam')>=0)F('an accessories studio is being asked for a trouser inseam');
+// and something a tailor recorded is still readable after the studio changes craft
+if(run("measFieldsFor({'Trouser length':'40'})").indexOf('Trouser length')<0)
+  F('a measurement on file vanished for an accessories studio');
+
 /* 9) Products file themselves under the right category. ------------------------------- */
-[['Oxford shoes','Footwear'],['Leather tote','Bag'],['Aso-oke wrapper','Fabric'],['Agbada','Garment'],['Zip','Other']]
+// Two of these are here because they were wrong. An ASO-OKE CAP was filed as cloth,
+// because the fabric test ran before the accessory one and matched what the cap is made
+// OF. And a NECKLACE was filed as cloth, because 'lace' had no word boundary and matched
+// inside it, which put a jeweller's entire catalogue under Fabric.
+//
+// Testing the order is what these cases do. The word boundary that was added alongside it
+// is defence in depth and is NOT independently provable here: with accessories tested
+// first, every realistic name containing 'lace' is claimed earlier (necklace by the
+// accessory rule, shoelace by the footwear one), so removing the boundary does not change
+// a single answer. It stays because the next word added to the fabric list might not be
+// so lucky.
+[['Oxford shoes','Footwear'],['Leather tote','Bag'],['Aso-oke wrapper','Fabric'],
+ ['Agbada','Garment'],['Zip','Other'],['Beads','Other'],
+ ['Beaded necklace','Accessory'],['Aso-oke cap','Accessory'],['Fascinator','Accessory'],
+ ['Silk scarf','Accessory'],['Gele & ipele','Accessory'],['Beaded cuff','Accessory'],
+ ['Swiss lace','Fabric'],['Lace (5 yards)','Fabric'],['Guinea brocade','Fabric']]
   .forEach(pair=>{const got=run("guessCategory("+JSON.stringify(pair[0])+")");if(got!==pair[1])F('"'+pair[0]+'" filed as '+got+', expected '+pair[1]);});
 
 /* 10) A shoemaker-only studio gets a working app, not an empty one. ------------------- */
@@ -231,7 +272,7 @@ if(run("showsBespoke()")!==false)F('a fabric seller is shown a Production board 
    against. An example that still says "Fabric Received" to a shoemaker is
    worse than no example, because it tells them the app is not for them. */
 const EX=run("EXAMPLE_STUDIOS.map(x=>x.key)");
-['multi','bespoke','footwear','leather','rtw','fabrics'].forEach(k=>{
+['multi','bespoke','footwear','leather','rtw','fabrics','accessories'].forEach(k=>{
   if(EX.indexOf(k)<0)F('there is no example studio for '+k);
 });
 const EXPECT={
@@ -239,7 +280,8 @@ const EXPECT={
   footwear:{word:'pair',   stage:/last|clicking|closing/i, prod:true,  retail:true,  sells:true},
   leather: {word:'piece',  stage:/pattern|cutting|skiv/i,  prod:true,  retail:true,  sells:true},
   rtw:     {word:'garment',stage:/sampl|cutting|sew/i,     prod:false, retail:true,  sells:true},
-  fabrics: {word:'piece',  stage:/cloth|measured|packed/i, prod:false, retail:true,  sells:true}
+  fabrics: {word:'piece',  stage:/cloth|measured|packed/i, prod:false, retail:true,  sells:true},
+  accessories:{word:'piece',stage:/design|beading|fasten|trims/i, prod:true, retail:true, sells:true}
 };
 Object.keys(EXPECT).forEach(k=>{
   const want=EXPECT[k];
@@ -380,7 +422,8 @@ const QC_LANG={
   garments:{wants:/fit|drape|press/i, banned:/sole|last|hardware|dye shading/i},
   footwear:{wants:/sole|last|insole|burnish/i, banned:/pressed|drape|dye shading/i},
   leather: {wants:/hardware|edge|lining|panel/i, banned:/sole|pressed|tried on/i},
-  fabrics: {wants:/length|cut edge|shading|folded/i, banned:/sole|hardware|tried on/i}
+  fabrics: {wants:/length|cut edge|shading|folded/i, banned:/sole|hardware|tried on/i},
+  accessories:{wants:/fasten|clasp|bead|trim/i, banned:/sole|drape|tried on|dye shading/i}
 };
 CRAFT_KEYS.forEach(c=>{
   const list=qcOf(c);

@@ -1588,7 +1588,8 @@ const STAGE_PRESETS={
   factory:['Cutting','Sewing','Assembly','Finishing','Pressing'],
   footwear:['Last & Pattern','Clicking','Closing','Lasting','Soling','Finishing'],
   leather:['Pattern','Cutting','Skiving','Edge Finishing','Assembly','Hardware','Stitching'],
-  fabrics:['Cloth Received','Measured & Cut','Packed']
+  fabrics:['Cloth Received','Measured & Cut','Packed'],
+  accessories:['Design','Materials Ready','Cutting & Shaping','Assembly','Beading & Trims','Fastenings','Finishing']
 };
 /* A preset only makes sense for the trade that uses those words. Each one names the
    activities it belongs to so Settings can lead with the right suggestion instead of
@@ -1599,11 +1600,12 @@ const STAGE_PRESETS={
 const STAGE_PRESET_META={
   bespoke:{label:'Bespoke tailoring',for:['garments']},
   bridal:{label:'Bridal & occasion',for:['garments']},
-  rtw:{label:'Ready-to-wear run',for:['garments','footwear','leather']},
+  rtw:{label:'Ready-to-wear run',for:['garments','footwear','leather','accessories']},
   factory:{label:'Factory / bulk',for:['garments']},
   footwear:{label:'Shoemaking',for:['footwear']},
   leather:{label:'Bags & leather goods',for:['leather']},
-  fabrics:{label:'Fabric cutting',for:['fabrics']}
+  fabrics:{label:'Fabric cutting',for:['fabrics']},
+  accessories:{label:'Accessories & trims',for:['accessories']}
 };
 function buildStages(mid){const m=(Array.isArray(mid)&&mid.length)?mid:DEFAULT_MIDDLE;return [STAGE_HEAD].concat(m,STAGE_TAIL);}
 let STAGES=buildStages(null);
@@ -2288,9 +2290,18 @@ const loyaltyOn=()=>SETTINGS.loyaltyEnabled!==false;
 const MEAS_BODY=['Neck','Shoulder','Chest / Bust','Tummy / Stomach','Waist','Hip','Sleeve length','Round sleeve','Bicep','Forearm','Wrist','Shirt / Kaftan length','Top / Jacket length','Trouser waist','Trouser length','Thigh','Knee','Calf','Ankle','Inseam','Outseam','Agbada width (arm-span)','Agbada length','Cap / Kufi size'];
 const MEAS_FOOT=['Shoe size','Foot length (L)','Foot length (R)','Foot width (L)','Foot width (R)','Instep / girth','Heel to ball','Ankle girth','Calf girth','Last / fitting notes'];
 const MEAS_BAG=['Bag height','Bag width','Bag depth','Strap length','Strap drop','Handle length','Gusset','Hardware finish'];
+/* A milliner measures a head, a jeweller measures a wrist and a finger, a belt maker
+   measures a waist. Three of these are already on the body list and are repeated here on
+   purpose: the set is what gets OFFERED for entry, and an accessories studio should not
+   have to scroll past a trouser inseam to find a cap size. */
+const MEAS_ACC=['Head / hat size','Cap / Kufi size','Neck','Wrist','Ring size','Belt length'];
 const MEAS_FIELDS=MEAS_BODY;
-const MEAS_ALL=MEAS_BODY.concat(MEAS_FOOT,MEAS_BAG);
-const MEAS_SETS={body:MEAS_BODY,foot:MEAS_FOOT,bag:MEAS_BAG};
+/* Every field anyone can have on file, deduped: the sets overlap, and measFieldsFor()
+   walks this list to re-show a value the current trade would not have asked for. A
+   duplicate here would render that field's input twice and read back the second one. */
+const MEAS_ALL=(function(){const out=[],seen={};[MEAS_BODY,MEAS_FOOT,MEAS_BAG,MEAS_ACC].forEach(function(set){
+  set.forEach(function(f){if(!seen[f]){seen[f]=1;out.push(f);}});});return out;})();
+const MEAS_SETS={body:MEAS_BODY,foot:MEAS_FOOT,bag:MEAS_BAG,acc:MEAS_ACC};
 /* Which sets to offer for entry, based on what the studio does. */
 /* Measurements belong to the craft, and only to a craft the studio actually MAKES.
    Nobody is measured for a pair off the shelf. */
@@ -3281,7 +3292,8 @@ const CRAFTS=[
   {key:'garments',label:'Garments',      desc:'Clothing of any kind',       word:'garment',meas:'body',stages:{make:'bespoke', stock:'rtw'}},
   {key:'footwear',label:'Footwear',      desc:'Shoes, sandals & boots',     word:'pair',   meas:'foot',stages:{make:'footwear',stock:'rtw'}},
   {key:'leather', label:'Bags & leather',desc:'Bags, belts & leather goods',word:'piece',  meas:'bag', stages:{make:'leather', stock:'rtw'}},
-  {key:'fabrics', label:'Fabrics',       desc:'Cloth sold by length',       word:'piece',  meas:'',    stages:{make:'fabrics', stock:''}}
+  {key:'fabrics', label:'Fabrics',       desc:'Cloth sold by length',       word:'piece',  meas:'',    stages:{make:'fabrics', stock:''}},
+  {key:'accessories',label:'Accessories',desc:'Caps, scarves, jewellery & trims',word:'piece',meas:'acc',stages:{make:'accessories',stock:'rtw'}}
 ];
 /* Quality control is a CRAFT question, and it was one flat list for every studio. A
    shoemaker was handed a suit's checks; a bag maker was asked about drape. Worse, the
@@ -3318,6 +3330,14 @@ const QC_BY_CRAFT={
     'Lining & pockets clean',
     'Stitch line straight',
     'Dust bag & packed'],
+  accessories:[
+    'Construction sound (knots, crimps, seams)',
+    'Dimensions to spec',
+    'Symmetry',
+    'Fastenings and clasps secure',
+    'Beading and trims even, nothing loose',
+    'Edges finished, nothing sharp or snagging',
+    'Packed'],
   fabrics:[
     'Length measured twice',
     'Cut edge square',
@@ -3807,13 +3827,24 @@ const DEFAULT_PRODUCT_TYPES=['Bespoke outfit','Agbada','Kaftan','Shoes','Mules',
 const PRODUCT_CATEGORIES=['Garment','Footwear','Bag','Accessory','Fabric','Other'];
 /* A name-only product list (an import, or an older studio) still deserves the right
    category, or a shoemaker's whole catalogue files itself under Garment. */
+/* Order matters here, and it was wrong in two ways that only showed up once accessories
+   became a trade of its own.
+
+   An ASO-OKE CAP is a cap, not cloth. The fabric test used to run first and match the
+   material a piece is made OF, so every accessory named after its own fabric was filed as
+   fabric. Accessories are now tested before materials, which is the right way round: what
+   the thing IS beats what it is made from.
+
+   And a NECKLACE is not lace. 'lace' with no word boundary matched inside necklace, so a
+   jeweller's whole catalogue filed itself under Fabric. \b on the words that are also common
+   endings fixes it for good rather than for the cases we happened to notice. */
 function guessCategory(n){
   const t=String(n||'').toLowerCase();
   if(/shoe|boot|sandal|slipper|mule|loafer|sneaker|pump|heel|brogue|espadrille/.test(t))return 'Footwear';
   if(/bag|purse|clutch|tote|belt|wallet|satchel|backpack|holdall|luggage/.test(t))return 'Bag';
-  if(/fabric|cloth|aso.?oke|ankara|lace|brocade|wrapper|yard|damask|adire/.test(t))return 'Fabric';
+  if(/cap|kufi|fila|tie|scarf|gele|ipele|accessor|jewel|cuff|necklace|bracelet|bangle|anklet|earring|brooch|pendant|fascinator|headband|hairpin|sash|pocket square|shawl|stole|glove/.test(t))return 'Accessory';
+  if(/fabric|cloth|aso.?oke|ankara|\blace|brocade|wrapper|\byard|damask|adire|georgette|chiffon|guinea/.test(t))return 'Fabric';
   if(/button|zip|thread|trim|notion|lining|interfacing|hook|stud|bead|ribbon|elastic/.test(t))return 'Other';
-  if(/cap|kufi|tie|scarf|gele|accessor|jewel|cuff/.test(t))return 'Accessory';
   return 'Garment';
 }
 function productCatalog(){
@@ -6641,6 +6672,12 @@ const EXAMPLE_STUDIOS=[
    branch:{name:'The boutique',location:'Ikoyi, Lagos'},
    items:['Ankara bomber','Linen co-ord','Silk slip dress','Cotton shirt dress','Wide-leg trousers','Wrap skirt'],
    catalogue:[['Ankara bomber','Garment'],['Linen co-ord','Garment'],['Silk slip dress','Garment'],['Cotton shirt dress','Garment'],['Wide-leg trousers','Garment']]},
+
+  {key:'accessories', label:'Accessories maker',  blurb:'Caps, scarves and beadwork, made and stocked',
+   solo:true, company:'Amaka Adorn', does:['accessories:make','accessories:stock'], stages:'accessories',
+   branch:{name:'The workbench',location:'Surulere, Lagos'},
+   items:['Aso-oke cap','Beaded necklace','Silk scarf','Fascinator','Gele & ipele','Beaded cuff'],
+   catalogue:[['Aso-oke cap','Accessory'],['Beaded necklace','Accessory'],['Silk scarf','Accessory'],['Fascinator','Accessory'],['Beaded cuff','Accessory']]},
 
   {key:'fabrics',  label:'Fabric shop',           blurb:'Cloth sold by the yard, over a counter',
    solo:true, company:'Balogun Fabrics', does:['fabrics:stock'], stages:'fabrics',

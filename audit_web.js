@@ -366,7 +366,7 @@ const craftBlock = (app.match(/const CRAFTS=\[[\s\S]*?\n\];/) || [''])[0];
 const crafts = all(craftBlock, /\{key:'(\w+)'/g).map(m => m[1]);
 const modeBlock = (app.match(/const MODES=\[[\s\S]*?\n\];/) || [''])[0];
 const modes = all(modeBlock, /\{key:'(\w+)'/g).map(m => m[1]);
-check(crafts.length === 4, 'the app offers the four crafts the site is written for (' + crafts.length + ')');
+check(crafts.length === 5, 'the app offers the five crafts the site is written for (' + crafts.length + ')');
 check(modes.length === 2, 'and the two modes a craft can be reached in (' + modes.length + ')');
 // Each business the site names, and the craft x mode a studio would actually pick.
 const SELLS_TO = {
@@ -374,7 +374,8 @@ const SELLS_TO = {
   'ready to wear': ['garments', 'stock'],
   'shoe':          ['footwear', 'make'],
   'bag':           ['leather',  'make'],
-  'fabric':        ['fabrics',  'stock']
+  'fabric':        ['fabrics',  'stock'],
+  'accessor':      ['accessories', 'make']
 };
 const productCopy = visible(html['features.html']).toLowerCase();
 Object.keys(SELLS_TO).forEach(phrase => {
@@ -677,11 +678,31 @@ const solRedirects = read('_redirects');
 check(solRedirects.indexOf('/solutions') !== -1, 'anyone holding the old Solutions url is sent to the trades');
 check(read('sitemap.xml').indexOf('solutions.html') === -1, 'the sitemap no longer offers the Solutions page');
 
-/* every trade names a picture, and every picture is on disk */
+/* Every trade names a picture and every picture is on disk — or the missing one is
+   written down in img/README.txt as still wanted.
+
+   The exception exists because a trade can be added to the app and the site faster than a
+   photograph can be made, and the alternatives are both worse: pointing at a file that is
+   not there gives every visitor a 404 on load, and dropping in a stand-in photograph puts
+   a picture of somebody else's work on a page selling ours. The tile falls back to its
+   line drawing, which is already drawn for every trade.
+
+   What this must never become is a silent gap, so the README has to name the file. That
+   is the difference between a decision and an oversight. */
+const imgNotes = read('img/README.txt');
 tileTrades.forEach(t => {
   const want = 'img/' + t + '.jpg';
-  check(home.indexOf(want) !== -1, 'the ' + t + ' tile carries its photograph');
-  check(fs.existsSync(path.join(dir, want)), 'the photograph is on disk: ' + want);
+  const onDisk = fs.existsSync(path.join(dir, want));
+  const named = home.indexOf(want) !== -1;
+  if (onDisk) {
+    check(named, 'the ' + t + ' tile carries the photograph that exists for it');
+  } else {
+    check(!named, 'the ' + t + ' tile asks for a photograph that is not there, so every visitor loads a 404');
+    check(imgNotes.indexOf(t + '.jpg') !== -1,
+      'the ' + t + ' tile has no photograph and nothing says one is wanted: ' + want);
+    check(/STILL WANTED/i.test(imgNotes),
+      'img/README.txt lists no still-wanted section, so a missing photograph reads as an oversight');
+  }
 });
 
 /* ---------- what each market pays ----------
@@ -872,7 +893,7 @@ const everyWord = built.map(k => visible(html[k])).join(' ').toLowerCase();
 check(!fs.existsSync(path.join(dir, 'img', 'haberdashery.jpg')), 'its picture went with it');
 // and the other way round: every craft the app can be set up as is spoken to somewhere,
 // or a studio the app serves reads the site and never sees itself in it.
-const CRAFT_SAYS = { garments: 'garment', footwear: 'shoe', leather: 'bag', fabrics: 'fabric' };
+const CRAFT_SAYS = { garments: 'garment', footwear: 'shoe', leather: 'bag', fabrics: 'fabric', accessories: 'accessor' };
 crafts.forEach(c => check(everyWord.indexOf(CRAFT_SAYS[c] || c) !== -1,
   'the site speaks to the "' + c + '" studios the app can be set up as'));
 
