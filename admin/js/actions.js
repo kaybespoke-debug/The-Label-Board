@@ -819,7 +819,7 @@ function exportFeedback() {
     DB.feedback.map(f => [f.title, f.kind, f.subscriber, f.plan, f.votes, f.rating || '', f.state, f.at, f.body]));
 }
 function exportRisk() {
-  exportCsv('at-risk-accounts', ['Business', 'Owner', 'Plan', 'Status', 'Past due', 'Orders 30d', 'Last seen', 'MRR'],
+  exportCsv('at-risk-accounts', ['Business', 'Owner', 'Plan', 'Status', 'Past due', 'Orders 30d', 'Last synced', 'MRR'],
     Q.atRisk().map(s => [s.name, s.owner, s.planName, s.status, s.pastDue ? 'yes' : 'no', s.ordersLast30, s.lastSeen, s.mrr]));
 }
 

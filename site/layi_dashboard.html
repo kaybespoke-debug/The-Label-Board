@@ -1575,10 +1575,78 @@ let SETTINGS=Object.assign({},DEFAULTS);
 const mem={};let storageFull=false,storageWarned=false;
 function warnStorageFull(){if(storageWarned)return;storageWarned=true;setTimeout(function(){alert('This browser is out of storage space.\n\nYour recent changes are held for this session but WILL BE LOST when you reload, until you free space.\n\nWhat to do now:\n1) Go to Settings and export a backup.\n2) Delete some photos or old data to make room.\n\n(This is the storage limit of a single-file app. The hosted version removes it entirely.)');},60);}
 const store={get(k){if(k in mem)return mem[k];try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);if(k in mem)delete mem[k];}catch(e){mem[k]=v;storageFull=true;warnStorageFull();}},del(k){delete mem[k];try{localStorage.removeItem(k);}catch(e){}}};
-function load(k,fb){try{const v=JSON.parse(store.get(k));return v==null?fb:v;}catch(e){return fb;}}
-function save(k,v){store.set(k,JSON.stringify(v));syncPush(k);}
+/* ---- The orders store, in two halves ------------------------------------------------
+   Orders is the only store that grows forever AND is rewritten in full on every stage
+   move. Measured on this codebase: an order is about 1.7KB of JSON, and a busy label after
+   three years carries a 9MB orders blob. Six stage moves an order, fifty signed-in devices,
+   and that is ~427GB a month of rebroadcast, about ₦51,800 of egress against a ₦65,000
+   subscription. A factory comes out at ₦368,000, five times what it pays us.
+
+   Almost all of it is finished work. An order that has been delivered and fully paid never
+   changes again, and by year three it is most of the file. So the store is split: orders
+   still moving, and orders that are done. A stage move rewrites only the first. The second
+   is written when an order settles — once per order rather than six times — and is then
+   never touched again.
+
+   Nothing above this line knows. rawOrders() still returns one list, all 36 save sites
+   still hand over one list, and the split happens here. The only visible difference is the
+   ORDER of that list: open work first, then finished work. Nothing reads it positionally
+   (every view sorts for itself) and the gate checks that every record survives intact.
+
+   Unsure always means LIVE. Archiving an order that is not really finished would stop it
+   syncing on the next change; keeping a finished one live merely costs what it costs
+   today. */
+const ORDERS_KEY='layi_dash_orders';
+const ORDERS_DONE_KEY='layi_dash_orders_done';
+function orderIsSettled(o){
+  if(!o)return false;
+  if(o.quoted&&!o.confirmedAt)return false;          // a quote is unanswered, not finished
+  const deli=STAGES.indexOf('Delivered');
+  if(deli<0)return false;
+  if((+o.stageIndex||0)<deli)return false;           // still on the board
+  if(orderOutstanding(o)>0)return false;             // delivered, but still owed for
+  return true;
+}
+function splitOrders(list){
+  const live=[],done=[];
+  (list||[]).forEach(function(o){
+    let settled=false;
+    try{settled=orderIsSettled(o);}catch(e){settled=false;}
+    (settled?done:live).push(o);
+  });
+  return {live:live,done:done};
+}
+function _rawKey(k,fb){try{const v=JSON.parse(store.get(k));return v==null?fb:v;}catch(e){return fb;}}
+function _writeOrders(list,safe){
+  const parts=splitOrders(list);
+  const liveJson=JSON.stringify(parts.live),doneJson=JSON.stringify(parts.done);
+  const liveMoved=liveJson!==store.get(ORDERS_KEY);
+  const doneMoved=doneJson!==store.get(ORDERS_DONE_KEY);
+  let ok=true;
+  if(safe){
+    try{localStorage.setItem(ORDERS_KEY,liveJson);localStorage.setItem(ORDERS_DONE_KEY,doneJson);
+      delete mem[ORDERS_KEY];delete mem[ORDERS_DONE_KEY];}
+    catch(e){mem[ORDERS_KEY]=liveJson;mem[ORDERS_DONE_KEY]=doneJson;storageFull=true;warnStorageFull();ok=false;}
+  }else{store.set(ORDERS_KEY,liveJson);store.set(ORDERS_DONE_KEY,doneJson);}
+  /* Push only the half that actually changed. This is the whole point: a stage move sends
+     the open orders and nothing else. */
+  if(liveMoved)syncPush(ORDERS_KEY);
+  if(doneMoved)syncPush(ORDERS_DONE_KEY);
+  return ok;
+}
+function load(k,fb){
+  if(k===ORDERS_KEY){
+    const live=_rawKey(ORDERS_KEY,null),done=_rawKey(ORDERS_DONE_KEY,null);
+    if(live==null&&done==null)return fb;
+    return (live||[]).concat(done||[]);
+  }
+  try{const v=JSON.parse(store.get(k));return v==null?fb:v;}catch(e){return fb;}
+}
+function save(k,v){if(k===ORDERS_KEY){_writeOrders(v,false);return;}store.set(k,JSON.stringify(v));syncPush(k);}
+/* saveLocal is what hydration and Realtime use, and they arrive with ONE key's data
+   already separated by the cloud, so it writes raw and never re-splits. */
 function saveLocal(k,v){store.set(k,JSON.stringify(v));}
-function saveSafe(k,v){try{localStorage.setItem(k,JSON.stringify(v));if(k in mem)delete mem[k];syncPush(k);return true;}catch(e){mem[k]=JSON.stringify(v);storageFull=true;warnStorageFull();syncPush(k);return false;}}
+function saveSafe(k,v){if(k===ORDERS_KEY)return _writeOrders(v,true);try{localStorage.setItem(k,JSON.stringify(v));if(k in mem)delete mem[k];syncPush(k);return true;}catch(e){mem[k]=JSON.stringify(v);storageFull=true;warnStorageFull();syncPush(k);return false;}}
 
 /* ===== STATE ===== */
 let activeView='activity',prodFilter='all',editingOrderId=null,draft=null,updateDraft=null,chartMode='line',prodLayout='board';
@@ -2080,7 +2148,7 @@ const SYNC_PUSHERS={
 };
 // Every other data key syncs as a JSON blob in the generic `app_state` table (one row per business + key).
 // Customers & suppliers keep their own relational tables above; everything else rides this generic path.
-const STATE_KEYS=['layi_dash_orders','layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
+const STATE_KEYS=['layi_dash_orders','layi_dash_orders_done','layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
 const _statePushTimers={};
 function pushState(key){
   if(!supa||!liveMode)return;
