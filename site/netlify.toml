@@ -1,7 +1,14 @@
 # Netlify publishes the site/ folder: the app plus its PWA files, nothing else.
 # Connected to github.com/kaybespoke-debug/The-Label-Board, so a push deploys.
+#
+# publish is relative to the site's BASE DIRECTORY, not to the repo root. This
+# file is only ever read when the base directory is "site", so the path from
+# here is "." — it used to read "site", which would have resolved to site/site
+# and published nothing the first time anybody set a base directory. It is
+# unread today, because with no base directory Netlify reads the root
+# netlify.toml instead. Matches admin/, partners/ and web/, which all say ".".
 [build]
-  publish = "site"
+  publish = "."
 
 # Serve the single-file app at the site root.
 [[redirects]]
