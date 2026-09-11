@@ -91,8 +91,8 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 1 | **Supabase → Auth → URL Configuration.** Site URL + redirect URLs with `/**` | Password resets and email confirmations land nowhere until this is set |
 | 2 | **SMTP for auth email** | The partner portal signs people in with a one-time code. Without SMTP nobody can sign in |
 | 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
-| 4 | **Move Supabase off Free before real subscribers** | Free is 500MB database and 5GB egress — about **15 studio-months of data and 3 of traffic**. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber |
-| 5 | **Delete the old project `gcdrkoitjqwbidcfgyzl`** | Two projects, one live. Easy to point something at the wrong one |
+| 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
+| 5 | **Delete the old project `gcdrkoitjqwbidcfgyzl`** (`The Label Board`, eu-central-1) | Two projects, and **the names are the wrong way round**: the live one is the lowercase `the-label-board` in eu-west-2, ref `eskubrbgbcbaejynjxvh`. Read the ref, never the name. The CLI on Kayode's machine is still linked to the dead one, so `supabase db push` would land there. See `SUPABASE_SETUP.md` |
 | 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
 | 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
 | 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |

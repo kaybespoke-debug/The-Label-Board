@@ -43,12 +43,33 @@ Region      eu-west-2 (London — the shorter hop to Lagos than Frankfurt,
 URL         https://eskubrbgbcbaejynjxvh.supabase.co
 ```
 
-**The old project `gcdrkoitjqwbidcfgyzl` is still there and still wired into
-`site/layi_dashboard.html`.** Leave it alone until step 6, then delete it.
-It is the hand-built one: `memberships` never existed on it, so nothing was
-isolated, and half the app's tables were missing. It holds one business,
-`11111111-1111-1111-1111-111111111111`, which is the hardcoded `LAYI_BIZ`
-placeholder, with 18 state rows and 11 customers of demo data. Nothing real.
+**Two projects still exist, and the names are the wrong way round.** Check the
+ref, never the name, before touching either:
+
+| On screen | Region | Ref | What it is |
+|---|---|---|---|
+| `the-label-board` | eu-west-2 | `eskubrbgbcbaejynjxvh` | **The live one.** All four apps point here |
+| `The Label Board` | eu-central-1 | `gcdrkoitjqwbidcfgyzl` | The old hand-built one. **Delete this** |
+
+The prettier name is the dead one. Read the ref.
+
+The old project is the hand-built one: `memberships` never existed on it, so
+nothing was isolated, and half the app's tables were missing. It holds one
+business, `11111111-1111-1111-1111-111111111111`, which is the hardcoded
+`LAYI_BIZ` placeholder, with 18 state rows and 11 customers of demo data.
+Nothing real. **No app code points at it any more** — that was true when this
+was written and is not now, so do not go looking for a reference to remove.
+
+**The Supabase CLI on this machine is still linked to the old one.**
+`supabase/.temp/linked-project.json` names `gcdrkoitjqwbidcfgyzl`, so a
+`supabase db push` or `supabase functions deploy` from this repo would land on
+the dead project and quietly appear to work. The file is gitignored, so it is
+per-machine and nobody else's checkout is affected. Fix it before running
+either command:
+
+```bash
+supabase link --project-ref eskubrbgbcbaejynjxvh
+```
 
 What is left for you: creating the test accounts (3b) and any other operator
 accounts, because both mean setting a password, and steps 5 and 8, because
