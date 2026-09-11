@@ -891,6 +891,19 @@ const everyWord = built.map(k => visible(html[k])).join(' ').toLowerCase();
   check(everyWord.indexOf(w) === -1, 'the site does not offer a trade the app cannot be set up as: ' + w);
 });
 check(!fs.existsSync(path.join(dir, 'img', 'haberdashery.jpg')), 'its picture went with it');
+/* The site has sold to MADE TO MEASURE since it launched: its own tile, its own photograph
+   and its own panel. The app had no word for it until 11 September, so anybody who booked a
+   demo off that tile arrived to find nothing matching how they actually work. The app has
+   to carry every way of working the site advertises, not only every trade. */
+const methodBlock = (app.match(/const MAKE_METHODS=\[[\s\S]*?\n\];/) || [''])[0];
+const methods = all(methodBlock, /label:'([^']+)'/g).map(m => m[1].toLowerCase());
+check(methods.indexOf('made to measure') !== -1,
+  'the app can record the made-to-measure work the site sells to');
+check(methods.indexOf('bespoke') !== -1,
+  'the app can tell bespoke apart from a block adjusted, which the site prices differently');
+check(everyWord.indexOf('made to measure') !== -1,
+  'the site still speaks to made-to-measure studios');
+
 // and the other way round: every craft the app can be set up as is spoken to somewhere,
 // or a studio the app serves reads the site and never sees itself in it.
 const CRAFT_SAYS = { garments: 'garment', footwear: 'shoe', leather: 'bag', fabrics: 'fabric', accessories: 'accessor' };

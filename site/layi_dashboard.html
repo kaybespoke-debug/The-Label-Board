@@ -1048,6 +1048,7 @@ body.modal-open{overflow:hidden}
           </div>
           <div class="panel dash-panel" id="dashWorkloadPanel"><div class="panel-head"><h3>Team workload</h3><span class="ph-act" onclick="go('rota')">Rota →</span></div><div id="dashBars"></div></div>
           <div class="panel dash-panel" id="dashStatusPanel"><div class="panel-head"><h3 style="cursor:pointer" onclick="salesCategoryDrill()">Sales by category <span style="color:var(--gold);font-size:12px">›</span></h3></div><div id="dashDonut"></div></div>
+          <div class="panel dash-panel" id="dashMethodPanel" style="display:none"><div class="panel-head"><h3>How the work was made</h3></div><div class="sd" id="dashMethodSub" style="color:var(--text-faint);margin:-6px 0 10px"></div><div id="dashMethod"></div></div>
         </div>
         <div class="panel" id="dashMoneyInPanel"><div class="panel-head"><h3 style="cursor:pointer" onclick="openMoneyInOverview(dashApptPeriod,dashApptCustom)">Money in by channel <span style="color:var(--gold);font-size:12px">›</span></h3><span class="page-sub" id="dashMoneyInSub"></span></div><div id="dashMoneyIn"></div></div>
         <div id="dashSalesTrio"></div>
@@ -3963,6 +3964,62 @@ function staffActiveFromStatus(st){return st!=='Left Company';}
    fabric cannot be replaced at any price — it was bought on a trip, it was a gift, it is
    the last of that dye lot — and that is the cloth that gets mixed up, because it arrives
    loose, in a bag, looking like everybody else's. */
+/* How a piece was made. This is a property of the PIECE, never of the studio: a shoemaker
+   cuts a bespoke last for one client, adjusts a standard last for the next, and sells
+   ready-made off the shelf, in the same week at the same bench. Making it a studio setting
+   would force them to pick one and be wrong about the other two.
+
+   The website has sold to 'made to measure' for months and the app had no word for it, so
+   there was no way to answer what share of the work is bespoke and what share is a block
+   adjusted — which is the difference between an afternoon and a fortnight, and between
+   two quite different prices.
+
+   Bespoke and made to measure behave the SAME in the app: both are measured, both walk the
+   board, both have fittings. That is why this is not a third mode on the studio. It is one
+   field on the piece, and what it changes is what the bench is told and what the books can
+   report. */
+const MAKE_METHODS=[
+  {k:'bespoke',label:'Bespoke',         hint:'Cut from scratch to this client\u2019s own pattern', measured:true},
+  {k:'mtm',    label:'Made to measure', hint:'A standard block or last, adjusted to their measurements', measured:true},
+  {k:'stock',  label:'From stock',      hint:'Finished already, taken off the shelf', measured:false}
+];
+function makeMethod(k){return MAKE_METHODS.find(x=>x.k===k)||null;}
+function makeMethodLabel(k){const m=makeMethod(k);return m?m.label:'';}
+function itemMethod(x){return (x&&x.method)||'';}
+/* A piece taken off the shelf is not measured for. Anything else is, including a piece
+   whose method nobody has said yet — assuming otherwise is how a measurement gets skipped. */
+function itemIsMeasured(x){const m=makeMethod(itemMethod(x));return m?!!m.measured:true;}
+/* The question this field exists to answer: of the work booked in this period, at this
+   studio, how much was cut from scratch and how much was a block adjusted.
+
+   Counted on the ORDER, not on the money received, because a deposit tells you nothing
+   about what was ordered and half of it may be for a piece not started. Item prices are
+   converted at the order's own rate, so a client paying in pounds lands in the same column
+   as everybody else.
+
+   Pieces whose method nobody recorded are their own line. Spreading them across the others
+   would invent an answer, and a studio reading a 70/30 split needs to know whether it came
+   from its records or from a guess. */
+function methodMix(period,custom){
+  const out={};MAKE_METHODS.forEach(m=>{out[m.k]={value:0,count:0};});
+  out['']={value:0,count:0};
+  getOrders().filter(inBranch).filter(o=>isClientOrder(o))
+    .filter(o=>(period===undefined||inPeriod(o.createdAt,period,custom)))
+    .forEach(function(o){
+      const rate=(typeof ofx==='function')?ofx(o):1;
+      const outs=(o.outfits&&o.outfits.length)?o.outfits:[{price:o.value,method:''}];
+      outs.forEach(function(x){
+        const k=makeMethod(itemMethod(x))?itemMethod(x):'';
+        out[k].value+=(+x.price||0)*rate;
+        out[k].count+=1;
+      });
+    });
+  return out;
+}
+function methodMixTotal(mix){return Object.keys(mix).reduce((s,k)=>s+mix[k].value,0);}
+/* Nothing recorded anywhere means the studio has not started using this, so the panel
+   stays away rather than showing a row of zeroes and one lump of 'not recorded'. */
+function methodMixWorthShowing(mix){return MAKE_METHODS.some(m=>mix[m.k].count>0);}
 const FABRIC_SOURCES=[
   {k:'studio', label:'We supplied it',         hint:'From our own stock'},
   {k:'vendor', label:'Ordered in for this',    hint:'Coming from a supplier'},
@@ -3988,7 +4045,7 @@ function fabricCheckNeeded(o){
   if(qc>=0&&(+o.stageIndex||0)>=qc)return false;
   return orderHasFabric(o);
 }
-function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:'',craft:''};}
+function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:'',craft:'',method:''};}
 function outfitMaterialsHtml(i){
   const o=(draft&&draft.outfits&&draft.outfits[i])||{};const sel=o.materials||[];
   const opts=materialOptionsFor(o.type);
@@ -4026,6 +4083,26 @@ function itemCraftChips(i){
     +'</div></div>';
 }
 function renderItemCraft(i){const el=document.getElementById('of_craft_'+i);if(el)el.innerHTML=itemCraftChips(i);}
+/* Asked of any studio that makes anything. A studio that only sells off a shelf takes no
+   made-to-order work, so the question would never have an answer worth recording. */
+function itemMethodChips(i){
+  if(!showsBespoke())return '';
+  const o=(draft&&draft.outfits&&draft.outfits[i])||{};
+  const Q=String.fromCharCode(39);
+  const cur=itemMethod(o);
+  const chips=MAKE_METHODS.map(function(m){
+    const on=cur===m.k;
+    return '<span class="matchip'+(on?' on':'')+'" title="'+esc(m.hint)+'" onclick="setOutfitMethod('+i+','+Q+m.k+Q+')">'+esc(m.label)+'</span>';
+  }).join('');
+  const meta=makeMethod(cur);
+  return '<div class="field" style="margin-bottom:10px"><label>How is it being made</label>'
+    +'<div class="matchips">'+chips+'</div>'
+    +'<div class="sd" style="color:var(--text-faint);margin-top:6px">'
+    +(meta?esc(meta.hint)+(meta.measured?'':'. No measurements needed, and it prints on the work order as a shelf piece.'):'Not said yet. It prints on the work order either way, and the books will read it as <b>not recorded</b> rather than guessing.')
+    +'</div></div>';
+}
+function renderItemMethod(i){const el=document.getElementById('of_meth_'+i);if(el)el.innerHTML=itemMethodChips(i);}
+function setOutfitMethod(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i].method=(draft.outfits[i].method===k?'':k);renderItemMethod(i);}
 /* Changing what a piece is changes the list it walks, so its position on the old list
    means nothing. Back to the start rather than landing on whatever stage happens to share
    that index. */
@@ -4397,6 +4474,7 @@ function renderOrderModal(){
       <div class="field" style="margin-bottom:10px"><label>Material(s) <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(tap to pick one or more)</span></label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
       <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
       <div id="of_craft_${i}">${itemCraftChips(i)}</div>
+      <div id="of_meth_${i}">${itemMethodChips(i)}</div>
       <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="e.g. Wedding agbada, size 43 mules…"></div>
       <div class="field" style="margin-bottom:10px"><label>Photos of this item / fabric</label>${outfitPhotoGrid(i,o.photos)}</div>
       <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, fabric, size, inspiration…">${esc(o.style)}</textarea></div>
@@ -4787,7 +4865,7 @@ function measTableHtml(meas,onlyFilled){meas=meas||{};const fields=onlyFilled?ME
 function jobSheetInner(o){
   const cust=getCustomers()[nameKey(o.client)]||{};
   const meas=((latestMeasOf(nameKey(o.client))||{}).meas)||o.meas||{};
-  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.name||x.type||'Item')}${x.style?`<br><span style="color:#888;font-size:12px">${esc(x.style)}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc((x.materials||[]).join(' · ')||x.fabric||'')}${x.fabricFrom?`<br><span style="font-size:11px;${itemIsTheirs(x)?'color:#b23b2e;font-weight:700':'color:#888'}">${esc(fabricSourceLabel(x.fabricFrom))}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.finish||'')}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888;padding:6px 0">No items listed.</td></tr>';
+  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.name||x.type||'Item')}${x.method?`<br><span style="font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#6b6257">${esc(makeMethodLabel(x.method))}</span>`:''}${x.style?`<br><span style="color:#888;font-size:12px">${esc(x.style)}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc((x.materials||[]).join(' · ')||x.fabric||'')}${x.fabricFrom?`<br><span style="font-size:11px;${itemIsTheirs(x)?'color:#b23b2e;font-weight:700':'color:#888'}">${esc(fabricSourceLabel(x.fabricFrom))}</span>`:''}</td><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(x.finish||'')}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#888;padding:6px 0">No items listed.</td></tr>';
   /* One line, at the top, in the only colour on the page. Somebody reading this sheet has
      a stack of cloth in front of them and no way of telling which piece cannot be replaced. */
   const theirCloth=orderHasTheirFabric(o)
@@ -7308,6 +7386,14 @@ function loadExample(force){
    if(_byId['L-0004'])_byId['L-0004'].outfits[0].materials=['Guinea brocade'];
    if(_byId['L-0003'])_byId['L-0003'].outfits[0].materials=['Lace · Emerald'];
    if(_byId['L-0010'])_byId['L-0010'].outfits[0].materials=['Wool · Super 120s'];
+   /* How each piece was made. Left off a couple on purpose: the 'not recorded' line is
+      part of what the panel is for, and a demo where every field is filled teaches nobody
+      what an unfilled one looks like. */
+   if(_byId['L-0001']){_byId['L-0001'].outfits[0].method='bespoke';if(_byId['L-0001'].outfits[1])_byId['L-0001'].outfits[1].method='mtm';}
+   if(_byId['L-0003']){_byId['L-0003'].outfits[0].method='bespoke';if(_byId['L-0003'].outfits[1])_byId['L-0003'].outfits[1].method='stock';}
+   if(_byId['L-0004'])_byId['L-0004'].outfits[0].method='mtm';
+   if(_byId['L-0010'])_byId['L-0010'].outfits[0].method='bespoke';
+   if(_byId['L-0011'])_byId['L-0011'].outfits[0].method='stock';
    let _rs=0;const _retailBr=['Abuja outlet','Abuja outlet','Ibadan branch','Abuja outlet','Kano store','Ibadan branch'];exOrders.forEach(o=>{if(o.kind==='sale'){o.branch=_retailBr[_rs%_retailBr.length];o.channel=(_rs%3===2)?'online':'showroom';_rs++;}else{o.branch='Lagos studio';}});}
   save('layi_dash_orders',exOrders);
   setAppts([{id:uid('a'),date:dd(0),time:'10:00',client:'A. Bakare',phone:'+44 7700 900111',location:'Studio',note:'Final fitting'},{id:uid('a'),date:dd(1),time:'14:00',client:'Ngozi Eze',phone:'+234 802 999 1111',location:'Studio',note:'Beadwork review'},{id:uid('a'),date:dd(3),time:'11:30',client:'Chief Adeyemi',phone:'+234 803 888 2222',location:'Studio',note:'Second fitting'}]);
@@ -9126,6 +9212,30 @@ function renderActivity(){
     else{const top=keys.slice(0,6),rest=keys.slice(6);const segs=top.map((k,i)=>({label:k,value:cat[k],color:MIX_COLORS[i%MIX_COLORS.length]}));if(rest.length)segs.push({label:'Other',value:rest.reduce((x,k)=>x+cat[k],0),color:MIX_COLORS[6%MIX_COLORS.length]});
       const tot=segs.reduce((x,sg)=>x+sg.value,0)||1;
       donut.innerHTML=`<div class="donut-wrap" style="cursor:pointer" onclick="salesCategoryDrill()" title="Tap for the full category breakdown">${donutSVG(segs,useRev?cur(tot):String(tot),useRev?'total sales':'items')}<div class="donut-legend">${segs.map(sg=>`<div class="dleg"><span class="ddot" style="background:${sg.color}"></span>${esc(sg.label)} <b>${useRev?cur(sg.value):sg.value}</b> <span style="color:var(--text-faint)">${Math.round(sg.value/tot*100)}%</span></div>`).join('')}</div><div class="ad" style="color:var(--gold);font-size:12.5px;text-align:center;padding-top:2px">See the full breakdown ›</div></div>`;}}
+  // how the work was made: bespoke, a block adjusted, or off the shelf
+  {
+    const mp=document.getElementById('dashMethodPanel'),me=document.getElementById('dashMethod');
+    const mix=methodMix(dashApptPeriod,dashApptCustom);
+    const show=methodMixWorthShowing(mix)&&showsBespoke();
+    if(mp)mp.style.display=show?'':'none';
+    if(me&&show){
+      const useRev=can('money');
+      const tot=methodMixTotal(mix)||1;
+      const cnt=Object.keys(mix).reduce((s,k)=>s+mix[k].count,0);
+      const sub=document.getElementById('dashMethodSub');
+      if(sub)sub.textContent=periodLabel(dashApptPeriod,dashApptCustom)+' · '+cnt+' piece'+(cnt===1?'':'s');
+      const rows=MAKE_METHODS.concat([{k:'',label:'Not recorded'}]).map(function(m){
+        const e=mix[m.k];
+        if(!e.count)return '';
+        const pct=Math.round(e.value/tot*100);
+        return '<div class="bd-row"><span class="bl">'+esc(m.label)
+          +(m.k?'':' <span style="color:var(--text-faint)">— nobody said</span>')
+          +' <span style="color:var(--text-faint)">· '+e.count+'</span></span>'
+          +'<span class="bv">'+(useRev?cur(e.value):'')+' <b style="color:var(--gold)">'+pct+'%</b></span></div>';
+      }).join('');
+      me.innerHTML=rows;
+    }
+  }
   // money in by channel (received lens) — mirrors the Finance hub, tracks the dashboard period + branch
   const dmiPanel=document.getElementById('dashMoneyInPanel');
   if(dmiPanel)dmiPanel.style.display=can('money')?'':'none';
