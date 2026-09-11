@@ -68,6 +68,58 @@ allRoles.forEach(function(r){
   });
 });
 
+/* Migrating a role saved before a permission existed. -------------------------------
+   The fallbacks read OTHER permissions, and migrateRoles() fills them in as it goes, so
+   reading the live object made the answer depend on the order of PERM_KEYS. That order is
+   PERM_GROUPS, which is the order of the Settings screen: rearranging that screen for looks
+   would quietly have changed what existing roles were migrated to, and these are money
+   permissions. The fix is to read the role as it was before the loop started.
+
+   Both properties are checked here. Order independence, by migrating the same role from two
+   different starting points that differ only in keys the fallbacks read. And direction, by
+   making sure a fallback never hands out something the role could not already exercise. */
+(function(){
+  const vm2={run:function(e){return vm.runInContext(e,sb);}};
+  const vm_runInContext2=null;
+  const money=['seeProfit','seeCost','receivables','funds','expenses','recordPay'];
+  function migrate(perms){
+    vm2.run("setRoles([{id:'tester',name:'Tester',perms:"+JSON.stringify(perms)+"}]);migrateRoles();");
+    return JSON.parse(vm2.run("JSON.stringify(getRoles().find(r=>r.id==='tester').perms)"));
+  }
+  // the same role, migrated twice: nothing may move the second time
+  const once=migrate({money:1});
+  vm2.run("migrateRoles();");
+  const twice=JSON.parse(vm2.run("JSON.stringify(getRoles().find(r=>r.id==='tester').perms)"));
+  if(JSON.stringify(once)!==JSON.stringify(twice))
+    fails.push('migrateRoles is not idempotent: running it again changed a role');
+
+  /* Order independence. 'finance' is read directly by the receivables and funds fallbacks.
+     Pre-setting it to 0 is the same thing the loop would do to an undefined key, so if the
+     fallbacks are reading the live object these two disagree. */
+  const undef=migrate({money:1});
+  const preset=migrate({money:1,finance:0});
+  ['receivables','funds'].forEach(function(k){
+    if(undef[k]!==preset[k])
+      fails.push('migrateRoles depends on the order of the Settings screen: '+k+' came out '+undef[k]+' or '+preset[k]+' depending on what had been filled in first');
+  });
+
+  /* Direction. A role with no money permission at all must not be handed one by a
+     fallback, whatever else the defaults fill in around it. */
+  const poor=migrate({orders:1});
+  money.forEach(function(k){
+    if(poor[k]===1)
+      fails.push('a role with no money permission was migrated into '+k+', so somebody who could not see the studio\u2019s money now can');
+  });
+  /* Migration must only FILL IN what is missing. This one is belt and braces: permVal()
+     returns an explicit value before it ever reaches a fallback, so the deny survives even
+     if the "only if undefined" guard is removed. Kept as a regression guard on the
+     property itself rather than on one of the two things currently providing it. */
+  const denied=migrate({money:1,funds:0,receivables:0});
+  ['funds','receivables'].forEach(function(k){
+    if(denied[k]!==0)fails.push('an explicit deny on '+k+' was overwritten by the migration');
+  });
+})();
+
 console.log('Permission audit:');
 console.log('Roles discovered at runtime: '+allRoles.map(r=>r.id).join(', '));
 console.log(fails.length? 'FAILURES ('+fails.length+'):\n'+fails.map(f=>'  ✗ '+f).join('\n') : '  ✓ all role/fallback/isolation checks passed');

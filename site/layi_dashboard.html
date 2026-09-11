@@ -1679,10 +1679,25 @@ function migrateRoles(){
     if(!r.perms)r.perms={};
     if(r.id==='owner'){PERM_KEYS.forEach(k=>{if(k==='ownTasksOnly'){if(r.perms[k]!==0){r.perms[k]=0;changed=true;}return;}if(r.perms[k]!==1){r.perms[k]=1;changed=true;}});return;}
     const def=byId[r.id];
+    /* Work from a SNAPSHOT of what this role had before anything was filled in.
+
+       The fallbacks read other permissions (receivables looks at finance, funds looks at
+       finance and seeProfit), and this loop is filling those in as it goes. Reading the
+       live object made the answer depend on the order of PERM_KEYS, which is derived from
+       PERM_GROUPS, which is the order of the Settings screen. Rearranging that screen for
+       looks would quietly have changed what existing roles were migrated to, and these are
+       money permissions.
+
+       Reading the snapshot also fixes the direction of the error. A fallback can now only
+       grant something the role could already exercise, never something a default handed it
+       a moment earlier in the same loop. Somebody who cannot see Funds and should asks the
+       owner to tick a box; somebody who can see the studio's reserves and should not has
+       already seen them. */
+    const was={id:r.id,perms:Object.assign({},r.perms)};
     PERM_KEYS.forEach(k=>{if(k==='seeProfit'||k==='seeCost')return;if(r.perms[k]===undefined){
       let v;
       if(def&&def.perms[k]!==undefined)v=def.perms[k]?1:0;      // the built-in default explicitly sets it
-      else if(PERM_FALLBACK[k])v=permVal(r,k)?1:0;              // otherwise inherit the old coupling (no regression)
+      else if(PERM_FALLBACK[k])v=permVal(was,k)?1:0;            // otherwise inherit the old coupling (no regression)
       else v=(k==='allOrders'?1:0);
       r.perms[k]=v;changed=true;
     }});
@@ -1697,6 +1712,9 @@ function setUsers(v){save('layi_dash_users',v);}
 function currentRole(){return currentUser?roleById(currentUser.roleId):null;}
 // New permissions fall back to their historical coupling when a role hasn't set them explicitly.
 // This keeps every existing account working exactly as before until an owner toggles the new switch.
+/* What a permission used to ride on, for roles saved before it existed. Every one of these
+   is handed the role as it was BEFORE migration started — see migrateRoles() — so none of
+   them can read a value another key was given a moment ago. */
 const PERM_FALLBACK={
   seeProfit:function(r){return !!r.perms.money;},
   seeCost:function(r){return !!r.perms.money;},
@@ -6543,6 +6561,11 @@ function allPhotoRefs(){
       (o.updates||[]).forEach(u=>(u.photos||[]).forEach(add));
     });
     const c=getCustomers();Object.keys(c).forEach(k=>(c[k].photos||[]).forEach(add));
+    /* The Shop's own photos. Missed when this list was written, which is part of why they
+       were the last ones still inline: nothing would have resolved them if they had moved. */
+    (typeof getProducts==='function'?getProducts():[]).forEach(pr=>{
+      add(pr.photo);(pr.photos||[]).forEach(add);(pr.variants||[]).forEach(v=>add(v&&v.photo));
+    });
   }catch(e){}
   return out;
 }
@@ -6648,6 +6671,31 @@ async function sweepInlinePhotos(limit){
       }
     }
     if(custDirty)setCustomers(cust);
+
+    /* The Shop. Every photo a studio has already taken of a product is sitting inline in
+       the products blob, so until it moves, changing a price rebroadcasts the lot. Same
+       budget as everything else, so a big catalogue drains over several passes rather than
+       holding up the ones somebody is looking at. */
+    const prods=getProducts();let prodsDirty=false;
+    for(const pr of prods){
+      const slots=[[pr,'photo']];
+      (pr.variants||[]).forEach(v=>slots.push([v,'photo']));
+      for(const [holder,key] of slots){
+        if(!isInlinePhoto(holder[key]))continue;
+        if(budget--<=0){left++;continue;}
+        const res=await saveImageAsset(holder[key],'product');
+        if(isStoredPhoto(res)){holder[key]=res;moved++;prodsDirty=true;}else left++;
+      }
+      if(Array.isArray(pr.photos)){
+        for(let i=0;i<pr.photos.length;i++){
+          if(!isInlinePhoto(pr.photos[i]))continue;
+          if(budget--<=0){left++;continue;}
+          const res=await saveImageAsset(pr.photos[i],'product');
+          if(isStoredPhoto(res)){pr.photos[i]=res;moved++;prodsDirty=true;}else left++;
+        }
+      }
+    }
+    if(prodsDirty)setProducts(prods);
   }catch(e){}
   finally{_sweeping=false;}
   if(moved&&typeof renderAll==='function')renderAll();
@@ -6665,6 +6713,11 @@ function inlinePhotoCount(){
       (o.updates||[]).forEach(u=>(u.photos||[]).forEach(count));
     });
     const c=getCustomers();Object.keys(c).forEach(k=>(c[k].photos||[]).forEach(count));
+    /* Counted with the rest, so the number the studio is shown is the number the sweep
+       still has to move. The two lists have to agree or the meter never reaches zero. */
+    (typeof getProducts==="function"?getProducts():[]).forEach(pr=>{
+      count(pr.photo);(pr.photos||[]).forEach(count);(pr.variants||[]).forEach(v=>count(v&&v.photo));
+    });
   }catch(e){}
   return n;
 }
@@ -8215,7 +8268,7 @@ function openProductDetail(id){
   const tiles=[stat('In stock',units,'units across variants',''),stat('Status',lbl,st==='out'?'restock now ›':st==='low'?'restock soon ›':'healthy',st==='ok'?'up':'warn',(st!=='ok'&&can('products'))?`openProduct('${id}')`:'')];
   if(can('money'))tiles.push(stat('Stock value',cur(val),'inventory asset','up'));
   if(can('money'))tiles.push(stat('Sold to date',sales.units+(can('seeProfit')&&sales.rev?' · '+cur(sales.rev):''),'recorded sales',''));
-  openModal(`${p.photo?`<div style="width:100%;height:220px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px;cursor:zoom-in" onclick="lightbox('${p.photo}')"><img src="${p.photo}" style="width:100%;height:100%;object-fit:cover"></div>`:''}<div style="margin-bottom:8px"><h3 style="margin:0">${esc(p.name||'Untitled')} <span class="sup-status ${st}">${lbl}</span></h3><div class="msub" style="margin:2px 0 0">${esc(p.category||'')}${can('money')?' · '+cur(p.price||0):''}${can('seeCost')&&p.cost?' · cost '+cur(p.cost):''}${can('seeProfit')&&p.price?' · margin '+cur(margin)+' ('+mpct+'%)':''}</div></div>
+  openModal(`${p.photo?`<div style="width:100%;height:220px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px;cursor:zoom-in" onclick="lightbox('${photoSrc(p.photo)}')"><img src="${photoSrc(p.photo)}" style="width:100%;height:100%;object-fit:cover"></div>`:''}<div style="margin-bottom:8px"><h3 style="margin:0">${esc(p.name||'Untitled')} <span class="sup-status ${st}">${lbl}</span></h3><div class="msub" style="margin:2px 0 0">${esc(p.category||'')}${can('money')?' · '+cur(p.price||0):''}${can('seeCost')&&p.cost?' · cost '+cur(p.cost):''}${can('seeProfit')&&p.price?' · margin '+cur(margin)+' ('+mpct+'%)':''}</div></div>
     ${p.note?`<div class="kv" style="margin:4px 0 10px"><b>Note:</b> ${esc(p.note)}</div>`:''}
     <div class="stat-grid" style="margin:8px 0 6px">${tiles.join('')}</div>
     <div class="bd-sub">Sizes &amp; colours (${(p.variants||[]).length})</div>
@@ -8279,7 +8332,7 @@ function renderProducts(){
     const away=productElsewhere(p);
     const awayBits=away.length?away.map(a=>esc(a.branch)+' '+a.qty).join(' · '):'';
     return`<div class="rtw-card ${st}" style="cursor:pointer" onclick="openProductDetail('${p.id}')">
-      <div class="rtw-thumb">${p.photo?`<img src="${p.photo}" alt="">`:'🏷'}</div>
+      <div class="rtw-thumb">${p.photo?`<img src="${photoSrc(p.photo)}" alt="">`:'🏷'}</div>
       <div class="rtw-body">
         <div class="rtw-name">${esc(p.name||'Untitled')} <span class="sup-status ${st}" style="font-size:10px">${lbl}</span></div>
         <div class="rtw-meta">${cur(p.price||0)}${can('seeCost')&&p.cost?' · cost '+cur(p.cost):''}</div>
@@ -8300,7 +8353,7 @@ function renderProductModal(){
   const vrows=p.variants.map((v,i)=>`<div class="row2" style="gap:8px;margin-bottom:6px;align-items:end"><div class="field" style="margin:0"><label>Size</label><input class="fld" id="pv_size_${i}" value="${esc(v.size||'')}" placeholder="S / M / L / 42"></div><div class="field" style="margin:0"><label>Colour</label><input class="fld" id="pv_color_${i}" value="${esc(v.color||'')}" placeholder="e.g. Navy"></div><div class="field" style="margin:0;max-width:110px"><label>Stock${(activeBranchView!=='all'&&multiBranch())?' here':''}</label><input class="fld" type="number" id="pv_qty_${i}" value="${variantQty(v,stockBranch())}"></div><button class="btn ghost sm" style="margin-bottom:2px" onclick="removeVariant(${i})">✕</button></div>`).join('');
   openModal(`<h3>${p.id?'Edit product':'Add product'}</h3><div class="msub">A ready-to-wear style with its sizes, colours & stock</div>
     <div class="field"><label>Product name</label><input class="fld" id="pp_name" value="${esc(p.name||'')}" placeholder="e.g. Signature linen shirt"></div>
-    <div class="field"><label>Photo (optional)</label><div style="display:flex;align-items:center;gap:14px"><div style="width:66px;height:66px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint);cursor:pointer" onclick="document.getElementById('ppPhotoFile').click()">${p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:'add'}</div><button class="btn ghost sm" type="button" onclick="document.getElementById('ppPhotoFile').click()">Upload</button>${p.photo?`<button class="btn ghost sm" type="button" onclick="removeProductPhoto()">Remove</button>`:''}<input type="file" id="ppPhotoFile" accept="image/*" style="display:none" onchange="uploadProductPhoto(this)"></div></div>
+    <div class="field"><label>Photo (optional)</label><div style="display:flex;align-items:center;gap:14px"><div style="width:66px;height:66px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint);cursor:pointer" onclick="document.getElementById('ppPhotoFile').click()">${p.photo?`<img src="${photoSrc(p.photo)}" style="width:100%;height:100%;object-fit:cover">`:'add'}</div><button class="btn ghost sm" type="button" onclick="document.getElementById('ppPhotoFile').click()">Upload</button>${p.photo?`<button class="btn ghost sm" type="button" onclick="removeProductPhoto()">Remove</button>`:''}<input type="file" id="ppPhotoFile" accept="image/*" style="display:none" onchange="uploadProductPhoto(this)"></div></div>
     <div class="row2"><div class="field"><label>Category</label>${selOther('pp_category',productTypes(),p.category||productTypes()[0],'Type of piece')}</div><div class="field"><label>Selling price (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="pp_price" value="${p.price?fmtNum(p.price):''}" placeholder="0"></div></div>
     <div class="field"><label>Cost to make / buy per unit (${SETTINGS.currency}) <span style="color:var(--text-faint);font-weight:400">(for profit)</span></label><input class="fld money" type="text" inputmode="decimal" id="pp_cost" value="${p.cost?fmtNum(p.cost):''}" placeholder="0"></div>
     <div class="bd-sub" style="margin-top:8px">Sizes / colours & stock</div>
@@ -8313,7 +8366,11 @@ function renderProductModal(){
 function syncProductDraft(){const p=productDraft;if(!p)return;if(fv('pp_name')!==undefined)p.name=fv('pp_name');if(fvOther('pp_category')!==undefined)p.category=fvOther('pp_category');if(fv('pp_price')!==undefined)p.price=amt('pp_price');if(fv('pp_cost')!==undefined)p.cost=amt('pp_cost');if(fv('pp_note')!==undefined)p.note=fv('pp_note');p.variants.forEach((v,i)=>{if(fv('pv_size_'+i)!==undefined)v.size=fv('pv_size_'+i);if(fv('pv_color_'+i)!==undefined)v.color=fv('pv_color_'+i);if(fv('pv_qty_'+i)!==undefined)setVariantQty(v,stockBranch(),Math.max(0,+fv('pv_qty_'+i)||0));});}
 function addVariant(){syncProductDraft();productDraft.variants.push(blankVariant());renderProductModal();}
 function removeVariant(i){syncProductDraft();productDraft.variants.splice(i,1);if(!productDraft.variants.length)productDraft.variants=[blankVariant()];renderProductModal();}
-async function uploadProductPhoto(input){const f=input.files&&input.files[0];if(!f)return;syncProductDraft();try{productDraft.photo=await compressImage(f,800,0.74);}catch(e){alert('Could not load that image.');}input.value='';renderProductModal();}
+/* Product photos were the last ones still kept inline. That matters twice over: they ride
+   in the products blob, so every price change rebroadcast every photo in the Shop, and they
+   sat in the database at the per-gigabyte rate rather than in Storage. Same seam as every
+   other photo now, so they cost the same as every other photo. */
+async function uploadProductPhoto(input){const f=input.files&&input.files[0];if(!f)return;syncProductDraft();if(photoUploadBlocked())return;try{productDraft.photo=await saveImageAsset(await compressFor(f,'reference'),'product');}catch(e){alert('Could not load that image.');}input.value='';renderProductModal();}
 function removeProductPhoto(){syncProductDraft();productDraft.photo='';renderProductModal();}
 function saveProduct(){
   syncProductDraft();const p=productDraft;
@@ -8428,7 +8485,7 @@ function recordSale(){
     id:'S-'+String(saleNo).padStart(4,'0'),kind:'sale',client:client,branch:branchOf(saleDraft),
     email:d.email||'',whatsapp:d.whatsapp||'',address:'',
     garment:label,
-    outfits:[{name:label,type:p.category||'Ready-to-wear',price:lineTotal,photos:p.photo?[p.photo]:[],style:'',finish:'',fabric:''}],
+    outfits:[{name:label,type:p.category||'Ready-to-wear',price:lineTotal,photos:p.photo?[p.photo]:[],style:'',finish:'',materials:[]}],
     saleItems:[{productId:p.id,variantId:v.id,label:variantLabel(v),qty:d.qty,unitPrice:+d.price||0,unitCost:+p.cost||0}],
     value:lineTotal,paid:paid,discount:0,
     currency:SETTINGS.currency,fx:1,
