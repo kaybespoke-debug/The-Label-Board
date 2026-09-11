@@ -153,14 +153,15 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   the shelf. The till then charges **no** stock cost for those pieces, because they are
   already paid for, while bought-in stock is charged as before and a mixed sale charges only
   the bought part. A run lives in the orders store so it gets the board, stages, QC, history
-  and sync for nothing, which meant the 28 filters reading  now read
-  . New gate .
+  and sync for nothing, which meant the 28 filters reading `o.kind!=='sale'` now read
+  `isClientOrder(o)`, because every one of them means "somebody is paying for this".
+  New gate `audit_runs.js`.
   - Found on the way: labour with **nobody named** was dropped from the cost, because
-     filters on . A run showed 9,000 a piece while the books said
+    `orderTeam()` filters on `staffId`. A run showed 9,000 a piece while the books said
     7,500. Unnamed labour is booked as a cost line now.
   - Also found: the per-item craft picker from the previous commit **had never been
     written**. An edit script rolled back halfway and every gate stayed green because none
-    of them rendered the order form.  renders it now.
+    of them rendered the order form. `audit_pieces.js` renders it now.
 
 All 46 gates green after each, plus the 1,790-check website gate. Forty-four mutations run
 against the two gates; all seventeen caught.
