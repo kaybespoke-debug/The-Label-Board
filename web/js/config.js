@@ -20,12 +20,18 @@ const SITE = {
   partnerPortalUrl: 'https://partners.thelabelboard.com',
 
   /* ---- how people reach us ----
-     PLACEHOLDERS. Replace with the real address and number.            */
+     The number is real, confirmed by Kayode on 11 Sep 2026. It is currently the
+     same line the LAYI site uses, so it will want splitting once the two are
+     answered by different people.
+
+     The two addresses and the Instagram handle are STILL PLACEHOLDERS. Nobody
+     has confirmed a mailbox exists at either, and a contact address that bounces
+     is worse on a marketing site than no address at all.                */
   email: 'hello@thelabelboard.com',
   supportEmail: 'support@thelabelboard.com',
-  phoneDisplay: '+234 800 000 0000',
-  phoneDial: '+2348000000000',
-  whatsapp: '2348000000000',
+  phoneDisplay: '+234 706 273 8923',
+  phoneDial: '+2347062738923',
+  whatsapp: '2347062738923',
   instagram: 'thelabelboard',
   city: 'Lagos, Nigeria',
 
