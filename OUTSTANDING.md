@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (fifth session)
+Last updated: 11 September 2026 (sixth session)
 
 ## How this run works
 
@@ -178,7 +178,24 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     to made-to-measure studios since launch and the app had no word for it.
   - New gate `audit_method.js`.
 
-All 47 gates green after each, plus the 1,793-check website gate. Fifty-two mutations run
+- **4. Quoted → Confirmed.** The invoice-first flow. A quote is an order with `quoted:true`
+  and no `confirmedAt`: **one field, no second store, nothing to reconcile.** It already
+  carries the client, items, prices, discount, deposit terms, logistics and the invoice
+  document.
+  - Out of the **production board**, **receivables**, the **work booked**, **Active Orders**
+    and every late/QC/fabric nudge, because none of it is true yet. Receivables took one
+    line: `orderOutstanding()` returns zero for a quote, and every chase reads through it.
+  - Confirmed by hand, or **on its own the moment any money arrives**, because a deposit is
+    the yes and confirming an order you have just been paid for is a step that only ever
+    gets forgotten. Stamped with who and when either way.
+  - The invoice carries the line that makes the flow work: *"This confirms your order once
+    payment is received. Nothing is cut until then."* A receipt never says it.
+  - A confirmed order **cannot be quietly turned back into a quote**. Work has started and
+    money may have arrived.
+  - A **Quotes Out** tile on the dashboard with what they are worth, shown only when there
+    are any. New gate `audit_quote.js`.
+
+All 48 gates green after each, plus the 1,793-check website gate. Sixty-three mutations run
 against the two gates; all seventeen caught.
 
 ---
@@ -200,20 +217,6 @@ roughly a hundredfold, but the shape is unchanged and it still scales as
 
 **Large — its own session, with a plan first.** Until then Pro is comfortable
 to ~50 staff and should become a Bespoke conversation around 120.
-
-### 4. Quoted → Confirmed order state
-Kayode's invoice-first flow: invoice a new client, their payment confirms the
-order, production starts.
-
-**Do not build invoices as a separate record.** That creates a second thing to
-reconcile against orders, which is the same data-conflict problem as #3. An
-invoice-first flow is just **an order that has not been confirmed yet** — add a
-state before the first production stage. It reuses client, items, prices,
-discount, deposit, logistics and the receipt, and answers "was it paid, how
-much, what is the balance" for free.
-
-Also delivers the "paid invoice prompts you to start the order" automation
-almost free. **~half a day.**
 
 ---
 
