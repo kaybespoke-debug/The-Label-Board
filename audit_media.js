@@ -146,6 +146,44 @@ section('Every photo-bearing record is swept, and none is invented');
   ].forEach(([label, needle]) =>
     ok(label + ' are compressed and put in storage', src.indexOf(needle) !== -1,
       'this category is still being written into the database as base64'));
+  /* Sending a client a photo of their own finished piece. ---------------------------
+     This is the one place a photo leaves the studio, so the link has to be signed (the
+     bucket is private), has to outlive the app's own seven days (somebody reads the message
+     a fortnight later), and has to expire eventually, because a link that never dies is a
+     photograph of somebody's wedding outfit on the open web for good. */
+  ok('a client gets a signed link, not a raw path',
+     /createSignedUrl\(storedPath\(ref\),SHARE_URL_TTL\)/.test(src),
+     'the bucket is private, so anything else hands the client a link that does not work');
+  const ttl = +((src.match(/const SHARE_URL_TTL=(\d+)/) || [0, 0])[1]);
+  ok('the link outlives the app\u2019s own url cache', ttl > 604800,
+     'a client reading the message next week would find a dead link');
+  ok('and it does expire', ttl > 0 && ttl <= 90 * 86400,
+     'a link that never expires puts a client\u2019s finished piece on the open web for good');
+  ok('only the ready message carries it',
+     /const link=\(kind==='ready'\)\?_msgPhotoLink:''/.test(src),
+     'a payment reminder is not the moment to show somebody what they cannot collect yet');
+  ok('an inline photo is never handed out as a link',
+     /if\(!isStoredPhoto\(ref\)\)return ''/.test(
+       (src.match(/async function sharePhotoLink[\s\S]*?\n\}/) || [''])[0]),
+     'base64 has no url, so the message would carry something broken');
+  ok('the screen does not wait on the round trip',
+     !/async function openMsgHelper/.test(src),
+     'the workroom taps this holding a garment; it cannot block on the network');
+  ok('and says so while the link is still coming',
+     /_msgPhotoPending/.test(src) && /Getting the link/.test(src),
+     'a message that quietly fills itself in later gets sent without the photo');
+  /* Both paths, not one. A link arrives on the resolve path and a failure arrives on the
+     reject path, and each of them redraws the screen \u2014 so each needs the guard. Asking only
+     whether the words appear somewhere in the file passed with the resolve guard, the one
+     that actually sets the link, deleted. */
+  const openBody = (src.match(/function openMsgHelper[\s\S]*?\n\}/) || [''])[0];
+  ok('a link signed for one client cannot land in another\u2019s message',
+     openBody.split('_msgOpenFor!==id').length - 1 === 2,
+     'tapping two orders quickly would put the first client\u2019s photo in the second\u2019s message');
+  ok('the photo line disappears when there is no photo',
+     /replace\(\/\[\^\\n\]\*\{photo\}/.test(src),
+     'the client would be sent a message with the word {photo} in it');
+
   ok('the counter counts the same places the sweep moves',
     ['clientPhotos', 'outfits', 'updates', 'getCustomers', 'count\\(pr\\.photo\\)'].every(f =>
       new RegExp(f).test((src.match(/function inlinePhotoCount[\s\S]*?\n\}/) || [''])[0])));

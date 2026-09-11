@@ -236,9 +236,28 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     chasing. So does a quote. So does anything the test cannot judge: archiving an order
     that is not finished stops it syncing, so unsure costs money rather than losing work.
   - New gate `audit_orderstore.js`.
+- **C. The photo goes in the "your order is ready" message.** Option 1, Kayode's call on
+  11 Sep: the finished piece travels to the client, and no Instagram. Neither `wa.me` nor
+  `mailto:` can carry an attachment, so it travels as a link, and there is now an **Email it**
+  button beside the WhatsApp one.
+  - `{photo}` in the ready template becomes a signed link, valid **30 days** — longer than the
+    app's own 7-day URLs, because somebody reads a message a fortnight later, and not forever,
+    because a link that never dies is a wedding outfit on the open web for good.
+  - The photo sent is the **latest progress photo**, or an outfit photo. Never the client's own
+    reference photo, which is theirs and not the studio's work.
+  - **Only the ready message** carries it. A confirmation is sent before the piece exists, and a
+    payment reminder is not the moment to show somebody what they cannot collect yet.
+  - The screen **draws before the link is signed**, because the workroom taps this holding a
+    garment. While it is coming the message says so plainly. Signed for one client, it cannot
+    land in another's message. Offline, or where the photo was saved inline, the whole line
+    drops out rather than sending the word `{photo}` to a client.
+  - Checks added to `audit_media.js` (87). **Ten mutants run against them, all ten caught** —
+    including one that deleted a single copy of a two-line guard and passed, which is why the
+    check now counts both.
 
-All 50 gates green after each, plus the 1,827-check website gate. Ninety-nine mutations run
-against the two gates; all seventeen caught.
+All 50 gates green after each change, plus the 1,827-check website gate, the 311-check partner
+gate and the 80-check console gate. Every gate written this run was run against a deliberately
+broken copy of the app first, and every mutant was caught.
 
 ---
 
@@ -260,27 +279,16 @@ the textbook answer and is weeks of work, a migration per store, RLS per store a
 migration path for every device. **Not worth starting until a real studio's numbers say so.**
 The measurements are in `audit_orderstore.js`, so the day they do, they will say it plainly.
 
-### C. What to do about "Ready to post"  —  Kayode's call
-Raised 11 Sep. The panel shows finished work with the photos already on it and offers a
-caption to copy. It stores **nothing extra**: those are the photos already on the order.
+### C. Instagram and Facebook posting  —  answered, not now
+Asked and settled on 11 Sep: the photo goes in the **ready message to the client**, built
+above, and **no Instagram**. Posting to Instagram or Facebook stays off the list until a
+studio asks for it twice: it is app review, tokens and a publishing flow, and it is a second
+product surface rather than a feature.
 
-Storage is not the reason to drop it. At the shipped compression a reference photo is about
-200KB, so **20GB is roughly 97,000 photos** — a studio doing 40 orders a month with five
-photos each would take **41 years** to fill Basic, and a 100-order-a-month studio with eight
-photos each takes **10 years**. Finished photos are not what fills a cap.
-
-The real question is the one Kayode asked: it only earns its place if it either **posts to
-Instagram or Facebook**, or the photo goes into the **"your order is ready" message to the
-client**. Right now it is a copy-and-paste helper. Three ways to go:
-
-1. **Put the photo in the ready-to-collect message.** Smallest, uses what is already there,
-   and it is a message the studio already sends.
-2. **Connect Instagram/Facebook.** A real integration: app review, tokens, a publishing
-   flow. Not small, and it is a second product surface.
-3. **Drop the panel.** Costs nothing to remove and nothing is lost, since the photos stay
-   on the orders.
-
-*Recommended: 1, then decide about 2 once a studio has asked for it twice.*
+For the record, storage was never the reason to be careful here. At the shipped compression a
+reference photo is about 200KB, so **20GB is roughly 97,000 photos** — a studio doing 40
+orders a month with five photos each takes **41 years** to fill Basic, and a 100-order studio
+with eight photos each takes **10 years**. Finished photos are not what fills a cap.
 
 ---
 
