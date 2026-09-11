@@ -55,7 +55,6 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
 | 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
 | 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
-| 9 | **A photograph for `web/img/accessories.jpg`** | 1000x667, a bench with caps, gele, beadwork and a jeweller's pliers, to match the other seven. The accessories tile reads as a line drawing until it exists |
 
 ---
 
@@ -132,7 +131,8 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   - **Still wanted: `web/img/accessories.jpg`.** The tile keeps its line drawing until that
     photograph exists. `img/README.txt` names it, and the website gate now enforces the
     rule rather than letting it pass quietly: a tile either carries a photograph that
-    exists, or names none and the README says one is wanted.
+    exists, or names none and the README says one is wanted. **Kayode made the photograph
+    the same day**, so the tile carries it like the other seven.
   - Two bugs fell out of it. A **necklace** was filed as Fabric (`lace` matched inside it)
     and an **aso-oke cap** was filed as Fabric too, because the fabric test ran before the
     accessory one and matched what the cap is made *of*. What a thing IS now beats what it
