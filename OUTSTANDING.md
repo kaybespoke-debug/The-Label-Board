@@ -21,26 +21,35 @@ somebody signs in to an app with no tabs.
 **Nothing ships until Kayode says so.** Commits are fine. Pushing, merging to
 `main`, deploying an Edge Function and applying a migration to the live
 Supabase project all wait, and happen at the END of the run rather than after
-each change. Gates still run every time.
+each change. Gates still run every time. *This run: said on 11 Sep, and
+`layi-v40` went out. The rule stands for the next batch.*
 
 ---
 
-## The deploy itself — what is left
+## The deploy — shipped 11 September 2026
 
-The code side is finished. Everything below is either one command or Kayode's
-hands on a dashboard.
+**`layi-v40` is out.** Both branches pushed on Kayode's word.
 
-**Nothing in this batch touches the database.** `supabase/` is unchanged
-against `main`, so there is no migration to apply and no Edge Function to
-deploy. The whole release is static files.
-
-| | Step | Who |
+| | Step | State |
 |---|---|---|
-| 1 | **Done.** `APP_VERSION` and the service worker `CACHE` moved to `layi-v40`. Without this every installed phone keeps serving v39 after the deploy | done |
-| 2 | `git push origin admin-deploy` — publishes the **admin console** | Kayode says go |
-| 3 | Merge to `main` — publishes the **customer app**. Use the recipe below, not a plain merge | Kayode says go |
-| 4 | Watch the sign-in screen on a real phone: the build stamp must read **layi-v40**. If it still says v39 the service worker did not swap | after |
-| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | after |
+| 1 | `APP_VERSION` and the service worker `CACHE` moved to `layi-v40` | done |
+| 2 | `git push origin admin-deploy` → `5b3d452`, publishes the **admin console** and the partner portal | done |
+| 3 | Merge to `main` → `d0c50b5`, publishes the **customer app** | done |
+| 4 | Watch the sign-in screen on a real phone: the build stamp must read **layi-v40**. If it still says v39 the service worker did not swap | **Kayode, now** |
+| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | **Kayode, now** |
+
+**Nothing in this release touched the database.** `supabase/` was unchanged
+against `main`, so no migration was applied and no Edge Function deployed. The
+whole release is static files, which is why it could go before the Supabase
+dashboard items were finished.
+
+**How the merge was done, for the next time.** In a throwaway `git worktree` on
+`main`, not by switching branches: the working tree had 19 uncommitted files
+from another session's work on `web/`, and switching would have dragged them
+across. The worktree was checked three ways before the commit — `netlify.toml`
+still reads `publish = "site"`, `site/` is byte-identical to `admin-deploy`, and
+all 50 gates were run **against the merged tree** rather than against the branch.
+The worktree is gone and those 19 files never moved.
 
 **The release window.** For as long as one phone in a studio is on v40 and
 another has not swapped yet, the old one shows only open orders: it knows one
@@ -101,7 +110,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 
 ## Fixed this run
 
-Committed on `admin-deploy`, gated, and **not pushed**.
+Committed, gated, and **shipped** in `layi-v40` on 11 September 2026.
 
 - **0a. Footwear and leather could not see their own sales.** They were given a
   Shop and a "Record a sale" button, then had the Sales tab hidden, because
@@ -277,7 +286,6 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     chasing. So does a quote. So does anything the test cannot judge: archiving an order
     that is not finished stops it syncing, so unsure costs money rather than losing work.
   - New gate `audit_orderstore.js`.
-- **C. "Ready to post" is gone, and so is the client photo link.** Built on 11 Sep, taken out
   the same day on Kayode's call: a nice addition, not worth more time on. Both halves went
   together, because both existed to move a finished photograph somewhere.
   - Out of the app: the **Ready to post panel** on Marketing, the caption writer, the post
