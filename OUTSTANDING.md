@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (sixth session)
+Last updated: 11 September 2026 (seventh session)
 
 ## How this run works
 
@@ -195,7 +195,25 @@ Committed on `admin-deploy`, gated, and **not pushed**.
   - A **Quotes Out** tile on the dashboard with what they are worth, shown only when there
     are any. New gate `audit_quote.js`.
 
-All 48 gates green after each, plus the 1,793-check website gate. Sixty-three mutations run
+- **6. Work sent out.** Beading, monogramming, soling. Recorded on the **cost line that
+  already carries the vendor**, so the money cannot move and the books cannot disagree with
+  the bench. The gate checks that first and hardest.
+  - The order says **"With Musa Beads"** instead of "In progress", above the due-date lines,
+    because where the piece IS beats how long it has been there. The due column beside it
+    still shows the lateness, so nothing is hidden.
+  - A piece late back is **somebody else’s delay** and reads as one, with *chase them* and a
+    button to say it came back. A piece with **no agreed date back is never called late**: a
+    vendor who never gave a date cannot have missed it.
+  - Coming back is recorded once, **with how long it took**, which is the only way a studio
+    learns a vendor is slow.
+  - The block sits **outside the profit section**: a machinist needs to know the beading is
+    with Musa and due Friday, and has no business seeing what it cost.
+  - **Bug found by the gate:** `migrate()` rebuilds every cost line field by field, so the
+    sent and due-back dates were being silently dropped on the next read. Anything new on a
+    cost line has to be named there, and now is, with a comment saying why.
+  - New gate `audit_outwork.js`.
+
+All 49 gates green after each, plus the 1,793-check website gate. Seventy-three mutations run
 against the two gates; all seventeen caught.
 
 ---
@@ -221,12 +239,6 @@ to ~50 staff and should become a Bespoke conversation around 120.
 ---
 
 ## Real value, well defined
-
-### 6. In-house vs outsourced work
-Embellishment, monogram, beading. Outsourced work needs a vendor, a cost, sent
-and due dates, and a **"waiting on them"** state that does not make the
-workroom look idle. Vendors and maker commissions already exist; this extends
-them. **Half a day.**
 
 ### 10. About Us rewrite
 Ten years of it. Four years of running a business from another country. The
