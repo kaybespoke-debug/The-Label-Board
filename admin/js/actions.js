@@ -332,6 +332,58 @@ function doConvert(id) {
   closeModal(); toast(s.name + ' is now on ' + p.name); render();
 }
 
+/* ---------------- money that arrived, and space that was granted ----------------
+   Both of these reach a real row through the gateway and have done since the storage work
+   landed; neither had a button, so the only way to use them was the console. */
+function formRecordPayment(id) {
+  const s = Q.sub(id);
+  modal('Record a payment', s.name + ' · money that has already arrived',
+    '<div class="f2"><div class="fg"><label>Amount (₦)</label><input id="rpAmt" type="number" min="0" value="' + (s.mrr || '') + '"></div>' +
+    '<div class="fg"><label>How it came</label><select id="rpMethod">' +
+    ['Transfer', 'Cash', 'Card', 'POS'].map(m => '<option>' + m + '</option>').join('') + '</select></div></div>' +
+    '<div class="fg"><label>Reference</label><input id="rpRef" placeholder="Bank reference, or what the alert said"></div>' +
+    '<div class="fg"><label>Note (goes on the audit log)</label><input id="rpNote" placeholder="e.g. September, paid late"></div>' +
+    '<p class="hint">This records money that has already reached the account. Nothing is charged to anybody from here.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn gold" onclick="doRecordPayment(' + id + ')">Record it</button>');
+}
+async function doRecordPayment(id) {
+  const s = Q.sub(id);
+  const amount = +document.getElementById('rpAmt').value || 0;
+  if (amount <= 0) { toast('How much arrived?'); return; }
+  try {
+    await liveRecordPayment(id, amount, document.getElementById('rpMethod').value,
+      document.getElementById('rpRef').value, document.getElementById('rpNote').value);
+    logAction('payment', 'Payment recorded',
+      'Kayode Ojomo recorded ' + money(amount) + ' from ' + s.name, 'subscriber:' + s.id);
+    closeModal(); toast(money(amount) + ' recorded for ' + s.name); render();
+  } catch (e) { toast(e.message || 'Could not record that payment'); }
+}
+
+function formStorageCap(id) {
+  const s = Q.sub(id);
+  modal('Storage for ' + s.name, 'Give this studio more room than its plan includes',
+    /* No prefill: the tenant list does not carry the current cap, and showing a blank box
+       as though it were the current value would read as 'no override' when there may be one.
+       Typing a number sets it; leaving it empty clears it. Both are said out loud below. */
+    '<div class="fg"><label>Cap (GB)</label><input id="scGb" type="number" min="0" placeholder="e.g. 300"></div>' +
+    '<div class="fg"><label>Why (goes on the audit log)</label><input id="scWhy" placeholder="e.g. agreed 300GB at ₦10,000 a month"></div>' +
+    '<p class="hint">Extra space costs us about ₦28 per GB a month, so whatever is charged for it wants to be comfortably above that. Type a number to set the cap; leave it empty and save to clear any override and return them to their plan.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn gold" onclick="doStorageCap(' + id + ')">Save cap</button>');
+}
+async function doStorageCap(id) {
+  const s = Q.sub(id);
+  const raw = document.getElementById('scGb').value.trim();
+  try {
+    await liveSetStorageCap(id, raw === '' ? null : +raw, document.getElementById('scWhy').value);
+    logAction('plan_change', 'Storage cap set',
+      'Kayode Ojomo ' + (raw === '' ? 'returned ' + s.name + ' to the storage its plan includes'
+                                    : 'gave ' + s.name + ' ' + raw + 'GB'), 'subscriber:' + s.id);
+    closeModal(); toast(raw === '' ? s.name + ' back on its plan' : s.name + ' now has ' + raw + 'GB'); render();
+  } catch (e) { toast(e.message || 'Could not set that cap'); }
+}
+
 /* ---------------- plans ---------------- */
 function formPlan(id) {
   const p = id ? planById(id) : null;

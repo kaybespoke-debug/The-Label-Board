@@ -369,6 +369,26 @@ section('Website enquiries reach the screen');
      xssDet.indexOf('<script>bad()') < 0);
 }
 
+/* Two gateway actions had no button for weeks: the only way to record a payment or grant a
+   studio extra storage was to open the console and call the function by hand. A door with
+   no handle is the same as no door. */
+{
+  const det = fs.readFileSync(path.join(root, "admin/js/detail.js"), "utf8");
+  const act = fs.readFileSync(path.join(root, "admin/js/actions.js"), "utf8");
+  [["formRecordPayment", "liveRecordPayment", "recording a payment"],
+   ["formStorageCap", "liveSetStorageCap", "granting extra storage"]].forEach(function (t) {
+    ok(t[2] + " has a button somewhere", det.indexOf(t[0] + "(") !== -1,
+       "the gateway serves it and nothing on screen reaches it");
+    ok(t[2] + " opens a form", act.indexOf("function " + t[0] + "(") !== -1);
+    ok(t[2] + " reaches the gateway", act.indexOf(t[1] + "(") !== -1);
+  });
+  // plain string search: the shell mangles a regex on its way into a file, every time
+  const liveGuard = det.indexOf("s.live ?");
+  const payBtn = det.indexOf("formRecordPayment");
+  ok("both are offered only on a real studio",
+     liveGuard !== -1 && payBtn > liveGuard && payBtn - liveGuard < 240,
+     "an example subscriber would be sent to the Edge Function and fail there");
+}
 /* Read a console source file. The one inside boot() is scoped to that loop. */
 const srcOf = f => fs.readFileSync(path.join(root, "admin", f), "utf8");
 /* Our own books. -------------------------------------------------------------------
