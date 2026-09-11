@@ -1743,8 +1743,47 @@ function batchAt(o,i){const r=(o.batch&&o.batch.reached)||[];return (r[i]||0)-((
 function batchPct(o){if(!o.batch||!o.batch.on)return Math.round((((o.stageIndex||0)+1)/STAGES.length)*100);const q=o.batch.qty||1,r=o.batch.reached||[];let sum=0;for(let i=1;i<STAGES.length;i++)sum+=(r[i]||0);return Math.round(sum/(q*(STAGES.length-1))*100);}
 function isBatch(o){return !!(o&&o.batch&&o.batch.on);}
 function isGroup(o){return !!(o&&o.group&&o.group.on);}
-function groupMinStage(o){const a=(o&&o.outfits)||[];if(!a.length)return 0;return Math.min(...a.map(m=>+m.stageIndex||0));}
-function groupPct(o){const a=(o&&o.outfits)||[];if(!a.length)return 0;const s=a.reduce((x,m)=>x+(((+m.stageIndex||0)+1)/STAGES.length),0);return Math.round(s/a.length*100);}
+/* ---- One order, two things that are not made the same way ----------------------------
+   A bag and a belt. A gown and the gele that goes with it. They share a client, a price
+   and a due date, and nothing else about how they are made: a belt has no fittings and a
+   gele has no lasting. outfits[].stageIndex has always existed per item; what did not was
+   a per-item stage SET, so every piece on an order was walked through the same list.
+
+   An item names its craft, or names nothing and uses the studio's own stages, which is
+   what every order in existence does today. */
+function itemCraft(x){return (x&&x.craft)||'';}
+function itemStages(x){
+  const c=craftByKey(itemCraft(x));
+  const mid=(c&&c.stages&&c.stages.make)?STAGE_PRESETS[c.stages.make]:null;
+  return mid?buildStages(mid):STAGES;
+}
+function itemStageIndex(x){const S=itemStages(x);return Math.max(0,Math.min(S.length-1,+((x&&x.stageIndex))||0));}
+function itemStageName(x){return itemStages(x)[itemStageIndex(x)]||'';}
+/* How far along, as a fraction, which is the only way to compare two pipelines of
+   different lengths. buildStages() puts Order Received at the front of every one of them
+   and Delivered at the back, so 0 and 1 mean exactly the same thing on all of them. */
+function itemProgress(x){const S=itemStages(x);return S.length<2?0:itemStageIndex(x)/(S.length-1);}
+function itemDispatchIndex(x){const S=itemStages(x);const i=S.indexOf('Dispatched');return i<0?S.length-1:i;}
+/* The order sits where its least advanced piece sits. When every piece is on the studio's
+   own stages this is exactly the old minimum-index answer, because the fraction and the
+   list it is mapped back onto are then the same list. */
+function orderStageFromItems(o){
+  const a=(o&&o.outfits)||[];
+  if(!a.length)return +o.stageIndex||0;
+  const f=Math.min.apply(null,a.map(itemProgress));
+  return Math.max(0,Math.min(STAGES.length-1,Math.round(f*(STAGES.length-1))));
+}
+function groupMinStage(o){return orderStageFromItems(o);}
+function groupPct(o){const a=(o&&o.outfits)||[];if(!a.length)return 0;return Math.round(a.reduce((x,m)=>x+itemProgress(m),0)/a.length*100);}
+/* Worth tracking piece by piece when the pieces are for different people, or are not the
+   same kind of thing. One shirt in two colours is not worth a screen of its own. */
+function hasOwnPieces(o){
+  const a=(o&&o.outfits)||[];
+  if(isBatch(o)||a.length<2)return false;
+  if(isGroup(o))return true;
+  const crafts={};a.forEach(x=>{crafts[itemCraft(x)]=1;});
+  return Object.keys(crafts).length>1;
+}
 function migrate(o){
   if(!o.outfits)o.outfits=[{type:'Bespoke outfit',name:o.garment||'Bespoke piece',price:o.value||0,photos:[],style:'',finish:''}];
   o.outfits.forEach(x=>{x.photos=x.photos||[];if(!x.type)x.type='Bespoke outfit';});
@@ -3531,9 +3570,13 @@ function qcFromCrafts(crafts){
   return out;
 }
 /* An edited list is the studio's own answer and beats the craft every time. */
-function qcChecklistFor(o){
+function qcChecklistFor(o,item){
   if(SETTINGS.qcChecklist&&SETTINGS.qcChecklist.length)return SETTINGS.qcChecklist.slice();
-  const byCraft=qcFromCrafts(qcCraftsFor(o));
+  /* A piece that names its own craft is checked as that craft, not as the studio. On an
+     order carrying a bag and a belt, the bag is checked for hardware and the belt is not
+     checked for a lining it does not have. */
+  const crafts=(item&&itemCraft(item))?[itemCraft(item)]:qcCraftsFor(o);
+  const byCraft=qcFromCrafts(crafts);
   return byCraft.length?byCraft:DEFAULTS.qcChecklist.slice();
 }
 function qcChecklist(){return qcChecklistFor(null);}
@@ -3926,7 +3969,7 @@ function fabricCheckNeeded(o){
   if(qc>=0&&(+o.stageIndex||0)>=qc)return false;
   return orderHasFabric(o);
 }
-function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:''};}
+function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:'',craft:''};}
 function outfitMaterialsHtml(i){
   const o=(draft&&draft.outfits&&draft.outfits[i])||{};const sel=o.materials||[];
   const opts=materialOptionsFor(o.type);
@@ -4099,24 +4142,41 @@ function toggleBatch(){syncOrderDraft();if(draft.batch&&draft.batch.on){draft.gr
 function toggleGroup(){syncOrderDraft();if(draft.group&&draft.group.on){draft.batch={on:false};draft.outfits=draft.outfits||[];draft.outfits.forEach(o=>{if(o.stageIndex==null)o.stageIndex=0;o.meas=o.meas||{};});}reRenderOrder();}
 let batchId=null;
 let groupId=null;
-function openGroup(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o||!isGroup(o))return;groupId=id;renderGroupModal();}
+function openGroup(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o||!hasOwnPieces(o))return;groupId=id;renderGroupModal();}
 function renderGroupModal(){
-  const o=getOrders().find(x=>x.id===groupId);if(!o)return;const dispI=STAGES.indexOf('Dispatched');
-  const rows=(o.outfits||[]).map((m,i)=>{const si=+m.stageIndex||0;const pct=Math.round((si+1)/STAGES.length*100);
+  const o=getOrders().find(x=>x.id===groupId);if(!o)return;
+  const grp=isGroup(o);
+  const rows=(o.outfits||[]).map((m,i)=>{
+    const S=itemStages(m),si=itemStageIndex(m),dispI=itemDispatchIndex(m);
+    const pct=Math.round(itemProgress(m)*100);
+    const own=itemCraft(m)?activityLabel(itemCraft(m)):'';
     const ks=MEAS_ALL.filter(f=>m.meas&&m.meas[f]);const measSummary=ks.length?ks.slice(0,6).map(f=>esc(f)+' '+esc(m.meas[f])).join(' · ')+(ks.length>6?' …':''):'no measurements on file';
-    return `<div class="srow"><div class="smain"><div class="sup-name">${esc(m.person||('Person '+(i+1)))} <span style="color:var(--text-faint);font-weight:400">· ${esc(m.name||m.type||'piece')}</span></div>
-      <div class="sup-meta"><b style="color:var(--gold)">${esc(STAGES[si])}</b> · ${pct}%</div>
+    return `<div class="srow"><div class="smain"><div class="sup-name">${esc(grp?(m.person||('Person '+(i+1))):(m.name||m.type||('Piece '+(i+1))))}${grp?` <span style="color:var(--text-faint);font-weight:400">· ${esc(m.name||m.type||'piece')}</span>`:''}</div>
+      <div class="sup-meta"><b style="color:var(--gold)">${esc(S[si])}</b> · ${pct}%${own?` <span style="color:var(--text-faint)">· ${esc(own)}</span>`:''}</div>
       <div class="sup-meta" style="color:var(--text-faint)">${measSummary}</div>
       <div class="prog" style="margin-top:6px"><i style="width:${pct}%"></i></div></div>
       <div class="sacts" style="display:flex;align-items:center;gap:6px">
         <button class="btn sm ghost" ${si<=0?'disabled':''} onclick="groupStep(${i},-1)">−</button>
         <button class="btn sm" ${si>=dispI?'disabled':''} onclick="groupStep(${i},1)">Advance →</button>
       </div></div>`;}).join('');
-  openModal(`<h3>${esc(o.client)} · group order</h3><div class="msub">${o.id} · ${(o.outfits||[]).length} people · each piece tracked on its own</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:12px">Move each person through the stages individually. Delivery is marked from Logistics once everyone is dispatched.</div>
-    <div class="slist">${rows||'<div class="kv">No people on this order.</div>'}</div>`);
+  const n=(o.outfits||[]).length;
+  openModal(`<h3>${esc(o.client)} · ${grp?'group order':'piece by piece'}</h3><div class="msub">${o.id} · ${n} ${grp?(n===1?'person':'people'):(n===1?'piece':'pieces')} · each one tracked on its own</div>
+    <div class="sd" style="color:var(--text-faint);margin-bottom:12px">${grp?'Move each person through the stages individually.':'These pieces are not made the same way, so each one walks its own stages.'} Delivery is marked from Logistics once everything is dispatched.</div>
+    <div class="slist">${rows||`<div class="kv">No ${grp?'people':'pieces'} on this order.</div>`}</div>`);
 }
-function groupStep(i,delta){if(!can('update'))return;const list=rawOrders();const o=list.find(x=>x.id===groupId);if(!o||!o.outfits[i])return;const max=STAGES.indexOf('Dispatched');let si=(+o.outfits[i].stageIndex||0)+delta;si=Math.max(0,Math.min(max,si));o.outfits[i].stageIndex=si;o.stageIndex=groupMinStage(o);save('layi_dash_orders',list);logAudit('Group piece updated',o.id+' · '+(o.outfits[i].person||('person '+(i+1)))+' → '+STAGES[si]);renderGroupModal();renderAll();}
+function groupStep(i,delta){
+  if(!can('update'))return;
+  const list=rawOrders();const o=list.find(x=>x.id===groupId);
+  if(!o||!o.outfits[i])return;
+  const x=o.outfits[i];
+  const S=itemStages(x),max=itemDispatchIndex(x);
+  const si=Math.max(0,Math.min(max,itemStageIndex(x)+delta));
+  x.stageIndex=si;
+  o.stageIndex=orderStageFromItems(o);
+  save('layi_dash_orders',list);
+  logAudit('Piece updated',o.id+' · '+(x.person||x.name||x.type||('piece '+(i+1)))+' → '+S[si]);
+  renderGroupModal();renderAll();
+}
 function openBatch(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o||!isBatch(o))return;batchId=id;renderBatchModal();}
 function renderBatchModal(){
   const o=getOrders().find(x=>x.id===batchId);if(!o)return;const q=o.batch.qty;const r=o.batch.reached;
@@ -4449,7 +4509,12 @@ function orderAttention(o){
       text:theirs?'Working on the client\u2019s own fabric and nobody has checked it against the photo yet.'
                  :'Nobody has checked the fabric against the photo yet.',
       act:can('update')?{label:'Post update',fn:`openUpdate('${o.id}')`}:null};}
-  if(o.stageIndex===QC&&!(o.qc&&o.qc.status==='passed'))return {sev:'var(--gold)',text:'Awaiting quality check before it can move on.',act:can('canQC')?{label:'Run QC',fn:`openQC('${o.id}')`}:null};
+  if(o.stageIndex===QC&&!(o.qc&&o.qc.status==='passed')){
+    const left=qcPerPiece(o)?(o.outfits||[]).filter(x=>!(x.qc&&x.qc.status==='passed')).length:0;
+    return {sev:'var(--gold)',
+      text:left>1?left+' pieces still to check before it can move on.':'Awaiting quality check before it can move on.',
+      act:can('canQC')?{label:'Run QC',fn:`openQC('${o.id}')`}:null};
+  }
   if(o.stageIndex===READY)return {sev:'var(--green)',text:'Ready to collect. Let the client know it is done.',act:(can('customers')||can('orders'))?{label:'Message client',fn:`openMsgHelper('${o.id}')`}:null};
   if(o.stageIndex>=DISP&&o.stageIndex<DELI)return {sev:'var(--amber)',text:'Out for delivery. Mark it delivered once it reaches the client.',act:(can('canDispatch')||can('orders')||can('update'))?{label:'Mark delivered',fn:`markDelivered('${o.id}')`}:null};
   if(can('money')&&out>0&&o.stageIndex>=READY)return {sev:'var(--amber)',text:`${curO(out,o)} still outstanding, collect on delivery.`,act:can('money')?{label:'Record payment',fn:`openPayment('${o.id}')`}:null};
@@ -4521,8 +4586,8 @@ function openDetail(id){
     stageActions=`<div style="margin-top:9px"><button class="btn sm" onclick="markDelivered('${o.id}')">${(o.delivery&&o.delivery.enabled)?'✓ Mark as delivered':'✓ Mark as collected'}</button></div>`;
   }
   const glance=`<div class="kv" style="background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0 12px">
-    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span><b>Stage:</b> ${isGroup(o)?'👥 Group · '+o.outfits.length+' '+(o.outfits.length===1?'person':'people'):isBatch(o)?'📦 Batch · '+o.batch.qty+' pieces':STAGES[o.stageIndex]} <span style="color:var(--text-faint)">(${isGroup(o)?groupPct(o):isBatch(o)?batchPct(o):pctG}%)</span></span><span style="color:${dueGc}">${dueG}</span></div>
-    <div class="prog" style="margin:8px 0"><i style="width:${isGroup(o)?groupPct(o):isBatch(o)?batchPct(o):pctG}%"></i></div>
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span><b>Stage:</b> ${isGroup(o)?'👥 Group · '+o.outfits.length+' '+(o.outfits.length===1?'person':'people'):isBatch(o)?'📦 Batch · '+o.batch.qty+' pieces':hasOwnPieces(o)?'🧵 '+o.outfits.length+' pieces · each on its own stages':STAGES[o.stageIndex]} <span style="color:var(--text-faint)">(${(isGroup(o)||hasOwnPieces(o))?groupPct(o):isBatch(o)?batchPct(o):pctG}%)</span></span><span style="color:${dueGc}">${dueG}</span></div>
+    <div class="prog" style="margin:8px 0"><i style="width:${(isGroup(o)||hasOwnPieces(o))?groupPct(o):isBatch(o)?batchPct(o):pctG}%"></i></div>
     ${isBatch(o)?`<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin:4px 0 8px">${STAGES.map((s,i)=>{const at=batchAt(o,i);return at>0?`<span style="font-size:12px;color:var(--text-dim)"><b style="color:var(--gold)">${at}</b> at ${esc(s)}</span>`:'';}).filter(Boolean).join('')||'<span style="color:var(--text-faint)">Not started yet</span>'}</div>${can('update')?`<button class="btn sm" style="margin-bottom:6px" onclick="closeModal();openBatch('${o.id}')">Track progress</button>`:''}`:isGroup(o)?`<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin:4px 0 8px">${o.outfits.map((m,i)=>`<span style="font-size:12px;color:var(--text-dim)">${esc(m.person||('P'+(i+1)))}: <b style="color:var(--gold)">${esc(STAGES[+m.stageIndex||0])}</b></span>`).join('')}</div>${can('update')?`<button class="btn sm" style="margin-bottom:6px" onclick="closeModal();openGroup('${o.id}')">Track each person</button>`:''}`:''}
     <div style="margin-top:2px"><b>Assigned to:</b> ${makers.length?makers.join(', '):'<span style="color:var(--text-faint)">not assigned yet, use Edit to add the maker</span>'}</div>
     ${lastU?`<div style="margin-top:5px"><b>Last action:</b> <span style="color:var(--gold)">${esc(lastU.worker||lastU.by)}</span> · ${esc(lastU.note)} <span style="color:var(--text-faint)">· ${timeAgo(lastU.at)}</span></div>`:'<div style="margin-top:5px;color:var(--text-faint)">No updates posted yet</div>'}
@@ -4556,7 +4621,7 @@ function openDetail(id){
       ${can('orders')?`<button class="btn ghost sm" onclick="openReceipt('${o.id}')">Receipt</button>`:''}
       ${o.kind!=='sale'&&(can('orders')||can('update'))?`<button class="btn ghost sm" onclick="printJobSheet('${o.id}')">Job sheet</button>`:''}
       ${can('update')&&isBatch(o)?`<button class="btn ghost sm" onclick="closeModal();openBatch('${o.id}')">Track progress</button>`:''}
-      ${can('update')&&isGroup(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each person</button>`:''}
+      ${can('update')&&hasOwnPieces(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each ${isGroup(o)?'person':'piece'}</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openQC('${o.id}')">Quality check</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openUpdate('${o.id}')">Post update</button>`:''}
       ${can('orders')?`<button class="btn ghost sm" onclick="duplicateOrder('${o.id}')">Duplicate</button>`:''}
@@ -4849,19 +4914,122 @@ function setSatisfaction(id,n){if(!can('orders'))return;const list=rawOrders();c
 /* ===== QUALITY CONTROL ===== */
 let qcDraft=null;
 function qcBadge(o){if(!o.qc||!o.qc.status||o.qc.status==='pending')return '';return o.qc.status==='passed'?'<span class="sup-status ok">✓ QC passed</span>':'<span class="sup-status out">↻ Needs rework</span>';}
-function openQC(id){if(!can('canQC'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;const tmpl=qcChecklistFor(o);const existing=(o.qc&&o.qc.items&&o.qc.items.length)?o.qc.items:tmpl.map(l=>({label:l,ok:false}));qcDraft={id,client:o.client,garment:o.garment,items:existing.map(i=>({label:i.label,ok:!!i.ok})),note:(o.qc&&o.qc.note)||''};renderQCModal();}
+/* Quality control runs per PIECE on an order whose pieces are not the same kind of thing,
+   and per order on every other one. A bag and a belt used to get a single verdict between
+   them, so passing the belt passed the bag. */
+function qcPerPiece(o){return hasOwnPieces(o);}
+function qcHolder(o,idx){return (idx>=0&&o.outfits&&o.outfits[idx])?o.outfits[idx]:o;}
+function qcPieceName(o,idx){
+  if(idx<0)return o.garment||'';
+  const x=(o.outfits||[])[idx]||{};
+  return x.person||x.name||x.type||('Piece '+(idx+1));
+}
+function openQC(id,idx){
+  if(!can('canQC'))return;
+  const o=getOrders().find(x=>x.id===id);if(!o)return;
+  idx=(idx===undefined||idx===null)?(qcPerPiece(o)?0:-1):+idx;
+  if(!qcPerPiece(o))idx=-1;
+  const holder=qcHolder(o,idx);
+  const tmpl=qcChecklistFor(o,idx>=0?holder:null);
+  const held=qcHeldFor(id,idx);
+  const existing=held?held.items:((holder.qc&&holder.qc.items&&holder.qc.items.length)?holder.qc.items:tmpl.map(l=>({label:l,ok:false})));
+  qcDraft={id,idx,client:o.client,garment:qcPieceName(o,idx),
+    items:existing.map(i=>({label:i.label,ok:!!i.ok})),note:held?held.note:((holder.qc&&holder.qc.note)||'')};
+  renderQCModal();
+}
+function qcPick(idx){if(!qcDraft)return;syncQC();qcSaveDraftInto();openQC(qcDraft.id,idx);}
+/* Moving between pieces must not throw away ticks made on the one being left. They are
+   held on the draft until Pass or Fail writes them, so switching keeps them in memory
+   without recording a verdict nobody gave. */
+let _qcHeld={};
+function qcSaveDraftInto(){if(!qcDraft)return;_qcHeld[qcDraft.id+'#'+qcDraft.idx]={items:qcDraft.items.map(i=>({label:i.label,ok:!!i.ok})),note:qcDraft.note};}
+function qcHeldFor(id,idx){return _qcHeld[id+'#'+idx]||null;}
 function syncQC(){if(!qcDraft)return;qcDraft.items.forEach((it,i)=>{const c=document.getElementById('qc_'+i);if(c)it.ok=c.checked;});const n=document.getElementById('qc_note');if(n)qcDraft.note=n.value;}
 function renderQCModal(){
   const items=qcDraft.items.map((it,i)=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" id="qc_${i}" ${it.ok?'checked':''} style="width:18px;height:18px;accent-color:var(--gold)"> <span>${esc(it.label)}</span></label>`).join('');
   const passed=qcDraft.items.filter(i=>i.ok).length,total=qcDraft.items.length;
+  const _qo=getOrders().find(x=>x.id===qcDraft.id)||{};
+  const _pieces=qcPerPiece(_qo)?(_qo.outfits||[]).map(function(x,i){
+    const st=(x.qc&&x.qc.status)||'';
+    const on=i===qcDraft.idx;
+    const mark=st==='passed'?' \u2713':(st==='failed'?' \u2715':'');
+    return '<span class="matchip'+(on?' on':'')+'" onclick="qcPick('+i+')" style="'+(st==='failed'&&!on?'border-color:var(--red);color:var(--red)':(st==='passed'&&!on?'border-color:var(--green);color:var(--green)':''))+'">'+esc(qcPieceName(_qo,i))+mark+'</span>';
+  }).join(''):'';
+  const _left=qcPerPiece(_qo)?(_qo.outfits||[]).filter(function(x){return !(x.qc&&x.qc.status==='passed');}).length:0;
   openModal(`<h3>Quality check</h3><div class="msub">${esc(qcDraft.client)} · ${esc(qcDraft.garment)}</div>
+    ${_pieces?`<div class="field"><label>Which piece <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(each is checked on its own)</span></label><div class="matchips">${_pieces}</div></div>`:''}
     <div class="field"><label>Checklist · ${passed}/${total} passed</label>${items}</div>
     <div class="field"><label>Notes / issues found</label><textarea class="fld" id="qc_note" placeholder="Defects, rework needed, or sign-off comments">${esc(qcDraft.note)}</textarea></div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Pass moves the order to <b>Ready for Delivery</b>. Fail sends it back to <b>Finishing</b> for rework and flags it.</div>
+    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">${_pieces?`Pass marks <b>${esc(qcDraft.garment)}</b> done. The order moves to <b>Ready for Delivery</b> when all ${(_qo.outfits||[]).length} pieces have passed${_left>1?`, and ${_left} are still to check`:''}.`:'Pass moves the order to <b>Ready for Delivery</b>.'} Fail sends it back for rework and flags it.</div>
     <div class="modal-foot"><button class="btn danger sm" onclick="failQC()">Fail · needs rework</button><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="passQC()">Pass QC</button></div>`);
 }
-function passQC(){syncQC();const list=rawOrders();const o=list.find(x=>x.id===qcDraft.id);if(!o)return;o.qc={status:'passed',items:qcDraft.items,note:qcDraft.note,by:userLabel(),at:new Date().toISOString()};const rfd=STAGES.indexOf('Ready for Delivery');if(o.stageIndex<rfd)o.stageIndex=rfd;o.updates=o.updates||[];o.updates.push({at:new Date().toISOString(),stage:'Quality Check',note:'QC passed ('+qcDraft.items.filter(i=>i.ok).length+'/'+qcDraft.items.length+' checks)'+(qcDraft.note?' · '+qcDraft.note:''),by:userLabel(),photos:[]});logAudit('QC passed',(o.client||'')+' · '+(o.garment||''));saveSafe('layi_dash_orders',list);closeModal();renderAll();}
-function failQC(){syncQC();const list=rawOrders();const o=list.find(x=>x.id===qcDraft.id);if(!o)return;o.qc={status:'failed',items:qcDraft.items,note:qcDraft.note,by:userLabel(),at:new Date().toISOString()};logAudit('QC failed, rework',(o.client||'')+' · '+(o.garment||''));o.stageIndex=Math.max(0,STAGES.indexOf('Quality Check')-1);o.updates=o.updates||[];o.updates.push({at:new Date().toISOString(),stage:'Quality Check',note:'Sent back for rework'+(qcDraft.note?': '+qcDraft.note:''),by:userLabel(),photos:[]});saveSafe('layi_dash_orders',list);closeModal();renderAll();}
+/* Passing a piece marks that piece. The ORDER only passes when every piece has, because
+   an order is done when the last thing on it is done, not the first. */
+function passQC(){
+  syncQC();
+  const list=rawOrders();const o=list.find(x=>x.id===qcDraft.id);if(!o)return;
+  const stamp={status:'passed',items:qcDraft.items,note:qcDraft.note,by:userLabel(),at:new Date().toISOString()};
+  const idx=qcDraft.idx;
+  const name=qcPieceName(o,idx);
+  const perPiece=idx>=0&&o.outfits&&o.outfits[idx];
+  if(perPiece){
+    o.outfits[idx].qc=stamp;
+    const S=itemStages(o.outfits[idx]);
+    const rfdI=S.indexOf('Ready for Delivery');
+    if(rfdI>=0&&itemStageIndex(o.outfits[idx])<rfdI)o.outfits[idx].stageIndex=rfdI;
+    const all=(o.outfits||[]).every(x=>x.qc&&x.qc.status==='passed');
+    o.qc=all?{status:'passed',items:qcDraft.items,note:qcDraft.note,by:userLabel(),at:stamp.at}:
+             {status:'partial',by:userLabel(),at:stamp.at,
+              note:(o.outfits||[]).filter(x=>x.qc&&x.qc.status==='passed').length+' of '+(o.outfits||[]).length+' pieces passed'};
+    o.stageIndex=orderStageFromItems(o);
+  }else{
+    o.qc=stamp;
+    const rfd=STAGES.indexOf('Ready for Delivery');
+    if(o.stageIndex<rfd)o.stageIndex=rfd;
+  }
+  o.updates=o.updates||[];
+  o.updates.push({at:new Date().toISOString(),stage:'Quality Check',
+    note:'QC passed'+(perPiece?' · '+name:'')+' ('+qcDraft.items.filter(i=>i.ok).length+'/'+qcDraft.items.length+' checks)'+(qcDraft.note?' · '+qcDraft.note:''),
+    by:userLabel(),photos:[]});
+  logAudit('QC passed',(o.client||'')+' · '+name);
+  delete _qcHeld[qcDraft.id+'#'+idx];
+  saveSafe('layi_dash_orders',list);
+  /* More still to check: stay on the screen and move to the next unchecked piece rather
+     than closing and making somebody find their way back in. */
+  const next=perPiece?(o.outfits||[]).findIndex(x=>!(x.qc&&x.qc.status==='passed')):-1;
+  if(next>=0){renderAll();openQC(o.id,next);return;}
+  closeModal();renderAll();
+}
+/* Failing a piece sends THAT piece back, not the whole order. The others keep whatever
+   they had passed, because making a bag maker redo a finished belt is how people stop
+   recording failures at all. The order is failed either way: something on it is wrong. */
+function failQC(){
+  syncQC();
+  const list=rawOrders();const o=list.find(x=>x.id===qcDraft.id);if(!o)return;
+  const stamp={status:'failed',items:qcDraft.items,note:qcDraft.note,by:userLabel(),at:new Date().toISOString()};
+  const idx=qcDraft.idx;
+  const name=qcPieceName(o,idx);
+  const perPiece=idx>=0&&o.outfits&&o.outfits[idx];
+  if(perPiece){
+    o.outfits[idx].qc=stamp;
+    const S=itemStages(o.outfits[idx]);
+    const qcI=S.indexOf('Quality Check');
+    o.outfits[idx].stageIndex=Math.max(0,(qcI<0?S.length-1:qcI)-1);
+    o.qc={status:'failed',by:userLabel(),at:stamp.at,note:name+': '+(qcDraft.note||'sent back for rework')};
+    o.stageIndex=orderStageFromItems(o);
+  }else{
+    o.qc=stamp;
+    o.stageIndex=Math.max(0,STAGES.indexOf('Quality Check')-1);
+  }
+  logAudit('QC failed, rework',(o.client||'')+' · '+name);
+  o.updates=o.updates||[];
+  o.updates.push({at:new Date().toISOString(),stage:'Quality Check',
+    note:'Sent back for rework'+(perPiece?' · '+name:'')+(qcDraft.note?': '+qcDraft.note:''),
+    by:userLabel(),photos:[]});
+  delete _qcHeld[qcDraft.id+'#'+idx];
+  saveSafe('layi_dash_orders',list);
+  closeModal();renderAll();
+}
 
 /* ===== PAYMENT / TXN / APPT ===== */
 function openPayment(id){if(!can('money'))return;const o=getOrders().find(x=>x.id===id);if(!o)return;const owed=Math.max(0,orderNet(o)-(+o.paid||0));
