@@ -13,19 +13,34 @@ const SITE = {
   domain: 'thelabelboard.com',
 
   /* ---- where the other apps live -------------------------------------
-     PLACEHOLDERS. Point these at the real Netlify URLs once each app is
-     deployed. Until then every button that uses them still renders, it
-     simply lands on a site that is not published yet.                  */
+     appUrl is REAL as of 12 Sep 2026: app.thelabelboard.com is a CNAME onto the
+     customer app's Netlify site, with its own certificate. The guess happened to
+     be right, so the value never changed — only this comment did.
+
+     partnerPortalUrl is STILL A PLACEHOLDER. The portal is not deployed
+     anywhere, because it signs people in with an emailed one-time code and there
+     is no SMTP yet, so a deployed portal would be a door nobody can open. The
+     button that uses this still renders; it lands on nothing.            */
   appUrl: 'https://app.thelabelboard.com',
   partnerPortalUrl: 'https://partners.thelabelboard.com',
 
   /* ---- how people reach us ----
-     PLACEHOLDERS. Replace with the real address and number.            */
+     The number is real, confirmed by Kayode on 11 Sep 2026. It is currently the
+     same line the LAYI site uses, so it will want splitting once the two are
+     answered by different people.
+
+     All of these are real as of 12 Sep 2026. The hello@ mailbox exists and the
+     Instagram handle is ours.
+
+     There is deliberately only ONE address. support@ used to be separate, which
+     for a business of this size means a second inbox for somebody to forget to
+     open, and a customer writing to it wondering why nobody answered. One
+     address that is read beats two that are not.                        */
   email: 'hello@thelabelboard.com',
-  supportEmail: 'support@thelabelboard.com',
-  phoneDisplay: '+234 800 000 0000',
-  phoneDial: '+2348000000000',
-  whatsapp: '2348000000000',
+  supportEmail: 'hello@thelabelboard.com',
+  phoneDisplay: '+234 706 273 8923',
+  phoneDial: '+2347062738923',
+  whatsapp: '2347062738923',
   instagram: 'thelabelboard',
   city: 'Lagos, Nigeria',
 

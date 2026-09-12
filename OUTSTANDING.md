@@ -21,26 +21,40 @@ somebody signs in to an app with no tabs.
 **Nothing ships until Kayode says so.** Commits are fine. Pushing, merging to
 `main`, deploying an Edge Function and applying a migration to the live
 Supabase project all wait, and happen at the END of the run rather than after
-each change. Gates still run every time.
+each change. Gates still run every time. *This run: said on 11 Sep, and
+`layi-v40` went out. The rule stands for the next batch.*
 
 ---
 
-## The deploy itself — what is left
+## The deploy — shipped 11 September 2026
 
-The code side is finished. Everything below is either one command or Kayode's
-hands on a dashboard.
+**`layi-v40` is out.** Both branches pushed on Kayode's word.
 
-**Nothing in this batch touches the database.** `supabase/` is unchanged
-against `main`, so there is no migration to apply and no Edge Function to
-deploy. The whole release is static files.
-
-| | Step | Who |
+| | Step | State |
 |---|---|---|
-| 1 | **Done.** `APP_VERSION` and the service worker `CACHE` moved to `layi-v40`. Without this every installed phone keeps serving v39 after the deploy | done |
-| 2 | `git push origin admin-deploy` — publishes the **admin console** | Kayode says go |
-| 3 | Merge to `main` — publishes the **customer app**. Use the recipe below, not a plain merge | Kayode says go |
-| 4 | Watch the sign-in screen on a real phone: the build stamp must read **layi-v40**. If it still says v39 the service worker did not swap | after |
-| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | after |
+| 1 | `APP_VERSION` and the service worker `CACHE` moved to `layi-v40` | done |
+| 2 | `git push origin admin-deploy` → `5b3d452`, publishes the **admin console**. Netlify site `thelabelboard-admin`, built and published | done |
+| 3 | Merge to `main` → `d0c50b5`, publishes the **customer app**. Netlify site `thelabelboard`, built and published | done |
+| 4 | Build stamp on a real phone reads **layi-v40** | **confirmed by Kayode** |
+| 5 | Tell every device in a studio to **reload once**. Not required, but it collapses the window below to nothing | **Kayode, when convenient** |
+
+**Correction:** step 2 does *not* publish the partner portal. Only two Netlify
+sites deploy from GitHub, `thelabelboard` and `thelabelboard-admin`, and the
+admin one publishes `admin/` alone. **`partners/` is deployed nowhere.** See
+the Netlify section below.
+
+**Nothing in this release touched the database.** `supabase/` was unchanged
+against `main`, so no migration was applied and no Edge Function deployed. The
+whole release is static files, which is why it could go before the Supabase
+dashboard items were finished.
+
+**How the merge was done, for the next time.** In a throwaway `git worktree` on
+`main`, not by switching branches: the working tree had 19 uncommitted files
+from another session's work on `web/`, and switching would have dragged them
+across. The worktree was checked three ways before the commit — `netlify.toml`
+still reads `publish = "site"`, `site/` is byte-identical to `admin-deploy`, and
+all 50 gates were run **against the merged tree** rather than against the branch.
+The worktree is gone and those 19 files never moved.
 
 **The release window.** For as long as one phone in a studio is on v40 and
 another has not swapped yet, the old one shows only open orders: it knows one
@@ -92,16 +106,121 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 2 | **SMTP for auth email** | The partner portal signs people in with a one-time code. Without SMTP nobody can sign in |
 | 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
-| 5 | **Delete the old project `gcdrkoitjqwbidcfgyzl`** (`The Label Board`, eu-central-1) | Two projects, and **the names are the wrong way round**: the live one is the lowercase `the-label-board` in eu-west-2, ref `eskubrbgbcbaejynjxvh`. Read the ref, never the name. The CLI on Kayode's machine is still linked to the dead one, so `supabase db push` would land there. See `SUPABASE_SETUP.md` |
-| 6 | **Set Netlify publish directories in the dashboard, then delete `netlify.toml`** | The file differs by branch on purpose; a clean merge silently serves the admin console to every studio |
-| 7 | **Connect `web/` to Netlify** | The marketing site is finished and deployed nowhere |
-| 8 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
+| 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 7 | Netlify: **over 75% of the monthly credit allowance used** on 11 Sep | Check Usage & billing for whether it is builds or bandwidth. Four pushes in one hour on 11 Sep each rebuilt the admin site, which did not help. Batch pushes |
+
+---
+
+## Netlify — two apps of four are deployed
+
+| App | Netlify site | Deploys from | State |
+|---|---|---|---|
+| Customer app | `thelabelboard` | GitHub, `main` | **live**, `layi-v40` |
+| Admin console | `thelabelboard-admin` | GitHub, `admin-deploy` | **live** |
+| Partner portal | — | — | **nowhere** |
+| Public website | — | — | **nowhere** |
+
+Also on the account: `layi-website` (Netlify Drop, 4 Aug) and
+`loquacious-pika-32f045` (Netlify Drop, 5 Jul), neither connected to this repo.
+Confirm whether `layi-website` still serves the LAYI tenant before deleting
+either.
+
+**Both undeployed apps are already wired to Supabase**, at the surviving project
+`eskubrbgbcbaejynjxvh` with the public anon key. Supabase is not what is holding
+either of them back. Each has exactly one blocker:
+
+- **Partner portal — blocked on SMTP (item 2 above).** It signs people in with
+  an emailed one-time code. Deploy it today and you get a site that nobody,
+  including you, can get into. Costs nothing to wait: there are no partners yet.
+- **Public website — blocked on the domain and a real phone number.** It is the
+  only one of the four meant to be found by Google. Today `web/js/config.js`
+  carries `+234 800 000 0000` and `wa.me/2348000000000`, so "WhatsApp us" goes
+  nowhere, and `domain: 'thelabelboard.com'` drives every canonical tag,
+  `robots.txt` and `sitemap.xml`. Publishing before that is settled tells Google
+  the real copy of every page lives at an address that may not be yours.
+  - *If you want a live URL sooner:* connect it with `robots.txt` set to
+    disallow everything. A real link to look at and share, no search damage, and
+    one line to lift when the details are settled. Say the word and it is a
+    two-minute change.
+
+### Pointing `thelabelboard.com` at the apps
+
+Kayode owns the domain, confirmed 12 Sep 2026, and bought `hello@` email on it
+the same day.
+
+| Address | App | Netlify site | State |
+|---|---|---|---|
+| `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME, set as Primary |
+| `partners.thelabelboard.com` | Partner portal | `thelabelboard-partners` | **live, 12 Sep.** Deploys `partners/` from `admin-deploy` |
+| `thelabelboard.com` + `www` | Public website | not created | needs the site created, and a branch decision |
+| `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | in progress |
+
+**The verification is per domain, not per subdomain.** The first one, `app.`,
+needed a TXT record at `subdomain-owner-verification` before Netlify would hand
+over the CNAME, because the domain is registered elsewhere. Every subdomain
+after that is **one record**: Netlify already trusts `thelabelboard.com` and
+goes straight to "found". The certificate also issues in seconds rather than
+minutes once the domain is known.
+
+Nothing has been deleted from the zone at any point. All 21 records stayed, and
+mail was re-checked after every change: MX, SPF, both DKIM selectors and
+autodiscover all intact each time.
+
+**The partner portal is live and cannot sign anybody in.** That is the expected
+state, not a fault: it sends a one-time code by email and there is no SMTP yet
+(item 2). The plumbing is finished, so SMTP is the single switch left.
+
+**Registrar is GoDaddy, and so is the mail.** Both bought there on 12 Sep 2026.
+
+**Do not move the nameservers to Netlify DNS.** Netlify offers it and it is the
+tidier option in the abstract; here it would carry the MX records away with it,
+and a missed one takes `hello@` down silently for days. Add individual records
+in GoDaddy's DNS screen and leave every MX record alone. A CNAME for a subdomain
+cannot touch mail. Only a nameserver change can.
+
+**GoDaddy has no ALIAS or ANAME record**, so when the apex is finally pointed at
+the website it needs an **A record**, not a CNAME, and GoDaddy's existing parked
+`@` record is *edited* rather than added alongside. Subdomains are ordinary
+CNAMEs and have no such problem.
+
+**The admin console deliberately gets no subdomain.** It already ships
+`X-Robots-Tag: noindex`, but `admin.thelabelboard.com` is the first thing
+anybody would try. It is not security on its own — the console has a real
+password wall — there is just no reason to advertise it. Kayode's call.
+
+Per subdomain, the shape is always the same: add the domain in Netlify first,
+because Netlify then tells you the exact record to create, and typing a record
+from memory is how this goes wrong. Then create that record at the registrar,
+leave every MX record untouched, and wait for Netlify to issue the certificate.
+
+**Turn off the "Powered by Netlify" badge on every new site.** It is on by
+default on free plans for any project created on or after 19 Aug 2026, and it
+renders bottom-right of the page. Checked 12 Sep: the customer app does not have
+it on either of its addresses (that site predates the cutoff), the admin console
+does. **The website and the partner portal are both new sites, so both will have
+it.** Do it as part of creating each one, before pointing a domain at it — a
+Powered by Netlify badge in the corner of the marketing homepage of a ₦65,000 a
+month product is the worst place it could appear.
+
+> Project configuration → General → Powered by Netlify badge
+> `https://app.netlify.com/projects/{site}/configuration/general#powered-by-netlify-badge`
+
+Injected at the edge, so turning it off takes effect on the next request with no
+redeploy. It is not a reason to leave Netlify, which was the first instinct.
+
+**Optional tidying, not urgent:** set base directories (`site` and `admin`) on
+the two live sites and delete the root `netlify.toml`. It only bites at the
+moment of merging `admin-deploy` into `main`, the recipe for doing that safely
+is in `CLAUDE.md` and in the file itself, and it was followed correctly on
+11 Sep. `site/netlify.toml` was fixed the same day so this job will actually
+work when somebody does it.
 
 ---
 
 ## Fixed this run
 
-Committed on `admin-deploy`, gated, and **not pushed**.
+Committed, gated, and **shipped** in `layi-v40` on 11 September 2026.
 
 - **0a. Footwear and leather could not see their own sales.** They were given a
   Shop and a "Record a sale" button, then had the Sales tab hidden, because
@@ -277,7 +396,6 @@ Committed on `admin-deploy`, gated, and **not pushed**.
     chasing. So does a quote. So does anything the test cannot judge: archiving an order
     that is not finished stops it syncing, so unsure costs money rather than losing work.
   - New gate `audit_orderstore.js`.
-- **C. "Ready to post" is gone, and so is the client photo link.** Built on 11 Sep, taken out
   the same day on Kayode's call: a nice addition, not worth more time on. Both halves went
   together, because both existed to move a finished photograph somewhere.
   - Out of the app: the **Ready to post panel** on Marketing, the caption writer, the post
