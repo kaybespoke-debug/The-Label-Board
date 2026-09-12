@@ -108,6 +108,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
 | 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 6b | **Turn on Netlify form notifications, then send a test through all four forms** | The site is live now, so this stopped being theoretical. `book`, `contact`, `partners` and `referrals` all post to Netlify. **A form that silently goes nowhere looks exactly like a form that works**, and the first one to go missing is a customer |
 | 7 | Netlify: **over 75% of the monthly credit allowance used** on 11 Sep | Check Usage & billing for whether it is builds or bandwidth. Four pushes in one hour on 11 Sep each rebuilt the admin site, which did not help. Batch pushes |
 
 ---
@@ -154,7 +155,26 @@ the same day.
 | `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME, set as Primary |
 | `partners.thelabelboard.com` | Partner portal | `thelabelboard-partners` | **live, 12 Sep.** Deploys `partners/` from `admin-deploy` |
 | `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | **live, 12 Sep.** `noindex, nofollow` and `X-Frame-Options: DENY` confirmed on the live response |
-| `thelabelboard.com` + `www` | Public website | `thelabelboard-web` | site being created; apex still on GoDaddy's parking page |
+| `thelabelboard.com` + `www` | Public website | `thelabelboard-web` | **live, 12 Sep.** Deploys `web/` from `main` |
+
+**All four apps are on the domain.** Every address returns 200 with a valid
+certificate, no Netlify badge anywhere, and the apex serves the real site rather
+than GoDaddy's parking page — checked on the live response, not assumed. `www`
+301s to the apex. `robots.txt` and `sitemap.xml` both answer, so the site is
+findable. Mail was re-checked after the last change and is untouched: MX, SPF,
+the Microsoft verification TXT, both DKIM selectors and autodiscover.
+
+Two things about the apex worth knowing. GoDaddy has no ALIAS, so it is an
+**A record to `75.2.60.5`**, Netlify's load balancer, edited in place over the
+"WebsiteBuilder Site" record rather than added beside it. And `www` already
+existed as a CNAME to the apex, GoDaddy's default, so that was an edit too —
+adding it fails with "conflicts with another record".
+
+**Open question, not urgent:** the apex is Primary and `www` redirects to it.
+Netlify's own advice for externally hosted DNS is the reverse, because an apex
+is one load-balancer IP while a CNAME reaches the nearest edge. For readers in
+Lagos that is a real if modest difference. Bare domain reads better in print.
+One dropdown either way.
 
 **Netlify project visibility, decided 12 Sep.** Production stays **Public** on all
 four; Deploy Previews go **Private**, because a preview is a draft build at a
