@@ -200,3 +200,42 @@ function notifyRow(key, title) {
     '<button class="tog' + (on ? ' on' : '') + '" onclick="toggleNotify(\'' + key + '\')" ' +
     'role="switch" aria-checked="' + on + '" aria-label="' + title + '"><i></i></button></div>';
 }
+
+/* ===== WELCOME =====
+   The first page after signing in, and only after an actual sign-in: restoring a
+   saved session goes straight to Home. A partner arrives here from a link
+   somebody sent them and may not know what The Label Board is, so this says what
+   the portal is for before they start poking at numbers.
+
+   Deliberately no commission figure. The tiers are set in the console, and a rate
+   hard-coded into a welcome screen is a rate that goes stale and then gets quoted
+   back at us. */
+PAGES.welcome = function () {
+  const name = (AUTH.session && AUTH.session.name) ? String(AUTH.session.name).split(' ')[0] : '';
+  const points = [
+    ['Every referral, tracked', 'Who you brought in, where they got to, and who is still on trial.'],
+    ['Recurring commission', 'You earn for as long as they stay, not once when they sign. Your rate rises with your tier.'],
+    ['Paid out to your account', 'What you have earned, what has been sent, and what is still owed.'],
+    ['Something to send', 'Your code and your links, ready to share.']
+  ];
+  return '<div class="pnl welcome">' +
+    '<h2 class="wel-h">' + (name ? 'Welcome, ' + esc(name) + '.' : 'Welcome.') + '</h2>' +
+    '<p class="wel-lead">You bring the studios. We do the rest.</p>' +
+    '<p class="wel-p">The Label Board is the software fashion studios run their business on: ' +
+    'orders, production, clients, staff and money in one place. You are one of the people who ' +
+    'brings them in, and this is where you watch that turn into income.</p>' +
+    '<ul class="wel-points">' +
+    points.map(p => '<li><span class="wel-tick">✓</span><span><b>' + p[0] + '.</b> ' + p[1] + '</span></li>').join('') +
+    '</ul>' +
+    '<button class="btn gold wel-go" onclick="leaveWelcome()">Continue to the portal</button>' +
+    '<p class="wel-foot">Anything you are unsure about, email ' +
+    '<a href="mailto:hello@thelabelboard.com">hello@thelabelboard.com</a>.</p>' +
+    '</div>';
+};
+
+function leaveWelcome() {
+  UI.page = 'home';
+  UI.detail = null;
+  render();
+  try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch (e) { window.scrollTo(0, 0); }
+}

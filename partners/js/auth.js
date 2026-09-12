@@ -247,7 +247,7 @@ async function submitCode() {
   }
 
   saveSession(r.session);
-  if (!enterPortal()) {
+  if (!enterPortal(true)) {
     clearSession();
     AUTH.error = 'We could not load your account. Try again in a moment.';
     renderAuth();
@@ -261,8 +261,13 @@ function backToEmail() {
   setTimeout(() => { const e = document.getElementById('authEmail'); if (e) e.focus(); }, 60);
 }
 
-/* Load the signed-in partner's data and hand over to the portal. */
-function enterPortal() {
+/* Load the signed-in partner's data and hand over to the portal.
+
+   `fresh` is true only when somebody has just typed a code, false when a saved
+   session is being restored on open. That distinction is the whole point of the
+   welcome page: it greets a sign-in, it does not greet somebody who simply
+   reopened the app on the bus. */
+function enterPortal(fresh) {
   if (!AUTH.session) return false;
   if (CONFIG.live) {
     /* Live mode fetches the partner's rows here. Until config.js is filled
@@ -270,7 +275,11 @@ function enterPortal() {
     return loadLivePartnerData(AUTH.session);
   }
   if (!loadPartnerData(AUTH.session.partnerKey)) return false;
-  UI.page = 'home'; UI.detail = null;
+  /* Welcome first, then the portal. Signing in is rare here — sessions run for
+     days — so this is not a screen anybody has to keep dismissing, and it is the
+     one moment a partner is paying attention to what this thing is for. Restoring
+     an existing session goes straight to home; only an actual sign-in lands here. */
+  UI.page = fresh ? 'welcome' : 'home'; UI.detail = null;
   render();
   return true;
 }
@@ -312,7 +321,6 @@ function renderAuth() {
   else body = emailCard();
 
   shell.innerHTML =
-    '<div class="authwrap">' +
     '<div class="authbox">' +
     '<div class="authbrand">' +
     '<svg viewBox="0 0 100 100" aria-hidden="true">' +
@@ -323,35 +331,7 @@ function renderAuth() {
     '<circle cx="74" cy="62" r="6" fill="#e0a94a"/>' +
     '</svg>' +
     '<div><div class="authname">THE LABEL BOARD</div><div class="authsub">Partner Portal</div></div>' +
-    '</div>' + body + '</div>' +
-    welcomePanel() +
-    '</div>';
-}
-
-/* A partner arrives here from a link somebody sent them, often with no idea what
-   The Label Board is. A bare email box asks them to trust it first and find out
-   afterwards, which is how a referral programme loses people at the door. This
-   says what the portal is and what they earn, before asking for anything.
-
-   Deliberately no numbers in the reward line. Commission is tiered and the tiers
-   are set in the console, so a rate hard-coded here is a rate that goes stale and
-   then gets quoted back at us. */
-function welcomePanel() {
-  return '<div class="authwelcome">' +
-    '<h2>You bring the studios. We do the rest.</h2>' +
-    '<p>The Label Board is the software fashion studios run their business on: orders, ' +
-    'production, clients, staff and money in one place. You are one of the people who ' +
-    'brings them in, and this is where you watch that turn into income.</p>' +
-    '<ul class="authpoints">' +
-    '<li><span class="authtick">✓</span><span><b>Every referral, tracked.</b> Who you brought in, ' +
-    'where they got to, and who is still on trial.</span></li>' +
-    '<li><span class="authtick">✓</span><span><b>Recurring commission.</b> You earn for as long as ' +
-    'they stay, not once when they sign. Your rate rises with your tier.</span></li>' +
-    '<li><span class="authtick">✓</span><span><b>Paid out to your account.</b> What you have earned, ' +
-    'what has been sent, and what is still owed.</span></li>' +
-    '<li><span class="authtick">✓</span><span><b>Something to send.</b> Your code and links, ready ' +
-    'to share.</span></li>' +
-    '</ul></div>';
+    '</div>' + body + '</div>';
 }
 
 function emailCard() {
@@ -432,5 +412,5 @@ async function bootAuth() {
   if (!r.ok) { clearSession(); renderAuth(); return; }
 
   AUTH.session = r.session;
-  if (!enterPortal()) { clearSession(); renderAuth(); }
+  if (!enterPortal(false)) { clearSession(); renderAuth(); }
 }

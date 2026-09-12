@@ -447,31 +447,24 @@ tbody tr:last-child td{border-bottom:0}
 }
 @media(prefers-reduced-motion:reduce){#splash .sp-draw,#splash .sp-dot,#splash .sp-copy,#splash .sp-tag{animation-duration:.01ms!important;animation-delay:0s!important}}
 
-/* ===== WELCOME PANEL =====
-   A partner arrives from a link somebody sent them and may not know what this
-   is. A bare email box asks them to trust it first and find out later, which is
-   how a referral programme loses people before it starts. So the sign-in screen
-   says what the portal is for and what they earn, then asks for the email.
 
-   On a phone it stacks above the form. On a tablet or a laptop it sits beside
-   it, because at that width a single 380px column in the middle of the screen
-   looks like a page that failed to load. */
-.authwrap{display:flex;gap:clamp(28px,5vw,72px);align-items:center;justify-content:center;width:100%;max-width:980px;margin:0 auto}
-.authwelcome{flex:1 1 0;max-width:460px;display:none}
-.authwelcome h2{font-size:clamp(22px,2.4vw,30px);line-height:1.25;margin:0 0 14px;font-weight:500}
-.authwelcome p{font-size:14px;color:var(--dim);line-height:1.7;margin:0 0 20px}
-.authpoints{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px}
-.authpoints li{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;line-height:1.6;color:var(--dim)}
-.authpoints b{color:var(--ink);font-weight:600}
-.authtick{flex:none;width:19px;height:19px;margin-top:1px;border-radius:50%;background:rgba(224,169,74,.13);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:11px}
-.authbox{width:100%;max-width:380px;flex:none}
 
-/* Phone: the form comes first, the explanation sits under it rather than
-   pushing the email box below the fold. */
-@media(max-width:860px){
-  .authwrap{flex-direction:column;gap:30px;max-width:420px}
-  .authwelcome{display:block;max-width:none;order:2;text-align:left;padding-top:4px;border-top:1px solid var(--line)}
-  .authwelcome h2{font-size:18px;margin-top:22px}
-  .authbox{order:1;max-width:none}
+/* ===== WELCOME PAGE =====
+   The first page after an actual sign-in, inside the normal shell so the nav is
+   there and nobody feels trapped. Reads as one column at any width: a welcome is
+   a thing you read top to bottom, not a dashboard. */
+.welcome{max-width:620px}
+.wel-h{font-size:clamp(23px,3.4vw,31px);line-height:1.2;margin:0 0 6px;font-weight:500}
+.wel-lead{font-size:clamp(15px,1.8vw,18px);color:var(--gold);margin:0 0 18px;line-height:1.45}
+.wel-p{font-size:14px;color:var(--dim);line-height:1.75;margin:0 0 24px}
+.wel-points{list-style:none;margin:0 0 30px;padding:0;display:flex;flex-direction:column;gap:15px}
+.wel-points li{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;line-height:1.65;color:var(--dim)}
+.wel-points b{color:var(--ink);font-weight:600}
+.wel-tick{flex:none;width:20px;height:20px;margin-top:1px;border-radius:50%;background:rgba(224,169,74,.13);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:11px}
+.wel-go{width:100%;max-width:280px}
+.wel-foot{font-size:12px;color:var(--faint);line-height:1.6;margin:18px 0 0}
+@media(max-width:600px){
+  .wel-go{max-width:none}
+  .wel-p{margin-bottom:20px}
+  .wel-points{gap:14px;margin-bottom:26px}
 }
-@media(min-width:861px){ .authwelcome{display:block} }
