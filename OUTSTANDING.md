@@ -149,12 +149,20 @@ either of them back. Each has exactly one blocker:
 Kayode owns the domain, confirmed 12 Sep 2026, and bought `hello@` email on it
 the same day.
 
-| Address | App | Netlify site | Can be done |
+| Address | App | Netlify site | State |
 |---|---|---|---|
-| `app.thelabelboard.com` | Customer app | `thelabelboard` | **now** |
+| `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME onto the Netlify site, set as Primary |
 | `thelabelboard.com` + `www` | Public website | not created | after the site is connected |
 | `partners.thelabelboard.com` | Partner portal | not created | after SMTP, then deploy |
 | (none) | Admin console | `thelabelboard-admin` | *recommended: leave it on its netlify.app address* |
+
+**How the first one went, because the next two are the same job.** Netlify
+would not take the subdomain on trust: with the domain registered elsewhere it
+asked for a TXT record at `subdomain-owner-verification` first, and only then
+handed over the CNAME. So it is **two records per subdomain, in order**, not one.
+The certificate fails loudly in between, which is expected and clears itself.
+Nothing was deleted from the zone: all 21 records stayed, and mail was
+re-checked afterwards — MX, SPF, both DKIM selectors and autodiscover all intact.
 
 **Registrar is GoDaddy, and so is the mail.** Both bought there on 12 Sep 2026.
 

@@ -13,9 +13,14 @@ const SITE = {
   domain: 'thelabelboard.com',
 
   /* ---- where the other apps live -------------------------------------
-     PLACEHOLDERS. Point these at the real Netlify URLs once each app is
-     deployed. Until then every button that uses them still renders, it
-     simply lands on a site that is not published yet.                  */
+     appUrl is REAL as of 12 Sep 2026: app.thelabelboard.com is a CNAME onto the
+     customer app's Netlify site, with its own certificate. The guess happened to
+     be right, so the value never changed — only this comment did.
+
+     partnerPortalUrl is STILL A PLACEHOLDER. The portal is not deployed
+     anywhere, because it signs people in with an emailed one-time code and there
+     is no SMTP yet, so a deployed portal would be a door nobody can open. The
+     button that uses this still renders; it lands on nothing.            */
   appUrl: 'https://app.thelabelboard.com',
   partnerPortalUrl: 'https://partners.thelabelboard.com',
 
