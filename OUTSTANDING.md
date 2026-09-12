@@ -144,6 +144,34 @@ either of them back. Each has exactly one blocker:
     one line to lift when the details are settled. Say the word and it is a
     two-minute change.
 
+### Pointing `thelabelboard.com` at the apps
+
+Kayode owns the domain, confirmed 12 Sep 2026, and bought `hello@` email on it
+the same day.
+
+| Address | App | Netlify site | Can be done |
+|---|---|---|---|
+| `app.thelabelboard.com` | Customer app | `thelabelboard` | **now** |
+| `thelabelboard.com` + `www` | Public website | not created | after the site is connected |
+| `partners.thelabelboard.com` | Partner portal | not created | after SMTP, then deploy |
+| (none) | Admin console | `thelabelboard-admin` | *recommended: leave it on its netlify.app address* |
+
+**Do not move the nameservers to Netlify DNS.** It is the tidier option in the
+abstract and it is the wrong one here: the domain now carries a live mailbox,
+and moving nameservers moves the MX records with them. Miss one and `hello@`
+silently stops receiving mail, which is the kind of failure nobody notices for
+a week. Add records at the registrar instead and leave the mail alone.
+
+**The admin console deliberately gets no subdomain.** It already ships
+`X-Robots-Tag: noindex`, but `admin.thelabelboard.com` is the first thing
+anybody would try. It is not security on its own — the console has a real
+password wall — there is just no reason to advertise it. Kayode's call.
+
+Per subdomain, the shape is always the same: add the domain in Netlify first,
+because Netlify then tells you the exact record to create, and typing a record
+from memory is how this goes wrong. Then create that record at the registrar,
+leave every MX record untouched, and wait for Netlify to issue the certificate.
+
 **Optional tidying, not urgent:** set base directories (`site` and `admin`) on
 the two live sites and delete the root `netlify.toml`. It only bites at the
 moment of merging `admin-deploy` into `main`, the recipe for doing that safely

@@ -246,9 +246,11 @@ roles `admin-api` knows are `owner`, `finance`, `support` and `developer` —
 each allowed a different set of actions, and `owner` is the only one that
 can read the audit log.
 
-The console prefills `kayode@thelabelboard.com` on its sign-in screen, which
-is the branded identity, not the account. **Sign in with the address the
-Auth user actually has.**
+**Sign in with the address the Auth user actually has.** This used to say the
+console prefills `kayode@thelabelboard.com`; it does not, and has not for some
+time — that string is nowhere in `admin/`. The sign-in field starts empty, which
+is the right behaviour anyway: a prefilled address on an operator console is a
+hint to anybody who opens it.
 
 <details>
 <summary>The original step 4, for adding an operator later</summary>
