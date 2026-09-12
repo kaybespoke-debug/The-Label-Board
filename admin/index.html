@@ -14,8 +14,11 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+<!-- apple-touch-icon.png, not icon-192.png. iOS does not honour transparency and
+     paints whatever it finds onto a square, so the flat 180px artwork is the one
+     that survives the trip to a home screen. -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -423,6 +426,13 @@ function hideSplash() {
 function startSplash() {
   const s = document.getElementById('splash');
   if (!s) return;
+  /* Once per browser session, the same as the customer app. An operator reloads
+     this console many times a day and sitting through three seconds of animation
+     each time turns a nice opening into a tax. */
+  try {
+    if (sessionStorage.getItem('tlb_admin_splash_seen') === '1') { s.style.display = 'none'; return; }
+    sessionStorage.setItem('tlb_admin_splash_seen', '1');
+  } catch (e) { /* private mode: show it, it is only an animation */ }
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   s.addEventListener('click', hideSplash);
   setTimeout(hideSplash, reduce ? 700 : 2900);

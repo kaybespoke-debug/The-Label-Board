@@ -108,6 +108,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
 | 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
+| 6b | **Turn on Netlify form notifications, then send a test through all four forms** | The site is live now, so this stopped being theoretical. `book`, `contact`, `partners` and `referrals` all post to Netlify. **A form that silently goes nowhere looks exactly like a form that works**, and the first one to go missing is a customer |
 | 7 | Netlify: **over 75% of the monthly credit allowance used** on 11 Sep | Check Usage & billing for whether it is builds or bandwidth. Four pushes in one hour on 11 Sep each rebuilt the admin site, which did not help. Batch pushes |
 
 ---
@@ -130,9 +131,15 @@ either.
 `eskubrbgbcbaejynjxvh` with the public anon key. Supabase is not what is holding
 either of them back. Each has exactly one blocker:
 
-- **Partner portal — blocked on SMTP (item 2 above).** It signs people in with
-  an emailed one-time code. Deploy it today and you get a site that nobody,
-  including you, can get into. Costs nothing to wait: there are no partners yet.
+- **Partner portal — blocked on SMTP (item 2 above) AND an unwritten hydrate.**
+  It signs people in with an emailed one-time code, so no SMTP means no code.
+  **But SMTP alone will not fix it.** Found 12 Sep while testing the welcome
+  page: `CONFIG.live` is true now the Supabase keys are filled in, and in live
+  mode `enterPortal()` hands off to `loadLivePartnerData()` in
+  `partners/js/auth.js`, which is still the placeholder that logs a warning and
+  returns `false`. So a partner would type a correct code and be bounced with
+  "We could not load your account". Two jobs, not one: SMTP, and that hydrate
+  written against `partner_me`. Half a day, and it is ours rather than Kayode's.
 - **Public website — blocked on the domain and a real phone number.** It is the
   only one of the four meant to be found by Google. Today `web/js/config.js`
   carries `+234 800 000 0000` and `wa.me/2348000000000`, so "WhatsApp us" goes
@@ -153,8 +160,37 @@ the same day.
 |---|---|---|---|
 | `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME, set as Primary |
 | `partners.thelabelboard.com` | Partner portal | `thelabelboard-partners` | **live, 12 Sep.** Deploys `partners/` from `admin-deploy` |
-| `thelabelboard.com` + `www` | Public website | not created | needs the site created, and a branch decision |
-| `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | in progress |
+| `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | **live, 12 Sep.** `noindex, nofollow` and `X-Frame-Options: DENY` confirmed on the live response |
+| `thelabelboard.com` + `www` | Public website | `thelabelboard-web` | **live, 12 Sep.** Deploys `web/` from `main` |
+
+**All four apps are on the domain.** Every address returns 200 with a valid
+certificate, no Netlify badge anywhere, and the apex serves the real site rather
+than GoDaddy's parking page — checked on the live response, not assumed. `www`
+301s to the apex. `robots.txt` and `sitemap.xml` both answer, so the site is
+findable. Mail was re-checked after the last change and is untouched: MX, SPF,
+the Microsoft verification TXT, both DKIM selectors and autodiscover.
+
+Two things about the apex worth knowing. GoDaddy has no ALIAS, so it is an
+**A record to `75.2.60.5`**, Netlify's load balancer, edited in place over the
+"WebsiteBuilder Site" record rather than added beside it. And `www` already
+existed as a CNAME to the apex, GoDaddy's default, so that was an edit too —
+adding it fails with "conflicts with another record".
+
+**Open question, not urgent:** the apex is Primary and `www` redirects to it.
+Netlify's own advice for externally hosted DNS is the reverse, because an apex
+is one load-balancer IP while a CNAME reaches the nearest edge. For readers in
+Lagos that is a real if modest difference. Bare domain reads better in print.
+One dropdown either way.
+
+**Netlify project visibility, decided 12 Sep.** Production stays **Public** on all
+four; Deploy Previews go **Private**, because a preview is a draft build at a
+guessable url and an unreleased pricing page should not be findable. Private was
+considered for the admin console and rejected on two grounds: on the free plan
+only the *Team Owner* can view a private project, so the first finance or support
+operator added would be locked out unless given the whole hosting account; and
+private projects carry Netlify's pre-launch toolbar overlay, which is trading one
+overlay for another. The console's own password wall plus `noindex` is the right
+layer for that, not hosting visibility.
 
 **The verification is per domain, not per subdomain.** The first one, `app.`,
 needed a TXT record at `subdomain-owner-verification` before Netlify would hand

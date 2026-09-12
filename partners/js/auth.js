@@ -247,7 +247,7 @@ async function submitCode() {
   }
 
   saveSession(r.session);
-  if (!enterPortal()) {
+  if (!enterPortal(true)) {
     clearSession();
     AUTH.error = 'We could not load your account. Try again in a moment.';
     renderAuth();
@@ -261,8 +261,13 @@ function backToEmail() {
   setTimeout(() => { const e = document.getElementById('authEmail'); if (e) e.focus(); }, 60);
 }
 
-/* Load the signed-in partner's data and hand over to the portal. */
-function enterPortal() {
+/* Load the signed-in partner's data and hand over to the portal.
+
+   `fresh` is true only when somebody has just typed a code, false when a saved
+   session is being restored on open. That distinction is the whole point of the
+   welcome page: it greets a sign-in, it does not greet somebody who simply
+   reopened the app on the bus. */
+function enterPortal(fresh) {
   if (!AUTH.session) return false;
   if (CONFIG.live) {
     /* Live mode fetches the partner's rows here. Until config.js is filled
@@ -270,7 +275,11 @@ function enterPortal() {
     return loadLivePartnerData(AUTH.session);
   }
   if (!loadPartnerData(AUTH.session.partnerKey)) return false;
-  UI.page = 'home'; UI.detail = null;
+  /* Welcome first, then the portal. Signing in is rare here — sessions run for
+     days — so this is not a screen anybody has to keep dismissing, and it is the
+     one moment a partner is paying attention to what this thing is for. Restoring
+     an existing session goes straight to home; only an actual sign-in lands here. */
+  UI.page = fresh ? 'welcome' : 'home'; UI.detail = null;
   render();
   return true;
 }
@@ -316,11 +325,11 @@ function renderAuth() {
     '<div class="authbrand">' +
     '<svg viewBox="0 0 100 100" aria-hidden="true">' +
     '<rect width="100" height="100" rx="24" fill="#0b1023"/>' +
-    '<path d="M30 27v33a10 10 0 0 0 10 10h13" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
-    '<path d="M40 35h13a8.5 8.5 0 0 1 0 17H40z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
-    '<path d="M40 52h15a9 9 0 0 1 0 18H40" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
-    '<circle cx="72" cy="40" r="5.5" fill="#e0a94a"/><circle cx="72" cy="62" r="5.5" fill="#3f9d78"/>' +
-    '<path d="M72 45.5v11" stroke="#e0a94a" stroke-width="3" stroke-linecap="round"/></svg>' +
+    '<path d="M33 27v33a10 10 0 0 0 10 10h16" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
+    '<path d="M43 35h13a8.5 8.5 0 0 1 0 17H43z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
+    '<path d="M43 52h15a9 9 0 0 1 0 18H43" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
+    '<circle cx="74" cy="62" r="6" fill="#e0a94a"/>' +
+    '</svg>' +
     '<div><div class="authname">THE LABEL BOARD</div><div class="authsub">Partner Portal</div></div>' +
     '</div>' + body + '</div>';
 }
@@ -337,7 +346,7 @@ function emailCard() {
     (AUTH.busy ? 'Sending…' : 'Send my code') + '</button>' +
     demoHint() +
     '<p class="authfoot">Not a partner yet? Ask whoever signed you up, or email ' +
-    '<a href="mailto:partners@thelabelboard.com">partners@thelabelboard.com</a>.</p>';
+    '<a href="mailto:hello@thelabelboard.com">hello@thelabelboard.com</a>.</p>';
 }
 
 function codeCard() {
@@ -365,7 +374,7 @@ function suspendedCard() {
     '<p class="authp">Your partner account is suspended, so there is nothing to show you here. ' +
     'Nothing you have already earned is affected.</p>' +
     '<p class="authp">Your partner manager can tell you why and what happens next.</p>' +
-    '<a class="btn gold authgo" href="mailto:partners@thelabelboard.com?subject=' +
+    '<a class="btn gold authgo" href="mailto:hello@thelabelboard.com?subject=' +
     encodeURIComponent('Suspended partner account: ' + (AUTH.pending.email || '')) + '">Email your manager</a>' +
     '<div class="authalt"><button class="lnk" onclick="backToEmail()">Back to sign in</button></div>';
 }
@@ -403,5 +412,5 @@ async function bootAuth() {
   if (!r.ok) { clearSession(); renderAuth(); return; }
 
   AUTH.session = r.session;
-  if (!enterPortal()) { clearSession(); renderAuth(); }
+  if (!enterPortal(false)) { clearSession(); renderAuth(); }
 }

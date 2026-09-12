@@ -1,11 +1,14 @@
 /* The Label Board — Partner Portal service worker
    Bump CACHE on every release so clients pick up new files. */
-const CACHE = 'tlb-partners-v3';
+const CACHE = 'tlb-partners-v4';
 const ASSETS = [
   './',
   'index.html',
   'manifest.json',
   'icon.svg',
+  'icon-192.png',
+  'icon-512.png',
+  'apple-touch-icon.png',
   'css/app.css',
   'js/config.js',
   'js/data.js',

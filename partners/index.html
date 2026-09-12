@@ -7,13 +7,35 @@
 <meta name="color-scheme" content="dark light">
 <title>The Label Board — Partner Portal</title>
 <link rel="manifest" href="manifest.json">
+<!-- iOS ignores the manifest entirely for the home screen and reads apple-touch-icon,
+     so an SVG-only head gave an iPhone nothing to use and it saved a screenshot of the
+     page instead. Desktop Chrome and Edge read the PNG favicon; the SVG stays last for
+     browsers that prefer it. -->
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+
+<!-- ============ LAUNCH SPLASH ============ -->
+<div id="splash" role="presentation">
+  <div class="sp-inner">
+    <div class="sp-mark">
+      <svg viewBox="0 0 220 220" role="img" aria-label="The Label Board"><path class="sp-draw" d="M72 28 L72 154 Q72 188 106 188 L157 188 Q187 188 187 159 Q187 132 158 132 L118 132 L118 73 L158 73 Q186 73 186 101 Q186 132 158 132"/></svg>
+      <span class="sp-dot"></span>
+    </div>
+    <div class="sp-copy">
+      <div class="sp-the">THE</div>
+      <div class="sp-name">LABEL BOARD</div>
+    </div>
+    <div class="sp-tag">PARTNER PORTAL</div>
+  </div>
+</div>
 
 <!-- ================= SVG icon sprite ================= -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -37,12 +59,12 @@
     <div class="brand">
       <svg viewBox="0 0 100 100" aria-label="The Label Board">
         <rect width="100" height="100" rx="24" fill="#0b1023"/>
-        <path d="M30 27v33a10 10 0 0 0 10 10h13" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>
-        <path d="M40 35h13a8.5 8.5 0 0 1 0 17H40z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
-        <path d="M40 52h15a9 9 0 0 1 0 18H40" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
-        <circle cx="72" cy="40" r="5.5" fill="#e0a94a"/>
-        <circle cx="72" cy="62" r="5.5" fill="#3f9d78"/>
-        <path d="M72 45.5v11" stroke="#e0a94a" stroke-width="3" stroke-linecap="round"/>
+        <path d="M33 27v33a10 10 0 0 0 10 10h16" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+        <path d="M43 35h13a8.5 8.5 0 0 1 0 17H43z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
+        <path d="M43 52h15a9 9 0 0 1 0 18H43" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>
+        <circle cx="74" cy="62" r="6" fill="#e0a94a"/>
+        
+        
       </svg>
       <div>
         <div class="brand-name">THE LABEL BOARD</div>
@@ -105,7 +127,8 @@ const TITLES = {
   referrals: ['Referrals', 'Everyone you have brought in'],
   share: ['Share', 'Your code, your links, something to send'],
   updates: ['Updates', 'News from The Label Board'],
-  account: ['Account', 'Your details, your money, your preferences']
+  account: ['Account', 'Your details, your money, your preferences'],
+  welcome: ['Welcome', 'What this is, and what you earn']
 };
 
 function buildNav() {
@@ -173,5 +196,6 @@ function render() {
   bootAuth();
 })();
 </script>
+<script src="js/splash.js"></script>
 </body>
 </html>
