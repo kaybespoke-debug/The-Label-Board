@@ -156,11 +156,18 @@ the same day.
 | `partners.thelabelboard.com` | Partner portal | not created | after SMTP, then deploy |
 | (none) | Admin console | `thelabelboard-admin` | *recommended: leave it on its netlify.app address* |
 
-**Do not move the nameservers to Netlify DNS.** It is the tidier option in the
-abstract and it is the wrong one here: the domain now carries a live mailbox,
-and moving nameservers moves the MX records with them. Miss one and `hello@`
-silently stops receiving mail, which is the kind of failure nobody notices for
-a week. Add records at the registrar instead and leave the mail alone.
+**Registrar is GoDaddy, and so is the mail.** Both bought there on 12 Sep 2026.
+
+**Do not move the nameservers to Netlify DNS.** Netlify offers it and it is the
+tidier option in the abstract; here it would carry the MX records away with it,
+and a missed one takes `hello@` down silently for days. Add individual records
+in GoDaddy's DNS screen and leave every MX record alone. A CNAME for a subdomain
+cannot touch mail. Only a nameserver change can.
+
+**GoDaddy has no ALIAS or ANAME record**, so when the apex is finally pointed at
+the website it needs an **A record**, not a CNAME, and GoDaddy's existing parked
+`@` record is *edited* rather than added alongside. Subdomains are ordinary
+CNAMEs and have no such problem.
 
 **The admin console deliberately gets no subdomain.** It already ships
 `X-Robots-Tag: noindex`, but `admin.thelabelboard.com` is the first thing
