@@ -151,18 +151,25 @@ the same day.
 
 | Address | App | Netlify site | State |
 |---|---|---|---|
-| `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME onto the Netlify site, set as Primary |
-| `thelabelboard.com` + `www` | Public website | not created | after the site is connected |
-| `partners.thelabelboard.com` | Partner portal | not created | after SMTP, then deploy |
-| (none) | Admin console | `thelabelboard-admin` | *recommended: leave it on its netlify.app address* |
+| `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME, set as Primary |
+| `partners.thelabelboard.com` | Partner portal | `thelabelboard-partners` | **live, 12 Sep.** Deploys `partners/` from `admin-deploy` |
+| `thelabelboard.com` + `www` | Public website | not created | needs the site created, and a branch decision |
+| `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | in progress |
 
-**How the first one went, because the next two are the same job.** Netlify
-would not take the subdomain on trust: with the domain registered elsewhere it
-asked for a TXT record at `subdomain-owner-verification` first, and only then
-handed over the CNAME. So it is **two records per subdomain, in order**, not one.
-The certificate fails loudly in between, which is expected and clears itself.
-Nothing was deleted from the zone: all 21 records stayed, and mail was
-re-checked afterwards — MX, SPF, both DKIM selectors and autodiscover all intact.
+**The verification is per domain, not per subdomain.** The first one, `app.`,
+needed a TXT record at `subdomain-owner-verification` before Netlify would hand
+over the CNAME, because the domain is registered elsewhere. Every subdomain
+after that is **one record**: Netlify already trusts `thelabelboard.com` and
+goes straight to "found". The certificate also issues in seconds rather than
+minutes once the domain is known.
+
+Nothing has been deleted from the zone at any point. All 21 records stayed, and
+mail was re-checked after every change: MX, SPF, both DKIM selectors and
+autodiscover all intact each time.
+
+**The partner portal is live and cannot sign anybody in.** That is the expected
+state, not a fault: it sends a one-time code by email and there is no SMTP yet
+(item 2). The plumbing is finished, so SMTP is the single switch left.
 
 **Registrar is GoDaddy, and so is the mail.** Both bought there on 12 Sep 2026.
 
