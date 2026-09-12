@@ -24,11 +24,15 @@ const SITE = {
      same line the LAYI site uses, so it will want splitting once the two are
      answered by different people.
 
-     The two addresses and the Instagram handle are STILL PLACEHOLDERS. Nobody
-     has confirmed a mailbox exists at either, and a contact address that bounces
-     is worse on a marketing site than no address at all.                */
+     All of these are real as of 12 Sep 2026. The hello@ mailbox exists and the
+     Instagram handle is ours.
+
+     There is deliberately only ONE address. support@ used to be separate, which
+     for a business of this size means a second inbox for somebody to forget to
+     open, and a customer writing to it wondering why nobody answered. One
+     address that is read beats two that are not.                        */
   email: 'hello@thelabelboard.com',
-  supportEmail: 'support@thelabelboard.com',
+  supportEmail: 'hello@thelabelboard.com',
   phoneDisplay: '+234 706 273 8923',
   phoneDial: '+2347062738923',
   whatsapp: '2347062738923',
