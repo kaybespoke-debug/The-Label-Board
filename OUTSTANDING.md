@@ -126,24 +126,32 @@ on a door Microsoft is closing. It also throttles, and a throttled one-time code
 is a partner who cannot get in.
 
 **Use a sending SUBDOMAIN, not the root domain.** This is the part that matters
-here.  publishes  — a
+here. `thelabelboard.com` publishes `v=spf1 include:secureserver.net -all` — a
 **hard fail**. Adding another sender to that record risks the mailbox that now
-runs the business. Verifying  instead leaves every
+runs the business. Verifying `send.thelabelboard.com` instead leaves every
 existing MX, SPF and DKIM record untouched, which is the same rule we have
 followed through six DNS changes today.
 
-Recommended: **Resend**. First on Supabase’s own list, 3,000 emails a month
+Recommended: **Resend**. First on Supabase's own list, 3,000 emails a month
 free, three domains on the free tier.
 
-1. Create the account, add the domain ****.
+1. Create the account, add the domain **`send.thelabelboard.com`**.
 2. It gives DKIM and SPF records. In GoDaddy: **Add New Record** for each, TTL
    600. **Touch nothing of type MX**, and do not edit the existing root TXT.
 3. Say the word and I will verify they have propagated, and re-check that the
    mail records are still intact, the same way as the domains.
 4. Create an API key in Resend.
 5. Supabase → **Authentication → SMTP Settings** → enable custom SMTP:
-   host , port , username , password the API key,
-   sender , sender name The Label Board.
+
+   | Field | Value |
+   |---|---|
+   | Host | `smtp.resend.com` |
+   | Port | `587` |
+   | Username | `resend` |
+   | Password | the Resend API key |
+   | Sender email | `hello@thelabelboard.com` |
+   | Sender name | The Label Board |
+
 6. Rate limits start at 30 an hour; raise them on the Rate Limits page when
    there are enough partners to need it.
 
