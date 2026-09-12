@@ -34,9 +34,24 @@ if (appV && cache && appV !== cache)
 
 // It has to reach the screen, not just exist in a constant.
 if (!/id="buildStamp"/.test(html))
-  F('there is no build stamp element on the sign-in screen');
+  F('there is no build stamp element anywhere, so nobody can be asked which build they are on');
 if (!/buildStamp'\)[\s\S]{0,80}APP_VERSION/.test(html))
   F('the build stamp element is never filled in, so it renders empty');
+
+/* It moved to Settings on 12 Sep, at Kayode's ask, and the move is the point:
+   the marker exists so somebody can READ it when a problem is reported, not so
+   every client meets a version string on the front door. Keeping it reachable
+   and keeping it off the sign-in screen are two separate requirements, so the
+   gate holds both — otherwise "tidy it away" and "delete it" look identical. */
+{
+  const login = (html.match(/<div class="login-wrap"[\s\S]*?<!-- =+ APP/) ||
+                 html.match(/id="loginPass"[\s\S]{0,4000}/) || [''])[0];
+  if (/id="buildStamp"/.test(login))
+    F('the build stamp is back on the sign-in screen; it belongs in Settings');
+  const settings = (html.match(/<section class="view" id="view-settings"[\s\S]*?\n      <\/section>/) || [''])[0];
+  if (!/id="buildStamp"/.test(settings))
+    F('the build stamp is not in Settings, so nobody can find it when asked for it');
+}
 
 // Bumping the cache is what makes an installed phone swap. A release that
 // forgets it serves the previous build to everyone who installed the app.
@@ -51,4 +66,4 @@ if (fails.length) {
   fails.forEach(f => console.log('   - ' + f));
   process.exit(1);
 }
-console.log('  ✓ one marker, shown on the sign-in screen, agreeing with the service worker');
+console.log('  ✓ one marker, in Settings and not on the front door, agreeing with the service worker');
