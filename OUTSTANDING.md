@@ -131,9 +131,15 @@ either.
 `eskubrbgbcbaejynjxvh` with the public anon key. Supabase is not what is holding
 either of them back. Each has exactly one blocker:
 
-- **Partner portal — blocked on SMTP (item 2 above).** It signs people in with
-  an emailed one-time code. Deploy it today and you get a site that nobody,
-  including you, can get into. Costs nothing to wait: there are no partners yet.
+- **Partner portal — blocked on SMTP (item 2 above) AND an unwritten hydrate.**
+  It signs people in with an emailed one-time code, so no SMTP means no code.
+  **But SMTP alone will not fix it.** Found 12 Sep while testing the welcome
+  page: `CONFIG.live` is true now the Supabase keys are filled in, and in live
+  mode `enterPortal()` hands off to `loadLivePartnerData()` in
+  `partners/js/auth.js`, which is still the placeholder that logs a warning and
+  returns `false`. So a partner would type a correct code and be bounced with
+  "We could not load your account". Two jobs, not one: SMTP, and that hydrate
+  written against `partner_me`. Half a day, and it is ours rather than Kayode's.
 - **Public website — blocked on the domain and a real phone number.** It is the
   only one of the four meant to be found by Google. Today `web/js/config.js`
   carries `+234 800 000 0000` and `wa.me/2348000000000`, so "WhatsApp us" goes
