@@ -28,7 +28,12 @@ const CONFIG = {
   /* Where a referral link points. The join page resolves the code through
      app.claim_referral_code(), which is the only thing an anonymous
      visitor may call. */
-  joinUrl: 'https://thelabelboard.com/join/'
+  joinUrl: 'https://thelabelboard.com/join/',
+
+  /* How long a studio's free trial runs. The portal uses it to show a partner
+     how long a referral has left, so it has to match what the app actually
+     gives them, not a number invented here. */
+  trialDays: 14
 };
 
 CONFIG.live = !!(CONFIG.SUPA_URL && CONFIG.SUPA_KEY);

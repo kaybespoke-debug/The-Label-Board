@@ -88,7 +88,7 @@ vm.createContext(sandbox);
 
 /* ---------- 1. every file loads and parses ---------- */
 const FILES = ['js/config.js', 'js/data.js', 'js/core.js', 'js/pages.js', 'js/pages2.js',
-  'js/detail.js', 'js/actions.js', 'js/auth.js'];
+  'js/detail.js', 'js/actions.js', 'js/live.js', 'js/auth.js'];
 let loaded = true;
 for (const f of FILES) {
   const p = path.join(dir, f);
@@ -538,6 +538,119 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
   }
   check(fs.existsSync(path.resolve(__dirname, 'supabase/tests/partner_rls_harness.mjs')),
     'and the adversarial suite that proves all of that still exists');
+}
+
+/* ---------------- the live hydrate ----------------
+   Live mode builds DB out of the partner's own rows instead of inventing them.
+   Every page already reads DB and none of them knows the difference, so the
+   thing that can actually break is the mapping: PostgREST answers snake_case
+   and the portal speaks camelCase, and a silent rename turns a total into zero
+   rather than into an error.
+
+   So this feeds buildLiveDB a row of every shape the database can produce and
+   checks what comes out, with the network stubbed. No Supabase needed, which
+   is the point: this has to be checkable before there is a partner to check it
+   with. */
+{
+  const ROWS = {
+    'partner_links': [
+      { id: 'L1', label: 'Instagram bio', code: 'AMAKA', clicks: 240, active: true,
+        is_default: true, created_at: '2026-01-04T09:00:00Z' },
+      { id: 'L2', label: 'WhatsApp status', code: 'AMAKA-WA', clicks: 31, active: true,
+        is_default: false, created_at: '2026-05-19T09:00:00Z' }
+    ],
+    'partner_referrals': [
+      { id: 'R1', link_id: 'L1', business_name: 'Lux Couture', owner_name: 'Amaka O',
+        city: 'Lagos', stage: 'subscribed', plan: 'pro', cycle: 'annual', mrr: '5416.67',
+        first_payment: '65000.00', signed_up_on: '2026-02-01', subscribed_on: '2026-02-15',
+        lapsed_on: null, outlets: 2, staff_count: 9, added_by: 'self', last_seen: '2026-09-10' },
+      { id: 'R2', link_id: 'L2', business_name: 'Thread & Needle', owner_name: null,
+        city: null, stage: 'trial', plan: 'basic', cycle: 'trial', mrr: '0',
+        first_payment: '0', signed_up_on: '2026-09-06', subscribed_on: null,
+        lapsed_on: null, outlets: 1, staff_count: 2, added_by: 'partner', last_seen: '2026-09-11' }
+    ],
+    'partner_ledger': [
+      { id: 'X1', referral_id: 'R1', payout_id: 'PO1', kind: 'signup', amount: '9750.00',
+        rate_pct: '15.00', tier: 'bronze', basis: '65000.00', note: 'Pro · 15% of 65,000',
+        credited_on: '2026-02-15', clears_on: '2026-03-17', status: 'paid' },
+      { id: 'X2', referral_id: null, payout_id: null, kind: 'bonus', amount: '5000.00',
+        rate_pct: '0', tier: 'bronze', basis: '0', note: 'milestone bonus',
+        credited_on: '2026-02-15', clears_on: '2026-03-17', status: 'cleared' }
+    ],
+    'partner_accounts': [
+      { id: 'A1', account_name: 'Amaka O', bank_name: 'GTBank', account_number: '0123456789',
+        currency: 'NGN', is_primary: true, verified: true, verified_on: '2026-01-10',
+        added_on: '2026-01-08' }
+    ],
+    'partner_payouts': [
+      { id: 'PO1', ref: '2026-03', paid_on: '2026-03-25', amount: '9750.00',
+        method: 'bank transfer', bank_ref: 'TLB202603/01' }
+    ]
+  };
+
+  const ME = { id: 'P1', code: 'AMAKA', name: 'Amaka Obi', business_name: 'Lux Couture',
+    email: 'amaka@luxcouture.com', phone: '+234 800 000 0000', city: 'Lagos',
+    tax_id: 'TIN-1', tier: 'silver', status: 'active', joined_on: '2026-01-02' };
+
+  /* stub the network: every select answers from ROWS, partner_me answers ME */
+  G('window.__calls = [];');
+  sandbox.supaFetch = async (path) => {
+    sandbox.window.__calls.push(path);
+    if (path.indexOf('/rest/v1/rpc/partner_me') === 0) return { ok: true, body: [ME] };
+    const table = (path.match(/\/rest\/v1\/([a-z_]+)/) || [])[1];
+    return ROWS[table] ? { ok: true, body: ROWS[table] } : { ok: false, body: null };
+  };
+
+  const db = await G('buildLiveDB({ partnerKey: "P1", token: "t", name: "Amaka Obi", ' +
+    'email: "amaka@luxcouture.com", me: ' + JSON.stringify(ME) + ' })');
+
+  check(!!db, 'the live hydrate returns a database rather than nothing');
+  if (db) {
+    /* the money, which is the half that matters */
+    check(db.ledger[0].amount === 9750, 'a ledger amount arrives as a number, not the string PostgREST sends');
+    check(db.referrals[0].firstPayment === 65000, 'first payment is mapped from first_payment');
+    check(db.referrals[0].mrr > 5416 && db.referrals[0].mrr < 5417, 'mrr survives as a number');
+    check(db.ledger[0].type === 'signup', 'ledger kind is mapped to the type the pages read');
+    check(db.ledger[0].status === 'paid', 'the database decides what is paid, not the device');
+    check(db.ledger[0].payoutRef === '2026-03', 'a paid ledger row carries its payout reference');
+    check(db.ledger[0].paidOn === '2026-03-25', 'and the date it was paid');
+
+    /* names and dates */
+    check(db.referrals[0].business === 'Lux Couture', 'business_name is mapped to business');
+    check(db.referrals[0].signedUpOn === '2026-02-01', 'signed_up_on is mapped to signedUpOn');
+    check(db.referrals[0].subscribedOn === '2026-02-15', 'subscribed_on is mapped');
+    check(db.referrals[1].subscribedOn === null, 'an unconverted referral has no subscribed date');
+    check(db.accounts[0].accountNumber === '0123456789', 'account_number is mapped');
+    check(db.accounts[0].primary === true, 'is_primary is mapped to primary, which is what the pages read');
+
+    /* derived, not stored */
+    const def = db.links.find(l => l.isDefault);
+    check(!!def, 'the default link is marked');
+    check(def.signups === 1 && def.converted === 1,
+      'per-link counts are counted from referrals rather than trusted from a column');
+    check(def.earned === 9750, 'and what a link earned is summed from the ledger');
+    check(db.links[1].signups === 1 && db.links[1].converted === 0,
+      'a link with a signup that never converted counts the signup and not the conversion');
+
+    /* a trial countdown has to come from the dates, not be invented */
+    check(db.referrals[1].trialEndsIn !== null, 'a referral on trial shows how long is left');
+    check(db.referrals[0].trialEndsIn === null, 'one that has already subscribed does not');
+
+    /* the tier drives the rate a partner is told about */
+    check(db.settings.baseRatePct === 18, 'a silver partner is shown the silver rate, not the bronze default');
+
+    /* the thing that must never happen: a failed request drawn as a confident zero */
+    sandbox.supaFetch = async (path) =>
+      path.indexOf('/rest/v1/rpc/partner_me') === 0 ? { ok: true, body: [ME] } : { ok: false, body: null };
+    const broken = await G('buildLiveDB({ partnerKey: "P1", token: "t", me: ' + JSON.stringify(ME) + ' })');
+    check(broken === null,
+      'a failed request returns nothing rather than an empty portal — a partner must never be shown zero earnings because the network dropped');
+
+    /* the queries carry no partner filter, on purpose: RLS is the wall */
+    const calls = G('window.__calls');
+    check(!calls.some(c => /partner_id=eq/.test(c)),
+      'the hydrate does not filter by partner_id — row level security is the control, and a filter here would look like the protection');
+  }
 }
 
 report();

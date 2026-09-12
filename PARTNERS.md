@@ -152,9 +152,27 @@ blanking the config again puts it back.
 4. **Fill in `partners/js/config.js`** with the project URL and the anon key.
    The anon key is public by design and safe in that file. The service role key
    is not, and must never appear there.
-5. **Wire the hydrate.** `loadLivePartnerData()` in `auth.js` is the one named
-   seam left to fill: read the six tables into the same shapes `buildDB()`
-   produces. Nothing above `data.js` needs to change.
+5. ~~Wire the hydrate.~~ **Done, 12 Sep 2026.** `partners/js/live.js` reads the
+   five tables plus `app.partner_me()` and builds the same object `buildDB()`
+   produces, so every page above it is unchanged and cannot tell the difference.
+
+   Three things worth knowing before editing it:
+
+   - **The selects carry no `partner_id` filter, deliberately.** Row level
+     security already answers with only the signed-in partner's rows. A filter
+     there would read like the protection while being only a convenience, and if
+     RLS were ever dropped it would hide the hole rather than close it. The gate
+     fails if somebody adds one.
+   - **A failed request returns `null`, never an empty portal.** A partner shown
+     a confident zero because the network dropped is worse than an error.
+   - **PostgREST answers `snake_case` and returns numerics as strings.** Every
+     column is mapped by hand for that reason: a silent rename or an unconverted
+     string turns a total into zero rather than into a crash. `audit_partners.js`
+     feeds `buildLiveDB` a row of every shape with the network stubbed and checks
+     what comes out, so this is testable with no Supabase and no partner.
+
+   What is left before a partner can actually sign in is **SMTP** (step 2), and
+   nothing else.
 
 ## How the money works
 
