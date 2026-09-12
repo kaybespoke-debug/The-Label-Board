@@ -103,8 +103,8 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | | What | Why it matters |
 |---|---|---|
 | 1 | **Supabase → Auth → URL Configuration.** Site URL + redirect URLs with `/**` | Password resets and email confirmations land nowhere until this is set |
-| 2 | **SMTP for auth email** — see the recipe below | The partner portal signs people in with a one-time code, and Supabase's built-in sender does **2 an hour, to your own team only**, so it can never work. The portal's code side is finished; this is all that is left |
-| 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
+| 2 | ~~SMTP for auth email~~ | **Done 12 Sep.** Resend, sending as `hello@thelabelboard.com` from the verified root domain. Both `thelabelboard.com` and `send.thelabelboard.com` are verified; the root is the one that matters, because it is what lets the From address be clean and stops Gmail showing "via". Mail records re-checked after every step and never touched. **Untested until a real auth email is sent** |
+| 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle — and it matters more now the per-IP sign-in limit is 200, because a password policy is the real brute-force defence, not a rate limit |
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
 | 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
@@ -162,8 +162,26 @@ free, three domains on the free tier.
    | Sender email | `hello@thelabelboard.com` |
    | Sender name | The Label Board |
 
-6. Rate limits start at 30 an hour; raise them on the Rate Limits page when
-   there are enough partners to need it.
+6. **Rate limits, settled 12 Sep.** Every one of these is **per IP address**,
+   not global, which is the thing that makes them easy to get wrong: ten
+   thousand studios on ten thousand connections are ten thousand separate
+   buckets. They only bite when people share an IP — and **Nigerian carrier NAT
+   puts hundreds of unrelated subscribers behind one address**, so the numbers
+   have to cover strangers colliding, not just one studio's staff.
+
+   | Setting | Value | Why |
+   |---|---|---|
+   | Sign-ups and sign-ins | **200** /5min | Carrier NAT headroom. Still caps one attacker at 2,400 password attempts an hour, which is nothing against a decent password. The real defence is item 3 |
+   | Token refreshes | **500** /5min | Refreshes cluster: everyone opens the app at 9am and a shared carrier IP can push 200+ into one window. Low risk to raise, since refreshing needs a token you already hold |
+   | Token verifications | **30** /5min | Left alone deliberately. This is the brute-force guard on a six-digit code, and it is somebody typing what they were just sent. Lower is safer here |
+   | Emails sent | **200** /h | Covers onboarding a hundred studios in a morning. Also bounds a runaway loop |
+   | SMS, Web3, anonymous | untouched | Not used |
+   | IP address forwarding | **OFF** | It lets a caller *claim* an IP, so every per-IP limit above would trust whatever it is told. For server-side setups behind a trusted proxy. These are browser apps |
+
+   **This rate limit counts Supabase Auth email only** — codes, resets,
+   confirmations, invites. A newsletter never touches it. The binding ceiling is
+   **Resend's free tier: 3,000 a month, about 100 a day**, and that is the
+   number to watch when real volume arrives.
 
 **Kayode enters the API key, not me.** It is a credential.
 
