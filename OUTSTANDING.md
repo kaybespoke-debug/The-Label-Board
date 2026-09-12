@@ -135,11 +135,21 @@ followed through six DNS changes today.
 Recommended: **Resend**. First on Supabase's own list, 3,000 emails a month
 free, three domains on the free tier.
 
-1. Create the account, add the domain **`send.thelabelboard.com`**.
-2. It gives DKIM and SPF records. In GoDaddy: **Add New Record** for each, TTL
-   600. **Touch nothing of type MX**, and do not edit the existing root TXT.
+1. Create the account, then **Domains → Add Domain → `send.thelabelboard.com`**.
+   It asks for a **region**: pick the one closest to the recipients, which for
+   Nigerian partners is **eu-west-1 (Ireland)**.
+2. Resend then shows the records. In GoDaddy: **Add New Record** for each,
+   TTL 600.
+
+   **Resend asks for an MX record, and that is fine.** Earlier note said "touch
+   nothing of type MX", which was right about the root and wrong as a blanket
+   rule. The real rule is narrower: **never touch the MX whose Name is `@`** —
+   that one is the Microsoft mailbox. An MX on `send` is a different record and
+   cannot affect it. That is the entire reason for using a subdomain.
+
+   Still true: do not edit the existing root TXT records.
 3. Say the word and I will verify they have propagated, and re-check that the
-   mail records are still intact, the same way as the domains.
+   root mail records are still intact, the same way as the domains.
 4. Create an API key in Resend.
 5. Supabase → **Authentication → SMTP Settings** → enable custom SMTP:
 
