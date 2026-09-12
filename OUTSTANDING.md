@@ -153,8 +153,18 @@ the same day.
 |---|---|---|---|
 | `app.thelabelboard.com` | Customer app | `thelabelboard` | **live, 12 Sep.** CNAME, set as Primary |
 | `partners.thelabelboard.com` | Partner portal | `thelabelboard-partners` | **live, 12 Sep.** Deploys `partners/` from `admin-deploy` |
-| `thelabelboard.com` + `www` | Public website | not created | needs the site created, and a branch decision |
-| `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | in progress |
+| `admin.thelabelboard.com` | Admin console | `thelabelboard-admin` | **live, 12 Sep.** `noindex, nofollow` and `X-Frame-Options: DENY` confirmed on the live response |
+| `thelabelboard.com` + `www` | Public website | `thelabelboard-web` | site being created; apex still on GoDaddy's parking page |
+
+**Netlify project visibility, decided 12 Sep.** Production stays **Public** on all
+four; Deploy Previews go **Private**, because a preview is a draft build at a
+guessable url and an unreleased pricing page should not be findable. Private was
+considered for the admin console and rejected on two grounds: on the free plan
+only the *Team Owner* can view a private project, so the first finance or support
+operator added would be locked out unless given the whole hosting account; and
+private projects carry Netlify's pre-launch toolbar overlay, which is trading one
+overlay for another. The console's own password wall plus `noindex` is the right
+layer for that, not hosting visibility.
 
 **The verification is per domain, not per subdomain.** The first one, `app.`,
 needed a TXT record at `subdomain-owner-verification` before Netlify would hand
