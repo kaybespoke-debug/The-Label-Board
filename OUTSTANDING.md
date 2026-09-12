@@ -103,7 +103,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | | What | Why it matters |
 |---|---|---|
 | 1 | **Supabase → Auth → URL Configuration.** Site URL + redirect URLs with `/**` | Password resets and email confirmations land nowhere until this is set |
-| 2 | **SMTP for auth email** | The partner portal signs people in with a one-time code. Without SMTP nobody can sign in |
+| 2 | **SMTP for auth email** — see the recipe below | The partner portal signs people in with a one-time code, and Supabase's built-in sender does **2 an hour, to your own team only**, so it can never work. The portal's code side is finished; this is all that is left |
 | 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
@@ -113,6 +113,43 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 
 ---
 
+## SMTP, the last thing the partner portal needs
+
+**Supabase’s built-in sender cannot do this.** It sends **2 messages an hour,
+and only to your own team**, explicitly not for production. So a real provider
+is required, not optional.
+
+**Do not use the Microsoft 365 mailbox**, tempting though it is since it exists
+and is paid for. Microsoft disables SMTP AUTH by default on new tenants and is
+retiring basic authentication for SMTP submission, so it is a login flow built
+on a door Microsoft is closing. It also throttles, and a throttled one-time code
+is a partner who cannot get in.
+
+**Use a sending SUBDOMAIN, not the root domain.** This is the part that matters
+here.  publishes  — a
+**hard fail**. Adding another sender to that record risks the mailbox that now
+runs the business. Verifying  instead leaves every
+existing MX, SPF and DKIM record untouched, which is the same rule we have
+followed through six DNS changes today.
+
+Recommended: **Resend**. First on Supabase’s own list, 3,000 emails a month
+free, three domains on the free tier.
+
+1. Create the account, add the domain ****.
+2. It gives DKIM and SPF records. In GoDaddy: **Add New Record** for each, TTL
+   600. **Touch nothing of type MX**, and do not edit the existing root TXT.
+3. Say the word and I will verify they have propagated, and re-check that the
+   mail records are still intact, the same way as the domains.
+4. Create an API key in Resend.
+5. Supabase → **Authentication → SMTP Settings** → enable custom SMTP:
+   host , port , username , password the API key,
+   sender , sender name The Label Board.
+6. Rate limits start at 30 an hour; raise them on the Rate Limits page when
+   there are enough partners to need it.
+
+**Kayode enters the API key, not me.** It is a credential.
+
+---
 ## Netlify — two apps of four are deployed
 
 | App | Netlify site | Deploys from | State |
@@ -131,15 +168,11 @@ either.
 `eskubrbgbcbaejynjxvh` with the public anon key. Supabase is not what is holding
 either of them back. Each has exactly one blocker:
 
-- **Partner portal — blocked on SMTP (item 2 above) AND an unwritten hydrate.**
-  It signs people in with an emailed one-time code, so no SMTP means no code.
-  **But SMTP alone will not fix it.** Found 12 Sep while testing the welcome
-  page: `CONFIG.live` is true now the Supabase keys are filled in, and in live
-  mode `enterPortal()` hands off to `loadLivePartnerData()` in
-  `partners/js/auth.js`, which is still the placeholder that logs a warning and
-  returns `false`. So a partner would type a correct code and be bounced with
-  "We could not load your account". Two jobs, not one: SMTP, and that hydrate
-  written against `partner_me`. Half a day, and it is ours rather than Kayode's.
+- **Partner portal — blocked on SMTP alone now.** The hydrate that was the other
+  half is **built** (12 Sep): `partners/js/live.js` reads the five tables plus
+  `app.partner_me()` and produces the same object the demo does, gated by 26
+  checks with the network stubbed, ten mutants all caught. SMTP is the last
+  thing standing between a partner and a working portal.
 - **Public website — blocked on the domain and a real phone number.** It is the
   only one of the four meant to be found by Google. Today `web/js/config.js`
   carries `+234 800 000 0000` and `wa.me/2348000000000`, so "WhatsApp us" goes
