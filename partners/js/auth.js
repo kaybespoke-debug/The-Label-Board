@@ -316,11 +316,11 @@ function renderAuth() {
     '<div class="authbrand">' +
     '<svg viewBox="0 0 100 100" aria-hidden="true">' +
     '<rect width="100" height="100" rx="24" fill="#0b1023"/>' +
-    '<path d="M30 27v33a10 10 0 0 0 10 10h13" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
-    '<path d="M40 35h13a8.5 8.5 0 0 1 0 17H40z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
-    '<path d="M40 52h15a9 9 0 0 1 0 18H40" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
-    '<circle cx="72" cy="40" r="5.5" fill="#e0a94a"/><circle cx="72" cy="62" r="5.5" fill="#3f9d78"/>' +
-    '<path d="M72 45.5v11" stroke="#e0a94a" stroke-width="3" stroke-linecap="round"/></svg>' +
+    '<path d="M33 27v33a10 10 0 0 0 10 10h16" stroke="#fff" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
+    '<path d="M43 35h13a8.5 8.5 0 0 1 0 17H43z" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
+    '<path d="M43 52h15a9 9 0 0 1 0 18H43" stroke="#fff" stroke-width="5.5" fill="none" stroke-linejoin="round"/>' +
+    '<circle cx="74" cy="62" r="6" fill="#e0a94a"/>' +
+    '</svg>' +
     '<div><div class="authname">THE LABEL BOARD</div><div class="authsub">Partner Portal</div></div>' +
     '</div>' + body + '</div>';
 }
