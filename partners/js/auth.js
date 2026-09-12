@@ -312,6 +312,7 @@ function renderAuth() {
   else body = emailCard();
 
   shell.innerHTML =
+    '<div class="authwrap">' +
     '<div class="authbox">' +
     '<div class="authbrand">' +
     '<svg viewBox="0 0 100 100" aria-hidden="true">' +
@@ -322,7 +323,35 @@ function renderAuth() {
     '<circle cx="74" cy="62" r="6" fill="#e0a94a"/>' +
     '</svg>' +
     '<div><div class="authname">THE LABEL BOARD</div><div class="authsub">Partner Portal</div></div>' +
-    '</div>' + body + '</div>';
+    '</div>' + body + '</div>' +
+    welcomePanel() +
+    '</div>';
+}
+
+/* A partner arrives here from a link somebody sent them, often with no idea what
+   The Label Board is. A bare email box asks them to trust it first and find out
+   afterwards, which is how a referral programme loses people at the door. This
+   says what the portal is and what they earn, before asking for anything.
+
+   Deliberately no numbers in the reward line. Commission is tiered and the tiers
+   are set in the console, so a rate hard-coded here is a rate that goes stale and
+   then gets quoted back at us. */
+function welcomePanel() {
+  return '<div class="authwelcome">' +
+    '<h2>You bring the studios. We do the rest.</h2>' +
+    '<p>The Label Board is the software fashion studios run their business on: orders, ' +
+    'production, clients, staff and money in one place. You are one of the people who ' +
+    'brings them in, and this is where you watch that turn into income.</p>' +
+    '<ul class="authpoints">' +
+    '<li><span class="authtick">✓</span><span><b>Every referral, tracked.</b> Who you brought in, ' +
+    'where they got to, and who is still on trial.</span></li>' +
+    '<li><span class="authtick">✓</span><span><b>Recurring commission.</b> You earn for as long as ' +
+    'they stay, not once when they sign. Your rate rises with your tier.</span></li>' +
+    '<li><span class="authtick">✓</span><span><b>Paid out to your account.</b> What you have earned, ' +
+    'what has been sent, and what is still owed.</span></li>' +
+    '<li><span class="authtick">✓</span><span><b>Something to send.</b> Your code and links, ready ' +
+    'to share.</span></li>' +
+    '</ul></div>';
 }
 
 function emailCard() {
@@ -337,7 +366,7 @@ function emailCard() {
     (AUTH.busy ? 'Sending…' : 'Send my code') + '</button>' +
     demoHint() +
     '<p class="authfoot">Not a partner yet? Ask whoever signed you up, or email ' +
-    '<a href="mailto:partners@thelabelboard.com">partners@thelabelboard.com</a>.</p>';
+    '<a href="mailto:hello@thelabelboard.com">hello@thelabelboard.com</a>.</p>';
 }
 
 function codeCard() {
@@ -365,7 +394,7 @@ function suspendedCard() {
     '<p class="authp">Your partner account is suspended, so there is nothing to show you here. ' +
     'Nothing you have already earned is affected.</p>' +
     '<p class="authp">Your partner manager can tell you why and what happens next.</p>' +
-    '<a class="btn gold authgo" href="mailto:partners@thelabelboard.com?subject=' +
+    '<a class="btn gold authgo" href="mailto:hello@thelabelboard.com?subject=' +
     encodeURIComponent('Suspended partner account: ' + (AUTH.pending.email || '')) + '">Email your manager</a>' +
     '<div class="authalt"><button class="lnk" onclick="backToEmail()">Back to sign in</button></div>';
 }

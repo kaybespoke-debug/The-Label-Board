@@ -7,13 +7,35 @@
 <meta name="color-scheme" content="dark light">
 <title>The Label Board — Partner Portal</title>
 <link rel="manifest" href="manifest.json">
+<!-- iOS ignores the manifest entirely for the home screen and reads apple-touch-icon,
+     so an SVG-only head gave an iPhone nothing to use and it saved a screenshot of the
+     page instead. Desktop Chrome and Edge read the PNG favicon; the SVG stays last for
+     browsers that prefer it. -->
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Serif+4:wght@400;500;600;700&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+
+<!-- ============ LAUNCH SPLASH ============ -->
+<div id="splash" role="presentation">
+  <div class="sp-inner">
+    <div class="sp-mark">
+      <svg viewBox="0 0 220 220" role="img" aria-label="The Label Board"><path class="sp-draw" d="M72 28 L72 154 Q72 188 106 188 L157 188 Q187 188 187 159 Q187 132 158 132 L118 132 L118 73 L158 73 Q186 73 186 101 Q186 132 158 132"/></svg>
+      <span class="sp-dot"></span>
+    </div>
+    <div class="sp-copy">
+      <div class="sp-the">THE</div>
+      <div class="sp-name">LABEL BOARD</div>
+    </div>
+    <div class="sp-tag">PARTNER PORTAL</div>
+  </div>
+</div>
 
 <!-- ================= SVG icon sprite ================= -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -173,5 +195,6 @@ function render() {
   bootAuth();
 })();
 </script>
+<script src="js/splash.js"></script>
 </body>
 </html>

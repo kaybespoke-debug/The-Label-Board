@@ -1,12 +1,14 @@
 /* The Label Board — Admin Control Centre service worker
    Bump CACHE on every release so clients pick up new files. */
-const CACHE = 'tlb-admin-v29';
+const CACHE = 'tlb-admin-v30';
 const ASSETS = [
   './',
   'index.html',
   'manifest.json',
   'icon.svg',
   'icon-192.png',
+  'icon-512.png',
+  'apple-touch-icon.png',
   'css/app.css',
   'js/data.js',
   'js/core.js',
