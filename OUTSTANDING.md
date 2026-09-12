@@ -187,6 +187,21 @@ because Netlify then tells you the exact record to create, and typing a record
 from memory is how this goes wrong. Then create that record at the registrar,
 leave every MX record untouched, and wait for Netlify to issue the certificate.
 
+**Turn off the "Powered by Netlify" badge on every new site.** It is on by
+default on free plans for any project created on or after 19 Aug 2026, and it
+renders bottom-right of the page. Checked 12 Sep: the customer app does not have
+it on either of its addresses (that site predates the cutoff), the admin console
+does. **The website and the partner portal are both new sites, so both will have
+it.** Do it as part of creating each one, before pointing a domain at it — a
+Powered by Netlify badge in the corner of the marketing homepage of a ₦65,000 a
+month product is the worst place it could appear.
+
+> Project configuration → General → Powered by Netlify badge
+> `https://app.netlify.com/projects/{site}/configuration/general#powered-by-netlify-badge`
+
+Injected at the edge, so turning it off takes effect on the next request with no
+redeploy. It is not a reason to leave Netlify, which was the first instinct.
+
 **Optional tidying, not urgent:** set base directories (`site` and `admin`) on
 the two live sites and delete the root `netlify.toml`. It only bites at the
 moment of merging `admin-deploy` into `main`, the recipe for doing that safely
