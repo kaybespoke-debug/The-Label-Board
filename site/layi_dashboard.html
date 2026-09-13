@@ -1564,6 +1564,34 @@ body.modal-open{overflow:hidden}
 const SUPA_URL='https://eskubrbgbcbaejynjxvh.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc';
 let supa=null;
+/* Read BEFORE the Supabase client is created, because creating it consumes the
+   token in the URL and clears it, and by the time any of our own code runs the
+   evidence is gone.
+
+   This is how somebody arrives from an invitation or a password reset. They land
+   already signed in, with no password set, on a screen that asks for one — which
+   is what happened to the first studio invited on 13 Sep: the link worked
+   perfectly and dropped them at a login form with nothing to type. */
+const AUTH_ARRIVAL=(function(){
+  try{
+    const hash=new URLSearchParams(String(location.hash||'').replace(/^#/,''));
+    const bad=hash.get('error_description')||hash.get('error');
+    if(bad)return {kind:'error',message:String(bad).replace(/\+/g,' ')};
+    const t=hash.get('type')||'';
+    if(hash.get('access_token')&&t)return {kind:t};
+    /* The newer PKCE flow puts a code in the query string instead. */
+    const qs=new URLSearchParams(String(location.search||''));
+    const qt=qs.get('type')||'';
+    if(qs.get('code')&&qt)return {kind:qt};
+  }catch(e){}
+  return null;
+})();
+/* An invitation and a reset both mean the same thing to this app: you are here,
+   we know who you are, and you need a password. 'signup' is a confirmation link,
+   which arrives the same way. */
+function authArrivalNeedsPassword(){
+  return !!(AUTH_ARRIVAL&&['invite','recovery','signup'].indexOf(AUTH_ARRIVAL.kind)>=0);
+}
 try{ if(SUPA_URL && SUPA_KEY && window.supabase && window.supabase.createClient) supa=window.supabase.createClient(SUPA_URL,SUPA_KEY); }catch(e){ supa=null; }
 /* ===== CONFIG / SETTINGS ===== */
 const DEFAULTS={ownerPassword:'layi2025',currency:'NGN',tiers:[{name:'Starter',min:0},{name:'Bronze',min:1000},{name:'Silver',min:5000},{name:'Gold',min:15000},{name:'Platinum',min:50000}],
@@ -2108,7 +2136,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v40';
+const APP_VERSION='layi-v41';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -3010,6 +3038,25 @@ async function doLogin(){
       const {error}=await supa.auth.signInWithPassword({email:raw.toLowerCase(),password:p});
       if(error){errEl.textContent=/confirm/i.test(error.message)?'This account is not confirmed yet (check Supabase → Authentication → Users).':('Sign-in failed: '+error.message);return;}
       const {data:{user}}=await supa.auth.getUser();
+      await enterLiveStudio(user,raw.toLowerCase(),errEl);
+    }catch(e){errEl.textContent='Could not reach the live server. Check your internet connection.';}
+    return;
+  }
+  // Fallback: local username + pin (demo and existing on-device accounts)
+  const u=raw.toLowerCase();
+  const user=getUsers().find(x=>x.username.toLowerCase()===u&&x.active!==false);
+  if(!user||String(user.pin)!==String(p)){errEl.textContent='Incorrect username or password.';return;}
+  currentUser=user;errEl.textContent='';document.getElementById('loginPass').value='';
+  activeBranchView='all'; // start on the all-studios view (renderBranchSwitch pins branch-locked roles to their studio)
+  enterApp();
+}
+
+/* Everything between "Supabase knows who you are" and "the studio is on screen".
+   Shared by the password sign-in and by arriving from an invitation, because the
+   studio has to be loaded, hydrated and made live identically whichever door
+   somebody came through. It used to live inside doLogin, which is why an invited
+   studio owner reached a login form and stopped. */
+async function enterLiveStudio(user,username,errEl){
       const {data:prof,error:pe}=await supa.from('profiles').select('name,role_id,business_id,staff_id').eq('id',user.id).maybeSingle();
       /* The password was right and the account is real; there is simply no
          studio attached to it. That is not a sign-in failure and must not be
@@ -3032,7 +3079,7 @@ async function doLogin(){
             +'it has not been set up yet.</span>';
         return;
       }
-      currentUser={id:user.id,name:prof.name||'Owner',username:raw.toLowerCase(),roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
+      currentUser={id:user.id,name:prof.name||'Owner',username:username,roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
       liveMode=true; myBusinessId=prof.business_id||LAYI_BIZ;
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
@@ -3048,17 +3095,84 @@ async function doLogin(){
       errEl.textContent='';document.getElementById('loginPass').value='';
       activeBranchView='all'; // start on the all-studios view (renderBranchSwitch pins branch-locked roles to their studio)
       enterApp();
-    }catch(e){errEl.textContent='Could not reach the live server. Check your internet connection.';}
-    return;
-  }
-  // Fallback: local username + pin (demo and existing on-device accounts)
-  const u=raw.toLowerCase();
-  const user=getUsers().find(x=>x.username.toLowerCase()===u&&x.active!==false);
-  if(!user||String(user.pin)!==String(p)){errEl.textContent='Incorrect username or password.';return;}
-  currentUser=user;errEl.textContent='';document.getElementById('loginPass').value='';
-  activeBranchView='all'; // start on the all-studios view (renderBranchSwitch pins branch-locked roles to their studio)
-  enterApp();
 }
+
+/* ===== ARRIVING FROM AN INVITATION OR A RESET =====
+   Everything below exists because the link in those emails used to land people
+   on the sign-in form with nothing to type. They are already authenticated by
+   the time they get here; what they do not have is a password.
+
+   Deliberately shares enterLiveStudio() with the ordinary sign-in rather than
+   repeating it: the studio has to be loaded, hydrated and made live the same way
+   whichever door somebody came through, and two copies of that would drift. */
+function showSetPassword(){
+  const card=document.querySelector('#login .login-card');if(!card)return;
+  const lead=card.querySelector('.lead');
+  if(lead)lead.textContent=AUTH_ARRIVAL&&AUTH_ARRIVAL.kind==='recovery'
+    ? 'Choose a new password.' : 'Welcome. Choose a password to finish setting up.';
+  const u=document.getElementById('loginUser');
+  const pwField=document.getElementById('loginPass');
+  if(u&&u.parentElement)u.parentElement.style.display='none';
+  if(pwField){pwField.placeholder='New password';pwField.autocomplete='new-password';}
+  /* A second box, because a password nobody can see is a password somebody
+     mistypes once and then cannot get back into their studio with. */
+  if(!document.getElementById('loginPass2')&&pwField&&pwField.parentElement){
+    const wrap=document.createElement('div');wrap.className='field';
+    wrap.innerHTML='<input type="password" class="fld" id="loginPass2" placeholder="Repeat the password" autocomplete="new-password">';
+    pwField.parentElement.insertAdjacentElement('afterend',wrap);
+  }
+  const btn=card.querySelector('button.btn');
+  if(btn){btn.textContent='Set my password';btn.setAttribute('onclick','setMyPassword()');}
+  ['bioUnlockBtn'].forEach(function(id){const el=document.getElementById(id);if(el)el.style.display='none';});
+  const forgot=card.querySelector('span[onclick="forgotPassword()"]');
+  if(forgot&&forgot.parentElement)forgot.parentElement.style.display='none';
+  const p2=document.getElementById('loginPass2');
+  if(p2)p2.onkeydown=function(e){if(e.key==='Enter')setMyPassword();};
+  if(pwField)pwField.onkeydown=function(e){if(e.key==='Enter'){const q=document.getElementById('loginPass2');if(q)q.focus();}};
+  if(pwField)pwField.focus();
+}
+
+async function setMyPassword(){
+  const errEl=document.getElementById('loginErr');
+  const a=(document.getElementById('loginPass')||{}).value||'';
+  const b=(document.getElementById('loginPass2')||{}).value||'';
+  if(a.length<8){errEl.textContent='Use at least 8 characters.';return;}
+  if(a!==b){errEl.textContent='Those two do not match.';return;}
+  if(!supa){errEl.textContent='This needs the live server.';return;}
+  errEl.textContent='Saving…';
+  try{
+    const {error}=await supa.auth.updateUser({password:a});
+    if(error){errEl.textContent='Could not set the password: '+error.message;return;}
+    const {data:{user}}=await supa.auth.getUser();
+    if(!user){errEl.textContent='That link has expired. Use “Forgot password?” to get a new one.';return;}
+    /* Clear the token out of the address bar before anything else renders, so a
+       shared screenshot of the studio does not carry a live session in its url. */
+    try{history.replaceState(null,'',location.pathname);}catch(e){}
+    await enterLiveStudio(user,String(user.email||'').toLowerCase(),errEl);
+  }catch(e){errEl.textContent='Could not reach the live server. Check your connection.';}
+}
+
+/* Runs once at boot. Waits for the client to have finished reading the url,
+   which it does asynchronously, rather than assuming it already has. */
+async function startAuthArrival(){
+  if(!AUTH_ARRIVAL)return false;
+  const errEl=document.getElementById('loginErr');
+  if(AUTH_ARRIVAL.kind==='error'){
+    if(errEl)errEl.textContent=AUTH_ARRIVAL.message||'That link is no longer valid.';
+    try{history.replaceState(null,'',location.pathname);}catch(e){}
+    return false;
+  }
+  if(!authArrivalNeedsPassword()||!supa)return false;
+  for(let i=0;i<20;i++){
+    let s=null;
+    try{s=(await supa.auth.getSession()).data.session;}catch(e){}
+    if(s){showSetPassword();return true;}
+    await new Promise(r=>setTimeout(r,150));
+  }
+  if(errEl)errEl.textContent='That link has expired. Use “Forgot password?” to get a new one.';
+  return false;
+}
+
 async function forgotPassword(){
   const raw=(document.getElementById('loginUser').value||'').trim();const errEl=document.getElementById('loginErr');
   if(raw.indexOf('@')<0){errEl.textContent='Enter your email address above first, then tap “Forgot password?”.';return;}
@@ -12630,7 +12744,11 @@ function addRole(){if(!can('users'))return;const name=(prompt('New role name (e.
   applyTheme();applyBranding();
   var _resumed=false;try{_resumed=restoreSession();}catch(e){}
   if(typeof initSplash==='function')initSplash();
-  if(!_resumed&&typeof refreshBiometricUI==='function')refreshBiometricUI();})();
+  if(!_resumed&&typeof refreshBiometricUI==='function')refreshBiometricUI();
+  /* Somebody arriving from an invitation or a reset link is already
+     authenticated and has no password. Without this they meet the sign-in form
+     with nothing to type, which is exactly what the first invited studio did. */
+  try{ if(typeof startAuthArrival==='function')startAuthArrival(); }catch(e){}})();
 </script>
 <script>
 // Progressive Web App: register the offline/install worker.
