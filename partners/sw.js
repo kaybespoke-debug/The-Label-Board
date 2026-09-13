@@ -1,6 +1,6 @@
 /* The Label Board — Partner Portal service worker
    Bump CACHE on every release so clients pick up new files. */
-const CACHE = 'tlb-partners-v4';
+const CACHE = 'tlb-partners-v5';
 const ASSETS = [
   './',
   'index.html',
@@ -17,7 +17,9 @@ const ASSETS = [
   'js/pages2.js',
   'js/detail.js',
   'js/actions.js',
-  'js/auth.js'
+  'js/live.js',
+  'js/auth.js',
+  'js/splash.js'
 ];
 
 self.addEventListener('install', e => {

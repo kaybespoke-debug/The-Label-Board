@@ -881,3 +881,88 @@ function doClearData() {
   toast('Cleared · ' + n + ' subscribers removed');
   render();
 }
+
+/* =================== INVITATIONS ===================
+   Creating an account used to mean opening Supabase, typing somebody's email
+   and inventing a password you then sent them in a message. These three forms
+   replace that.
+
+   Nobody is ever shown a password, because none is ever set here. The gateway
+   asks Supabase to email an invitation and the person chooses their own, so a
+   credential never passes through an operator, a chat, or a screenshot.
+
+   Everything that decides who may do this, and the order the records have to be
+   written in, lives in admin-api where a browser cannot reach it. These are the
+   form and the wording only. */
+
+function formInviteStudio(prefillEmail, prefillName) {
+  modal('Invite a studio', 'They set their own password. Nothing is sent to you.',
+    '<div class="fg"><label>Studio name</label>' +
+    '<input id="isName" placeholder="e.g. Adeola Couture" value="' + esc(prefillName || '') + '"></div>' +
+    '<div class="fg"><label>Owner\u2019s email</label>' +
+    '<input id="isEmail" type="email" placeholder="them@theirstudio.com" value="' + esc(prefillEmail || '') + '"></div>' +
+    '<p class="hint">This creates the studio on a trial with one branch, and emails them a link ' +
+    'to choose a password. They land in a working studio, not a setup form.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn gold" onclick="doInviteStudio()">Send the invitation</button>');
+}
+
+async function doInviteStudio() {
+  const name = (document.getElementById('isName').value || '').trim();
+  const email = (document.getElementById('isEmail').value || '').trim();
+  if (!name) { toast('What is the studio called?'); return; }
+  if (!email || email.indexOf('@') < 0) { toast('An email address is needed to invite them.'); return; }
+  const btn = document.querySelector('.modal .btn.gold');
+  if (btn) { btn.textContent = 'Sending\u2026'; btn.disabled = true; }
+  try {
+    await liveInviteStudio(email, name);
+    logAction('sub_edit', 'Studio invited', 'Invitation sent to ' + email + ' for ' + name);
+    closeModal(); toast('Invitation sent to ' + email); render();
+  } catch (e) {
+    if (btn) { btn.textContent = 'Send the invitation'; btn.disabled = false; }
+    toast(e.message || 'Could not send that invitation');
+  }
+}
+
+function formInvitePartner(prefillEmail, prefillName) {
+  const suggested = String(prefillName || '').toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+  modal('Invite a partner', 'They set their own password. Nothing is sent to you.',
+    '<div class="fg"><label>Name</label>' +
+    '<input id="ipName" placeholder="e.g. Tunde Sanni" value="' + esc(prefillName || '') + '"></div>' +
+    '<div class="fg"><label>Email</label>' +
+    '<input id="ipEmail" type="email" placeholder="them@wherever.com" value="' + esc(prefillEmail || '') + '"></div>' +
+    '<div class="f2"><div class="fg"><label>Referral code</label>' +
+    '<input id="ipCode" placeholder="TUNDE" value="' + esc(suggested) + '"></div>' +
+    '<div class="fg"><label>Tier</label><select id="ipTier">' +
+    [['bronze', 'Bronze'], ['silver', 'Silver'], ['gold', 'Gold'], ['platinum', 'Platinum']]
+      .map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('') +
+    '</select></div></div>' +
+    '<p class="hint">The code is what they share, so it has to be unique and it is worth it being ' +
+    'something they would say out loud. Letters, numbers and hyphens. Their tier sets what ' +
+    'they earn and can be changed later.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn gold" onclick="doInvitePartner()">Send the invitation</button>');
+}
+
+async function doInvitePartner() {
+  const name = (document.getElementById('ipName').value || '').trim();
+  const email = (document.getElementById('ipEmail').value || '').trim();
+  const code = (document.getElementById('ipCode').value || '').trim().toUpperCase();
+  const tier = document.getElementById('ipTier').value;
+  if (!name) { toast('What is their name?'); return; }
+  if (!email || email.indexOf('@') < 0) { toast('An email address is needed to invite them.'); return; }
+  if (!/^[A-Z0-9][A-Z0-9-]{1,31}$/.test(code)) {
+    toast('The referral code needs letters, numbers or hyphens, and at least two characters.'); return;
+  }
+  const btn = document.querySelector('.modal .btn.gold');
+  if (btn) { btn.textContent = 'Sending\u2026'; btn.disabled = true; }
+  try {
+    await liveInvitePartner(email, name, code, tier);
+    logAction('sub_edit', 'Partner invited', 'Invitation sent to ' + email + ' for ' + name + ' (' + code + ')');
+    closeModal(); toast('Invitation sent to ' + email); render();
+  } catch (e) {
+    if (btn) { btn.textContent = 'Send the invitation'; btn.disabled = false; }
+    toast(e.message || 'Could not send that invitation');
+  }
+}

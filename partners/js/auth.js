@@ -247,7 +247,7 @@ async function submitCode() {
   }
 
   saveSession(r.session);
-  if (!enterPortal(true)) {
+  if (!await enterPortal(true)) {
     clearSession();
     AUTH.error = 'We could not load your account. Try again in a moment.';
     renderAuth();
@@ -267,12 +267,12 @@ function backToEmail() {
    session is being restored on open. That distinction is the whole point of the
    welcome page: it greets a sign-in, it does not greet somebody who simply
    reopened the app on the bus. */
-function enterPortal(fresh) {
+async function enterPortal(fresh) {
   if (!AUTH.session) return false;
   if (CONFIG.live) {
     /* Live mode fetches the partner's rows here. Until config.js is filled
        in this branch is never reached, and the demo path below runs. */
-    return loadLivePartnerData(AUTH.session);
+    return await loadLivePartnerData(AUTH.session, fresh);
   }
   if (!loadPartnerData(AUTH.session.partnerKey)) return false;
   /* Welcome first, then the portal. Signing in is rare here — sessions run for
@@ -286,9 +286,15 @@ function enterPortal(fresh) {
 
 /* Placeholder for the live hydrate. Kept as a named seam so the wiring is
    one function rather than a hunt through the portal. */
-function loadLivePartnerData() {
-  console.warn('Live mode is configured but the hydrate is not wired yet. See PARTNERS.md.');
-  return false;
+async function loadLivePartnerData(session, fresh) {
+  const me = await partnerMe(session.token);
+  if (!me) return false;
+  const db = await buildLiveDB(Object.assign({}, session, { me: me }));
+  if (!db) return false;
+  DB = db;
+  UI.page = fresh ? 'welcome' : 'home'; UI.detail = null;
+  render();
+  return true;
 }
 
 async function signOut() {
@@ -412,5 +418,5 @@ async function bootAuth() {
   if (!r.ok) { clearSession(); renderAuth(); return; }
 
   AUTH.session = r.session;
-  if (!enterPortal(false)) { clearSession(); renderAuth(); }
+  if (!await enterPortal(false)) { clearSession(); renderAuth(); }
 }

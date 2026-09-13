@@ -22,20 +22,28 @@ const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 /* what each role is allowed to ask for. Anything not listed is refused. */
 const ALLOWED: Record<string, string[]> = {
+  /* inviteOperator is deliberately owner-only and the other two are not.
+     Inviting a studio or a partner is day-to-day work any manager should do
+     without waiting for Kayode. Creating another operator hands somebody the
+     ability to read every subscriber's books and every payment, and a support
+     agent who can do that can quietly promote themselves. */
   owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
               'billing', 'payments', 'recordPayment', 'setStorageCap',
-              'enquiries', 'setEnquiryState'],
+              'enquiries', 'setEnquiryState', 'partners',
+              'inviteOperator', 'inviteStudio', 'invitePartner'],
   // Finance is the role that exists to do this. Support and developer are not
   // given it: what every subscriber pays is not something a support agent needs
   // to answer a ticket, and a role that can read it will eventually be given to
   // somebody because it was easier than making a new one.
   finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus',
               'billing', 'payments', 'recordPayment', 'setStorageCap',
-              'enquiries', 'setEnquiryState'],
+              'enquiries', 'setEnquiryState', 'partners',
+              'inviteStudio', 'invitePartner'],
   support:   ['me', 'tenants', 'tenant', 'setNote',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
-              'enquiries', 'setEnquiryState'],
+              'enquiries', 'setEnquiryState', 'partners',
+              'inviteStudio', 'invitePartner'],
   // a developer reads what studios reported and can move it along, but does
   // not write to a studio in our name
   developer: ['me', 'tenants', 'tenant', 'feedback', 'feedbackThread', 'setFeedbackState'],
@@ -325,6 +333,164 @@ Deno.serve(async (req) => {
       await admin.from('feedback').update({ state: 'open' }).eq('id', id).eq('state', 'new')
       await log({ replied: id, length: text.length }, msg.business_id as string)
       return json({ ok: true })
+    }
+
+    /* Who our referral partners are, and how each of them is doing. Read
+       through the service role like everything else here, because partner rows
+       are readable by that partner and nobody else — an operator is not a
+       partner, so row level security correctly refuses them and this is the one
+       audited place that goes around it.
+
+       pending_email is exposed deliberately: an invited partner who has not
+       claimed their account yet is invisible otherwise, and "did that invite
+       ever go out" is the first question anybody asks. */
+    if (action === 'partners') {
+      const { data, error } = await admin
+        .from('partners')
+        .select('id,code,name,business_name,email,phone,city,tier,status,joined_on,user_id,pending_email')
+        .order('joined_on', { ascending: false })
+      if (error) return json({ error: error.message }, 500)
+      await log({ count: (data || []).length })
+      return json({ ok: true, partners: data || [] })
+    }
+
+    /* ---------------- invitations ----------------------------------------
+       The only way an account gets created anywhere. Before this, every studio,
+       partner and colleague was made by hand in the Supabase dashboard with a
+       password somebody invented and then sent them in a message.
+
+       Nobody is ever sent a password. Supabase emails an invite and they set
+       their own, so a credential never passes through an operator, a chat, or a
+       screenshot.
+
+       ORDER MATTERS AND IS NOT OBVIOUS. The record is written BEFORE the account.
+       `app.provision_studio()` runs on insert into auth.users and claims a row
+       whose pending address matches; if the account is created first there is
+       nothing to claim, and the trigger cheerfully builds a brand new studio
+       instead of attaching them to the one just prepared. */
+
+    if (action === 'inviteOperator' || action === 'inviteStudio' || action === 'invitePartner') {
+      const email = String(body.email || '').trim().toLowerCase()
+      if (!email || !email.includes('@')) return json({ error: 'A valid email address is needed' }, 400)
+
+      /* Prepare the record first. Each kind has its own table and its own idea
+         of what the pending address is called. */
+      let prepared: { table: string; id?: string } | null = null
+
+      if (action === 'inviteOperator') {
+        const ROLES = ['owner', 'finance', 'support', 'developer']
+        const wanted = String(body.role || 'support')
+        if (!ROLES.includes(wanted)) {
+          return json({ error: `role must be one of: ${ROLES.join(', ')}` }, 400)
+        }
+        /* platform_admins is keyed by the auth user id, so unlike the other two
+           it cannot be written until the account exists. Held and written after. */
+        prepared = { table: 'platform_admins' }
+      }
+
+      if (action === 'inviteStudio') {
+        const name = String(body.businessName || '').trim().slice(0, 200)
+        if (!name) return json({ error: 'The studio needs a name' }, 400)
+        const { data: existing } = await admin
+          .from('businesses').select('id').eq('pending_owner_email', email).maybeSingle()
+        if (existing) {
+          prepared = { table: 'businesses', id: existing.id as string }
+        } else {
+          /* businesses.slug is NOT NULL, and the trigger only generates one on
+             the path where it invents a studio from scratch. A studio prepared
+             here takes the path that just clears the pending address, so the
+             slug has to exist before the row does. Collisions are real: two
+             studios called Adeola Couture is a Tuesday, not an edge case. */
+          const base = name.toLowerCase().normalize('NFKD')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'studio'
+          let slug = base
+          for (let n = 1; n < 50; n++) {
+            const { data: clash } = await admin
+              .from('businesses').select('id').eq('slug', slug).maybeSingle()
+            if (!clash) break
+            slug = base + '-' + n
+          }
+          const { data: made, error } = await admin.from('businesses')
+            .insert({ name, slug, plan: 'trial', status: 'active',
+                      contact_email: email, pending_owner_email: email })
+            .select('id').maybeSingle()
+          if (error) return json({ error: 'Could not create the studio: ' + error.message }, 500)
+          prepared = { table: 'businesses', id: made?.id as string }
+          await admin.from('branches').insert({ business_id: made?.id, name: 'Main studio' })
+        }
+      }
+
+      if (action === 'invitePartner') {
+        const name = String(body.name || '').trim().slice(0, 160)
+        const code = String(body.code || '').trim().toUpperCase().slice(0, 32)
+        const tier = String(body.tier || 'bronze')
+        if (!name) return json({ error: 'The partner needs a name' }, 400)
+        if (!/^[A-Z0-9][A-Z0-9-]{1,31}$/.test(code)) {
+          return json({ error: 'A referral code is needed: letters, numbers and hyphens' }, 400)
+        }
+        if (!['bronze', 'silver', 'gold', 'platinum'].includes(tier)) {
+          return json({ error: 'Unknown tier' }, 400)
+        }
+        const { data: existing } = await admin
+          .from('partners').select('id').eq('pending_email', email).maybeSingle()
+        if (existing) {
+          prepared = { table: 'partners', id: existing.id as string }
+        } else {
+          const { data: made, error } = await admin.from('partners')
+            .insert({ name, email, code, tier, status: 'active', pending_email: email })
+            .select('id').maybeSingle()
+          if (error) return json({ error: 'Could not create the partner: ' + error.message }, 500)
+          prepared = { table: 'partners', id: made?.id as string }
+        }
+      }
+
+      /* Now the account. The invite email goes out from here. */
+      const { data: invited, error: inviteErr } =
+        await admin.auth.admin.inviteUserByEmail(email, {
+          redirectTo: String(body.redirectTo || '') || undefined,
+        })
+
+      if (inviteErr) {
+        /* An address that already has an account is a decision, not a failure:
+           somebody may already be a studio owner and now also a partner. We do
+           not guess. The console shows this and the operator chooses. */
+        const already = /already|registered|exists/i.test(inviteErr.message || '')
+        await log({ invite: email, kind: action, failed: inviteErr.message })
+        return json({
+          error: already
+            ? 'That address already has an account. Adding a second role to an existing account is not built yet.'
+            : 'Could not send the invitation: ' + inviteErr.message,
+          alreadyExists: already,
+        }, already ? 409 : 500)
+      }
+
+      const newUserId = invited?.user?.id
+      if (!newUserId) return json({ error: 'The invitation was sent but no account came back' }, 500)
+
+      /* platform_admins is the one the trigger does not handle, because an
+         operator is not something anybody self-provisions into. */
+      if (action === 'inviteOperator') {
+        const { error } = await admin.from('platform_admins').upsert({
+          id: newUserId, email,
+          name: String(body.name || '').trim().slice(0, 160) || email.split('@')[0],
+          role: String(body.role || 'support'), active: true,
+        })
+        if (error) return json({ error: 'Invited, but the operator record failed: ' + error.message }, 500)
+      }
+
+      /* Approving an enquiry and creating the account are one act, so the
+         enquiry is closed here rather than in a second call the console might
+         not make if the first one half-failed. */
+      const enquiryId = String(body.enquiryId || '')
+      if (enquiryId) {
+        await admin.rpc('set_enquiry_state', {
+          p_id: enquiryId, p_state: 'converted',
+          p_by: staff.name || user.email, p_notes: 'Account created and invitation sent',
+        })
+      }
+
+      await log({ invite: email, kind: action, record: prepared?.id || null, enquiry: enquiryId || null })
+      return json({ ok: true, email, userId: newUserId })
     }
 
     return json({ error: 'Unknown action' }, 400)

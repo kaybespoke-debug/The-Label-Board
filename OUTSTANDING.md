@@ -103,8 +103,8 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | | What | Why it matters |
 |---|---|---|
 | 1 | **Supabase → Auth → URL Configuration.** Site URL + redirect URLs with `/**` | Password resets and email confirmations land nowhere until this is set |
-| 2 | **SMTP for auth email** | The partner portal signs people in with a one-time code. Without SMTP nobody can sign in |
-| 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle |
+| 2 | ~~SMTP for auth email~~ | **Done 12 Sep.** Resend, sending as `hello@thelabelboard.com` from the verified root domain. Both `thelabelboard.com` and `send.thelabelboard.com` are verified; the root is the one that matters, because it is what lets the From address be clean and stops Gmail showing "via". Mail records re-checked after every step and never touched. **Untested until a real auth email is sent** |
+| 3 | **Auth → Policies → leaked-password protection: ON** | Off today. Checks new passwords against known breaches. One toggle — and it matters more now the per-IP sign-in limit is 200, because a password policy is the real brute-force defence, not a rate limit |
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
 | 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
@@ -113,6 +113,79 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 
 ---
 
+## SMTP, the last thing the partner portal needs
+
+**Supabase’s built-in sender cannot do this.** It sends **2 messages an hour,
+and only to your own team**, explicitly not for production. So a real provider
+is required, not optional.
+
+**Do not use the Microsoft 365 mailbox**, tempting though it is since it exists
+and is paid for. Microsoft disables SMTP AUTH by default on new tenants and is
+retiring basic authentication for SMTP submission, so it is a login flow built
+on a door Microsoft is closing. It also throttles, and a throttled one-time code
+is a partner who cannot get in.
+
+**Use a sending SUBDOMAIN, not the root domain.** This is the part that matters
+here. `thelabelboard.com` publishes `v=spf1 include:secureserver.net -all` — a
+**hard fail**. Adding another sender to that record risks the mailbox that now
+runs the business. Verifying `send.thelabelboard.com` instead leaves every
+existing MX, SPF and DKIM record untouched, which is the same rule we have
+followed through six DNS changes today.
+
+Recommended: **Resend**. First on Supabase's own list, 3,000 emails a month
+free, three domains on the free tier.
+
+1. Create the account, then **Domains → Add Domain → `send.thelabelboard.com`**.
+   It asks for a **region**: pick the one closest to the recipients, which for
+   Nigerian partners is **eu-west-1 (Ireland)**.
+2. Resend then shows the records. In GoDaddy: **Add New Record** for each,
+   TTL 600.
+
+   **Resend asks for an MX record, and that is fine.** Earlier note said "touch
+   nothing of type MX", which was right about the root and wrong as a blanket
+   rule. The real rule is narrower: **never touch the MX whose Name is `@`** —
+   that one is the Microsoft mailbox. An MX on `send` is a different record and
+   cannot affect it. That is the entire reason for using a subdomain.
+
+   Still true: do not edit the existing root TXT records.
+3. Say the word and I will verify they have propagated, and re-check that the
+   root mail records are still intact, the same way as the domains.
+4. Create an API key in Resend.
+5. Supabase → **Authentication → SMTP Settings** → enable custom SMTP:
+
+   | Field | Value |
+   |---|---|
+   | Host | `smtp.resend.com` |
+   | Port | `587` |
+   | Username | `resend` |
+   | Password | the Resend API key |
+   | Sender email | `hello@thelabelboard.com` |
+   | Sender name | The Label Board |
+
+6. **Rate limits, settled 12 Sep.** Every one of these is **per IP address**,
+   not global, which is the thing that makes them easy to get wrong: ten
+   thousand studios on ten thousand connections are ten thousand separate
+   buckets. They only bite when people share an IP — and **Nigerian carrier NAT
+   puts hundreds of unrelated subscribers behind one address**, so the numbers
+   have to cover strangers colliding, not just one studio's staff.
+
+   | Setting | Value | Why |
+   |---|---|---|
+   | Sign-ups and sign-ins | **200** /5min | Carrier NAT headroom. Still caps one attacker at 2,400 password attempts an hour, which is nothing against a decent password. The real defence is item 3 |
+   | Token refreshes | **500** /5min | Refreshes cluster: everyone opens the app at 9am and a shared carrier IP can push 200+ into one window. Low risk to raise, since refreshing needs a token you already hold |
+   | Token verifications | **30** /5min | Left alone deliberately. This is the brute-force guard on a six-digit code, and it is somebody typing what they were just sent. Lower is safer here |
+   | Emails sent | **200** /h | Covers onboarding a hundred studios in a morning. Also bounds a runaway loop |
+   | SMS, Web3, anonymous | untouched | Not used |
+   | IP address forwarding | **OFF** | It lets a caller *claim* an IP, so every per-IP limit above would trust whatever it is told. For server-side setups behind a trusted proxy. These are browser apps |
+
+   **This rate limit counts Supabase Auth email only** — codes, resets,
+   confirmations, invites. A newsletter never touches it. The binding ceiling is
+   **Resend's free tier: 3,000 a month, about 100 a day**, and that is the
+   number to watch when real volume arrives.
+
+**Kayode enters the API key, not me.** It is a credential.
+
+---
 ## Netlify — two apps of four are deployed
 
 | App | Netlify site | Deploys from | State |
@@ -131,15 +204,11 @@ either.
 `eskubrbgbcbaejynjxvh` with the public anon key. Supabase is not what is holding
 either of them back. Each has exactly one blocker:
 
-- **Partner portal — blocked on SMTP (item 2 above) AND an unwritten hydrate.**
-  It signs people in with an emailed one-time code, so no SMTP means no code.
-  **But SMTP alone will not fix it.** Found 12 Sep while testing the welcome
-  page: `CONFIG.live` is true now the Supabase keys are filled in, and in live
-  mode `enterPortal()` hands off to `loadLivePartnerData()` in
-  `partners/js/auth.js`, which is still the placeholder that logs a warning and
-  returns `false`. So a partner would type a correct code and be bounced with
-  "We could not load your account". Two jobs, not one: SMTP, and that hydrate
-  written against `partner_me`. Half a day, and it is ours rather than Kayode's.
+- **Partner portal — blocked on SMTP alone now.** The hydrate that was the other
+  half is **built** (12 Sep): `partners/js/live.js` reads the five tables plus
+  `app.partner_me()` and produces the same object the demo does, gated by 26
+  checks with the network stubbed, ten mutants all caught. SMTP is the last
+  thing standing between a partner and a working portal.
 - **Public website — blocked on the domain and a real phone number.** It is the
   only one of the four meant to be found by Google. Today `web/js/config.js`
   carries `+234 800 000 0000` and `wa.me/2348000000000`, so "WhatsApp us" goes

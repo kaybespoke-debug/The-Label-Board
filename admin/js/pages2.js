@@ -743,3 +743,81 @@ PAGES.enquiries = function () {
         ? 'No enquiries match that filter. When somebody fills in a form on the website, they appear here.'
         : 'Not connected to the live site yet.') + '</div>') + '</div>';
 };
+
+/* =================== PARTNERS ===================
+   The console tracked subscribers, billing, support and its own staff, and had
+   nowhere at all to see the people bringing subscribers in. So a partner could
+   only be created by writing SQL, and once created could not be looked at.
+
+   Two things this screen is careful about.
+
+   An invited partner who has not signed in yet is shown, not hidden. "Did that
+   invitation ever go out" is the first question anybody asks, and a list that
+   only shows claimed accounts cannot answer it.
+
+   What a partner has earned is not shown here. That lives in their own portal,
+   computed from the ledger, and a second calculation of the same money in a
+   second place is how two screens start disagreeing about what somebody is
+   owed. This screen answers who they are and whether they are in. */
+PAGES.partners = function () {
+  const all = DB.partners || [];
+  const f = (UI.filters && UI.filters.partners) || 'all';
+  const buckets = {
+    all: all,
+    pending: all.filter(p => p.pending),
+    active: all.filter(p => p.claimed && p.status === 'active'),
+    suspended: all.filter(p => p.status !== 'active')
+  };
+  const list = buckets[f] || all;
+
+  const TIER = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' };
+
+  const head = '<div class="stats">' +
+    statCard({ label: 'Partners', value: all.length, tone: 'info',
+      sub: 'Everyone bringing studios in' }) +
+    statCard({ label: 'Waiting to sign in', value: buckets.pending.length,
+      tone: buckets.pending.length ? 'warn' : 'good',
+      sub: buckets.pending.length ? 'Invited, not claimed yet' : 'Nobody left hanging' }) +
+    statCard({ label: 'Active', value: buckets.active.length, tone: 'good',
+      sub: 'Signed in and able to refer' }) +
+    statCard({ label: 'Suspended', value: buckets.suspended.length,
+      tone: buckets.suspended.length ? 'warn' : 'good', sub: 'Cannot refer while suspended' }) +
+    '</div>';
+
+  const bar = '<div class="bar">' + tabBar('partners', [
+    { k: 'all', t: 'All', n: all.length },
+    { k: 'pending', t: 'Waiting', n: buckets.pending.length },
+    { k: 'active', t: 'Active', n: buckets.active.length },
+    { k: 'suspended', t: 'Suspended', n: buckets.suspended.length }
+  ]) + '<span class="spacer"></span>' +
+    '<button class="btn gold" onclick="formInvitePartner()">Invite a partner</button></div>';
+
+  if (!all.length) {
+    return head + bar +
+      '<div class="pnl"><div class="empty">No partners yet.<br>' +
+      '<span class="note">Invite one and they get an email to set their own password. ' +
+      'Applications from the website arrive in Enquiries, where you can approve them ' +
+      'into a partner account in one step.</span></div></div>';
+  }
+
+  const rows = list.map(p =>
+    '<tr>' +
+    '<td><b>' + esc(p.name || '(no name)') + '</b>' +
+    (p.business ? '<div class="note">' + esc(p.business) + '</div>' : '') + '</td>' +
+    '<td><code>' + esc(p.code) + '</code></td>' +
+    '<td>' + esc(TIER[p.tier] || p.tier) + '</td>' +
+    '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—') + '</td>' +
+    '<td>' + (p.pending
+      ? '<span class="pill amber">Invited, not in yet</span>'
+      : (p.status === 'active' ? '<span class="pill green">Active</span>'
+        : '<span class="pill red">' + esc(p.status) + '</span>')) + '</td>' +
+    '<td class="note">' + (p.joined ? esc(p.joined) : '—') + '</td>' +
+    '</tr>').join('');
+
+  return head + bar +
+    (list.length
+      ? '<div class="pnl"><div class="tw"><table><thead><tr>' +
+        '<th>Name</th><th>Code</th><th>Tier</th><th>Email</th><th>Access</th><th>Joined</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
+      : '<div class="pnl"><div class="empty">Nothing matches.</div></div>');
+};

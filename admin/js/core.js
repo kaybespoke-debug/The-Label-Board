@@ -10,7 +10,7 @@ const UI = {
   filters: {                  // per-page sub-tab state
     subscribers: 'all', payments: 'all', announcements: 'published',
     tasks: 'mine', staff: 'all', support: 'tickets', feedback: 'all', enquiries: 'new',
-    onboarding: 'all', activity: 'all'
+    onboarding: 'all', activity: 'all', partners: 'all'
   },
   sort: { subscribers: 'name', payments: 'date-desc', payroll: 'net-desc', activity: 'newest' },
   dashPanel: 0,               // which of the four dashboard panels shows on a phone

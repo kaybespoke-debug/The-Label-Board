@@ -236,6 +236,69 @@ function upsertsIn(src, label) {
   return out;
 }
 
+/* The same question again for `.from('x').insert({...})`, which neither of the
+   two scanners above catches: selectsIn only reads select(), and upsertsIn walks
+   back to the enclosing `function ` and so misses a chained call inside a long
+   handler. admin-api's invite actions are written that way, and a typo in one of
+   their column names would have shipped green and failed the first time anybody
+   invited a studio. Found by injecting `pending_emial` and watching the harness
+   pass, 13 Sep. */
+function insertsIn(src, label) {
+  const out = [];
+  let i = 0;
+  while ((i = src.indexOf(".from('", i)) !== -1) {
+    const close = src.indexOf("')", i + 7);
+    if (close === -1) break;
+    const table = src.slice(i + 7, close);
+    /* the insert has to belong to THIS from(): anything further away is a
+       different statement that happens to follow. */
+    const window = src.slice(close, close + 160);
+    const nextFrom = window.indexOf(".from('");
+    const ins = window.indexOf('.insert({');
+    if (ins !== -1 && (nextFrom === -1 || ins < nextFrom)) {
+      const objStart = close + ins + 8;
+      let d = 0, end = -1;
+      for (let j = objStart; j < src.length && j < objStart + 2000; j++) {
+        if (src[j] === '{') d++;
+        else if (src[j] === '}') { d--; if (d === 0) { end = j; break; } }
+      }
+      if (end > 0) {
+        const body = src.slice(objStart + 1, end);
+        const keys = []; let dd = 0;
+        body.replace(/[{}[\]]|([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, (m0, k, off) => {
+          if (m0 === '{' || m0 === '[') dd++;
+          else if (m0 === '}' || m0 === ']') dd--;
+          else if (k && dd === 0) {
+            let p = off - 1;
+            while (p >= 0 && /\s/.test(body[p])) p--;
+            if (p < 0 || body[p] === ',') keys.push(k);
+          }
+          return m0;
+        });
+        if (keys.length) out.push({ table, keys, label });
+      }
+    }
+    i = close + 2;
+  }
+  return out;
+}
+
+const inserts = [
+  ...insertsIn(adminFn, 'admin-api'),
+  ...insertsIn(teamFn, 'team-admin'),
+];
+ok('the Edge Functions are being scanned for inserted columns too', inserts.length > 0,
+   'found no from().insert({...}) — the scanner has stopped working');
+for (const { table, keys, label } of inserts) {
+  const have = (await asAdmin(
+    `select column_name from information_schema.columns
+      where table_schema='public' and table_name=$1`, [table])).map(r => r.column_name);
+  for (const col of keys) {
+    ok(label + ' inserts ' + table + '.' + col + ', and it exists', have.includes(col),
+       have.length ? 'the table has: ' + have.join(', ') : 'no such table');
+  }
+}
+
 for (const { table, keys, label } of upsertsIn(app, 'the app')) {
   const have = (await asAdmin(
     `select column_name from information_schema.columns
