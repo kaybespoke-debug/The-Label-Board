@@ -622,3 +622,72 @@ async function enquiryState(id, state) {
     toast(String(e.message || e));
   }
 }
+
+/* ---------------- invitations -----------------------------------------
+   The only way an account is created anywhere. Before this, every studio,
+   partner and colleague was made by hand in the Supabase dashboard with a
+   password somebody invented and then sent them in a message.
+
+   Nobody is ever sent a password. The gateway asks Supabase to email an
+   invitation and they set their own, so a credential never passes through an
+   operator, a chat, or a screenshot.
+
+   Each of these is a thin wrapper on purpose. Everything that decides whether
+   the caller is allowed to do it, and the order the records have to be written
+   in, lives server side in admin-api where a browser cannot reach it. */
+
+async function liveInviteOperator(email, name, role) {
+  return await liveCall('inviteOperator', { email: email, name: name, role: role });
+}
+
+async function liveInviteStudio(email, businessName, enquiryId) {
+  return await liveCall('inviteStudio', {
+    email: email, businessName: businessName, enquiryId: enquiryId || ''
+  });
+}
+
+async function liveInvitePartner(email, name, code, tier, enquiryId) {
+  return await liveCall('invitePartner', {
+    email: email, name: name, code: code, tier: tier || 'bronze',
+    enquiryId: enquiryId || ''
+  });
+}
+
+/* Approving an enquiry is one act: the account is created and the enquiry is
+   marked converted in the same server call, so a half-failure cannot leave a
+   studio with a login and an enquiry still sitting in the new pile. */
+async function approveEnquiry(id) {
+  if (!LIVE.on()) { toast('Not connected to the live site.'); return; }
+  const e = (DB.enquiries || []).find(x => String(x.id) === String(id));
+  if (!e) { toast('That enquiry is no longer here.'); return; }
+  if (!e.email) { toast('That enquiry left no email address, so there is nobody to invite.'); return; }
+
+  const isPartner = e.kind === 'partner' || e.kind === 'referral';
+  const what = isPartner ? 'partner' : 'studio';
+  const named = (e.business || e.name || '').trim();
+  if (!named) { toast('That enquiry left no name, so there is nothing to call the ' + what + '.'); return; }
+
+  /* A referral code has to be unique and is a decision, not a default, so it is
+     asked for rather than invented from a name that two partners might share. */
+  let code = '';
+  if (isPartner) {
+    code = (prompt('Referral code for ' + named + '\n\nLetters, numbers and hyphens. This is what they share.',
+      named.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20)) || '').trim();
+    if (!code) return;
+  }
+
+  if (!confirm('Create a ' + what + ' account for ' + named + ' and email an invitation to '
+    + e.email + '?\n\nThey set their own password. Nothing is sent to you.')) return;
+
+  try {
+    if (isPartner) await liveInvitePartner(e.email, named, code, 'bronze', e.id);
+    else await liveInviteStudio(e.email, named, e.id);
+    await liveLoadEnquiries();
+    toast('Invitation sent to ' + e.email);
+    render();
+  } catch (err) {
+    /* The gateway says plainly when an address already has an account, because
+       that is a decision for a person rather than something to retry. */
+    toast(String(err.message || err));
+  }
+}

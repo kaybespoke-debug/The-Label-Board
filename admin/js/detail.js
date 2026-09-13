@@ -738,11 +738,29 @@ DETAIL.enquiry = function (id) {
     kv('Handled by', esc(e.handled_by || '—')) +
     kv('Last touched', e.handled_at ? ago(e.handled_at) : '—') +
     (e.notes ? kv('Notes', esc(e.notes)) : '') +
+    /* Approving is the one button here that creates something. It makes the
+       studio or the partner, emails them an invitation, and marks this
+       converted in the same server call — so a half-failure cannot leave
+       somebody with a login and their enquiry still sitting in the new pile.
+
+       "Became a subscriber" stays beside it and stays separate: it records
+       that somebody converted through a route that did not start here, and
+       must not quietly create a second account for a studio that already
+       has one. */
     '<div class="btn-row" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">' +
+    ((e.email && e.state !== 'converted' && e.kind !== 'contact')
+      ? '<button class="btn gold" onclick="approveEnquiry(\'' + esc(String(e.id)) + '\')">' +
+        'Approve and create account</button>'
+      : '') +
     act('open', 'Picked it up') +
     act('replied', 'Replied') +
-    act('converted', 'Became a subscriber', 'gold') +
+    act('converted', 'Became a subscriber') +
     act('spam', 'Spam') +
     act('closed', 'Close') +
-    '</div>';
+    '</div>' +
+    ((e.email && e.state !== 'converted' && e.kind !== 'contact')
+      ? '<div class="note" style="margin-top:9px">Approving emails them an invitation. ' +
+        'They set their own password — nothing is sent to you, and nothing is sent to them ' +
+        'that anybody else could use.</div>'
+      : '');
 };
