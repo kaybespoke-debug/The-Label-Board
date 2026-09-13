@@ -258,7 +258,13 @@ PAGES.onboarding = function () {
       { k: 'all', t: 'All', n: all.length }, { k: 'new', t: 'Not started', n: buckets.new.length },
       { k: 'setup', t: 'Setting up', n: buckets.setup.length }, { k: 'ready', t: 'Ready', n: buckets.ready.length },
       { k: 'ending', t: 'Trial ending', n: buckets.ending.length }
-    ]) + '<span class="spacer"></span><button class="btn" onclick="exportOnboarding()">Export CSV</button></div>' +
+    /* The pipeline could track a studio through onboarding but never start one,
+       so every studio on it had been created by hand in Supabase first. This is
+       that missing first step. Left of Export because it is the thing somebody
+       came to this screen to do. */
+    ]) + '<span class="spacer"></span>' +
+      '<button class="btn gold" onclick="formInviteStudio()">Invite a studio</button>' +
+      '<button class="btn" onclick="exportOnboarding()">Export CSV</button></div>' +
 
     (list.length ? '<div class="cards">' + list.map(o =>
       '<div class="card" onclick="openDetail(\'onb\',\'' + o.id + '\')">' +

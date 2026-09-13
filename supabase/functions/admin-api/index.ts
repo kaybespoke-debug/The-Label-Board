@@ -30,7 +30,7 @@ const ALLOWED: Record<string, string[]> = {
   owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
               'billing', 'payments', 'recordPayment', 'setStorageCap',
-              'enquiries', 'setEnquiryState',
+              'enquiries', 'setEnquiryState', 'partners',
               'inviteOperator', 'inviteStudio', 'invitePartner'],
   // Finance is the role that exists to do this. Support and developer are not
   // given it: what every subscriber pays is not something a support agent needs
@@ -38,11 +38,11 @@ const ALLOWED: Record<string, string[]> = {
   // somebody because it was easier than making a new one.
   finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus',
               'billing', 'payments', 'recordPayment', 'setStorageCap',
-              'enquiries', 'setEnquiryState',
+              'enquiries', 'setEnquiryState', 'partners',
               'inviteStudio', 'invitePartner'],
   support:   ['me', 'tenants', 'tenant', 'setNote',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
-              'enquiries', 'setEnquiryState',
+              'enquiries', 'setEnquiryState', 'partners',
               'inviteStudio', 'invitePartner'],
   // a developer reads what studios reported and can move it along, but does
   // not write to a studio in our name
@@ -333,6 +333,25 @@ Deno.serve(async (req) => {
       await admin.from('feedback').update({ state: 'open' }).eq('id', id).eq('state', 'new')
       await log({ replied: id, length: text.length }, msg.business_id as string)
       return json({ ok: true })
+    }
+
+    /* Who our referral partners are, and how each of them is doing. Read
+       through the service role like everything else here, because partner rows
+       are readable by that partner and nobody else — an operator is not a
+       partner, so row level security correctly refuses them and this is the one
+       audited place that goes around it.
+
+       pending_email is exposed deliberately: an invited partner who has not
+       claimed their account yet is invisible otherwise, and "did that invite
+       ever go out" is the first question anybody asks. */
+    if (action === 'partners') {
+      const { data, error } = await admin
+        .from('partners')
+        .select('id,code,name,business_name,email,phone,city,tier,status,joined_on,user_id,pending_email')
+        .order('joined_on', { ascending: false })
+      if (error) return json({ error: error.message }, 500)
+      await log({ count: (data || []).length })
+      return json({ ok: true, partners: data || [] })
     }
 
     /* ---------------- invitations ----------------------------------------

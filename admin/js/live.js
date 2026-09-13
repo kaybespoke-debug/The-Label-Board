@@ -229,6 +229,7 @@ async function liveStart() {
   await liveLoadPayments();
   await liveLoadInbox();
   await liveLoadEnquiries();
+  await liveLoadPartners();
   liveStartPolling();
   if (typeof render === 'function') { try { render(); } catch (e) {} }
 }
@@ -689,5 +690,36 @@ async function approveEnquiry(id) {
     /* The gateway says plainly when an address already has an account, because
        that is a decision for a person rather than something to retry. */
     toast(String(err.message || err));
+  }
+}
+
+/* ---------------- partners --------------------------------------------
+   Read through the gateway like everything else, because a partner row is
+   readable by that partner and nobody else. An operator is not a partner, so
+   row level security correctly refuses them, and admin-api is the one audited
+   place that goes around it.
+
+   An invited partner who has not claimed their account yet has no user_id and
+   is carried on pending_email instead. They are shown, because "did that
+   invitation ever go out" is the first thing anybody asks and a list that hides
+   them cannot answer it. */
+async function liveLoadPartners() {
+  try {
+    const out = await liveCall('partners');
+    DB.partners = (out.partners || []).map(function (p) {
+      return {
+        id: p.id, code: p.code || '', name: p.name || '',
+        business: p.business_name || '', email: p.email || p.pending_email || '',
+        phone: p.phone || '', city: p.city || '',
+        tier: p.tier || 'bronze', status: p.status || 'active',
+        joined: p.joined_on || '',
+        claimed: !!p.user_id,
+        pending: !p.user_id && !!p.pending_email
+      };
+    });
+    return true;
+  } catch (e) {
+    LIVE.error = LIVE.error || String(e.message || e);
+    return false;
   }
 }
