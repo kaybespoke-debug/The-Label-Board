@@ -120,45 +120,70 @@ shows up in the user list, and has to be cleaned up if we say no. The schema was
 already built for this: `partners.pending_email` and
 `businesses.pending_owner_email` are waiting for exactly this use.
 
-**Studios get a temporary password, operators get an invite link.** An invite
-email that lands in spam is a studio that never onboards, and this market is
-more reachable on WhatsApp than on email. So studios get a temporary password to
-pass on, and must change it on first sign-in.
+**Everybody gets an invite link. Nobody is sent a password.**
 
-Operators do not, because **forcing a password change is enforced by our code,
-not by Supabase** — somebody using the API directly could skip it. That is an
-acceptable risk for a studio owner and not for an account that can read every
-subscriber's finances. Nobody should ever know an operator's password, including
-Kayode.
+This reversed on 13 Sep, and Kayode was right to push on it. The original plan
+gave studios a temporary password to pass on by hand, on the reasoning that this
+market is more reachable on WhatsApp than on email. That reasoning does not
+survive the rest of the design: if email is unreliable then password resets are
+unreliable too and always have been, a password in a chat log is there forever
+while a link expires, and we are building and proving the email path regardless.
+
+So an invite link is the default for all three kinds of account. **A temporary
+password stays as a fallback the console can offer** — "they never got it, give
+me a temporary password instead" — used by exception, and still forcing a change
+on first sign-in.
+
+Worth remembering why that fallback is second-best: **forcing a password change
+is enforced by our code, not by Supabase.** Somebody calling the API directly
+could skip it. Tolerable for a studio owner as an exception; never the default,
+and never for an account that can read every subscriber's finances.
+
+**Two role lists, kept separate.** The console has job titles — Finance Manager,
+Support Manager, Head of Product. The gateway has permission levels — `owner`,
+`finance`, `support`, `developer`. Kayode holds every role today, so they look
+redundant; the moment he hires a finance manager they become two different facts
+about one person, one of them HR and one of them what the gateway will let them
+touch. Collapsing them now would mean un-collapsing them exactly when he is
+busiest. Shown side by side on the access panel, job title editable on the staff
+record, access level set only on the panel and only by an owner.
 
 ---
 
 ## Open, and needed before building
 
-- [ ] **Is the `on_auth_user_created` trigger attached on the live project?**
-      Everything here ends with "the trigger attaches them to their record". If
-      it is not attached, every invite produces an account with nothing on it —
-      which is what happened to Kayode's own account. This decides whether this
-      work is a build or a repair.
+- [x] ~~Is the `on_auth_user_created` trigger attached on the live project?~~
+      **Yes, checked 13 Sep.** So provisioning will run. It does leave one thing
+      unexplained: Kayode's own account has no studio despite the trigger being
+      there, so either it predates the trigger or the trigger failed silently for
+      it — it catches every exception by design and lets the signup succeed
+      anyway. Worth knowing which, because the second would affect everyone:
 
       ```sql
-      select tgname from pg_trigger
-       where tgrelid = 'auth.users'::regclass and not tgisinternal;
+      select u.email from auth.users u
+        left join public.memberships m on m.user_id = u.id
+        left join public.partners p on p.user_id = u.id
+        left join public.platform_admins a on a.id = u.id
+       where m.id is null and p.id is null and a.id is null;
       ```
 
-- [ ] **Has one real email ever arrived?** SMTP is configured; nothing has been
-      seen to deliver. The whole feature is "send someone an invite". Prove one
-      lands before building on the assumption.
+- [ ] **SMTP is broken, confirmed 13 Sep.** Not an unknown any more: "Send
+      password recovery" on a user that definitely exists returned *Error sending
+      recovery email*. Supabase could not hand the message to Resend.
 
-- [ ] **Two role lists, or one?** The console has Finance Manager, Support
-      Manager, Head of Product. The gateway has `owner`, `finance`, `support`,
-      `developer`. They are mapped roughly onto each other in code, which is
-      fine with one operator and confusing the first time a title and an access
-      level disagree. Blocks the Access column specifically.
+      The whole feature is "send somebody an invite", so this is a hard blocker.
+      Two logs give opposite answers. **Nothing in Resend's log** means Supabase
+      never connected — host, port, username or password, and the usual culprit
+      is the username, which must be the literal word `resend` rather than an
+      email address. **Something in Resend's log marked failed** means it
+      connected and Resend refused, which is nearly always the sender address or
+      the key's permissions. Supabase → Logs → Auth names the actual error.
 
-- [ ] **Do temporary passwords expire?** Recommended 72 hours, then Forgot
-      password. Otherwise a password Kayode generated and sent over WhatsApp
-      stays valid forever if they never change it.
+- [x] ~~Two role lists, or one?~~ **Two, settled 13 Sep.** Reasoning above.
+
+- [x] ~~Do temporary passwords expire?~~ **Moot.** Invite links are the default
+      now; the temporary password is an exception path, and an exception that has
+      to be asked for does not sit around unused for months.
 
 ---
 
