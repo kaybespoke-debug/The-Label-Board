@@ -32,13 +32,17 @@ function staffByEmail(email) {
     (s.altEmails || []).some(a => String(a).toLowerCase() === e)) || null;
 }
 
+/* Only ever what THIS browser last signed in with. Nothing else.
+
+   There used to be a fallback that filled the field from the seeded owner
+   record whenever the console had a single staff account, on the reasoning
+   that a brand new console has nobody to give away. That reasoning was wrong
+   twice over: it fired on a fresh console before anybody had signed in, so a
+   stranger opening the operator console was handed half of a credential; and
+   the address it offered was invented demo data rather than a real login, so
+   it was also useless. Removed 13 Sep at Kayode's ask. */
 function lastEmail() {
-  let v = '';
-  try { v = localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch (e) {}
-  /* On a brand new console the owner is the only account there is, so
-     there is nothing to give away by filling their address in. */
-  if (!v && DB.staff.length === 1) v = String(DB.staff[0].email || '');
-  return v;
+  try { return localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch (e) { return ''; }
 }
 
 function loginShell(inner) {
