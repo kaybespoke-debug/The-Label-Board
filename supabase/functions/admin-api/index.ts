@@ -20,6 +20,26 @@ const URL_ = Deno.env.get('SUPABASE_URL')!
 const ANON = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+/* ===== WHERE AN INVITATION LANDS =====
+   Three kinds of account, three different apps, and the invitation email has
+   one link in it. Supabase falls back to the project's Site URL when no
+   redirect is given, and the Site URL is the customer app — so every partner
+   and every operator we invited was sent to a studio sign-in screen that
+   correctly told them they had no studio. The link was wrong, not the account.
+
+   Decided here and not by the caller. The console is a trusted client today,
+   but an invitation is an email we send with a link in it, and a redirect the
+   browser can name is a redirect an attacker can name. There is nothing a
+   console operator needs that this table does not already give them.
+
+   Overridable by env so a staging project can point elsewhere without a code
+   change; the defaults are the live addresses. */
+const APP_URLS: Record<string, string> = {
+  inviteStudio:   Deno.env.get('STUDIO_APP_URL')   || 'https://app.thelabelboard.com',
+  invitePartner:  Deno.env.get('PARTNER_APP_URL')  || 'https://partners.thelabelboard.com',
+  inviteOperator: Deno.env.get('CONSOLE_APP_URL')  || 'https://admin.thelabelboard.com',
+}
+
 /* what each role is allowed to ask for. Anything not listed is refused. */
 const ALLOWED: Record<string, string[]> = {
   /* inviteOperator is deliberately owner-only and the other two are not.
@@ -447,7 +467,7 @@ Deno.serve(async (req) => {
       /* Now the account. The invite email goes out from here. */
       const { data: invited, error: inviteErr } =
         await admin.auth.admin.inviteUserByEmail(email, {
-          redirectTo: String(body.redirectTo || '') || undefined,
+          redirectTo: APP_URLS[action],
         })
 
       if (inviteErr) {

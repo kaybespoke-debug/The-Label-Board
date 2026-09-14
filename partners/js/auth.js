@@ -402,8 +402,81 @@ function useDemo(email) {
   requestCode();
 }
 
+/* ---------------- arriving from an invitation ----------------
+   The invitation email carries one link, and Supabase answers it by handing the
+   browser a live session in the fragment of whatever address the link points
+   at. Until now that address was the customer app for everybody, so a partner
+   following their invitation landed on a studio sign-in form and was correctly
+   told they had no studio. The account was right; the link was wrong.
+
+   A partner who arrives here is already signed in. What they do not have — and
+   by design never will — is a password: this portal signs people in with a code
+   emailed on the day, because a partner opens it every few weeks and a password
+   set in November is forgotten by February. So the honest thing to do with that
+   session is use it. One tap from the email into the portal, and every visit
+   after that is a code.
+
+   The fragment is cleared before anything renders. A URL with a live token in
+   it is the kind of thing that gets pasted into a chat to ask "is this right?" */
+function readAuthArrival() {
+  try {
+    const raw = String(location.hash || '').replace(/^#/, '');
+    if (!raw) return null;
+    const h = new URLSearchParams(raw);
+    const bad = h.get('error_description') || h.get('error');
+    if (bad) return { error: String(bad).replace(/\+/g, ' ') };
+    const token = h.get('access_token');
+    if (!token) return null;
+    return { token: token, refresh: h.get('refresh_token') || '', kind: h.get('type') || '' };
+  } catch (e) { return null; }
+}
+function clearAuthArrival() {
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+}
+/* Returns true when it has dealt with the page, false to carry on booting. */
+async function handleAuthArrival() {
+  if (!CONFIG.live) return false;                 // the demo has no real tokens
+  const arrival = readAuthArrival();
+  if (!arrival) return false;
+  clearAuthArrival();
+
+  if (arrival.error) {
+    /* Almost always an expired link. Say so and leave the code box right there,
+       because asking for a code is the fix and they are already on the page. */
+    AUTH.error = arrival.error + '. Ask for a sign-in code below, or your partner manager for a new invitation.';
+    renderAuth();
+    return true;
+  }
+
+  const me = await partnerMe(arrival.token);
+  if (!me) {
+    AUTH.error = 'That link signed you in, but this account is not set up as a partner. Talk to your partner manager.';
+    renderAuth();
+    return true;
+  }
+  if (me.status !== 'active') {
+    clearSession();
+    AUTH.stage = 'suspended';
+    AUTH.pending = { email: me.email, name: me.name };
+    renderAuth();
+    return true;
+  }
+
+  saveSession({
+    partnerKey: me.id, email: me.email, name: me.name,
+    token: arrival.token, refresh: arrival.refresh,
+    expiresAt: sessionExpiry(), provider: 'supabase'
+  });
+  /* fresh: true — this is a sign-in, so it gets the welcome page. It is the one
+     moment a brand new partner is actually paying attention to what this is. */
+  if (!await enterPortal(true)) { clearSession(); renderAuth(); }
+  return true;
+}
+
 /* ---------------- boot ---------------- */
 async function bootAuth() {
+  if (await handleAuthArrival()) return;
+
   const s = readSession();
   if (!s) { renderAuth(); return; }
 

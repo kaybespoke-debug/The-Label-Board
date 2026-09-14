@@ -19,6 +19,40 @@ const SESSION_KEY = 'tlb_admin_session';
 const LAST_EMAIL_KEY = 'tlb_admin_last_email';
 let LOGIN_MODE = 'signin';
 
+/* ===== ARRIVING FROM AN INVITATION =====================================
+   An operator we invite has an account and no password. The invitation link
+   hands the browser a live session, and that is enough to get in exactly once
+   — which is worse than being locked out, because it looks like it worked and
+   then never does again. So an arrival is not a sign-in here: it is a screen
+   that asks for a password first, and only then goes through the same door
+   everybody else uses.
+
+   Read at parse time, before anything calls liveClient(). supabase-js consumes
+   the token out of the address the moment the client is created, so a capture
+   that runs afterwards finds an empty hash and cannot tell an invitation from
+   somebody opening the page. This is the same ordering trap the customer app
+   hit on 13 Sep; it is written down in both places on purpose. */
+const CONSOLE_ARRIVAL = (function () {
+  try {
+    const h = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+    const bad = h.get('error_description') || h.get('error');
+    if (bad) return { kind: 'error', message: String(bad).replace(/\+/g, ' ') };
+    const t = h.get('type') || '';
+    if (h.get('access_token') && t) return { kind: t };
+    const q = new URLSearchParams(String(location.search || ''));
+    const qt = q.get('type') || '';
+    if (q.get('code') && qt) return { kind: qt };
+  } catch (e) {}
+  return null;
+})();
+function consoleArrivalNeedsPassword() {
+  return !!(CONSOLE_ARRIVAL && ['invite', 'recovery', 'signup'].indexOf(CONSOLE_ARRIVAL.kind) >= 0);
+}
+function clearConsoleArrival() {
+  /* A console screenshot must not carry a live session in its address bar. */
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+}
+
 function signedIn() {
   try { return !!localStorage.getItem(SESSION_KEY); } catch (e) { return false; }
 }
@@ -74,6 +108,7 @@ function buildLogin() {
   }
   el.innerHTML = loginShell(
     LOGIN_MODE === 'setup'   ? formSetup()
+    : LOGIN_MODE === 'invited' ? formInvited()
     : LOGIN_MODE === 'recover' ? formRecover()
     : formSignIn());
 
@@ -118,6 +153,116 @@ function formSetup() {
     '<button class="btn gold" id="setupBtn" style="width:100%;padding:13px" onclick="doSetup()">' +
     'Set password</button>' +
     '</div>';
+}
+
+/* ---------------- arriving on an invitation ----------------
+   Two boxes and the same strength rules as every other password in the
+   console. No email field: the link decided who this is, and an editable
+   address here would only invite somebody to type the wrong one and wonder
+   why nothing happened. */
+function formInvited() {
+  const recovering = CONSOLE_ARRIVAL && CONSOLE_ARRIVAL.kind === 'recovery';
+  return '<div class="pw-wrap on">' +
+    '<p class="login-lead" style="margin-top:22px">' +
+    (recovering ? 'Choose a new password for the control centre.'
+                : 'Welcome. Choose a password to finish setting up your account.') + '</p>' +
+    '<div class="pw-row">' +
+    '<input class="fld" type="password" id="invPw" placeholder="New password" autocomplete="new-password" ' +
+    'style="padding-right:60px" oninput="onInvitedType()">' +
+    '<span class="pw-show" id="pwShow" onclick="toggleLoginPw(\'invPw\')">Show</span>' +
+    '</div>' +
+    '<div id="invMeter" style="margin:8px 0 4px">' + strengthMeter('', null) + '</div>' +
+    '<input class="fld" type="password" id="invPw2" placeholder="Repeat it" autocomplete="new-password" ' +
+    'oninput="onInvitedType()" onkeydown="if(event.key===\'Enter\')doAcceptInvite()">' +
+    '<div class="login-err" id="loginErr"></div>' +
+    '<button class="btn gold" id="invBtn" style="width:100%;padding:13px" onclick="doAcceptInvite()">' +
+    'Set my password</button>' +
+    '</div>';
+}
+
+function onInvitedType() {
+  const pw = (document.getElementById('invPw') || {}).value || '';
+  const pw2 = (document.getElementById('invPw2') || {}).value || '';
+  const m = document.getElementById('invMeter');
+  if (m) m.innerHTML = strengthMeter(pw, null);
+  const err = document.getElementById('loginErr');
+  if (err) err.textContent = (pw2 && pw !== pw2) ? 'The two entries do not match yet.' : '';
+}
+
+/* The session is not in the address any more by the time this runs — creating
+   the client took it — so wait for the client to have stored it rather than
+   reading the url again. Twenty tries at 150ms is three seconds, which is far
+   longer than it takes and still short enough that a dead link says so while
+   somebody is still looking at the screen. */
+async function startConsoleArrival() {
+  /* A dead link never reaches here: it has no type, so it is not an arrival
+     that needs a password, and initSignIn shows it on the sign-in screen where
+     the fix — asking for a new invitation — is one message away. */
+  const err = () => document.getElementById('loginErr');
+  const c = (typeof liveClient === 'function') ? liveClient() : null;
+  if (!c) { const e = err(); if (e) e.textContent = 'This console is not connected to a project.'; return false; }
+  for (let i = 0; i < 20; i++) {
+    let s = null;
+    try { s = (await c.auth.getSession()).data.session; } catch (e) {}
+    if (s) return true;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  const e = err();
+  if (e) e.textContent = 'That link has expired. Ask for a new invitation, or sign in below.';
+  return false;
+}
+
+async function doAcceptInvite() {
+  const btn = document.getElementById('invBtn');
+  const err = document.getElementById('loginErr');
+  const pw = (document.getElementById('invPw') || {}).value || '';
+  const pw2 = (document.getElementById('invPw2') || {}).value || '';
+
+  if (!pw) { err.textContent = 'Choose a password.'; return; }
+  if (pw !== pw2) { err.textContent = 'The two entries do not match.'; return; }
+  const r = checkPassword(pw, null);
+  if (!r.allOk) {
+    err.textContent = 'Not accepted yet: ' + r.rules.filter(x => !x.ok)[0].label.toLowerCase() + '.';
+    return;
+  }
+
+  const c = (typeof liveClient === 'function') ? liveClient() : null;
+  if (!c) { err.textContent = 'This console is not connected to a project.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Setting…';
+  let session = null;
+  try { session = (await c.auth.getSession()).data.session; } catch (e) {}
+  if (!session) {
+    btn.disabled = false; btn.textContent = 'Set my password';
+    err.textContent = 'That link has expired. Ask for a new invitation.';
+    return;
+  }
+
+  const { error: upErr } = await c.auth.updateUser({ password: pw });
+  document.getElementById('invPw').value = '';
+  document.getElementById('invPw2').value = '';
+  if (upErr) {
+    btn.disabled = false; btn.textContent = 'Set my password';
+    err.textContent = 'Could not set that password: ' + upErr.message;
+    return;
+  }
+  clearConsoleArrival();
+
+  /* Same door as everybody else from here: admin-api decides whether a valid
+     Supabase account is one of ours. A studio owner who somehow followed an
+     operator link has a perfectly good session and still does not get in. */
+  try {
+    const out = await liveCall('me');
+    LIVE.me = out.me; LIVE.ready = true; LIVE.error = '';
+    try { localStorage.setItem(LAST_EMAIL_KEY, credKeyFor(out.me.email)); } catch (e) {}
+    signInAs(liveAdoptStaff(out.me));
+  } catch (e) {
+    try { await c.auth.signOut(); } catch (e2) {}
+    LIVE.ready = false;
+    btn.disabled = false; btn.textContent = 'Set my password';
+    err.textContent = 'Your password is set, but this account is not an operator account. ' +
+      'Studios sign in at app.thelabelboard.com and partners at partners.thelabelboard.com.';
+  }
 }
 
 function onSetupType() {
@@ -368,10 +513,28 @@ function initSignIn() {
      Restoring is asynchronous, so show the sign-in screen and let it come
      back and dismiss itself if this browser already holds a session. */
   if (CONFIG.live) {
+    /* An invitation is not a session to restore. Restoring it would let an
+       invited operator straight in on the link's own session, having set no
+       password — in once, and locked out forever after, which reads as the
+       console being broken rather than as a step that was skipped. */
+    if (consoleArrivalNeedsPassword()) {
+      LOGIN_MODE = 'invited';
+      document.body.classList.add('signed-out');
+      document.getElementById('login').classList.add('on');
+      buildLogin();
+      startConsoleArrival();
+      return false;
+    }
     LOGIN_MODE = 'signin';
     document.body.classList.add('signed-out');
     document.getElementById('login').classList.add('on');
     buildLogin();
+    if (CONSOLE_ARRIVAL && CONSOLE_ARRIVAL.kind === 'error') {
+      const e = document.getElementById('loginErr');
+      if (e) e.textContent = CONSOLE_ARRIVAL.message + '. Ask for a new invitation.';
+      clearConsoleArrival();
+      return false;
+    }
     if (typeof liveRestore === 'function') {
       liveRestore().then(me => { if (me) signInAs(liveAdoptStaff(me)); })
                    .catch(() => {});

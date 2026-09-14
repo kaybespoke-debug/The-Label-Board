@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 11 September 2026 (eighth session)
+Last updated: 14 September 2026 (ninth session)
 
 ## How this run works
 
@@ -323,7 +323,81 @@ work when somebody does it.
 
 ---
 
-## Fixed this run
+## Fixed after the first real end-to-end test — 14 September 2026
+
+The invite chain worked end to end for the first time. Kayode reported three
+things from that run. All three are built and gated, **none is deployed yet**.
+
+Customer app goes to **`layi-v42`** (`site/sw.js` `CACHE` bumped to match).
+
+- **1. Two banners sat over the dashboard.** Face ID and Install are both
+  offered on a first mobile sign-in, and stacked they are about 200px of fixed
+  banner above the tab bar, on top of the dashboard somebody just signed in to
+  look at. Clearing one slid the other into its place, which reads as the thing
+  refusing to go away. Only one shows now: Face ID first, because it is offered
+  once per device and then never again, and the install prompt takes its turn
+  when that is dealt with. Gated in `audit_first_run.js`, and the gate first
+  proves the install prompt *would* have shown, so "it waited" cannot pass
+  because it was never eligible.
+- **2a. Every new studio was called LAYI.** `DEFAULTS.company.name` was the
+  literal `'LAYI'`, so a studio inherited the demo tenant's name — in the
+  header, on a supplier WhatsApp message, and in `businesses.name`, which the
+  app writes from that value. Now blank, and three things follow: the console's
+  name for a studio is adopted on first sign-in (`adoptStudioName()`), presence
+  never reports a blank over a real name, and the two `||'LAYI'` fallbacks are
+  placeholders. Gated in `audit_print.js` — the check is on the source, because
+  a fallback nobody can see is the only safe kind.
+- **2b. The header disagreed with the rest of the screen.** `go()` painted the
+  title once on the way in and nothing repainted it, so a studio that named
+  itself on the first-run screen kept reading the placeholder in the header
+  while the sidebar and welcome strip showed its real name. One
+  `paintPageTitle()` now, called from the two places that change the answer.
+- **2c. The greeting was an email address.** "Good afternoon, Olayiwola.lad" —
+  an invited account carries no name, so the trigger falls back to the part
+  before the @. The first-run screen now asks, prefilling only when the stored
+  name could plausibly be one (a space in it is a name; dots and digits are a
+  mailbox), and writes the answer to `profiles`.
+- **3. The partner invitation went to the customer app.** The gateway never
+  sent a `redirectTo`, so Supabase used the project Site URL — the customer app
+  — for every invitation of every kind. A partner following their own
+  invitation was shown a studio sign-in and told, correctly, that they had no
+  studio. Fixed in three places:
+  - `admin-api` now has an `APP_URLS` table, one address per invite action,
+    **decided in the function and not by the caller** — a redirect the browser
+    can name is a redirect an attacker can name, and this one goes out in an
+    email we send. Overridable by env for staging.
+  - The **partner portal** honours the link: a partner arrives already signed
+    in and needs no password, because that portal signs people in with an
+    emailed code and has none. One tap from the email into the portal, welcome
+    page and all. Dead links, non-partner accounts and suspended partners are
+    each handled separately.
+  - The **console** now has an invitation screen. Without one, redirecting an
+    operator there would have signed them in on the link's own session having
+    set no password: in once, locked out forever after, which reads as the
+    console being broken rather than a step being skipped.
+
+**Mutation-tested, not just gated.** 19 deliberate breakages across the three
+files — including "the handler is correct but nothing calls it", which is the
+exact shape of the bug in 2b and 2c. All 19 caught.
+
+### Before this batch goes out — Kayode
+
+**Supabase → Authentication → URL Configuration → Redirect URLs.** A
+`redirectTo` is only honoured when it matches the allowlist; anything else
+falls back to the Site URL silently, which is the bug this fixes. All three
+need to be there:
+
+```
+https://app.thelabelboard.com/**
+https://partners.thelabelboard.com/**
+https://admin.thelabelboard.com/**
+```
+
+Then: deploy `admin-api`, push `admin-deploy`, merge to `main` for the customer
+app. Test a **partner** invite end to end — that path has never once run for
+real.
+
+## Fixed in the run before
 
 Committed, gated, and **shipped** in `layi-v40` on 11 September 2026.
 

@@ -304,6 +304,113 @@ section('How many of you, and how many outlets');
   ok('a band can be tapped again to unset it', u.run("setupDraft.team") === '');
 }
 
+// ---------------------------------------------------------------------
+section('The person, not the mailbox');
+// ---------------------------------------------------------------------
+// An account made by invitation carries no name, so the database falls back to
+// the part of the address before the @ and the dashboard greets somebody as
+// "Olayiwola.lad". The setup screen asks, because it is the only screen every
+// studio sees and the answer costs one field.
+{
+  const form = (() => { const b = freshStudio(); b.run('openStudioSetup();'); return b.els.modal.innerHTML || b.run('document.getElementById("modal").innerHTML'); })();
+  ok('the first-run screen asks the person their name', /id="su_you"/.test(form));
+  ok('and says what the answer is for', /How the app greets you/.test(form));
+
+  const b = freshStudio();
+  b.run('currentUser={id:"u1",name:"olayiwola.lad",roleId:"owner"};');
+  b.run('openStudioSetup();');
+  ok('a name that is really a mailbox is not offered back as one',
+     b.run('setupDraft.you') === '', 'got: ' + JSON.stringify(b.run('setupDraft.you')));
+
+  const c = freshStudio();
+  c.run('currentUser={id:"u1",name:"Adeola Ojo",roleId:"owner"};');
+  c.run('openStudioSetup();');
+  ok('but a real name is kept, so nobody retypes what we already have',
+     c.run('setupDraft.you') === 'Adeola Ojo');
+
+  const d = freshStudio();
+  d.run('currentUser={id:"u1",name:"olayiwola.lad",roleId:"owner"};');
+  d.run('openStudioSetup();');
+  d.run("setupToggleCraft('garments');");
+  fillSetup(d, { name: 'Test Studio Two' });
+  d.els.su_you = { value: 'Layiwola Ojomo' };
+  d.run('saveStudioSetup();');
+  ok('answering it renames the person', d.run('currentUser.name') === 'Layiwola Ojomo');
+  ok('and the greeting stops reading as an email address',
+     d.run("(function(){renderActivity();return document.getElementById('welcomeStrip').innerHTML;})()")
+       .indexOf('Layiwola') >= 0);
+
+  // Leaving it blank must not wipe the name the account already had.
+  const e = freshStudio();
+  e.run('currentUser={id:"u1",name:"Adeola Ojo",roleId:"owner"};');
+  e.run('openStudioSetup();');
+  e.run("setupToggleCraft('garments');");
+  fillSetup(e, { name: 'Adé Bespoke' });
+  e.els.su_you = { value: '' };
+  e.run('saveStudioSetup();');
+  ok('leaving it blank keeps the name already on the account', e.run('currentUser.name') === 'Adeola Ojo');
+}
+
+// ---------------------------------------------------------------------
+section('The header agrees with the rest of the screen');
+// ---------------------------------------------------------------------
+// go() painted the header on the way in and nothing repainted it. So a studio
+// that named itself on this very screen kept reading the placeholder in the
+// title while the sidebar and the welcome strip showed its real name — two
+// answers to "whose app is this" on one screen.
+{
+  const b = freshStudio();
+  b.run('activeView="activity";');
+  // The header as go() left it on the way in, before the studio had a name.
+  b.run('document.getElementById("pgTitle").textContent="Today at the studio";');
+  b.run('openStudioSetup();');
+  b.run("setupToggleCraft('garments');");
+  fillSetup(b, { name: 'Test Studio Two' });
+  b.run('saveStudioSetup();');
+  const painted = b.run('document.getElementById("pgTitle").textContent') || '';
+  ok('the header carries the name they just typed', /Test Studio Two/.test(painted),
+     'header reads: ' + JSON.stringify(painted));
+  ok('and there is one function that repaints it, so it cannot drift again',
+     b.run('typeof paintPageTitle') === 'function');
+
+  // An unnamed studio is not told it belongs to somebody else.
+  const c = freshStudio();
+  c.run('activeView="activity";paintPageTitle();');
+  const blankName = c.run('document.getElementById("pgTitle").textContent') || '';
+  ok('a studio that has not answered is not given the demo tenant\'s name',
+     !!blankName && !/LAYI/.test(blankName), 'header reads: ' + JSON.stringify(blankName));
+}
+
+// ---------------------------------------------------------------------
+section('One thing asked at a time');
+// ---------------------------------------------------------------------
+// Face ID and Install are both offered on the first mobile sign-in. Stacked
+// they are about 200px of fixed banner above the tab bar, over the dashboard
+// the person signed in to look at, and dismissing one slides the other into
+// its place — which reads as the thing refusing to leave.
+{
+  const b = freshStudio();
+  b.run('innerWidth=390;');          // a phone, or the install prompt never applies
+  // First prove the install prompt WOULD show here. Without this the next two
+  // checks pass for the wrong reason: a banner that was never eligible is not
+  // a banner that politely waited.
+  b.run('refreshInstallUI();');
+  ok('the install prompt is eligible on this device, so the rest means something',
+     b.run('document.getElementById("installBanner").style.display') === 'flex',
+     'install banner display: ' + JSON.stringify(b.run('document.getElementById("installBanner").style.display')));
+
+  b.run('showBioBanner();');
+  ok('Face ID is offered first', b.run('bioBannerUp()') === true);
+  ok('and the install prompt stands down while it is up',
+     b.run('document.getElementById("installBanner").style.display') === 'none',
+     'install banner display: ' + JSON.stringify(b.run('document.getElementById("installBanner").style.display')));
+
+  b.run('dismissBio();');
+  ok('clearing Face ID clears it', b.run('bioBannerUp()') === false);
+  ok('and the install prompt then takes its turn',
+     b.run('document.getElementById("installBanner").style.display') === 'flex');
+}
+
 console.log('\nFirst run audit:');
 console.log('  asked once, on the first live sign-in, and never again');
 if (failures.length) {

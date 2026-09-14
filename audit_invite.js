@@ -146,6 +146,39 @@ check('and something actually calls it at boot',
     'two copies of "load the studio" drift, and the copy nobody signs in through is the one that rots');
 }
 
+/* ---------- 7. the link goes to the app the invitation is for -------------
+   Three kinds of account, three apps, one link in the email. Supabase falls
+   back to the project's Site URL when no redirect is given, and that is the
+   customer app — so every partner and every operator we invited was sent to a
+   studio sign-in screen that correctly told them they had no studio. The
+   account was fine. The link was wrong, and nothing in the code said where a
+   link was supposed to go, so nothing could be wrong about it. */
+{
+  const gw = fs.readFileSync('supabase/functions/admin-api/index.ts', 'utf8');
+
+  check('the gateway says where each kind of invitation lands',
+    /const APP_URLS\s*:/.test(gw),
+    'a redirect that is not written down anywhere cannot be reviewed or corrected');
+
+  const table = (gw.match(/const APP_URLS[\s\S]*?\n\}/) || [''])[0];
+  [['inviteStudio', 'app.'], ['invitePartner', 'partners.'], ['inviteOperator', 'admin.']]
+    .forEach(([action, host]) => {
+      check('an invitation to ' + action.replace('invite', '').toLowerCase() + ' goes to ' + host + 'thelabelboard.com',
+        new RegExp(action + '\\s*:[^\\n]*' + host.replace('.', '\\.') + 'thelabelboard\\.com').test(table),
+        'it went to the customer app, where a partner is told they have no studio');
+    });
+
+  check('every one of the three is accounted for, so a new kind cannot inherit the wrong app',
+    (table.match(/thelabelboard\.com/g) || []).length === 3);
+
+  check('the invitation uses that table and not something the caller sent',
+    /redirectTo:\s*APP_URLS\[action\]/.test(gw) && !/redirectTo:\s*String\(body\./.test(gw),
+    'a redirect the browser can name is a redirect an attacker can name, and this one goes out in an email we send');
+
+  check('the addresses can be overridden for a staging project without a code change',
+    /Deno\.env\.get\('(STUDIO|PARTNER|CONSOLE)_APP_URL'\)/.test(gw));
+}
+
 console.log('Invitation arrival audit:');
 ok.forEach(l => console.log('  PASS  ' + l));
 if (fail.length) {

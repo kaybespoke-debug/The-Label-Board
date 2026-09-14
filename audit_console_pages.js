@@ -27,7 +27,8 @@ function section(t) { console.log('\n' + t); }
 const indexHtml = fs.readFileSync(path.join(root, 'admin/index.html'), 'utf8');
 const files = [...indexHtml.matchAll(/src="(js\/[a-z0-9]+\.js)"/g)].map(m => m[1]);
 
-function boot() {
+function boot(opts) {
+  opts = opts || {};
   const mkEl = () => ({
     innerHTML: '', outerHTML: '', value: '', checked: false, textContent: '', style: {},
     dataset: {}, options: [], children: [], classList: { add() {}, remove() {}, toggle() {}, contains() { return false } },
@@ -47,7 +48,14 @@ function boot() {
     localStorage: (() => { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } }; })(),
     setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
     requestAnimationFrame: () => 0,
-    navigator: { userAgent: 'node', onLine: true }, location: { href: '', hash: '', search: '' },
+    navigator: { userAgent: 'node', onLine: true },
+    /* The address matters here: an invitation arrives as a fragment on it, and
+       the console reads that at parse time — so it has to be set before the
+       files are loaded, which is why boot() takes it rather than the caller
+       poking it afterwards. */
+    location: { href: '', hash: opts.hash || '', search: opts.search || '', pathname: '/' },
+    history: { replaceState() {} },
+    URLSearchParams,
     alert() {}, confirm() { return true }, prompt() { return '' },
     matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
     fetch: async () => ({ ok: false, json: async () => ({}) }),
@@ -440,6 +448,70 @@ const srcOf = f => fs.readFileSync(path.join(root, "admin", f), "utf8");
   ok('the dashboard says an ended trial ended, rather than that it ends today',
      /Trial ended, not converted/.test(srcOf('js/pages.js')),
      'a trial that ended a week ago reads as ending today');
+}
+
+// ---------------------------------------------------------------------
+section('An invited operator can actually get in');
+// ---------------------------------------------------------------------
+// Inviting somebody created the account and emailed a link. The link went to
+// the customer app, which told them they had no studio; pointed at the console
+// instead, the console would have signed them in on the link's own session
+// without ever asking for a password — in once, locked out forever after. Both
+// halves had to be fixed, so both halves are checked.
+{
+  const inv = boot({ hash: '#access_token=tok_live&refresh_token=ref&type=invite&expires_in=3600' });
+  inv.run('CONFIG.live = true;');
+  ok('an invitation link is recognised as one',
+     inv.run('consoleArrivalNeedsPassword()') === true);
+  ok('and is read before anything can consume the token',
+     /const CONSOLE_ARRIVAL = \(function/.test(srcOf('js/signin.js')) &&
+     srcOf('js/signin.js').indexOf('const CONSOLE_ARRIVAL') < srcOf('js/signin.js').indexOf('function initSignIn'),
+     'creating the Supabase client clears the token out of the address');
+
+  let restored = false;
+  inv.sb.liveRestore = async () => { restored = true; return null; };
+  inv.sb.liveClient = () => null;          // the session poll is not what is under test
+  inv.run('initSignIn();');
+  ok('the console asks for a password instead of signing them straight in',
+     inv.run('LOGIN_MODE') === 'invited', 'mode: ' + inv.run('LOGIN_MODE'));
+  ok('and does not restore the link\'s own session as if it were a sign-in',
+     restored === false,
+     'that is the one-time sign-in that leaves somebody locked out the next day');
+
+  const form = inv.run('formInvited()');
+  ok('the screen offers two password boxes', /id="invPw"/.test(form) && /id="invPw2"/.test(form));
+  ok('and no email box, because the link already decided who this is',
+     !/type="email"/.test(form));
+  ok('it says what is being asked and why', /Choose a password/.test(form));
+
+  // A link that has expired carries an error and no type at all.
+  const dead = boot({ hash: '#error=access_denied&error_description=Email+link+is+invalid+or+has+expired' });
+  dead.run('CONFIG.live = true;');
+  ok('a dead link is not mistaken for an invitation',
+     dead.run('consoleArrivalNeedsPassword()') === false);
+  dead.sb.liveRestore = async () => null;
+  dead.run('initSignIn();');
+  ok('and lands on the ordinary sign-in screen', dead.run('LOGIN_MODE') === 'signin');
+  ok('saying the link expired, in the plainest words there are',
+     /expired/i.test(dead.run('document.getElementById("loginErr").textContent') || ''),
+     'reads: ' + JSON.stringify(dead.run('document.getElementById("loginErr").textContent')));
+
+  // And an ordinary visit is untouched by any of it.
+  const plain = boot({});
+  plain.run('CONFIG.live = true;');
+  ok('an ordinary visit is still an ordinary sign-in',
+     plain.run('consoleArrivalNeedsPassword()') === false);
+  let plainRestored = false;
+  plain.sb.liveRestore = async () => { plainRestored = true; return null; };
+  plain.run('initSignIn();');
+  ok('and still restores a session this browser already had',
+     plain.run('LOGIN_MODE') === 'signin' && plainRestored === true);
+
+  ok('setting the password goes through admin-api like every other sign-in',
+     /doAcceptInvite[\s\S]*?liveCall\('me'\)/.test(srcOf('js/signin.js')),
+     'a second road into the console is a second road to keep right');
+  ok('and the token is taken out of the address once it has been used',
+     /clearConsoleArrival\(\)/.test((srcOf('js/signin.js').match(/async function doAcceptInvite[\s\S]*?\n\}/) || [''])[0]));
 }
 
 console.log('\n' + '='.repeat(62));

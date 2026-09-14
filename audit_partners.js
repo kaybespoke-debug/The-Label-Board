@@ -71,7 +71,12 @@ const localStorage = {
 
 const sandbox = {
   document, localStorage,
-  navigator: {}, location: { reload() {}, href: '' },
+  navigator: {}, location: { reload() {}, href: '', hash: '', pathname: '/', search: '' },
+  /* An invitation arrives as a fragment on the address, and the portal clears
+     it before it renders. Both halves of that need to exist here or the
+     arrival path cannot be driven at all. */
+  history: { replaceState(a, b, url) { sandbox.location.href = String(url || ''); sandbox.location.hash = ''; } },
+  URLSearchParams,
   console, setTimeout, clearTimeout, Blob: function () {},
   URL: { createObjectURL: () => '', revokeObjectURL() {} },
   Math, Date, JSON, Set, Map, Array, Object, String, Number, RegExp,
@@ -202,6 +207,111 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
   check(readSession() !== null, 'a live session is kept');
   clearSession();
   check(readSession() === null, 'signing out clears it');
+}
+
+/* ---------- 2b. an invitation lands here, and is honoured ----------
+   The console invites a partner, Supabase emails a link, and until now every
+   one of those links pointed at the customer app — so a partner following their
+   own invitation was shown a studio sign-in form and told, correctly, that they
+   had no studio. Nothing was broken except where the link went.
+   A partner who follows the fixed link arrives already signed in, and never
+   needs a password because this portal does not have them. These checks drive
+   that arrival: the happy path, the dead link, the wrong kind of account, the
+   suspended one, and an ordinary visit that must not be disturbed by any of it. */
+{
+  const clearSession = G('clearSession'), readSession = G('readSession');
+  const handleAuthArrival = G('handleAuthArrival');
+  const loc = sandbox.location;
+  const realPartnerMe = sandbox.partnerMe, realBuildLiveDB = sandbox.buildLiveDB;
+
+  // Live mode, because a demo browser has no real tokens to arrive with.
+  G('CONFIG.live = true');
+  /* The hydrate has its own checks further down; here it only has to succeed,
+     and DB is still empty this early in the suite. */
+  sandbox.__dbBefore = G('DB');
+  sandbox.buildLiveDB = async () => ({ partner: { name: 'New Partner' }, referrals: [], links: [],
+    ledger: [], payouts: [], statements: [], updates: [], accounts: [] });
+
+  const arrive = (hash) => { loc.hash = hash; loc.href = 'https://partners.thelabelboard.com/' + hash; };
+  const reset = () => { clearSession(); G('AUTH.error = ""'); G('AUTH.stage = "email"'); loc.hash = ''; };
+
+  /* 1. the happy path */
+  reset();
+  let seen = [];
+  sandbox.partnerMe = async (t) => { seen.push(t); return { id: 'p_new', name: 'New Partner', email: 'new@example.com', status: 'active' }; };
+  arrive('#access_token=tok_live&refresh_token=ref_live&type=invite');
+  let handled = await handleAuthArrival();
+  check(handled === true, 'an invitation link is recognised and handled here');
+  check(seen[0] === 'tok_live', 'the token in the link is the one used to find out who arrived');
+  const made = readSession();
+  check(!!made && made.partnerKey === 'p_new', 'a partner following their invitation is signed in');
+  check(!!made && made.token === 'tok_live' && made.refresh === 'ref_live',
+    'and both halves of the session are kept, so it survives the token expiring');
+  check(G('UI.page') === 'welcome', 'and lands on the welcome page, because this is a sign-in and not a reopen');
+  check(!loc.hash && loc.href.indexOf('access_token') < 0,
+    'the live token is taken out of the address rather than left there to be pasted somewhere');
+
+  /* 2. a link that has already expired */
+  reset();
+  sandbox.partnerMe = async () => { throw new Error('should not be asked'); };
+  arrive('#error=access_denied&error_description=Email+link+is+invalid+or+has+expired');
+  handled = await handleAuthArrival();
+  check(handled === true, 'a dead invitation link is handled rather than ignored');
+  check(/expired/i.test(G('AUTH.error')), 'and says the link expired, not something generic');
+  check(/code/i.test(G('AUTH.error')), 'and points at the thing that fixes it, which is on the same screen');
+  check(readSession() === null, 'a dead link signs nobody in');
+
+  /* 3. an account that exists but is not a partner */
+  reset();
+  sandbox.partnerMe = async () => null;
+  arrive('#access_token=tok_x&type=invite');
+  handled = await handleAuthArrival();
+  check(handled === true, 'an account that is not a partner is handled here too');
+  check(readSession() === null, 'and is not signed in');
+  check(/partner/i.test(G('AUTH.error')) && G('AUTH.error').length > 20,
+    'and is told what is actually wrong rather than shown an empty portal');
+
+  /* 4. a suspended partner */
+  reset();
+  sandbox.partnerMe = async () => ({ id: 'p_off', name: 'Old Partner', email: 'old@example.com', status: 'suspended' });
+  arrive('#access_token=tok_y&type=invite');
+  handled = await handleAuthArrival();
+  check(handled === true, 'a suspended partner arriving on a link is handled');
+  check(readSession() === null, 'and a live token does not let them back in');
+  check(G('AUTH.stage') === 'suspended', 'and they get the suspended screen, not the code box');
+
+  /* 5. an ordinary visit */
+  reset();
+  sandbox.partnerMe = async () => { throw new Error('should not be asked'); };
+  handled = await handleAuthArrival();
+  check(handled === false, 'an ordinary visit with no link is left alone to boot normally');
+
+  /* 5b. and the whole thing is actually wired into boot.
+     Every check above passes on a build where handleAuthArrival is correct and
+     nothing ever calls it — which is exactly the shape of the bug being fixed
+     here, so drive it through the front door the browser actually uses. */
+  reset();
+  seen = [];
+  sandbox.partnerMe = async (t) => { seen.push(t); return { id: 'p_boot', name: 'Booted', email: 'boot@example.com', status: 'active' }; };
+  arrive('#access_token=tok_boot&refresh_token=ref_boot&type=invite');
+  await G('bootAuth')();
+  const booted = readSession();
+  check(!!booted && booted.partnerKey === 'p_boot',
+    'opening the portal on an invitation link signs the partner in — boot honours it, not just the handler');
+  check(!loc.hash, 'and boot clears the token out of the address too');
+
+  /* 6. the demo never touches any of this */
+  G('CONFIG.live = false');
+  arrive('#access_token=tok_z&type=invite');
+  handled = await handleAuthArrival();
+  check(handled === false, 'and the demo build ignores tokens entirely, because it has none to honour');
+
+  reset();
+  sandbox.partnerMe = realPartnerMe;
+  sandbox.buildLiveDB = realBuildLiveDB;
+  G('CONFIG.live = false');
+  G('DB = __dbBefore');
+  G('UI.page = "home"');
 }
 
 /* ---------- 3. every partner's money reconciles ----------
