@@ -59,6 +59,20 @@ if(!branchDiffers) F('stock list does not respond to the branch switcher');
 // 4) Every sheet carries the company letterhead.
 if(jobHtml.indexOf(run("((SETTINGS.company||{}).name)||'LAYI'"))<0) F('job sheet is missing the company letterhead');
 
+// 4b) Nothing a client ever sees falls back to the demo tenant's name.
+// LAYI is one real label among many now. A studio that has not named itself
+// used to inherit it from DEFAULTS and from hardcoded `||'LAYI'` fallbacks, so
+// its receipts, its supplier messages and the platform's own list of studios
+// all said LAYI. That is not a cosmetic default; it is one customer's business
+// name printed on another customer's paperwork. The source must not contain the
+// fallback at all — a value nobody can see is the only safe version of it.
+{
+  const stripped = html.replace(/\/\*[\s\S]*?\*\//g, '');   // comments may name it
+  const leaks = stripped.match(/\|\|\s*'LAYI'/g) || [];
+  if (leaks.length) F(leaks.length + ' place(s) still fall back to the demo tenant\'s name for a studio that has not set one');
+  if (/company:\{name:'LAYI'/.test(stripped)) F('a new studio is still named after the demo tenant by DEFAULTS');
+}
+
 // 5) The three print buttons are wired into the UI.
 if(!/onclick="printJobSheet\('/.test(html)) F('no Job sheet button is wired into the order view');
 if(!/onclick="printMeasSheet\('/.test(html)) F('no Print measurements button is wired into the customer view');

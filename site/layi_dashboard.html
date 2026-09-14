@@ -1595,7 +1595,12 @@ function authArrivalNeedsPassword(){
 try{ if(SUPA_URL && SUPA_KEY && window.supabase && window.supabase.createClient) supa=window.supabase.createClient(SUPA_URL,SUPA_KEY); }catch(e){ supa=null; }
 /* ===== CONFIG / SETTINGS ===== */
 const DEFAULTS={ownerPassword:'layi2025',currency:'NGN',tiers:[{name:'Starter',min:0},{name:'Bronze',min:1000},{name:'Silver',min:5000},{name:'Gold',min:15000},{name:'Platinum',min:50000}],
-  company:{name:'LAYI',address:'',email:'',phone:'',reg:'',logo:'',payInstructions:'',showPhotos:true,banks:[]},
+  /* No name. LAYI is the demo tenant, and a studio that has not said what it is
+     called must not be shown somebody else's label — not in the header, not on a
+     job sheet, not in the platform's own list of studios, which the app writes
+     from this value. Blank is an unanswered question; every reader falls back to
+     a neutral word until the first-run screen is answered. */
+  company:{name:'',address:'',email:'',phone:'',reg:'',logo:'',payInstructions:'',showPhotos:true,banks:[]},
   suppliers:[],invoiceNo:1000,stagesV2:false,
   qcChecklist:['Construction sound (seams, linings, interfacing)','Measurements match the spec','Stitching & seams clean','Symmetry \u2014 left matches right','Fit confirmed / tried on','Finishing & detailing correct','Embellishment / monogram correct','Pressed & packaged neatly'],
   defaults:{depositPct:50,leadDays:21,deliveryFee:0,lowStock:5},
@@ -2136,7 +2141,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v41';
+const APP_VERSION='layi-v42';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -2238,17 +2243,41 @@ async function reconcileDeletes(table,keepIds){
    Deliberately silent on failure: if the platform tables are not deployed yet,
    or the studio is offline, the app must not care. This is our bookkeeping,
    not theirs. */
+/* ===== THE NAME THE CONSOLE ALREADY GAVE THEM =====
+   A studio invited from the console is created with a name before anybody
+   signs in, and the device knew nothing about it: the first-run screen opened
+   with an empty box and asked a studio to type a name we already had.
+
+   This fills a blank and nothing else. If the studio has answered for itself,
+   its own answer wins and is pushed the other way by reportTenantPresence —
+   this must never rename a studio from under it. */
+async function adoptStudioName(){
+  if(!supa||!liveMode||!myBusinessId)return false;
+  if(typeof tenantName==='function'&&tenantName())return false;   // they have answered
+  try{
+    const {data,error}=await supa.from('businesses').select('name').eq('id',myBusinessId).maybeSingle();
+    if(error||!data||!data.name)return false;
+    SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:String(data.name)});
+    save('layi_dash_settings',SETTINGS);
+    return true;
+  }catch(e){return false;}
+}
 async function reportTenantPresence(){
   if(!supa||!liveMode)return false;
   try{
     const co=(SETTINGS&&SETTINGS.company)||{};
     const row={
       id: myBusinessId||LAYI_BIZ,
-      name: (typeof tenantName==='function'?tenantName():'')||null,
       contact_email: co.email||null,
       last_seen_at: new Date().toISOString(),
       app_version: (typeof APP_VERSION!=='undefined')?APP_VERSION:null
     };
+    /* Only when there is one. A studio that has not answered the first-run
+       screen has no name of its own, and sending the blank would overwrite the
+       name the console gave it when the invitation was created — the studio
+       would quietly lose its name by signing in. */
+    const _tn=(typeof tenantName==='function'?tenantName():'')||'';
+    if(_tn)row.name=_tn;
     const {error}=await supa.from('businesses').upsert(row,{onConflict:'id'});
     if(error){console.debug('presence:',error.message);return false;}
     return true;
@@ -3083,6 +3112,7 @@ async function enterLiveStudio(user,username,errEl){
       liveMode=true; myBusinessId=prof.business_id||LAYI_BIZ;
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
+      try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
       try{reportTenantPresence();}catch(e){}
       startRealtime();
       /* Photos: find out how full they are, mint the URLs this screen needs,
@@ -3317,12 +3347,27 @@ function needsStudioSetup(){
 }
 function maybeOpenStudioSetup(){ if(needsStudioSetup())openStudioSetup(); }
 
+/* Nobody ever told the app who the person is. An account made by invitation has
+   no name on it, so the database falls back to the part of the address before
+   the @ — which is how "Good afternoon, Olayiwola.lad" ends up at the top of
+   somebody's own dashboard. That string is a mailbox, not a name, so it is
+   offered back as a prefill only when it could plausibly be one: a name with a
+   space in it is a name, "olayiwola.lad" is not. */
+function looksLikeAnAddress(n){
+  n=String(n||'').trim();
+  if(!n)return true;
+  if(n.indexOf(' ')>=0)return false;    // two words is a name
+  return /[._\-]|\d/.test(n);           // dots, underscores or digits: a mailbox
+}
 function openStudioSetup(){
   const co=(SETTINGS.company&&SETTINGS.company.name)||'';
+  const me=(currentUser&&currentUser.name)||'';
   setupDraft={
-    /* LAYI is the demo tenant's name and arrives via DEFAULTS, so it is an
-       unanswered question rather than this studio's own answer. */
+    /* LAYI is the demo tenant's name and arrived via DEFAULTS on devices set up
+       before that default was blanked, so it is an unanswered question rather
+       than this studio's own answer. */
     name:(co&&co!=='LAYI')?co:'',
+    you:looksLikeAnAddress(me)?'':me,
     location:'', does:[], channels:['showroom'], team:'', outlets:''
   };
   renderStudioSetup();
@@ -3362,9 +3407,10 @@ function setupToggleCraft(c){setupSync();setupDraft.does=doesToggleCraft(setupDr
 function setupToggleMode(c,m){setupSync();setupDraft.does=doesToggleMode(setupDraft.does,c,m);renderStudioSetup();}
 function setupSync(){
   if(!setupDraft)return;
-  const n=document.getElementById('su_name'),l=document.getElementById('su_loc');
+  const n=document.getElementById('su_name'),l=document.getElementById('su_loc'),y=document.getElementById('su_you');
   if(n)setupDraft.name=n.value;
   if(l)setupDraft.location=l.value;
+  if(y)setupDraft.you=y.value;
   const sh=document.getElementById('su_show'),on=document.getElementById('su_onl');
   if(sh||on){const c=[];if(sh&&sh.checked)c.push('showroom');if(on&&on.checked)c.push('online');
     setupDraft.channels=c.length?c:['showroom'];}
@@ -3374,6 +3420,8 @@ function renderStudioSetup(){
   const chips=craftPickerHtml(d.does,'setupToggleCraft','setupToggleMode','');
   openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
+    +'<div class="field"><label>And your name</label><input class="fld" id="su_you" value="'+esc(d.you||'')+'" placeholder="e.g. Adéolá Ojo" autocomplete="name">'
+    +'<div class="sd" style="color:var(--text-faint)">How the app greets you, and the name against everything you do in it.</div></div>'
     +'<div class="field"><label>Where do you work from <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="su_loc" value="'+esc(d.location)+'" placeholder="City / area"></div>'
     +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label>'
     +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 8px">Tick what you work in, then how each one reaches your customer. <b>Made to order</b> opens the production board, <b>ready made</b> opens the Shop and Sales. Tick both if you make what you sell.</div>'
@@ -3406,6 +3454,21 @@ function saveStudioSetup(){
   if(!normaliseDoes(d.does).some(k=>modeOf(k))){alert('For each one, say whether it is made to order or sold ready made.');return;}
 
   SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:name});
+  /* Who they are, alongside what the label is called. An account made by
+     invitation carries only the mailbox the invitation was sent to, so until
+     this is answered the greeting, the audit trail and every signature in the
+     app read as an email address. Written to whichever store this account
+     actually lives in: a device account is in the local list, a live one is a
+     row in profiles. */
+  const you=(d.you||'').trim();
+  if(you&&currentUser){
+    currentUser.name=you;
+    const list=getUsers(),local=list.find(function(x){return x.id===currentUser.id;});
+    if(local){local.name=you;setUsers(list);}
+    else if(supa&&liveMode){try{supa.from('profiles').update({name:you}).eq('id',currentUser.id);}catch(e){}}
+    const wn=document.getElementById('whoName');if(wn)wn.textContent=you;
+    const av=document.getElementById('avInit');if(av)av.textContent=(you[0]||'?').toUpperCase();
+  }
   const existing=getBranches()[0]||{};
   SETTINGS.branches=[{
     id:existing.id||uid('br'),
@@ -3451,6 +3514,12 @@ function saveStudioSetup(){
   if(typeof applyTeamVisibility==='function')applyTeamVisibility();
   if(typeof renderBranchSwitch==='function')renderBranchSwitch();
   renderAll();
+  paintPageTitle();
+  /* The platform's own list of studios is written from this value. Tell it the
+     real name now: leaving it until the next sign-in means the console lists a
+     studio under a placeholder, and whoever reads that list has no way to know
+     it is not what the studio calls itself. */
+  if(typeof reportTenantPresence==='function'){try{reportTenantPresence();}catch(e){}}
   /* If they said there are more of them, or more than one outlet, say where
      those live rather than leaving them to find it. */
   const nextStep=outletsN>1?'Add your other studios in Settings › Branches.'
@@ -3538,10 +3607,18 @@ async function maybeOfferBiometric(){
     showBioBanner();
   }catch(e){}
 }
-function showBioBanner(){try{const b=document.getElementById('bioBanner');if(!b)return;b.style.display='flex';document.body.classList.add('has-bio');}catch(e){}}
+/* Only one of these is ever on screen. Both at once stack to about 200px above
+   the tab bar on a phone — a third of the screen, fixed, over the dashboard the
+   person just signed in to see, and clearing one only moves the other into its
+   place, which reads as the thing refusing to go away.
+   Face ID goes first because it is offered once per device and then never
+   again; the install prompt is patient and comes back every session until it is
+   taken or dismissed. */
+function bioBannerUp(){try{const b=document.getElementById('bioBanner');return !!(b&&b.style.display==='flex');}catch(e){return false;}}
+function showBioBanner(){try{const b=document.getElementById('bioBanner');if(!b)return;b.style.display='flex';document.body.classList.add('has-bio');refreshInstallUI();}catch(e){}}
 function hideBioBanner(){try{const b=document.getElementById('bioBanner');if(b)b.style.display='none';document.body.classList.remove('has-bio');}catch(e){}}
-function dismissBio(){hideBioBanner();}
-async function acceptBiometric(){hideBioBanner();try{await bioEnroll();renderBiometricSetting();}catch(e){}}
+function dismissBio(){hideBioBanner();try{refreshInstallUI();}catch(e){}}
+async function acceptBiometric(){hideBioBanner();try{refreshInstallUI();}catch(e){}try{await bioEnroll();renderBiometricSetting();}catch(e){}}
 function updateNavGroups(){
   const side=document.querySelector('.sidebar');if(!side||!side.children)return;
   let grp=null,has=false;const flush=()=>{if(grp)grp.style.display=has?'':'none';};
@@ -3677,6 +3754,18 @@ const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantNam
     if(multiBranch()&&activeBranchView==='all')return 'Today across your studios';
     if(multiBranch()&&activeBranchView&&activeBranchView!=='all')return 'Today at '+activeBranchView;
     return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Calendar','Tasks, fittings, meetings, content & what is due'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
+/* go() paints the header once, on the way in, and nothing repainted it after.
+   So a studio that arrived on the placeholder name and then named itself on the
+   first-run screen kept reading "Today at ..." with the old value until it
+   happened to navigate — the sidebar and the welcome strip updated, the header
+   did not, and the two disagreed on screen. Anything that changes the studio's
+   name, its branches or the branch in view calls this. */
+function paintPageTitle(){
+  const def=TITLES[activeView];if(!def)return;
+  const t=document.getElementById('pgTitle'),s=document.getElementById('pgSub');
+  if(t)t.textContent=typeof def[0]==='function'?def[0]():def[0];
+  if(s)s.textContent=typeof def[1]==='function'?def[1]():def[1];
+}
 function branchTypeOf(name){const b=getBranches().find(x=>x.name===name);if(!b)return SETTINGS.businessType||'both';const bk=branchMakes(b),rt=branchStocks(b);return (bk&&rt)?'both':(bk?'bespoke':(rt?'rtw':'both'));}
 function isBespokeType(t){return t==='bespoke'||t==='both';}
 function isGarmentShopType(t){return t==='rtw'||t==='both';}
@@ -4164,7 +4253,7 @@ function refreshInstallUI(){
   const banner=document.getElementById('installBanner');
   if(banner){let dismissed=false;try{dismissed=localStorage.getItem('layi_install_dismissed')==='1';}catch(e){}
     const mobile=(typeof window!=='undefined'&&window.innerWidth<=820);
-    const on=(show&&!dismissed&&mobile);
+    const on=(show&&!dismissed&&mobile&&!bioBannerUp());   // one banner at a time
     banner.style.display=on?'flex':'none';
     try{document.body.classList.toggle('has-install',on);}catch(e){}}
 }
@@ -5276,7 +5365,7 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
 }
 function invoiceText(o,kind){const _R=kind==='receipt';
   const co=SETTINGS.company||{};const f=invoiceFigures(o);const cs=CUR_SYM[ocur(o)]||(ocur(o)+' ');
-  let t=`*${(co.name||'LAYI').toUpperCase()}* · ${_R?'Receipt':'Invoice'} #${o.invoiceNo||''}\n`;
+  let t=`*${(co.name||'Your studio').toUpperCase()}* · ${_R?'Receipt':'Invoice'} #${o.invoiceNo||''}\n`;
   t+=`For: ${o.client}\nOrder: ${o.id}\n\n`;
   (o.outfits||[]).forEach(x=>{t+=`• ${x.name||x.type||'Item'} · ${cs}${fmtNum(+x.price||0)}\n`;});
   t+=`\nSubtotal: ${cs}${fmtNum(f.subtotal)}\n`;
@@ -6193,7 +6282,7 @@ function migrateBranchOwnership(){
   if(!SETTINGS.branchScopeV1){SETTINGS.branchScopeV1=true;save('layi_dash_settings',SETTINGS);}
   return touched;
 }
-function setBranchView(v){activeBranchView=v;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();try{renderAll();}catch(e){}const _t=document.getElementById('pgTitle'),_d=TITLES[activeView];if(_t&&_d)_t.textContent=typeof _d[0]==='function'?_d[0]():_d[0];if((activeView==='production'&&!showsBespoke())||(activeView==='products'&&!showsRTW())||(activeView==='sales'&&!salesVisible()))go('activity');}
+function setBranchView(v){activeBranchView=v;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();try{renderAll();}catch(e){}paintPageTitle();if((activeView==='production'&&!showsBespoke())||(activeView==='products'&&!showsRTW())||(activeView==='sales'&&!salesVisible()))go('activity');}
 function userBranch(){try{const u=currentUser;if(u&&u.branch)return u.branch;if(u&&u.staffId){const st=getStaff().find(x=>x.id===u.staffId||x.staffId===u.staffId);if(st&&st.location)return st.location;}}catch(e){}return defaultBranchName();}
 function canSwitchBranch(){const r=currentRole();if(!r)return false;if(r.id==='owner')return true;return !!(r.perms&&r.perms.branchSwitch);}
 function renderBranchSwitch(){const sel=document.getElementById('branchSwitch');if(!sel)return;const names=branchNames();
@@ -8218,7 +8307,10 @@ function reorderSupply(id){
   const sup=it.supplierId?supplierById(it.supplierId):null;
   if(!sup){alert('Link this item to a supplier first (Edit the item → Supplier), so we know who to contact.');return;}
   const need=Math.max((+it.reorder||0)*2-(+it.qty||0),(+it.reorder||0),1);
-  const co=(SETTINGS.company||{}).name||'LAYI';
+  /* A studio that skipped the first-run screen has no name yet. A placeholder
+     is a prompt to go and fix it; the demo tenant's name on a document a client
+     holds is a different label's receipt. */
+  const co=(SETTINGS.company||{}).name||'Your studio';
   const msg='Hello'+(sup.contact?' '+sup.contact:'')+', this is '+co+'. We would like to reorder '+it.name+', about '+need+' '+(it.unit||'units')+'. Please let us know availability and current price. Thank you.';
   const wa=String(sup.whatsapp||'').replace(/[^0-9]/g,'');
   if(wa){window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(msg),'_blank');}
