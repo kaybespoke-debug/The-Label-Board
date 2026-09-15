@@ -172,11 +172,77 @@ check('and something actually calls it at boot',
     (table.match(/thelabelboard\.com/g) || []).length === 3);
 
   check('the invitation uses that table and not something the caller sent',
-    /redirectTo:\s*APP_URLS\[action\]/.test(gw) && !/redirectTo:\s*String\(body\./.test(gw),
+    /const wantUrl = APP_URLS\[action\]/.test(gw) &&
+    /redirectTo:\s*wantUrl/.test(gw) &&
+    !/redirectTo:\s*String\(body\./.test(gw),
     'a redirect the browser can name is a redirect an attacker can name, and this one goes out in an email we send');
 
   check('the addresses can be overridden for a staging project without a code change',
     /Deno\.env\.get\('(STUDIO|PARTNER|CONSOLE)_APP_URL'\)/.test(gw));
+
+  /* THE SLASH. Measured against the live project on 15 Sep:
+       asked https://partners.thelabelboard.com   landed on app.thelabelboard.com
+       asked https://partners.thelabelboard.com/  landed on partners.thelabelboard.com
+     The allow list holds `https://partners.thelabelboard.com/**`, and the bare
+     origin does not match that pattern. A redirect that does not match is not
+     refused; it is silently replaced with the Site URL. Studio invitations
+     looked fine throughout, because their fallback and their destination are
+     the same address — so the only people who could see this were partners and
+     operators, which is exactly who it broke. */
+  const urls = table.match(/'https:\/\/[^']+'/g) || [];
+  check('every invitation address ends in a slash',
+    urls.length === 3 && urls.every(u => u.endsWith("/'")),
+    'a bare origin does not match the /** in the allow list, and the mismatch is silent: ' + urls.join(' '));
+  check('and a slash is put back on anything the environment supplies',
+    /const withSlash\s*=/.test(gw) &&
+    (table.match(/withSlash\(Deno\.env\.get/g) || []).length === 3,
+    'all three, not two: an override set without one would reintroduce the bug on whichever was missed');
+}
+
+/* ---------- 9. it finds out where the link goes BEFORE creating anything ----
+   Reading back the redirect we asked for proves nothing: GoTrue echoes it into
+   the link and only decides whether to honour it when somebody follows it. The
+   only honest way to know is to ask the thing that decides, which a deliberately
+   invalid token does for free — the answer is a 302 to wherever a real link
+   would have gone, and nothing is created or consumed. */
+{
+  const gw = fs.readFileSync('supabase/functions/admin-api/index.ts', 'utf8');
+  check('the gateway asks where an invitation would actually land',
+    /async function wouldLandOn/.test(gw));
+  check('by probing the verify endpoint rather than trusting the link it was handed',
+    /\/auth\/v1\/verify\?token=preflight/.test(gw) && /redirect:\s*'manual'/.test(gw));
+
+  const block = (gw.match(/if \(action === 'inviteOperator'[\s\S]*?return json\(\{ ok: true, email/) || [''])[0];
+  check('it asks before the record is prepared and before the account exists',
+    block.indexOf('wouldLandOn') > 0 &&
+    block.indexOf('wouldLandOn') < block.indexOf('let prepared'),
+    'a half-created account plus a wrong email is worse than a refusal');
+  check('a wrong destination refuses the whole thing rather than sending it anyway',
+    /if \(landsOn && landsOn !== wantOrigin\)/.test(block) &&
+    /has not been sent and no account was created/.test(block),
+    'the message existing is not the same as the test that reaches it');
+  check('and the refusal names the exact setting that fixes it',
+    /URL Configuration/.test(block) && /trailing \/\*\* matters/.test(block),
+    'an error nobody can act on is a thing to ignore');
+  check('a probe that cannot answer does not block the invitation',
+    /return ''\s*\/\/ could not tell/.test(gw) || /could not tell; do not block/.test(gw),
+    'our own network trouble must not stop somebody being invited');
+}
+
+/* ---------- 10. our own email, when there is a key for it ---------------- */
+{
+  const gw = fs.readFileSync('supabase/functions/admin-api/index.ts', 'utf8');
+  check('the invitation can be sent as our own email',
+    /api\.resend\.com\/emails/.test(gw) && /RESEND_API_KEY/.test(gw));
+  check('with wording of its own for a studio, a partner and an operator',
+    /partner account is ready/.test(gw) && /control centre/.test(gw) && /studio is set up/.test(gw));
+  check('and Supabase still sends when there is no key, rather than nothing going out',
+    /if \(RESEND_KEY\) \{[\s\S]*?\} else \{[\s\S]*?inviteUserByEmail/.test(gw),
+    'a hard dependency on a secret means invitations stop the day it is missing');
+  check('an account made but not emailed is reported as a failure, not a success',
+    /The account was created, but the invitation email did not send/.test(gw));
+  check('the address in the email is escaped, because a name goes into it',
+    /const esc = \(s: string\)/.test(gw));
 }
 
 /* ---------- 8. a partner who lands here anyway is handed over ------------
