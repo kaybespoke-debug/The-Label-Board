@@ -18,6 +18,18 @@ four you are in, and read that app's doc first.
 The gate scripts and preview servers live at the repo root, never inside an
 app folder, because every app folder is published to the public web.
 
+One gate spans all three front ends rather than belonging to any of them:
+
+```bash
+node audit_safearea.js
+```
+
+Nothing may be pinned to an edge of the screen without allowing for what the
+phone puts there. It is invisible on a desktop browser, which is where all of
+this gets built, and it goes wrong the same way every time: a status bar
+printing through a modal title, or a navigation bar sitting under the home
+indicator. Run it after touching any stylesheet.
+
 ## The customer app
 
 `site/layi_dashboard.html` is the product. One file, no build step, no

@@ -179,6 +179,26 @@ check('and something actually calls it at boot',
     /Deno\.env\.get\('(STUDIO|PARTNER|CONSOLE)_APP_URL'\)/.test(gw));
 }
 
+/* ---------- 8. a partner who lands here anyway is handed over ------------
+   The redirect table above is the fix. This is the net under it. Supabase only
+   honours a redirect that matches its own allowlist and falls back to the Site
+   URL silently when it does not, so a partner can still arrive at the customer
+   app through no fault of the code — and "this account has no studio" is a
+   true sentence that leaves them nowhere to go. */
+{
+  const fn = (html.match(/async function enterLiveStudio[\s\S]*?\n\}/) || [''])[0];
+  check('a partner who lands on the customer app is recognised as one',
+    /partner_me/.test(fn),
+    'the app can ask who this is; not asking means the dead end stays a dead end');
+  check('and is pointed at the partner portal rather than turned away',
+    /PARTNER_PORTAL_URL/.test(fn));
+  check('the portal address is written down once, not typed into a message',
+    /const PARTNER_PORTAL_URL\s*=/.test(html));
+  check('it asks who they are before signing them out',
+    fn.indexOf('partner_me') > 0 && fn.indexOf('partner_me') < fn.indexOf('signOut'),
+    'signing out first would make the question unanswerable');
+}
+
 console.log('Invitation arrival audit:');
 ok.forEach(l => console.log('  PASS  ' + l));
 if (fail.length) {

@@ -416,11 +416,16 @@ tbody tr:last-child td{border-bottom:0}
   .dstat .dv{font-size:18px}
   .dhead h2{font-size:21px}
   .dav{width:46px;height:46px;font-size:16px}
-  .mask{padding:0}
+  /* A sheet taller than the screen reaches the very top of it, and .mh is
+     sticky at top:0 — so on a phone with a status bar the clock printed
+     straight through the modal title. The mask carries the inset, so the sheet
+     can never begin above the safe area however tall it gets. The footer is
+     sticky at the other end and needs the same treatment for the home bar. */
+  .mask{padding:env(safe-area-inset-top) 0 0}
   .modal{border-radius:14px 14px 0 0;margin:auto 0 0;min-height:60vh}
   .mh{padding:16px 16px;border-radius:14px 14px 0 0}
   .mb{padding:16px}
-  .mf{padding:12px 16px;position:sticky;bottom:0;background:var(--bg)}
+  .mf{padding:12px 16px calc(12px + env(safe-area-inset-bottom));position:sticky;bottom:0;background:var(--bg)}
   .mf .btn{flex:1}
   .donutwrap{flex-direction:column;align-items:flex-start}
   .donutwrap svg{width:130px;height:130px;margin:0 auto}
@@ -517,8 +522,11 @@ tbody tr:last-child td{border-bottom:0}
   .mobbar .mb .mbi{line-height:0;display:block}
   .mobbar .mb .mbi svg{width:22px;height:22px;display:block}
   .mobbar .mb .mbt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .mobbar .mb:not(.on){opacity:.55}
-  .mobbar .mb.on{color:var(--text);font-weight:600}
+  /* .55 was dim enough to grey the hues back out again, which defeated the
+     point of having them. The label stays quiet; the icon is what you aim at. */
+  .mobbar .mb:not(.on){opacity:.8}
+  .mobbar .mb:not(.on) .mbt{opacity:.7}
+  .mobbar .mb.on{opacity:1;color:var(--text);font-weight:600}
   .mobbar .mb .mbd{position:absolute;top:3px;right:calc(50% - 20px);min-width:15px;height:15px;
     padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;
     font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}

@@ -1489,8 +1489,8 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Data</h3></div>
-          <p class="page-sub" style="margin-bottom:16px">Load a quick example to explore, or clear everything to start fresh.</p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" onclick="openExamplePicker()">Load example studio…</button><button class="btn danger" onclick="clearAll()">Clear all data</button></div>
+          <p class="page-sub" style="margin-bottom:16px" id="setDataLead">Load a quick example to explore, or clear everything to start fresh.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="setExampleBtn" onclick="openExamplePicker()">Load example studio…</button><button class="btn danger" onclick="clearAll()">Clear all data</button></div>
         </div>
         <!-- The version marker lives here rather than on the sign-in screen. It exists
              because three fixes once shipped in a row and nobody could tell from the
@@ -2142,6 +2142,10 @@ let liveMode=false, myBusinessId=null;
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
 const APP_VERSION='layi-v42';
+/* The other two doors. Used only to hand somebody who arrived at the wrong one
+   over to the right one; nothing here reads or writes anything of theirs. */
+const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
+const CONSOLE_URL='https://admin.thelabelboard.com';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -3099,7 +3103,28 @@ async function enterLiveStudio(user,username,errEl){
          Signed back out, because a session with nothing behind it just means
          the next tap lands on the same wall. */
       if(pe||!prof){
+        /* No studio on this account. Before turning anybody away, find out
+           whether they are somebody else's user — because the commonest way to
+           arrive here is not a broken account, it is a partner following an
+           invitation whose link pointed at this app instead of the portal.
+           They are authenticated, their record is correct, and they are one tap
+           from the right place. Telling them "no studio" and stopping is
+           accurate and useless.
+           partner_me() reads the row matching auth.uid(), so it answers only
+           for the person asking and cannot be used to look anybody else up. */
+        let partner=null;
+        if(!pe){
+          try{ const r=await supa.rpc('partner_me'); partner=(r&&r.data&&r.data[0])||null; }catch(e){}
+        }
         try{await supa.auth.signOut();}catch(e){}
+        if(partner){
+          errEl.innerHTML='You are signed in as a partner'
+            +(partner.name?', '+esc(partner.name):'')+', not a studio. '
+            +'The partner portal is the right door.'
+            +'<br><a href="'+PARTNER_PORTAL_URL+'" style="display:inline-block;margin-top:10px;color:var(--gold);font-weight:600">'
+            +'Continue to the partner portal &rsaquo;</a>';
+          return;
+        }
         errEl.innerHTML=pe
           ? 'Signed in, but your studio could not be read: '+esc(pe.message)
           : 'That password is correct, but this account has no studio on it.'
@@ -3368,7 +3393,8 @@ function openStudioSetup(){
        than this studio's own answer. */
     name:(co&&co!=='LAYI')?co:'',
     you:looksLikeAnAddress(me)?'':me,
-    location:'', does:[], channels:['showroom'], team:'', outlets:''
+    location:'', does:[], channels:['showroom'], team:'', outlets:'',
+    studios:[]     // filled in once they say they run more than one
   };
   renderStudioSetup();
 }
@@ -3392,7 +3418,92 @@ const SETUP_OUTLETS=[
   {k:'two',  label:'2 or 3',       n:3},
   {k:'more', label:'More than 3',  n:5}
 ];
-function setupPick(field,k){setupSync();setupDraft[field]=(setupDraft[field]===k?'':k);renderStudioSetup();}
+/* Every tick on this screen rebuilds the whole modal, which threw the reader
+   back to the top of the page — so answering the last question meant scrolling
+   down to it again, every single time. openModal already knows how to keep its
+   place; the order screen has used it for months. Re-renders ask for it, the
+   first open does not, because arriving at the top is right. */
+/* ===== MORE THAN ONE STUDIO =====================================
+   Saying "2 or 3" used to set up exactly one branch and point at Settings.
+   So a studio that had just told us it runs three outlets opened the app with
+   no studio switcher, and the one screen that would have made it easy was the
+   screen they had just finished. Now the answer opens a list: name each one,
+   and say which of your crafts happen there.
+
+   The trade defaults to everything the label does, because that is true far
+   more often than not and it keeps this to one question per studio rather
+   than four. Narrowing it is a tap. */
+function outletsMin(k){return k==='two'?2:k==='more'?4:1;}
+/* Grow to the minimum the band implies, never shrink below what has been
+   typed: somebody who names four studios and then taps "2 or 3" by accident
+   must not lose two of them. */
+function setupSyncStudios(){
+  const d=setupDraft;if(!d)return;
+  if(!Array.isArray(d.studios))d.studios=[];
+  const want=outletsMin(d.outlets);
+  while(d.studios.length<want)d.studios.push({name:'',crafts:null});
+  if(want<=1&&d.studios.every(function(s){return !String(s.name||'').trim();}))d.studios=[];
+}
+function setupAddStudio(){setupSync();setupDraft.studios.push({name:'',crafts:null});renderStudioSetup(true);}
+function setupRemoveStudio(i){
+  setupSync();
+  const d=setupDraft;
+  if(d.studios.length<=outletsMin(d.outlets))return;   // never below what they said
+  d.studios.splice(i,1);
+  renderStudioSetup(true);
+}
+/* null crafts means "everything the label does". The first tap has to turn
+   that into a real list before it can remove one, or untick would look like
+   it did nothing. */
+function setupStudioToggleCraft(i,c){
+  setupSync();
+  const d=setupDraft,s=d.studios[i];if(!s)return;
+  const all=setupCraftKeys();
+  let cur=Array.isArray(s.crafts)?s.crafts.slice():all.slice();
+  const at=cur.indexOf(c);
+  if(at>=0){ if(cur.length>1)cur.splice(at,1); }   // a studio that does nothing is not a studio
+  else cur.push(c);
+  s.crafts=cur;
+  renderStudioSetup(true);
+}
+function setupCraftKeys(){
+  const out=[],seen={};
+  normaliseDoes((setupDraft&&setupDraft.does)||[]).forEach(function(k){
+    const c=craftOf(k);if(!seen[c]){seen[c]=1;out.push(c);}
+  });
+  return out;
+}
+function setupStudiosHtml(){
+  const d=setupDraft;
+  if(outletsMin(d.outlets)<=1)return '';
+  const all=setupCraftKeys();
+  const min=outletsMin(d.outlets);
+  const rows=(d.studios||[]).map(function(s,i){
+    const mine=Array.isArray(s.crafts)?s.crafts:all;
+    const chips=all.length>1?('<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'
+      +all.map(function(c){
+        const on=mine.indexOf(c)>=0;
+        const label=(typeof craftByKey==='function'&&craftByKey(c)&&craftByKey(c).label)||c;
+        return '<span onclick="setupStudioToggleCraft('+i+',\''+c+'\')" style="cursor:pointer;display:inline-block;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--panel-2)':'transparent')+';color:'+(on?'var(--text)':'var(--text-faint)')+';border-radius:999px;padding:5px 11px;font-size:12.5px">'+esc(label)+'</span>';
+      }).join('')+'</div>'):'';
+    const del=(d.studios.length>min)
+      ? '<button class="btn ghost sm" onclick="setupRemoveStudio('+i+')" style="flex:none" aria-label="Remove this studio">Remove</button>':'';
+    return '<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px">'
+      +'<div style="display:flex;gap:8px;align-items:center">'
+      +'<input class="fld" id="su_st_'+i+'" value="'+esc(s.name||'')+'" placeholder="Studio '+(i+1)+' name, e.g. '+(i===0?'Lekki':'Ikeja')+'" style="margin:0">'
+      +del+'</div>'+chips+'</div>';
+  }).join('');
+  return '<div class="field"><label>Name your studios</label>'
+    +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 10px">Each one is scoped and reported on its own, and the switcher at the top lets you move between them. Tap a craft to say it does not happen there.</div>'
+    +rows
+    +'<button class="btn ghost sm" onclick="setupAddStudio()">+ Add another studio</button></div>';
+}
+function setupPick(field,k){
+  setupSync();
+  setupDraft[field]=(setupDraft[field]===k?'':k);
+  if(field==='outlets')setupSyncStudios();
+  renderStudioSetup(true);
+}
 function setupBandRow(field,opts){
   return opts.map(function(o){
     const on=setupDraft[field]===o.k;
@@ -3403,8 +3514,8 @@ function setupBandN(field,opts,fallback){
   const hit=opts.find(function(o){return o.k===setupDraft[field];});
   return hit?hit.n:fallback;
 }
-function setupToggleCraft(c){setupSync();setupDraft.does=doesToggleCraft(setupDraft.does,c);renderStudioSetup();}
-function setupToggleMode(c,m){setupSync();setupDraft.does=doesToggleMode(setupDraft.does,c,m);renderStudioSetup();}
+function setupToggleCraft(c){setupSync();setupDraft.does=doesToggleCraft(setupDraft.does,c);renderStudioSetup(true);}
+function setupToggleMode(c,m){setupSync();setupDraft.does=doesToggleMode(setupDraft.does,c,m);renderStudioSetup(true);}
 function setupSync(){
   if(!setupDraft)return;
   const n=document.getElementById('su_name'),l=document.getElementById('su_loc'),y=document.getElementById('su_you');
@@ -3414,9 +3525,23 @@ function setupSync(){
   const sh=document.getElementById('su_show'),on=document.getElementById('su_onl');
   if(sh||on){const c=[];if(sh&&sh.checked)c.push('showroom');if(on&&on.checked)c.push('online');
     setupDraft.channels=c.length?c:['showroom'];}
+  /* Read the studio names back before any re-render throws the inputs away. */
+  (setupDraft.studios||[]).forEach(function(s,i){
+    const el=document.getElementById('su_st_'+i);
+    if(el&&typeof el.value==='string')s.name=el.value;
+  });
 }
-function renderStudioSetup(){
+function renderStudioSetup(keepScroll){
   const d=setupDraft;if(!d)return;
+  /* Hold the scroll position AND keep this off the modal back-stack. Without
+     the second half, every tick pushed another copy of this screen onto the
+     stack, so a "Back" button appeared on a screen that has nowhere to go
+     back to and the stack filled with fifteen copies of itself. */
+  if(keepScroll){
+    const _ov=document.getElementById('overlay');
+    window.__omScroll=_ov?_ov.scrollTop:0;
+    window.__omKeep=true;
+  }
   const chips=craftPickerHtml(d.does,'setupToggleCraft','setupToggleMode','');
   openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
@@ -3435,7 +3560,10 @@ function renderStudioSetup(){
     +'<div class="sd" style="color:var(--text-faint)">Tell us and the Team, Rota and Payroll tabs are there from the start. Add the actual people whenever you like.</div></div>'
     +'<div class="field"><label>How many studios or outlets do you run? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
     +'<div style="padding-top:2px">'+setupBandRow('outlets',SETUP_OUTLETS)+'</div>'
-    +'<div class="sd" style="color:var(--text-faint)">We set up the first one now. You name and add the rest in Settings, so each is scoped and reported on its own.</div></div>'
+    +'<div class="sd" style="color:var(--text-faint)">'+(outletsMin(d.outlets)>1
+        ? 'Name them below and they are all set up now, switcher and all.'
+        : 'We set up the first one now. You name and add the rest in Settings, so each is scoped and reported on its own.')+'</div></div>'
+    +setupStudiosHtml()
     +'<div class="modal-foot"><button class="btn ghost" onclick="skipStudioSetup()">Skip for now</button><span style="flex:1"></span><button class="btn" onclick="saveStudioSetup()">Start</button></div>');
 }
 /* Skipping is a real answer. It is recorded, so the studio is asked once and
@@ -3452,6 +3580,13 @@ function saveStudioSetup(){
   if(!name){alert('What is your label called?');return;}
   if(!d.does.length){alert('Tick at least one thing you do, so the app knows which tabs to show you.');return;}
   if(!normaliseDoes(d.does).some(k=>modeOf(k))){alert('For each one, say whether it is made to order or sold ready made.');return;}
+  /* Somebody who said they run several and then left the boxes blank would
+     silently get one studio and no switcher, which is exactly the thing this
+     screen was changed to stop happening. Ask rather than guess. */
+  if(outletsMin(d.outlets)>1){
+    const namedCount=(d.studios||[]).filter(function(s){return String(s.name||'').trim();}).length;
+    if(namedCount<2){alert('Give each studio a name, so the app can keep their orders, stock and takings apart.');return;}
+  }
 
   SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:name});
   /* Who they are, alongside what the label is called. An account made by
@@ -3470,15 +3605,41 @@ function saveStudioSetup(){
     const av=document.getElementById('avInit');if(av)av.textContent=(you[0]||'?').toUpperCase();
   }
   const existing=getBranches()[0]||{};
-  SETTINGS.branches=[{
-    id:existing.id||uid('br'),
-    name:(d.location||'').trim()||name,
-    location:(d.location||'').trim(),
-    active:true,
-    does:d.does.slice(),
-    type:summaryType(d.does),
-    channels:d.channels.slice()
-  }];
+  /* One studio behaves exactly as it always did. Several become several
+     branches here and now, so the switcher is in the header the first time
+     the app opens rather than something to go and find in Settings. */
+  const named=(d.studios||[]).map(function(s){return Object.assign({},s,{name:String(s.name||'').trim()});})
+                             .filter(function(s){return s.name;});
+  if(outletsMin(d.outlets)>1&&named.length>1){
+    const allCrafts=setupCraftKeys();
+    SETTINGS.branches=named.map(function(s,i){
+      /* Which of the label's crafts happen here. The modes carry over
+         untouched: a studio that makes garments makes them everywhere it
+         does garments at all. */
+      const mine=Array.isArray(s.crafts)&&s.crafts.length?s.crafts:allCrafts;
+      const does=normaliseDoes(d.does).filter(function(k){return mine.indexOf(craftOf(k))>=0;});
+      const use=does.length?does:normaliseDoes(d.does);
+      return {
+        id:(i===0&&existing.id)?existing.id:uid('br'),
+        name:s.name,
+        location:i===0?(d.location||'').trim():'',
+        active:true,
+        does:use.slice(),
+        type:summaryType(use),
+        channels:d.channels.slice()
+      };
+    });
+  } else {
+    SETTINGS.branches=[{
+      id:existing.id||uid('br'),
+      name:(d.location||'').trim()||name,
+      location:(d.location||'').trim(),
+      active:true,
+      does:d.does.slice(),
+      type:summaryType(d.does),
+      channels:d.channels.slice()
+    }];
+  }
   /* The production board should be the right board the first time they open it.
      Stages come from the first craft they said they MAKE, because 'make' is what
      opens the board at all; a studio doing two keeps the first one's and can change
@@ -3554,7 +3715,7 @@ function enterApp(){
   show('navAttendance',can('attendance'));show('msAttendance',can('attendance'));
   show('navLeave',can('team'));show('msLeave',can('team'));
   show('navCompanylog',can('team'));show('msCompanylog',can('team'));
-  applyTeamVisibility();updateConnPill();refreshInstallUI();
+  applyTeamVisibility();applyExampleVisibility();updateConnPill();refreshInstallUI();
   show('navExpenses',can('expenses'));show('msExpenses',can('expenses'));document.getElementById('expLockIco').style.display='none';
   show('navAudit',can('audit'));show('msAudit',can('audit'));
   show('msSwitch',isOwner());
@@ -7152,7 +7313,7 @@ function askForMoreStorage(){
   }
   alert(body+'\n\nSend this to us and we will come back with a price.');
 }
-function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -7883,6 +8044,7 @@ function applyExampleStudio(key){
 /* Load one of the worked examples. Same warning as loadExample(): this
    REPLACES whatever is in the app. */
 function loadExampleAs(key){
+  if(!exampleAllowed()){loadExample(true);return;}   // says why, and changes nothing
   loadExample(true);
   applyExampleStudio(key);
   if(typeof applyBizVisibility==='function')applyBizVisibility();
@@ -7893,6 +8055,7 @@ function loadExampleAs(key){
 /* The picker. Offered wherever the example is offered, because "show me one
    like mine" is the first thing anybody asks. */
 function openExamplePicker(){
+  if(!exampleAllowed()){loadExample(true);return;}   // the refusal explains itself
   const rows=EXAMPLE_STUDIOS.map(function(x){
     return '<div class="up-line" style="cursor:pointer;padding:11px 0;border-bottom:1px solid var(--line-soft)" onclick="pickExample(\''+x.key+'\')">'
       +'<b>'+esc(x.label)+'</b><div style="color:var(--text-dim);font-size:13px">'+esc(x.blurb)+'</div></div>';
@@ -7909,7 +8072,30 @@ function pickExample(key){
   closeModal();
   loadExampleAs(key);
 }
+/* ===== THE EXAMPLE STUDIO IS FOR PEOPLE WITHOUT ONE =====
+   It exists so somebody can see what the app does before they have any data.
+   A signed-in studio is the opposite case, and for them this button is not a
+   demo, it is a delete: loadExample REPLACES everything, and on a live account
+   the replacement syncs to the cloud and to every other device they own. Our
+   made-up label is nothing they should be able to reach by accident, let alone
+   have it overwrite their own orders.
+
+   Refused here as well as hidden, because a screen is a suggestion and this is
+   the function that does the damage. */
+function exampleAllowed(){return !liveMode;}
+function applyExampleVisibility(){
+  const btn=document.getElementById('setExampleBtn');
+  const lead=document.getElementById('setDataLead');
+  if(btn)btn.style.display=exampleAllowed()?'':'none';
+  if(lead)lead.textContent=exampleAllowed()
+    ? 'Load a quick example to explore, or clear everything to start fresh.'
+    : 'Clear everything and start fresh. Exporting a backup first is strongly recommended.';
+}
 function loadExample(force){
+  if(!exampleAllowed()){
+    alert('The example studio is only for exploring the app before you have your own.\n\nThis account has a studio on it, and loading the example would replace everything in it.');
+    return;
+  }
   if(!force && hasOwnData()){
     if(!confirm('This REPLACES everything in the app with the example studio.\n\nYour orders, customers, payments, staff and stock will be wiped and cannot be recovered unless you exported a backup.\n\nContinue?'))return;
     if(confirm('Export a backup of your current data first? Strongly recommended.')){try{exportData();}catch(e){}}

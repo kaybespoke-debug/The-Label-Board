@@ -428,6 +428,22 @@ function liveToSubscriber(row) {
     }),
     referredBy: null,
     referrals: [],
+    /* The Referrals & bonuses tab reads all five of these, and one of them is
+       read as `.length`. A live studio arrived without any of them, so opening
+       that tab threw and the error boundary blanked the whole Subscribers page
+       — three clicks from the subscriber list. Nothing tracks studio-to-studio
+       referrals in the database yet, so zero and empty is the truthful answer
+       rather than a placeholder: when it is tracked, this is where it lands. */
+    referralLedger: [],
+    referralEarned: 0,
+    referralPaid: 0,
+    referralPending: 0,
+    referralConverted: 0,
+    /* Filled in by liveLoadBilling a moment later. Present here so the detail
+       view never reads undefined in the window before that call returns. */
+    paidToDate: 0,
+    paymentsCount: 0,
+    trialEndsOn: null,
     lastSeen: String(row.last_active_at || '').slice(0, 10),
     ordersLast30: null,
     notes: []

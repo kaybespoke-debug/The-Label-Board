@@ -252,8 +252,12 @@ function buildMobBar() {
     const n = flat[id];
     if (!n || !canPage(id)) return '';
     const count = n[3] ? n[3]() : 0;
+    /* Every icon carries its own hue, lit or not. Colouring only the active one
+       left four grey shapes and one gold, which is a row of icons you have to
+       read rather than a row you can aim at. The sidebar has worked this way
+       all along, and so does the customer app. */
     return '<button class="mb' + (lit === id ? ' on' : '') + '" onclick="go(\'' + id + '\')">' +
-      '<span class="mbi" style="color:' + (lit === id ? (NAV_HUE[id] || 'currentColor') : 'currentColor') + '">' +
+      '<span class="mbi" style="color:' + (NAV_HUE[id] || 'currentColor') + '">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
       'stroke-linecap="round" stroke-linejoin="round"><use href="#' + n[2] + '"/></svg></span>' +
       '<span class="mbt">' + (MOB_LABEL[id] || n[1]) + '</span>' +

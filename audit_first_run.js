@@ -82,6 +82,14 @@ function fillSetup(b, { name, location, online }) {
   b.els.su_show.checked = true;
   b.els.su_onl.checked = !!online;
 }
+/* Name the studios, the way the browser would from the boxes the screen draws
+   once somebody says they run more than one. */
+function fillStudios(b, names) {
+  names.forEach((n, i) => {
+    b.els['su_st_' + i] = b.els['su_st_' + i] || { value: '' };
+    b.els['su_st_' + i].value = n;
+  });
+}
 
 // ---------------------------------------------------------------------
 section('A new studio is asked, an existing one is not');
@@ -95,7 +103,10 @@ section('A new studio is asked, an existing one is not');
   ok('a studio that has answered is never asked again', b2.run('needsStudioSetup()') === false);
 
   const b3 = freshStudio();
-  b3.run('loadExample(true);');
+  /* Orders written directly, not by loading the example. A live studio is now
+     refused the example outright, and a fixture that goes through a product
+     feature stops being a fixture the day that feature changes. */
+  b3.run("save('layi_dash_orders',[{id:'o1',client:'Mid Flight',outfits:[]}]);");
   ok('a studio with work already in it is not asked', b3.run('needsStudioSetup()') === false,
      'it would interrupt somebody mid-flight');
 
@@ -269,6 +280,7 @@ section('How many of you, and how many outlets');
   b.run("setupToggleCraft('garments');");
   b.run("setupPick('team','many');setupPick('outlets','two');");
   fillSetup(b, { name: 'Six Of Us' });
+  fillStudios(b, ['Lekki', 'Ikeja']);
   const staffBefore = b.run('getStaff().length');
   b.run('saveStudioSetup();');
 
@@ -278,8 +290,17 @@ section('How many of you, and how many outlets');
     b.run("teamToolsOn()") === true, 'teamTools=' + b.run('SETTINGS.teamTools'));
   ok('and invents nobody: no staff records are created from a rough count',
     b.run('getStaff().length') === staffBefore);
-  ok('and invents no outlets either: one branch is set up, the rest are theirs to name',
-    b.run('getBranches().length') === 1);
+  /* This used to assert the opposite: one branch, and "the rest are theirs to
+     name in Settings". That was the bug. Somebody who has just said they run
+     three outlets opened the app with no switcher, and the one screen that
+     could have set it up was the screen they had just finished. */
+  ok('the studios they named are set up, so the switcher is there at first open',
+    b.run('getBranches().length') === 2, 'got ' + b.run('getBranches().length') + ' branches');
+  ok('and they are called what they were named',
+    b.run("getBranches().map(function(x){return x.name;}).join('|')") === 'Lekki|Ikeja',
+    b.run("getBranches().map(function(x){return x.name;}).join('|')"));
+  ok('which is what makes the app open on the all-studios view',
+    b.run('multiBranch()') === true);
   ok('the plan starts as one that fits what they described',
     b.run("SETTINGS.plan") === b.run("smallestPlanFitting(3,8).id"),
     'got ' + b.run('SETTINGS.plan'));
@@ -379,6 +400,144 @@ section('The header agrees with the rest of the screen');
   const blankName = c.run('document.getElementById("pgTitle").textContent') || '';
   ok('a studio that has not answered is not given the demo tenant\'s name',
      !!blankName && !/LAYI/.test(blankName), 'header reads: ' + JSON.stringify(blankName));
+}
+
+// ---------------------------------------------------------------------
+section('Our demo studio is not a thing a real studio can reach');
+// ---------------------------------------------------------------------
+// The example exists so somebody can see the app before they have any data.
+// For a signed-in studio it is not a demo, it is a delete: loadExample REPLACES
+// everything, and on a live account that replacement syncs to the cloud and to
+// every other device on the account. So it is hidden AND refused — a screen is
+// a suggestion, and this is the function that does the damage.
+{
+  const live = freshStudio();                       // liveMode = true
+  live.run('save("layi_dash_orders",[{id:"o1",client:"Real Client",outfits:[]}]);');
+  live.sb.__alert = '';
+  live.run('loadExample(true);');
+  ok('a signed-in studio cannot load our example data',
+     live.run('rawOrders().length') === 1, 'the example replaced their orders');
+  ok('and is told why rather than nothing happening',
+     /example/i.test(live.sb.__alert || ''), 'alert was: ' + JSON.stringify(live.sb.__alert));
+  ok('the button is hidden from them too',
+     (live.run('applyExampleVisibility();'),
+      live.run('document.getElementById("setExampleBtn").style.display') === 'none'));
+
+  // Both other ways in are closed, because the picker is a second door.
+  live.sb.__alert = '';
+  live.run('openExamplePicker();');
+  ok('the picker does not open for them either', /example/i.test(live.sb.__alert || ''));
+  live.sb.__alert = '';
+  live.run('loadExampleAs("shoes");');
+  ok('nor does asking for one example studio by name', /example/i.test(live.sb.__alert || ''));
+  ok('and after all three, their own work is still there',
+     live.run('rawOrders().length') === 1);
+
+  // Somebody exploring without an account is exactly who it is for.
+  const demo = boot();
+  demo.run('demoLogin();');
+  ok('somebody exploring without an account still gets the example',
+     demo.run('rawOrders().length') > 0);
+  ok('and can still see the button',
+     (demo.run('applyExampleVisibility();'),
+      demo.run('document.getElementById("setExampleBtn").style.display') !== 'none'));
+}
+
+// ---------------------------------------------------------------------
+section('Several studios are set up here, not in Settings later');
+// ---------------------------------------------------------------------
+{
+  // Nothing is asked of somebody who runs one.
+  const one = freshStudio();
+  one.run('openStudioSetup();');
+  one.run("setupToggleCraft('garments');setupPick('outlets','one');");
+  ok('a studio that runs one is not asked to name anything',
+     one.run('setupStudiosHtml()') === '');
+
+  const b = freshStudio();
+  b.run('openStudioSetup();');
+  b.run("setupToggleCraft('garments');setupToggleCraft('footwear');");
+  b.run("setupPick('outlets','two');");
+  ok('saying "2 or 3" opens boxes to name them', /id="su_st_0"/.test(b.run('setupStudiosHtml()')));
+  ok('and starts with two, which is the fewest that answer can mean',
+     b.run('setupDraft.studios.length') === 2);
+  ok('"more than 3" starts with four for the same reason',
+     (function () { const c = freshStudio(); c.run('openStudioSetup();'); c.run("setupToggleCraft('garments');setupPick('outlets','more');"); return c.run('setupDraft.studios.length'); })() === 4);
+
+  ok('another can be added', (b.run('setupAddStudio();'), b.run('setupDraft.studios.length') === 3));
+  ok('and removed again', (b.run('setupRemoveStudio(2);'), b.run('setupDraft.studios.length') === 2));
+  b.run('setupRemoveStudio(1);');
+  ok('but never below the number they said they run',
+     b.run('setupDraft.studios.length') === 2, 'removing went below the band');
+
+  // What each one does. Defaults to everything the label does.
+  ok('each studio starts doing everything the label does',
+     b.run('setupDraft.studios[0].crafts') === null);
+  b.run("setupStudioToggleCraft(0,'footwear');");
+  ok('and a craft can be said not to happen at one of them',
+     b.run("setupDraft.studios[0].crafts.indexOf('footwear')") < 0 &&
+     b.run("setupDraft.studios[0].crafts.indexOf('garments')") >= 0,
+     'crafts: ' + JSON.stringify(b.run('setupDraft.studios[0].crafts')));
+  b.run("setupStudioToggleCraft(0,'garments');");
+  ok('but a studio cannot be left doing nothing at all',
+     b.run('setupDraft.studios[0].crafts.length') >= 1);
+
+  // Naming them is required, because the silent fallback was the old bug.
+  fillSetup(b, { name: 'Two Towns' });
+  fillStudios(b, ['Lekki', '']);
+  b.sb.__alert = '';
+  b.run('saveStudioSetup();');
+  ok('leaving one unnamed is refused rather than quietly collapsing to one studio',
+     /name/i.test(b.sb.__alert || ''), 'alert was: ' + JSON.stringify(b.sb.__alert));
+  ok('and the studio is not set up until it is answered', b.run('needsStudioSetup()') === true);
+
+  fillStudios(b, ['Lekki', 'Ikeja']);
+  b.run('saveStudioSetup();');
+  ok('naming them both sets both up', b.run('getBranches().length') === 2);
+  ok('the one with footwear turned off does not do footwear',
+     b.run("branchCrafts(getBranches()[0]).indexOf('footwear')") < 0,
+     'crafts: ' + b.run("branchCrafts(getBranches()[0]).join(',')"));
+  ok('and the other still does both',
+     b.run("branchCrafts(getBranches()[1]).length") === 2);
+  ok('each one keeps a trade, so no branch falls through to a guessed default',
+     b.run('getBranches().every(function(x){return x.does&&x.does.length;})') === true);
+}
+
+// ---------------------------------------------------------------------
+section('Answering a question does not lose your place');
+// ---------------------------------------------------------------------
+// Every tick on this screen rebuilds the whole modal, and openModal scrolls a
+// freshly built modal to the top. So on a phone, ticking "Ready made" threw
+// you back to the title and you scrolled down to the same spot again — for
+// every one of the seven answers. openModal already knows how to hold its
+// place; this screen simply never asked it to.
+{
+  const b = freshStudio();
+  const seen = [];
+  const realOpen = b.sb.openModal;
+  b.sb.openModal = function (html) { seen.push(!!b.sb.__omKeep); return realOpen.call(b.sb, html); };
+
+  b.run('openStudioSetup();');
+  ok('opening the screen starts at the top, which is where the first question is',
+     seen[0] === false, 'it asked to keep a scroll position it does not have yet');
+
+  b.run("setupToggleCraft('garments');");
+  ok('ticking a craft keeps your place', seen[1] === true);
+  b.run("setupToggleMode('garments','make');");
+  ok('and so does choosing how it reaches the customer', seen[2] === true);
+  b.run("setupPick('team','few');");
+  ok('and so does answering how many of you there are', seen[3] === true);
+  b.run("setupPick('outlets','two');");
+  ok('and how many studios you run', seen[4] === true);
+
+  b.sb.openModal = realOpen;
+
+  // The other half of the same bug: each rebuild used to push a copy of this
+  // screen onto the modal back-stack, so a "Back" button appeared on the first
+  // screen of the app and the stack filled with copies of itself.
+  ok('and none of it piles up on the back-stack',
+     (b.run('(window.__modalStack||[]).length')) <= 1,
+     'back-stack holds ' + b.run('(window.__modalStack||[]).length') + ' copies of the setup screen');
 }
 
 // ---------------------------------------------------------------------
