@@ -126,7 +126,6 @@ async function main() {
 
 /* ---------- 2. the front door ---------- */
 const DEMO = G('DEMO_PROVIDER');
-const demoCodeFor = G('demoCodeFor');
 
 /* This suite tests the demo provider, and the portal only selects it when
    CONFIG.live is false. That used to be guaranteed by asserting the shipped
@@ -167,33 +166,77 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
 {
   const p = PROFILES[0];
 
-  const wrong = await DEMO.verify(p.email, '000000');
-  check(wrong.ok === false, 'a wrong code does not sign you in');
-  check(!!wrong.error, 'and says so');
+  /* The portal signs in with a password now. It used to email a six digit code
+     every time, which meant every sign-in waited on an email arriving and the
+     screen read as though anybody could let themselves in. Kayode's call,
+     15 Sep. Forgetting is handled by a reset link, which is the same thing the
+     code was, asked for on the rare day it is needed instead of every time. */
+  const noPw = await DEMO.signIn(p.email, '');
+  check(noPw.ok === false, 'an empty password does not sign you in');
+  check(!!noPw.error, 'and says so');
 
-  const right = await DEMO.verify(p.email, demoCodeFor(p.email));
+  const right = await DEMO.signIn(p.email, 'anything');
   check(right.ok === true && right.session.partnerKey === p.key,
-    'the right code signs you in as the right partner');
+    'signing in lands you in your own account and nobody else\'s');
   check(!!right.session.expiresAt, 'the session carries an expiry');
 
-  /* An address we do not know must behave exactly like one we do, or the box
-     becomes a way to find out who our partners are. */
-  const unknownSend = await DEMO.sendCode('stranger@nowhere.example');
-  const knownSend = await DEMO.sendCode(p.email);
-  check(unknownSend.ok === knownSend.ok,
-    'an unknown address gets the same answer as a known one');
-  check(unknownSend.demoCode === null, 'and no code is issued for it');
-  const unknownVerify = await DEMO.verify('stranger@nowhere.example', demoCodeFor('stranger@nowhere.example'));
-  check(unknownVerify.ok === false, 'and a code guessed for it still does not work');
-
-  /* One partner's code must not open another partner's account. */
-  const crossed = await DEMO.verify(PROFILES[1].email, demoCodeFor(p.email));
-  check(crossed.ok === false, 'one partner\'s code does not open another partner\'s account');
+  const unknown = await DEMO.signIn('stranger@nowhere.example', 'anything');
+  check(unknown.ok === false, 'an address with no partner behind it is refused');
 
   const restored = await DEMO.restore({ partnerKey: p.key });
   check(restored.ok === true, 'a stored session for a real partner is restored');
   const bogus = await DEMO.restore({ partnerKey: 'nobody' });
   check(bogus.ok === false, 'a stored session naming nobody is not');
+}
+
+/* The live front door must not tell anybody who our partners are.
+   The demo names its three made-up logins on screen, so it can say "not one of
+   these". The real one cannot: a different answer for "wrong password" and "no
+   such account" turns the sign-in box into a way to enumerate our partners, one
+   address at a time. So both get the same sentence, and it names neither. */
+{
+  const SUPA = G('SUPA_PROVIDER');
+  const seen = [];
+  const realFetch = sandbox.fetch;
+  sandbox.fetch = async (url, opts) => {
+    seen.push(String(url));
+    return { ok: false, status: 400, text: async () => JSON.stringify({ msg: 'Invalid login credentials' }) };
+  };
+  const a = await SUPA.signIn('a-real-partner@example.com', 'wrong');
+  const b = await SUPA.signIn('nobody-at-all@example.com', 'wrong');
+  sandbox.fetch = realFetch;
+
+  check(a.ok === false && b.ok === false, 'a bad sign-in is refused');
+  check(a.error === b.error,
+    'a wrong password and an unknown address get the same answer, word for word',
+    JSON.stringify([a.error, b.error]));
+  check(!/no such|not found|unknown|does not exist/i.test(String(a.error)),
+    'and that answer does not say whether the address exists');
+  check(!/Invalid login credentials/.test(String(a.error)),
+    'nor pass the auth server\'s own wording through to the screen');
+  check(seen.every(u => /grant_type=password/.test(u)),
+    'the live door asks the auth server for a password grant, not a code');
+
+  /* A correct password is not the same as an active partner. Suspending
+     somebody has to close the door, or it is a label in the console and
+     nothing more. */
+  const realPm = sandbox.partnerMe;
+  sandbox.fetch = async () => ({ ok: true, status: 200,
+    text: async () => JSON.stringify({ access_token: 'tok', refresh_token: 'ref' }) });
+
+  sandbox.partnerMe = async () => ({ id: 'p1', name: 'On Hold', email: 'hold@example.com', status: 'suspended' });
+  const held = await SUPA.signIn('hold@example.com', 'the-right-password');
+  check(held.ok === false && held.suspended === true,
+    'a suspended partner with the right password is still turned away');
+  check(!held.session, 'and gets no session out of it');
+
+  sandbox.partnerMe = async () => null;
+  const notPartner = await SUPA.signIn('someone@example.com', 'the-right-password');
+  check(notPartner.ok === false && !notPartner.session,
+    'and neither does a real account that is not a partner at all');
+
+  sandbox.partnerMe = realPm;
+  sandbox.fetch = realFetch;
 }
 
 /* An expired session is not a session. */
@@ -214,10 +257,14 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
    one of those links pointed at the customer app — so a partner following their
    own invitation was shown a studio sign-in form and told, correctly, that they
    had no studio. Nothing was broken except where the link went.
-   A partner who follows the fixed link arrives already signed in, and never
-   needs a password because this portal does not have them. These checks drive
-   that arrival: the happy path, the dead link, the wrong kind of account, the
-   suspended one, and an ordinary visit that must not be disturbed by any of it. */
+   A partner who follows the fixed link arrives holding a live session, and the
+   link works exactly once. Signing them straight in on it would leave them with
+   no way back tomorrow — in once, locked out after, which reads as the portal
+   being broken rather than a step having been skipped. So the arrival asks for
+   a password, and the sign-in happens on the far side of that.
+   These checks drive it: the happy path, the dead link, the wrong kind of
+   account, the suspended one, and an ordinary visit that must not be disturbed
+   by any of it. */
 {
   const clearSession = G('clearSession'), readSession = G('readSession');
   const handleAuthArrival = G('handleAuthArrival');
@@ -233,9 +280,10 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
     ledger: [], payouts: [], statements: [], updates: [], accounts: [] });
 
   const arrive = (hash) => { loc.hash = hash; loc.href = 'https://partners.thelabelboard.com/' + hash; };
-  const reset = () => { clearSession(); G('AUTH.error = ""'); G('AUTH.stage = "email"'); loc.hash = ''; };
+  const reset = () => { clearSession(); G('AUTH.error = ""'); G('AUTH.stage = "signin"');
+                        G('AUTH.arrivalToken = ""'); loc.hash = ''; };
 
-  /* 1. the happy path */
+  /* 1. the happy path: arrive, set a password, land inside */
   reset();
   let seen = [];
   sandbox.partnerMe = async (t) => { seen.push(t); return { id: 'p_new', name: 'New Partner', email: 'new@example.com', status: 'active' }; };
@@ -243,13 +291,46 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
   let handled = await handleAuthArrival();
   check(handled === true, 'an invitation link is recognised and handled here');
   check(seen[0] === 'tok_live', 'the token in the link is the one used to find out who arrived');
-  const made = readSession();
-  check(!!made && made.partnerKey === 'p_new', 'a partner following their invitation is signed in');
-  check(!!made && made.token === 'tok_live' && made.refresh === 'ref_live',
-    'and both halves of the session are kept, so it survives the token expiring');
-  check(G('UI.page') === 'welcome', 'and lands on the welcome page, because this is a sign-in and not a reopen');
+  check(G('AUTH.stage') === 'setpw',
+    'an invited partner is asked for a password rather than signed in on a one-shot link');
+  check(readSession() === null,
+    'and nothing is stored until they have one — a session they cannot recreate is a lock-out tomorrow');
   check(!loc.hash && loc.href.indexOf('access_token') < 0,
     'the live token is taken out of the address rather than left there to be pasted somewhere');
+
+  // Too short, and mismatched, are both refused before anything is sent.
+  const realFetch2 = sandbox.fetch, realGet = sandbox.document.getElementById;
+  let put = [];
+  sandbox.fetch = async (url, opts) => {
+    put.push({ url: String(url), opts: opts });
+    return { ok: true, status: 200, text: async () => '{}' };
+  };
+  sandbox.document.getElementById = (id) =>
+    id === 'authPw' ? { value: 'short' } : id === 'authPw2' ? { value: 'short' } : { value: '' };
+  await G('doSetPassword')();
+  check(put.length === 0 && /at least/i.test(G('AUTH.error')),
+    'a password under the minimum is refused without asking the server');
+
+  sandbox.document.getElementById = (id) =>
+    id === 'authPw' ? { value: 'a-good-password' } : id === 'authPw2' ? { value: 'a-different-one' } : { value: '' };
+  await G('doSetPassword')();
+  check(put.length === 0 && /match/i.test(G('AUTH.error')),
+    'and two that do not match are refused the same way');
+
+  sandbox.document.getElementById = (id) =>
+    id === 'authPw' ? { value: 'a-good-password' } : id === 'authPw2' ? { value: 'a-good-password' } : { value: '' };
+  await G('doSetPassword')();
+  check(put.length === 1 && /\/auth\/v1\/user/.test(put[0].url) && put[0].opts.method === 'PUT',
+    'a good one is written to the account');
+  check(put.length === 1 && String((put[0].opts.headers || {}).Authorization) === 'Bearer tok_live',
+    'signed with the token from the link, which is the only thing proving who they are',
+    JSON.stringify((put[0].opts || {}).headers || {}));
+  const made = readSession();
+  check(!!made && made.partnerKey === 'p_new', 'and only then are they signed in');
+  check(G('UI.page') === 'welcome', 'landing on the welcome page, because this is a sign-in and not a reopen');
+  check(G('AUTH.arrivalToken') === '', 'the one-shot token is dropped once it has been used');
+  sandbox.fetch = realFetch2;
+  sandbox.document.getElementById = realGet;
 
   /* 2. a link that has already expired */
   reset();
@@ -258,7 +339,8 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
   handled = await handleAuthArrival();
   check(handled === true, 'a dead invitation link is handled rather than ignored');
   check(/expired/i.test(G('AUTH.error')), 'and says the link expired, not something generic');
-  check(/code/i.test(G('AUTH.error')), 'and points at the thing that fixes it, which is on the same screen');
+  check(/link/i.test(G('AUTH.error')), 'and points at the thing that fixes it, which is on the same screen');
+  check(G('AUTH.stage') === 'signin', 'leaving them on the screen where the reset link is one tap away');
   check(readSession() === null, 'a dead link signs nobody in');
 
   /* 3. an account that exists but is not a partner */
@@ -278,7 +360,7 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
   handled = await handleAuthArrival();
   check(handled === true, 'a suspended partner arriving on a link is handled');
   check(readSession() === null, 'and a live token does not let them back in');
-  check(G('AUTH.stage') === 'suspended', 'and they get the suspended screen, not the code box');
+  check(G('AUTH.stage') === 'suspended', 'and they get the suspended screen, not a password box');
 
   /* 5. an ordinary visit */
   reset();
@@ -295,9 +377,9 @@ check(PROFILES.length === 3, 'three demo partners, not one — a door with one p
   sandbox.partnerMe = async (t) => { seen.push(t); return { id: 'p_boot', name: 'Booted', email: 'boot@example.com', status: 'active' }; };
   arrive('#access_token=tok_boot&refresh_token=ref_boot&type=invite');
   await G('bootAuth')();
-  const booted = readSession();
-  check(!!booted && booted.partnerKey === 'p_boot',
-    'opening the portal on an invitation link signs the partner in — boot honours it, not just the handler');
+  check(G('AUTH.stage') === 'setpw',
+    'opening the portal on an invitation link asks for a password — boot honours it, not just the handler');
+  check(seen[0] === 'tok_boot', 'and it is the token from that link being checked');
   check(!loc.hash, 'and boot clears the token out of the address too');
 
   /* 6. the demo never touches any of this */

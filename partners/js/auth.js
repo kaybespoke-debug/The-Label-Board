@@ -30,10 +30,15 @@ const SESSION_KEY = 'tlb_partner_session';
 
 const AUTH = {
   session: null,          // { partnerKey, email, name, expiresAt, provider }
-  stage: 'email',         // email | code | suspended
-  pending: null,          // { email, sentAt, demoCode }
+  stage: 'signin',        // signin | reset | sent | setpw | suspended
+  pending: null,          // { email, name }
   busy: false,
   error: '',
+  /* Held only between arriving on a link and setting a password on it. Never
+     written to storage: it is a live session in a variable, and the moment it
+     has been used it goes. */
+  arrivalToken: '',
+  arrivalKind: '',
 
   live() { return CONFIG.live; },
   signedIn() { return !!AUTH.session; },
@@ -72,19 +77,14 @@ function sessionExpiry() {
 const DEMO_PROVIDER = {
   name: 'demo',
 
-  async sendCode(email) {
-    const p = profileByEmail(email);
-    /* The same answer whether or not the address is one we know. An error
-       that says "no such partner" turns this box into a way to find out
-       who our partners are. */
-    await pause(400);
-    return { ok: true, demoCode: p ? demoCodeFor(p.email) : null };
-  },
-
-  async verify(email, code) {
+  /* There is no real account behind a demo partner, so any password opens one
+     of the three example logins and the screen says so. Refusing a password
+     here would only be theatre: the data it guards is invented. */
+  async signIn(email, password) {
     await pause(400);
     const p = profileByEmail(email);
-    if (!p || code !== demoCodeFor(p.email)) return { ok: false, error: 'That code is not right. Check it and try again.' };
+    if (!p) return { ok: false, error: 'That is not one of the demo logins. Pick one below.' };
+    if (!password) return { ok: false, error: 'Type anything as the password. This is the demo.' };
     return {
       ok: true,
       session: {
@@ -94,6 +94,16 @@ const DEMO_PROVIDER = {
     };
   },
 
+  async requestReset() {
+    await pause(300);
+    return { ok: true };
+  },
+
+  async setPassword() {
+    await pause(300);
+    return { ok: false, error: 'There is no account to set a password on in the demo.' };
+  },
+
   async restore(session) {
     return profileByKey(session.partnerKey) ? { ok: true, session } : { ok: false };
   },
@@ -101,16 +111,6 @@ const DEMO_PROVIDER = {
   async signOut() { /* nothing to tell anyone about */ }
 };
 
-/* A six digit code, stable for the day, derived from the address. */
-function demoCodeFor(email) {
-  const day = iso(new Date());
-  let h = 2166136261;
-  for (const ch of (email + '|' + day)) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return String(h % 1000000).padStart(6, '0');
-}
 function pause(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 /* ---------------- the Supabase provider ----------------
@@ -123,46 +123,53 @@ function pause(ms) { return new Promise(r => setTimeout(r, ms)); }
 const SUPA_PROVIDER = {
   name: 'supabase',
 
-  async sendCode(email) {
-    const r = await supaFetch('/auth/v1/otp', {
+  async signIn(email, password) {
+    const r = await supaFetch('/auth/v1/token?grant_type=password', {
       method: 'POST',
-      body: JSON.stringify({ email: String(email).trim(), create_user: false })
+      body: JSON.stringify({ email: String(email).trim().toLowerCase(), password: password })
     });
-    /* Same answer either way, for the same reason as the demo provider. */
-    return { ok: true, demoCode: null, softError: r.ok ? null : r.error };
-  },
-
-  async verify(email, code) {
-    const r = await supaFetch('/auth/v1/verify', {
-      method: 'POST',
-      body: JSON.stringify({ email: String(email).trim(), token: code, type: 'email' })
-    });
+    if (r.error === 'offline') return { ok: false, error: 'Could not reach the sign-in server. Check your connection.' };
     if (!r.ok || !r.body || !r.body.access_token) {
-      return { ok: false, error: 'That code is not right, or it has expired. Ask for a new one.' };
+      /* One answer for a wrong password and for an address with no account.
+         Spelling out which one is wrong turns this box into a way to find out
+         who our partners are. */
+      return { ok: false, error: 'That email and password do not match a partner account.' };
     }
-    const token = r.body.access_token;
-    const me = await partnerMe(token);
-    if (!me) {
-      return { ok: false, error: 'That login is not set up as a partner yet. Talk to your partner manager.' };
-    }
-    if (me.status !== 'active') {
-      return { ok: false, suspended: true, name: me.name };
-    }
-    return {
-      ok: true,
-      session: {
-        partnerKey: me.id, email: me.email, name: me.name,
-        token, refresh: r.body.refresh_token,
-        expiresAt: sessionExpiry(), provider: 'supabase'
-      }
-    };
+    return await sessionFromToken(r.body.access_token, r.body.refresh_token);
   },
 
+  /* redirect_to goes on the query string, which is where GoTrue reads it for
+     this endpoint. It is still subject to the project's allow list, and the
+     portal handles the arrival either way. */
+  async requestReset(email) {
+    await supaFetch('/auth/v1/recover?redirect_to=' + encodeURIComponent(portalUrl()), {
+      method: 'POST',
+      body: JSON.stringify({ email: String(email).trim().toLowerCase() })
+    });
+    /* Always the same answer. Whether an address has an account is not
+       something this screen tells anybody. */
+    return { ok: true };
+  },
+
+  async setPassword(token, password) {
+    const r = await supaFetch('/auth/v1/user', {
+      method: 'PUT', token: token,
+      body: JSON.stringify({ password: password })
+    });
+    if (!r.ok) return { ok: false, error: (r.error || 'That password was not accepted.') };
+    return await sessionFromToken(token, '');
+  },
+
+  /* Same three questions as a fresh sign-in, asked of the stored token: is the
+     account real, is it a partner, is that partner still active. Suspending
+     somebody has to end the session they already had, not just stop new ones,
+     or it is a label in the console and nothing more. */
   async restore(session) {
-    const me = await partnerMe(session.token);
-    if (!me) return { ok: false };
-    if (me.status !== 'active') return { ok: false, suspended: true, name: me.name };
-    return { ok: true, session };
+    const r = await sessionFromToken(session.token, session.refresh || '');
+    if (!r.ok) return r;
+    /* Keep the stored session object, which carries the expiry this browser
+       agreed to, rather than starting a fresh clock on every reopen. */
+    return { ok: true, session: session };
   },
 
   async signOut() {
@@ -171,6 +178,33 @@ const SUPA_PROVIDER = {
     }
   }
 };
+
+/* Where this portal lives, for the link in a reset email. Taken from the page
+   rather than written down, so a preview build sends people back to the
+   preview and not to production. */
+function portalUrl() {
+  try { return location.origin + location.pathname.replace(/[^/]*$/, ''); } catch (e) { return ''; }
+}
+
+/* A live token is not the same as being a partner. Every way into this portal
+   ends here, so the check happens once: the account exists, it has a partner
+   row, and that row is active. A suspended partner is told so rather than
+   shown an empty portal, which would read as their earnings having vanished. */
+async function sessionFromToken(token, refresh) {
+  const me = await partnerMe(token);
+  if (!me) {
+    return { ok: false, error: 'That login is not set up as a partner yet. Talk to your partner manager.' };
+  }
+  if (me.status !== 'active') return { ok: false, suspended: true, name: me.name };
+  return {
+    ok: true,
+    session: {
+      partnerKey: me.id, email: me.email, name: me.name,
+      token: token, refresh: refresh || '',
+      expiresAt: sessionExpiry(), provider: 'supabase'
+    }
+  };
+}
 
 async function partnerMe(token) {
   const r = await supaFetch('/rest/v1/rpc/partner_me', {
@@ -202,60 +236,103 @@ async function supaFetch(path, opts) {
   }
 }
 
-/* ---------------- the flow ---------------- */
-async function requestCode() {
-  const input = document.getElementById('authEmail');
-  const email = (input ? input.value : '').trim();
+/* ---------------- the flow ----------------
+   A password, not a code emailed every time. The code was chosen because a
+   partner opens this every few weeks and forgets passwords; in practice it
+   meant every single sign-in waited on an email arriving, and a screen that
+   asks only for an email address and sends something reads as though anybody
+   can let themselves in. Kayode's call, 15 Sep. Forgetting is handled by the
+   reset link, which is the same thing the code was, only asked for on the rare
+   day it is needed instead of every time. */
+const PW_MIN = 8;
+
+/* Every outcome of a sign-in attempt lands here, so the four screens that can
+   start one do not each need their own copy of what to do next. */
+async function finishSignIn(r, fresh) {
+  if (r.suspended) {
+    AUTH.stage = 'suspended';
+    AUTH.pending = { email: (AUTH.pending && AUTH.pending.email) || '', name: r.name };
+    renderAuth();
+    return false;
+  }
+  if (!r.ok) {
+    AUTH.error = r.error || 'That did not work.';
+    renderAuth();
+    return false;
+  }
+  saveSession(r.session);
+  if (!await enterPortal(fresh)) {
+    clearSession();
+    AUTH.error = 'We could not load your account. Try again in a moment.';
+    renderAuth();
+    return false;
+  }
+  return true;
+}
+
+async function doSignIn() {
+  const em = document.getElementById('authEmail');
+  const pw = document.getElementById('authPw');
+  const email = (em ? em.value : '').trim();
+  const password = pw ? pw.value : '';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    AUTH.error = 'That does not look like an email address.';
+    renderAuth();
+    return;
+  }
+  if (!password) { AUTH.error = 'Type your password.'; renderAuth(); return; }
+
+  AUTH.busy = true; AUTH.error = ''; AUTH.pending = { email: email };
+  renderAuth();
+  const r = await AUTH.provider().signIn(email, password);
+  AUTH.busy = false;
+  await finishSignIn(r, true);
+}
+
+function forgotPassword() {
+  AUTH.stage = 'reset';
+  AUTH.error = '';
+  renderAuth();
+  setTimeout(() => { const e = document.getElementById('authEmail'); if (e) e.focus(); }, 60);
+}
+
+async function doRequestReset() {
+  const em = document.getElementById('authEmail');
+  const email = (em ? em.value : '').trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     AUTH.error = 'That does not look like an email address.';
     renderAuth();
     return;
   }
   AUTH.busy = true; AUTH.error = ''; renderAuth();
-
-  const r = await AUTH.provider().sendCode(email);
+  await AUTH.provider().requestReset(email);
   AUTH.busy = false;
-  AUTH.pending = { email, sentAt: Date.now(), demoCode: r.demoCode };
-  AUTH.stage = 'code';
+  AUTH.pending = { email: email };
+  AUTH.stage = 'sent';
   renderAuth();
-  setTimeout(() => { const c = document.getElementById('authCode'); if (c) c.focus(); }, 60);
 }
 
-async function submitCode() {
-  const input = document.getElementById('authCode');
-  const code = (input ? input.value : '').replace(/[^0-9]/g, '');
-  if (code.length !== 6) {
-    AUTH.error = 'The code is six digits.';
+/* Setting a password on arrival. The token came from the link, so there is a
+   live session already; what is being added is the way back in next time. */
+async function doSetPassword() {
+  const a = document.getElementById('authPw');
+  const b = document.getElementById('authPw2');
+  const p1 = a ? a.value : '', p2 = b ? b.value : '';
+  if (p1.length < PW_MIN) {
+    AUTH.error = 'Use at least ' + PW_MIN + ' characters.';
     renderAuth();
     return;
   }
+  if (p1 !== p2) { AUTH.error = 'The two passwords do not match.'; renderAuth(); return; }
+
   AUTH.busy = true; AUTH.error = ''; renderAuth();
-
-  const r = await AUTH.provider().verify(AUTH.pending.email, code);
+  const r = await AUTH.provider().setPassword(AUTH.arrivalToken || '', p1);
   AUTH.busy = false;
-
-  if (r.suspended) {
-    AUTH.stage = 'suspended';
-    AUTH.pending = { email: AUTH.pending.email, name: r.name };
-    renderAuth();
-    return;
-  }
-  if (!r.ok) {
-    AUTH.error = r.error || 'That did not work.';
-    renderAuth();
-    return;
-  }
-
-  saveSession(r.session);
-  if (!await enterPortal(true)) {
-    clearSession();
-    AUTH.error = 'We could not load your account. Try again in a moment.';
-    renderAuth();
-  }
+  if (await finishSignIn(r, true)) AUTH.arrivalToken = '';
 }
 
-function backToEmail() {
-  AUTH.stage = 'email';
+function backToSignIn() {
+  AUTH.stage = 'signin';
   AUTH.error = '';
   renderAuth();
   setTimeout(() => { const e = document.getElementById('authEmail'); if (e) e.focus(); }, 60);
@@ -323,8 +400,10 @@ function renderAuth() {
 
   let body;
   if (AUTH.stage === 'suspended') body = suspendedCard();
-  else if (AUTH.stage === 'code') body = codeCard();
-  else body = emailCard();
+  else if (AUTH.stage === 'setpw') body = setpwCard();
+  else if (AUTH.stage === 'reset') body = resetCard();
+  else if (AUTH.stage === 'sent') body = sentCard();
+  else body = signinCard();
 
   shell.innerHTML =
     '<div class="authbox">' +
@@ -340,39 +419,64 @@ function renderAuth() {
     '</div>' + body + '</div>';
 }
 
-function emailCard() {
+function signinCard() {
   return '<h1 class="autht">Sign in</h1>' +
-    '<p class="authp">We will send a six digit code to your email. No password to remember.</p>' +
+    '<p class="authp">Your email and the password you set when you joined.</p>' +
     (AUTH.error ? '<div class="autherr">' + esc(AUTH.error) + '</div>' : '') +
     '<div class="fg"><label for="authEmail">Email</label>' +
-    '<input id="authEmail" type="email" inputmode="email" autocomplete="email" ' +
+    '<input id="authEmail" type="email" inputmode="email" autocomplete="username" ' +
     'placeholder="you@yourbusiness.com" value="' + esc(AUTH.pending ? AUTH.pending.email : '') + '" ' +
-    'onkeydown="if(event.key===\'Enter\')requestCode()"></div>' +
-    '<button class="btn gold authgo" onclick="requestCode()"' + (AUTH.busy ? ' disabled' : '') + '>' +
-    (AUTH.busy ? 'Sending…' : 'Send my code') + '</button>' +
+    'onkeydown="if(event.key===\'Enter\')document.getElementById(\'authPw\').focus()"></div>' +
+    '<div class="fg"><label for="authPw">Password</label>' +
+    '<input id="authPw" type="password" autocomplete="current-password" ' +
+    'onkeydown="if(event.key===\'Enter\')doSignIn()"></div>' +
+    '<button class="btn gold authgo" onclick="doSignIn()"' + (AUTH.busy ? ' disabled' : '') + '>' +
+    (AUTH.busy ? 'Checking…' : 'Sign in') + '</button>' +
+    '<div class="authalt"><button class="lnk" onclick="forgotPassword()">Forgot your password?</button></div>' +
     demoHint() +
     '<p class="authfoot">Not a partner yet? Ask whoever signed you up, or email ' +
     '<a href="mailto:hello@thelabelboard.com">hello@thelabelboard.com</a>.</p>';
 }
 
-function codeCard() {
-  return '<h1 class="autht">Check your email</h1>' +
-    '<p class="authp">We sent a six digit code to <b>' + esc(AUTH.pending.email) + '</b>. ' +
-    'It works for ten minutes.</p>' +
+function resetCard() {
+  return '<h1 class="autht">Reset your password</h1>' +
+    '<p class="authp">We will email you a link to set a new one.</p>' +
     (AUTH.error ? '<div class="autherr">' + esc(AUTH.error) + '</div>' : '') +
-    (AUTH.pending.demoCode
-      ? '<div class="authdemo"><span>Demo mode, so here is the code instead of an email</span>' +
-        '<b>' + AUTH.pending.demoCode + '</b></div>'
-      : '') +
-    '<div class="fg"><label for="authCode">Your code</label>' +
-    '<input id="authCode" class="authcode" inputmode="numeric" autocomplete="one-time-code" ' +
-    'maxlength="6" placeholder="000000" onkeydown="if(event.key===\'Enter\')submitCode()"></div>' +
-    '<button class="btn gold authgo" onclick="submitCode()"' + (AUTH.busy ? ' disabled' : '') + '>' +
-    (AUTH.busy ? 'Checking…' : 'Sign in') + '</button>' +
-    '<div class="authalt">' +
-    '<button class="lnk" onclick="backToEmail()">Use a different email</button>' +
-    '<button class="lnk" onclick="requestCode()">Send it again</button>' +
-    '</div>';
+    '<div class="fg"><label for="authEmail">Email</label>' +
+    '<input id="authEmail" type="email" inputmode="email" autocomplete="username" ' +
+    'placeholder="you@yourbusiness.com" value="' + esc(AUTH.pending ? AUTH.pending.email : '') + '" ' +
+    'onkeydown="if(event.key===\'Enter\')doRequestReset()"></div>' +
+    '<button class="btn gold authgo" onclick="doRequestReset()"' + (AUTH.busy ? ' disabled' : '') + '>' +
+    (AUTH.busy ? 'Sending…' : 'Email me a link') + '</button>' +
+    '<div class="authalt"><button class="lnk" onclick="backToSignIn()">Back to sign in</button></div>';
+}
+
+/* Deliberately says "if that address has an account". Confirming that it does
+   is the same leak as naming it on the sign-in screen. */
+function sentCard() {
+  return '<h1 class="autht">Check your email</h1>' +
+    '<p class="authp">If <b>' + esc(AUTH.pending.email) + '</b> has a partner account, ' +
+    'a link to set a new password is on its way. It works for one hour.</p>' +
+    '<p class="authp">Nothing arrived? Look in spam, and check the address above.</p>' +
+    '<div class="authalt"><button class="lnk" onclick="backToSignIn()">Back to sign in</button></div>';
+}
+
+function setpwCard() {
+  const recovering = AUTH.arrivalKind === 'recovery';
+  return '<h1 class="autht">' + (recovering ? 'Set a new password' : 'Welcome') + '</h1>' +
+    '<p class="authp">' + (recovering
+      ? 'Choose a new password for the partner portal.'
+      : 'Choose a password to finish setting up your partner account. You will use it every time from now on.') +
+    '</p>' +
+    (AUTH.error ? '<div class="autherr">' + esc(AUTH.error) + '</div>' : '') +
+    '<div class="fg"><label for="authPw">Password</label>' +
+    '<input id="authPw" type="password" autocomplete="new-password" ' +
+    'placeholder="At least ' + PW_MIN + ' characters"></div>' +
+    '<div class="fg"><label for="authPw2">Repeat it</label>' +
+    '<input id="authPw2" type="password" autocomplete="new-password" ' +
+    'onkeydown="if(event.key===\'Enter\')doSetPassword()"></div>' +
+    '<button class="btn gold authgo" onclick="doSetPassword()"' + (AUTH.busy ? ' disabled' : '') + '>' +
+    (AUTH.busy ? 'Saving…' : 'Set my password') + '</button>';
 }
 
 function suspendedCard() {
@@ -382,7 +486,7 @@ function suspendedCard() {
     '<p class="authp">Your partner manager can tell you why and what happens next.</p>' +
     '<a class="btn gold authgo" href="mailto:hello@thelabelboard.com?subject=' +
     encodeURIComponent('Suspended partner account: ' + (AUTH.pending.email || '')) + '">Email your manager</a>' +
-    '<div class="authalt"><button class="lnk" onclick="backToEmail()">Back to sign in</button></div>';
+    '<div class="authalt"><button class="lnk" onclick="backToSignIn()">Back to sign in</button></div>';
 }
 
 /* Only shown in demo mode, and it says so. Three example partners with
@@ -399,7 +503,9 @@ function demoHint() {
 function useDemo(email) {
   const el = document.getElementById('authEmail');
   if (el) el.value = email;
-  requestCode();
+  const pw = document.getElementById('authPw');
+  if (pw) pw.value = 'demo';          // the demo takes any password, and says so
+  doSignIn();
 }
 
 /* ---------------- arriving from an invitation ----------------
@@ -441,9 +547,10 @@ async function handleAuthArrival() {
   clearAuthArrival();
 
   if (arrival.error) {
-    /* Almost always an expired link. Say so and leave the code box right there,
-       because asking for a code is the fix and they are already on the page. */
-    AUTH.error = arrival.error + '. Ask for a sign-in code below, or your partner manager for a new invitation.';
+    /* Almost always an expired link. Say so, and leave them on the sign-in
+       screen, where the reset link is the fix and it is one tap away. */
+    AUTH.error = arrival.error + '. Ask for a new link below, or your partner manager for a new invitation.';
+    AUTH.stage = 'signin';
     renderAuth();
     return true;
   }
@@ -451,6 +558,7 @@ async function handleAuthArrival() {
   const me = await partnerMe(arrival.token);
   if (!me) {
     AUTH.error = 'That link signed you in, but this account is not set up as a partner. Talk to your partner manager.';
+    AUTH.stage = 'signin';
     renderAuth();
     return true;
   }
@@ -462,14 +570,19 @@ async function handleAuthArrival() {
     return true;
   }
 
-  saveSession({
-    partnerKey: me.id, email: me.email, name: me.name,
-    token: arrival.token, refresh: arrival.refresh,
-    expiresAt: sessionExpiry(), provider: 'supabase'
-  });
-  /* fresh: true — this is a sign-in, so it gets the welcome page. It is the one
-     moment a brand new partner is actually paying attention to what this is. */
-  if (!await enterPortal(true)) { clearSession(); renderAuth(); }
+  /* The link proves who they are, and it works exactly once. Signing them
+     straight in on it would leave them with no way back tomorrow — in once,
+     locked out after, which reads as the portal being broken rather than a
+     step having been skipped. So the arrival asks for a password first, and
+     the sign-in happens on the far side of that.
+     The token is held only for the moment it takes to set one, and is not
+     written to storage. */
+  AUTH.arrivalToken = arrival.token;
+  AUTH.arrivalKind = arrival.kind || 'invite';
+  AUTH.pending = { email: me.email, name: me.name };
+  AUTH.stage = 'setpw';
+  AUTH.error = '';
+  renderAuth();
   return true;
 }
 

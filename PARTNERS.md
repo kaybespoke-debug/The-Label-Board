@@ -45,29 +45,46 @@ tabs, no charts, and no tabs inside a detail view.
 
 ## Signing in
 
-One flow: type your email, we send a six digit code, you type it back. No
-password.
+Email and password.
 
-That is not a shortcut. Partners open this every few weeks on a phone, and a
-password set in November is a password forgotten by February. A code that
-expires in ten minutes cannot be reused, cannot be shared by accident, and
-cannot be the same one they use for their bank.
+**This changed on 15 September 2026.** It used to email a six digit code every
+single time, on the reasoning that partners open this every few weeks and a
+password set in November is forgotten by February. In practice that reasoning
+cost more than it saved: every sign-in waited on an email arriving, and a screen
+that asks only for an email address and then sends something reads as though
+anybody can let themselves in. It could not — the code was only ever issued to
+an address that already had an account — but a door has to look shut as well as
+be shut. Kayode's call.
+
+Forgetting is handled by a reset link, which is the same thing the code was,
+asked for on the rare day it is needed instead of every time.
+
+A partner never sets a password in advance. The invitation link hands the
+browser a live session, and the portal spends it on one thing: asking for a
+password. That link works exactly once, so signing somebody in on it and
+stopping there would let them in today and lock them out tomorrow.
 
 `partners/js/auth.js` has two providers behind the same four functions, and
 `config.js` picks between them by whether `SUPA_URL` and `SUPA_KEY` are filled
 in:
 
-- **demo** (config blank) — three example partners, the code shown on screen
-  because there is no email to send it to. The screen says so in as many words.
-- **supabase** (config filled) — `signInWithOtp` / `verifyOtp` against Supabase
-  Auth, then `app.partner_me()` to find out who signed in.
+- **demo** (config blank) — three example partners, any password, and the screen
+  says so. Refusing one would be theatre: the data it guards is invented.
+- **supabase** (config filled) — `grant_type=password` against Supabase Auth,
+  then `app.partner_me()` to find out who signed in.
+
+Every route in ends at `sessionFromToken()`, which asks the same three questions
+however somebody arrived: is the account real, is it a partner, is that partner
+still active. Suspending somebody therefore ends the session they already had
+rather than only stopping new ones.
 
 Sessions last 30 days and are stored per browser. Signing out clears the
 session; it does not touch anything the partner changed on that device.
 
-An address we do not know behaves exactly like one we do: same screen, same
-wait, no code issued. Otherwise the box becomes a way to find out who our
-partners are.
+**One answer for a wrong password and for an address with no account**, word for
+word, and it names neither. A different answer for each turns the sign-in box
+into a way to enumerate our partners one address at a time. The gate checks the
+two strings are identical, not just that both fail.
 
 The three demo partners exist because a front door with one person behind it
 proves nothing. Their histories are deliberately different: forty-four
