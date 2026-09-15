@@ -2142,6 +2142,10 @@ let liveMode=false, myBusinessId=null;
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
 const APP_VERSION='layi-v42';
+/* The other two doors. Used only to hand somebody who arrived at the wrong one
+   over to the right one; nothing here reads or writes anything of theirs. */
+const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
+const CONSOLE_URL='https://admin.thelabelboard.com';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
 function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
 function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
@@ -3099,7 +3103,28 @@ async function enterLiveStudio(user,username,errEl){
          Signed back out, because a session with nothing behind it just means
          the next tap lands on the same wall. */
       if(pe||!prof){
+        /* No studio on this account. Before turning anybody away, find out
+           whether they are somebody else's user — because the commonest way to
+           arrive here is not a broken account, it is a partner following an
+           invitation whose link pointed at this app instead of the portal.
+           They are authenticated, their record is correct, and they are one tap
+           from the right place. Telling them "no studio" and stopping is
+           accurate and useless.
+           partner_me() reads the row matching auth.uid(), so it answers only
+           for the person asking and cannot be used to look anybody else up. */
+        let partner=null;
+        if(!pe){
+          try{ const r=await supa.rpc('partner_me'); partner=(r&&r.data&&r.data[0])||null; }catch(e){}
+        }
         try{await supa.auth.signOut();}catch(e){}
+        if(partner){
+          errEl.innerHTML='You are signed in as a partner'
+            +(partner.name?', '+esc(partner.name):'')+', not a studio. '
+            +'The partner portal is the right door.'
+            +'<br><a href="'+PARTNER_PORTAL_URL+'" style="display:inline-block;margin-top:10px;color:var(--gold);font-weight:600">'
+            +'Continue to the partner portal &rsaquo;</a>';
+          return;
+        }
         errEl.innerHTML=pe
           ? 'Signed in, but your studio could not be read: '+esc(pe.message)
           : 'That password is correct, but this account has no studio on it.'
