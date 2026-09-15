@@ -3392,7 +3392,12 @@ const SETUP_OUTLETS=[
   {k:'two',  label:'2 or 3',       n:3},
   {k:'more', label:'More than 3',  n:5}
 ];
-function setupPick(field,k){setupSync();setupDraft[field]=(setupDraft[field]===k?'':k);renderStudioSetup();}
+/* Every tick on this screen rebuilds the whole modal, which threw the reader
+   back to the top of the page — so answering the last question meant scrolling
+   down to it again, every single time. openModal already knows how to keep its
+   place; the order screen has used it for months. Re-renders ask for it, the
+   first open does not, because arriving at the top is right. */
+function setupPick(field,k){setupSync();setupDraft[field]=(setupDraft[field]===k?'':k);renderStudioSetup(true);}
 function setupBandRow(field,opts){
   return opts.map(function(o){
     const on=setupDraft[field]===o.k;
@@ -3403,8 +3408,8 @@ function setupBandN(field,opts,fallback){
   const hit=opts.find(function(o){return o.k===setupDraft[field];});
   return hit?hit.n:fallback;
 }
-function setupToggleCraft(c){setupSync();setupDraft.does=doesToggleCraft(setupDraft.does,c);renderStudioSetup();}
-function setupToggleMode(c,m){setupSync();setupDraft.does=doesToggleMode(setupDraft.does,c,m);renderStudioSetup();}
+function setupToggleCraft(c){setupSync();setupDraft.does=doesToggleCraft(setupDraft.does,c);renderStudioSetup(true);}
+function setupToggleMode(c,m){setupSync();setupDraft.does=doesToggleMode(setupDraft.does,c,m);renderStudioSetup(true);}
 function setupSync(){
   if(!setupDraft)return;
   const n=document.getElementById('su_name'),l=document.getElementById('su_loc'),y=document.getElementById('su_you');
@@ -3415,8 +3420,17 @@ function setupSync(){
   if(sh||on){const c=[];if(sh&&sh.checked)c.push('showroom');if(on&&on.checked)c.push('online');
     setupDraft.channels=c.length?c:['showroom'];}
 }
-function renderStudioSetup(){
+function renderStudioSetup(keepScroll){
   const d=setupDraft;if(!d)return;
+  /* Hold the scroll position AND keep this off the modal back-stack. Without
+     the second half, every tick pushed another copy of this screen onto the
+     stack, so a "Back" button appeared on a screen that has nowhere to go
+     back to and the stack filled with fifteen copies of itself. */
+  if(keepScroll){
+    const _ov=document.getElementById('overlay');
+    window.__omScroll=_ov?_ov.scrollTop:0;
+    window.__omKeep=true;
+  }
   const chips=craftPickerHtml(d.does,'setupToggleCraft','setupToggleMode','');
   openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'

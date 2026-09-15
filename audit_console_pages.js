@@ -451,6 +451,65 @@ const srcOf = f => fs.readFileSync(path.join(root, "admin", f), "utf8");
 }
 
 // ---------------------------------------------------------------------
+section('Every tab of a REAL studio opens');
+// ---------------------------------------------------------------------
+// The example data builds a subscriber with about forty fields on it. A live
+// studio arrives from platform_tenant_summary(), which knows nine. Everything
+// the console reads off a subscriber and the mapper does not set is undefined
+// at best and a thrown page at worst — and a throw here does not break one
+// tab, it blanks the whole Subscribers page behind the error boundary.
+//
+// Found the hard way on 15 Sep: three clicks from the subscriber list into
+// Referrals & bonuses, and the page went. s.referralLedger.length, on a row
+// that had no referralLedger. So this renders EVERY tab against a row that
+// has only ever been through liveToSubscriber, with no example data anywhere
+// near it.
+{
+  const b = boot();
+  b.run('clearAllData();');
+  b.sb.__rows = [{
+    id: 'cdb635da-6312-4581-b395-22e90f993079', name: 'Adé Bespoke', slug: 'ade-bespoke',
+    plan: 'starter', status: 'active', created_at: '2026-09-04 15:10:47.456985+00',
+    members: 1, branches: 1, orders: 0, last_active_at: '2026-09-14 10:00:00+00'
+  }];
+  b.run('DB.subscribers = mergeLive(DB.subscribers || [], __rows.map(liveToSubscriber));');
+  const id = b.run('DB.subscribers[0].id');
+  ok('the live studio is the only subscriber in this console',
+     b.run('DB.subscribers.length') === 1 && b.run('DB.subscribers[0].live') === true);
+
+  const TABS = ['profile', 'subscription', 'referrals', 'businesses', 'payments', 'support', 'activity'];
+  TABS.forEach(function (t) {
+    let html = '', threw = '';
+    try {
+      b.run('UI.vtab[' + JSON.stringify('sub' + id) + '] = ' + JSON.stringify(t) + ';');
+      html = b.run('DETAIL.sub(' + JSON.stringify(id) + ')');
+    } catch (e) { threw = e.message; }
+    ok('the "' + t + '" tab opens for a real studio', !threw && String(html).length > 400,
+       threw || ('only ' + String(html).length + ' chars came back'));
+  });
+
+  // A thrown tab is the loud failure. Printing the word "undefined" into a
+  // record an operator is reading is the quiet one, and it was on screen in
+  // the stat row above these tabs the whole time.
+  b.run('UI.vtab[' + JSON.stringify('sub' + id) + '] = "profile";');
+  const shell = b.run('DETAIL.sub(' + JSON.stringify(id) + ')');
+  ok('and no tab prints the word "undefined" at an operator',
+     !/>undefined|undefined</.test(shell), 'the subscriber header or body reads "undefined"');
+  ok('nor the word "null" where a number belongs',
+     !/>null<|>null /.test(shell), 'the record reads "null"');
+
+  // money(undefined) is Math.round(undefined).toLocaleString(), which is the
+  // string "NaN" with a naira sign in front of it. It does not throw, so it
+  // reaches an operator looking like a real figure that has gone wrong.
+  const ALL = TABS.map(function (t) {
+    b.run('UI.vtab[' + JSON.stringify('sub' + id) + '] = ' + JSON.stringify(t) + ';');
+    try { return String(b.run('DETAIL.sub(' + JSON.stringify(id) + ')')); } catch (e) { return ''; }
+  }).join('');
+  ok('and no money figure on any tab reads NaN', !/NaN/.test(ALL),
+     'a missing number rendered as ₦NaN, which reads as a broken amount rather than a missing one');
+}
+
+// ---------------------------------------------------------------------
 section('An invited operator can actually get in');
 // ---------------------------------------------------------------------
 // Inviting somebody created the account and emailed a link. The link went to

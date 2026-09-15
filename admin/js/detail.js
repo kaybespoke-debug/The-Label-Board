@@ -47,7 +47,10 @@ DETAIL.sub = function (id) {
       kv('Status', statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '')) +
       kv('Health', statusPill(s.health)) +
       kv('Joined', fmtD(s.joined)) + kv('Subscriber for', tenureLbl) +
-      kv('Last synced', ago(s.lastSeen)) + kv('Orders in last 30 days', s.ordersLast30) +
+      kv('Last synced', ago(s.lastSeen)) +
+      /* A real studio does not report this yet, and null printed the word
+         "null" into the record. Not knowing is a fine thing to say. */
+      kv('Orders in last 30 days', s.ordersLast30 == null ? '<span class="note">Not reported yet</span>' : s.ordersLast30) +
       (referrer ? kv('Referred by', '<button class="lnk" onclick="openDetail(\'sub\',\'' + referrer.id + '\')">' + esc(referrer.name) + ' &rsaquo;</button>') : kv('Referred by', '<span class="note">Direct signup</span>'));
   }
 

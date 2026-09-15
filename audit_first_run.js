@@ -382,6 +382,43 @@ section('The header agrees with the rest of the screen');
 }
 
 // ---------------------------------------------------------------------
+section('Answering a question does not lose your place');
+// ---------------------------------------------------------------------
+// Every tick on this screen rebuilds the whole modal, and openModal scrolls a
+// freshly built modal to the top. So on a phone, ticking "Ready made" threw
+// you back to the title and you scrolled down to the same spot again — for
+// every one of the seven answers. openModal already knows how to hold its
+// place; this screen simply never asked it to.
+{
+  const b = freshStudio();
+  const seen = [];
+  const realOpen = b.sb.openModal;
+  b.sb.openModal = function (html) { seen.push(!!b.sb.__omKeep); return realOpen.call(b.sb, html); };
+
+  b.run('openStudioSetup();');
+  ok('opening the screen starts at the top, which is where the first question is',
+     seen[0] === false, 'it asked to keep a scroll position it does not have yet');
+
+  b.run("setupToggleCraft('garments');");
+  ok('ticking a craft keeps your place', seen[1] === true);
+  b.run("setupToggleMode('garments','make');");
+  ok('and so does choosing how it reaches the customer', seen[2] === true);
+  b.run("setupPick('team','few');");
+  ok('and so does answering how many of you there are', seen[3] === true);
+  b.run("setupPick('outlets','two');");
+  ok('and how many studios you run', seen[4] === true);
+
+  b.sb.openModal = realOpen;
+
+  // The other half of the same bug: each rebuild used to push a copy of this
+  // screen onto the modal back-stack, so a "Back" button appeared on the first
+  // screen of the app and the stack filled with copies of itself.
+  ok('and none of it piles up on the back-stack',
+     (b.run('(window.__modalStack||[]).length')) <= 1,
+     'back-stack holds ' + b.run('(window.__modalStack||[]).length') + ' copies of the setup screen');
+}
+
+// ---------------------------------------------------------------------
 section('One thing asked at a time');
 // ---------------------------------------------------------------------
 // Face ID and Install are both offered on the first mobile sign-in. Stacked
