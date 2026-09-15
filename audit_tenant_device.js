@@ -214,33 +214,42 @@ section('An unmarked device whose cloud already has a studio on it');
 }
 
 // ---------------------------------------------------------------------
-section('A signed-in studio can fill itself from its trade example');
+section('A signed-in studio cannot fill itself from our example');
 // ---------------------------------------------------------------------
-// Settings offers "Load example studio…". Signed in, on a device that studio
-// is claimed by, that is not demo data being borrowed — it is that studio
-// creating records, which must sync like any other records it creates. This
-// is how a test studio gets a full set without any of it living in a
-// migration, and it is the same path a real studio uses to try the app out.
+// This section used to assert the opposite, on the reasoning that a signed-in
+// studio loading the example is not borrowing demo data, it is creating its
+// own records. That reasoning was wrong about the risk. loadExample REPLACES
+// everything, and on a live account the replacement does not stop at the
+// device: it syncs to the cloud and to every other phone on the account. So
+// the button a studio might press out of curiosity is a button that deletes
+// their work everywhere at once, and our made-up label is what lands in its
+// place. Kayode's call, 15 Sep: the example is for people who do not have a
+// studio yet.
+//
+// What this section still has to prove is the half that was never in doubt:
+// records a studio really does create are pushed, and pushed as theirs.
 {
   const { sb, run } = boot();
   const { client, writes } = makeSupa({ app_state: [], customers: [], suppliers: [] });
   // signed in, device already claimed by this studio
   run(`store.set('layi_dash_biz_owner', ${JSON.stringify(B)});`);
   sb.__stub = client; run('supa=__stub; liveMode=true; myBusinessId=' + JSON.stringify(B) + ';');
-  run("loadExampleAs('footwear');");
 
-  ok('the studio now has its trade\'s orders', run('rawOrders().length') > 0,
-     String(run('rawOrders().length')));
-  ok('and they are that trade\'s work, not another\'s',
-     /brogue|boot|loafer|sandal|mule/i.test(String(run('rawOrders()[0].garment'))),
-     String(run('rawOrders()[0].garment')));
-  ok('the studio keeps the one branch its trade uses',
-     run('getBranches().length') === 1, String(run('getBranches().length')));
+  run("loadExampleAs('footwear');");
+  ok('the example is refused on a live studio', run('rawOrders().length') === 0,
+     'it loaded ' + run('rawOrders().length') + ' orders over a real studio');
+  ok('and nothing about it reached the cloud',
+     writes.filter(w => w.table === 'app_state').length === 0,
+     'it pushed ' + writes.filter(w => w.table === 'app_state').length + ' rows of our demo data into a real studio');
+
+  // Now the records a studio actually makes for itself.
+  run("save('layi_dash_orders',[{id:'o1',client:'Real Client',garment:'Brogue',outfits:[]}]);");
+  run("save('layi_dash_products',[{id:'p1',name:'Oxford'}]);");
 
   const pushed = new Set(writes.filter(w => w.table === 'app_state').flatMap(w => (w.rows || []).map(r => r.key)));
-  ok('the orders were pushed to the cloud, not just written locally',
+  ok('the orders it writes are pushed to the cloud, not just written locally',
      pushed.has('layi_dash_orders'), [...pushed].join(', ') || 'nothing pushed');
-  ok('and so were the products', pushed.has('layi_dash_products'), [...pushed].join(', '));
+  ok('and so are the products', pushed.has('layi_dash_products'), [...pushed].join(', '));
   ok('every push carries this studio\'s business id and no other',
      writes.filter(w => w.table === 'app_state')
            .every(w => (w.rows || []).every(r => r.business_id === B)),
