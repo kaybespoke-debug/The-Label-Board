@@ -297,10 +297,17 @@ tbody tr:last-child td{border-bottom:0}
    phone — the sidebar becomes a bottom bar under the thumb
    ============================================================ */
 @media(max-width:680px){
-  .shell{grid-template-columns:1fr;padding-bottom:66px}
+  /* Room for the fixed bottom navigation, which is 66px plus whatever the home
+     bar takes. A flat 66px left the last row of every page tucked behind it. */
+  .shell{grid-template-columns:1fr;padding-bottom:calc(66px + env(safe-area-inset-bottom))}
   html,body{height:auto}
+  /* The whole navigation sits on the bottom edge, so it sits under the home
+     bar on any phone that has one — the last few pixels of every tab were
+     behind it and the row read as clipped. The console's bar has carried this
+     inset all along; this one never did. */
   .side{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;width:100%;
-    flex-direction:row;padding:5px 4px;border-right:0;border-top:1px solid var(--line);
+    flex-direction:row;padding:5px 4px calc(5px + env(safe-area-inset-bottom));
+    border-right:0;border-top:1px solid var(--line);
     background:var(--bg-2);z-index:400;box-shadow:0 -8px 24px -12px rgba(0,0,0,.5)}
   .brand{display:none}
   #nav{flex-direction:row;width:100%;gap:2px}
@@ -344,9 +351,12 @@ tbody tr:last-child td{border-bottom:0}
   .dstats{gap:18px;margin:12px 0 14px}
   .dhead h2{font-size:19px}
 
-  .mask{padding:0}
+  /* Same trap as the console: a sheet taller than the screen starts at the very
+     top of it, and the sticky header lands under the phone's status bar with
+     the clock printing through the title. The mask holds the inset. */
+  .mask{padding:env(safe-area-inset-top) 0 0}
   .modal{border-radius:14px 14px 0 0;margin:auto 0 0;max-width:none}
-  .mf{position:sticky;bottom:0;background:var(--bg)}
+  .mf{position:sticky;bottom:0;background:var(--bg);padding-bottom:calc(14px + env(safe-area-inset-bottom))}
   .mf .btn{flex:1}
   .toast{bottom:78px;left:13px;right:13px;transform:translateY(80px);max-width:none}
   .toast.on{transform:translateY(0)}
