@@ -517,8 +517,11 @@ tbody tr:last-child td{border-bottom:0}
   .mobbar .mb .mbi{line-height:0;display:block}
   .mobbar .mb .mbi svg{width:22px;height:22px;display:block}
   .mobbar .mb .mbt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .mobbar .mb:not(.on){opacity:.55}
-  .mobbar .mb.on{color:var(--text);font-weight:600}
+  /* .55 was dim enough to grey the hues back out again, which defeated the
+     point of having them. The label stays quiet; the icon is what you aim at. */
+  .mobbar .mb:not(.on){opacity:.8}
+  .mobbar .mb:not(.on) .mbt{opacity:.7}
+  .mobbar .mb.on{opacity:1;color:var(--text);font-weight:600}
   .mobbar .mb .mbd{position:absolute;top:3px;right:calc(50% - 20px);min-width:15px;height:15px;
     padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;
     font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
