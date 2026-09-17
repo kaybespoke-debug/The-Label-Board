@@ -748,3 +748,46 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);z-index:3}
 @media (max-width:1000px){.shot-phone{width:128px;right:-10px;bottom:-20px}}
 @media (max-width:680px){.shot-phone{display:none}}
+
+/* ---------- the one thing that moves in the hero ----------
+   Four live bars sitting exactly on top of the four in the screenshot, so
+   Team workload fills once as the page arrives and then stops. The hero is a
+   flat PNG, so anything that moves has to be drawn over it.
+
+   Bars, not the Active Orders number: a bar is a rectangle and rgb(201,162,75)
+   is rgb(201,162,75), so the match is exact. Matching a typeface, its weight
+   and its colour well enough to fool the eye is where this kind of thing
+   usually looks cheap.
+
+   Every figure below was measured out of dash.png's pixels, not eyeballed:
+   the track runs x1043..1188 at 1700px wide, which is 61.353% to 69.882%, and
+   each bar is 12px tall on a 1063px image, with the tops nudged up 2px after
+   comparing the drawn boxes against the image's own. Percentages, so it holds at every
+   width. The colours are sampled from the image itself.
+
+   The span is the track and covers the screenshot's own bar; the ::after is
+   the gold growing over it. Without that cover there is nothing to reveal,
+   because the bar underneath is already full. */
+.wl{position:absolute;inset:0;pointer-events:none}
+.wl span{position:absolute;left:61.353%;width:8.529%;height:1.129%;
+  background:rgb(29,32,41);border-radius:999px;overflow:hidden}
+.wl span:nth-child(1){top:86.830%}
+.wl span:nth-child(2){top:90.593%}
+.wl span:nth-child(3){top:94.356%}
+.wl span:nth-child(4){top:98.213%;height:1.035%}
+.wl span::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--w);
+  background:rgb(201,162,75);border-radius:999px;
+  transform:scaleX(0);transform-origin:left center;
+  animation:wlfill .85s cubic-bezier(.22,.7,.3,1) forwards}
+.wl span:nth-child(2)::after{animation-delay:.09s}
+.wl span:nth-child(3)::after{animation-delay:.18s}
+.wl span:nth-child(4)::after{animation-delay:.27s}
+@keyframes wlfill{to{transform:scaleX(1)}}
+/* Somebody who has asked for less movement gets the screenshot as it is: the
+   bars simply stand at their real lengths. */
+@media (prefers-reduced-motion:reduce){
+  .wl span::after{animation:none;transform:scaleX(1)}
+}
+/* Under 680px the hero image is small enough that a 5px bar filling is noise
+   rather than life, and the phone overlay is already hidden at this width. */
+@media (max-width:680px){.wl{display:none}}
