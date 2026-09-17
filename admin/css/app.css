@@ -466,10 +466,23 @@ tbody tr:last-child td{border-bottom:0}
 #drawerMask{display:none}
 .mobbar{display:none}
 
+/* Content that belongs to a column being dropped, moved into the column that
+   stays. Hidden everywhere else, or it would read twice on a desktop. */
+.show-sm{display:none}
+/* An email or a reference has no spaces in it, so white-space:normal cannot
+   wrap it and the cell claims whatever width the string needs. That is what
+   made the Partners table 606px wide inside a 375px screen. */
+.brk{overflow-wrap:anywhere;word-break:break-word}
+
 /* secondary table columns disappear on a phone rather than scrolling away */
 @media(max-width:760px){
   .hide-sm{display:none!important}
+  .show-sm{display:block}
   th,td{padding:11px 8px}
+  /* The last line of defence: whatever is in a cell, it may not push the page
+     sideways. Dropping columns is the design; this is what stops one long
+     unbroken string undoing it on a table nobody re-measured. */
+  th,td{overflow-wrap:anywhere}
 }
 @media(max-width:440px){
   .hide-xs{display:none!important}

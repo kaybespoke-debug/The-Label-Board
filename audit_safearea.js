@@ -115,6 +115,81 @@ for (const a of APPS) {
      anyBlockHas(css, '#splash', 'safe-area-inset-top'));
 }
 
+// ---------------------------------------------------------------------
+section('No table pushes the whole page sideways');
+// ---------------------------------------------------------------------
+// Reported with a photograph on 17 Sep: the console's Partners page on a
+// phone, with the headings, the stat cards and the search box all sitting off
+// the left edge. Nothing was wrong with any of them. One table was 606px wide
+// inside a 375px screen, so the DOCUMENT was 635px and everything else was
+// simply parked outside the window.
+//
+// Every table in the console and the portal sheds its secondary columns under
+// 760px, which is what keeps them inside the screen. The Partners table was
+// written without a single hide-sm on it. Measured in a real browser at 320,
+// 414 and 768 afterwards: one offending page out of twenty-three, and it was
+// that one.
+//
+// This is a static check because a page that scrolls sideways needs a layout
+// engine to detect, and these gates run in node. It catches the thing that
+// actually went wrong — a wide table with nothing allowed to drop — rather
+// than pretending to measure. build_overflow_harness.js does the measuring.
+{
+  const SRC = [
+    ['Admin console', ['admin/js/pages.js', 'admin/js/pages2.js', 'admin/js/detail.js',
+      'admin/js/metrics.js', 'admin/js/calendar.js', 'admin/js/staffforms.js']],
+    ['Partner portal', ['partners/js/pages.js', 'partners/js/pages2.js',
+      'partners/js/detail.js', 'partners/js/actions.js']],
+  ];
+  const wide = [];
+  for (const [app, files] of SRC) {
+    for (const f of files) {
+      const p = path.join(root, f);
+      if (!fs.existsSync(p)) continue;
+      const src = fs.readFileSync(p, 'utf8');
+      for (const h of (src.match(/<thead>[\s\S]{0,1400}?<\/thead>/g) || [])) {
+        const cols = (h.match(/<th[\s>]/g) || []).length;
+        const droppable = (h.match(/hide-sm/g) || []).length;
+        if (cols >= 4 && droppable === 0) {
+          wide.push(app + ' — ' + f + ' (' + cols + ' columns, none droppable)');
+        }
+      }
+    }
+  }
+  ok('every table of four columns or more can shed some on a phone',
+     wide.length === 0, wide.join('; '));
+}
+
+// ---------------------------------------------------------------------
+section('And a cell cannot be widened by one long unbroken string');
+// ---------------------------------------------------------------------
+// white-space:normal wraps at spaces. An email address has none, so the cell
+// claims whatever width the address needs and the dropped columns were for
+// nothing. This is the belt to that braces.
+const adminCss = CSS['Admin console'];
+ok('every cell in the console may break a long string, not just the ones asked to',
+   /th,\s*td\{overflow-wrap:\s*anywhere\}/.test(adminCss),
+   'the blanket rule is what protects a table nobody re-measured');
+ok('and there is a class for the cells that carry an address',
+   /\.brk\{[^}]*overflow-wrap:\s*anywhere/.test(adminCss),
+   'an email with no spaces cannot wrap, so it sets the column width');
+ok('content moved out of a dropped column has somewhere to go',
+   /\.show-sm\{display:none\}/.test(adminCss) &&
+   /\.show-sm\{display:block\}/.test(adminCss),
+   'it has to be hidden by default AND shown on a phone, or it reads twice or never');
+
+// The Partners page is the one this was found on, so it is named.
+{
+  const p2 = fs.readFileSync(path.join(root, 'admin/js/pages2.js'), 'utf8');
+  const partners = (p2.match(/PAGES\.partners[\s\S]*?\n\};/) || [''])[0];
+  ok('the Partners list still drops columns on a phone',
+     (partners.match(/hide-sm/g) || []).length >= 3,
+     'it went to six columns with none droppable once already');
+  ok('and still shows the address somewhere when the Email column goes',
+     /show-sm/.test(partners) && /brk/.test(partners),
+     'who they are and how to reach them is the whole job of that list');
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass.length + ' passed, ' + failures.length + ' FAILED:');

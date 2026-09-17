@@ -25,10 +25,26 @@ node audit_safearea.js
 ```
 
 Nothing may be pinned to an edge of the screen without allowing for what the
-phone puts there. It is invisible on a desktop browser, which is where all of
-this gets built, and it goes wrong the same way every time: a status bar
-printing through a modal title, or a navigation bar sitting under the home
-indicator. Run it after touching any stylesheet.
+phone puts there, and no table may push the whole page sideways. Both are
+invisible on a desktop browser, which is where all of this gets built, and both
+go wrong the same way every time: a status bar printing through a modal title,
+a navigation bar under the home indicator, or a six-column table making the
+document wider than the window so every heading sits off the left edge. Run it
+after touching any stylesheet or any table.
+
+That gate is static, because a page that scrolls sideways needs a layout engine
+to detect and these run in node. To actually measure:
+
+```bash
+node build_overflow_harness.js
+npx http-server . -p 3005 -c-1
+```
+
+Then open `http://localhost:3005/_overflow_tmp/console.html` (and `portal.html`)
+at 320, 414 and 768. It renders every page of the console and the portal —
+neither of which can be opened without signing in — into the real shell with
+the real stylesheet. The file itself documents the two ways this measurement
+lies to you; read them before trusting a result.
 
 ## The customer app
 
