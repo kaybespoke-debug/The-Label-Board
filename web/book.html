@@ -28,6 +28,24 @@
 
 <a class="skip" href="#main">Skip to content</a>
 
+<div class="ticker">
+  <div class="ticker-track">
+    <ul class="ticker-set">
+      <li>Works offline</li>
+      <li>Built for your phone</li>
+      <li>Your data, your control</li>
+      <li>One shop or six</li>
+      <li>No commission on your sales</li>
+    </ul>
+    <ul class="ticker-set" aria-hidden="true">
+      <li>Works offline</li>
+      <li>Built for your phone</li>
+      <li>Your data, your control</li>
+      <li>One shop or six</li>
+      <li>No commission on your sales</li>
+    </ul>
+  </div>
+</div>
 <header class="hdr">
   <div class="wrap hdr-in">
     <a class="brand" href="index.html" aria-label="The Label Board, home">
@@ -86,12 +104,7 @@
       <div class="row2-text">
         <span class="eyebrow">Tell us about your shop</span>
         <h2>A few details and we will find a time</h2>
-        <p>We reply within one working day with a couple of times to choose from. Nothing is set up and no account exists until we have spoken, and there is no card involved at any point.</p>
-        <ul class="checks">
-          <li><strong>A person, not a bot.</strong> Someone who has run a workroom takes the call.</li>
-          <li><strong>Your own data.</strong> Whatever you bring goes into the account we build with you, so the session is not wasted.</li>
-          <li><strong>No pressure.</strong> If it is not right for you we will say so on the call. The <span data-cfg="trialDays">14</span> day trial afterwards is free.</li>
-        </ul>
+        <p>We reply within one working day with a couple of times to choose from. No card, and no account until we have spoken. The <span data-cfg="trialDays">14</span> day trial afterwards is free.</p>
         <div class="callout" style="margin-top:26px">
           <p><strong>Prefer to just message?</strong></p>
           <p><a data-cfg-link="whatsapp" href="https://wa.me/2347062738923">Send us a WhatsApp</a> or email <a data-cfg-link="email" href="mailto:hello@thelabelboard.com"><span data-cfg="email">hello@thelabelboard.com</span></a>. We answer during working hours, Lagos time.</p>
@@ -119,39 +132,6 @@
             <label for="d-email">Email <span class="req">*</span></label>
             <input id="d-email" name="email" type="email" required autocomplete="email" placeholder="you@yourlabel.com">
           </div>
-          <div class="field">
-            <label for="d-city">City</label>
-            <input id="d-city" name="city" type="text" autocomplete="address-level2" placeholder="Lagos">
-          </div>
-          <div class="field">
-            <label for="d-size">How many people work with you</label>
-            <select id="d-size" name="team_size">
-              <option>Just me</option>
-              <option>2 to 5</option>
-              <option>6 to 10</option>
-              <option>11 to 30</option>
-              <option>More than 30</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="d-now">How you keep records today</label>
-            <select id="d-now" name="records_today">
-              <option>Notebook and WhatsApp</option>
-              <option>Spreadsheet</option>
-              <option>Another app</option>
-              <option>A mix of everything</option>
-              <option>Nothing formal yet</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="d-when">Best time to reach you</label>
-            <select id="d-when" name="best_time">
-              <option>Morning, before noon</option>
-              <option>Afternoon</option>
-              <option>Evening, after 5</option>
-              <option>Weekend</option>
-            </select>
-          </div>
           <div class="field full">
             <label for="d-note">Anything you want us to look at</label>
             <textarea id="d-note" name="note" placeholder="The thing that is costing you time or money right now. Chasing balances, fabric going missing, working out what to pay the tailors, knowing whether the month was good."></textarea>
@@ -173,49 +153,6 @@
   </div>
 </section>
 
-<hr class="rule">
-
-<!-- ============ what the call actually covers ============ -->
-<section class="tight">
-  <div class="wrap">
-    <div class="row2">
-      <div class="row2-text">
-        <span class="eyebrow">On the call</span>
-        <h2>What we will walk you through</h2>
-        <p>Not slides. We open the app with your figures in it and go through the four screens you would live in, in the order a working day actually goes.</p>
-        <ul class="checks">
-          <li><strong>Your day, on one screen.</strong> What came in, what is owed, and what is due today.</li>
-          <li><strong>Your work, at its stages.</strong> Every piece, who has it, and what is late.</li>
-          <li><strong>Your money, arrived at.</strong> Profit worked out from the orders, the stock and the wages behind it.</li>
-          <li><strong>Your customers, kept properly.</strong> What they have spent, and the measurements held against their name.</li>
-        </ul>
-      </div>
-
-      <div>
-        <div class="tabs" role="tablist" aria-label="Preview">
-          <button class="tab on" type="button" data-group="peek" data-tab="dash" role="tab" aria-selected="true">Dashboard</button>
-          <button class="tab" type="button" data-group="peek" data-tab="board" role="tab" aria-selected="false">Production</button>
-          <button class="tab" type="button" data-group="peek" data-tab="books" role="tab" aria-selected="false">Books</button>
-          <button class="tab" type="button" data-group="peek" data-tab="people" role="tab" aria-selected="false">Customers</button>
-        </div>
-
-        <div class="pane on" data-group="peek" data-pane="dash">
-          <img class="shot" src="img/screens/dash.png" width="1180" height="738" loading="lazy" decoding="async" alt="The dashboard: what came in, what is owed, and what is due today">
-        </div>
-        <div class="pane" data-group="peek" data-pane="board">
-          <img class="shot" src="img/screens/production.png" width="1180" height="738" loading="lazy" decoding="async" alt="The production pipeline: every piece, its stage, and who has it">
-        </div>
-        <div class="pane" data-group="peek" data-pane="books">
-          <img class="shot" src="img/screens/finance.png" width="1180" height="738" loading="lazy" decoding="async" alt="Finance: revenue, costs, profit, and where the money came in from">
-        </div>
-        <div class="pane" data-group="peek" data-pane="people">
-          <img class="shot" src="img/screens/customers.png" width="1180" height="738" loading="lazy" decoding="async" alt="Customers: everyone you have made for, what they have spent, and the measurements kept against their name">
-        </div>
-        <p class="note">Screenshots taken from the running app. These are the screens we will set your business up in.</p>
-      </div>
-    </div>
-  </div>
-</section>
 
 <hr class="rule">
 
@@ -279,7 +216,6 @@
           <li><a data-cfg-link="email" href="mailto:hello@thelabelboard.com"><span data-cfg="email">hello@thelabelboard.com</span></a></li>
           <li><a data-cfg-link="instagram" href="https://instagram.com/thelabelboard"><span data-cfg="instagram">@thelabelboard</span></a></li>
         </ul>
-        <p class="small"><span data-cfg="city">Lagos, Nigeria</span><br>Monday to Saturday, 9 to 6.</p>
       </div>
     </div>
     <div class="ftr-bot">

@@ -92,6 +92,37 @@ section:last-of-type{border-bottom:0}
 .btn-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:26px}
 .btn-row.center{justify-content:center}
 
+/* ---------- the strip above the header ----------
+   Sits in normal flow, so it scrolls away and the sticky header takes the
+   top as usual. The track holds the claims twice and slides by half its own
+   width, so the copy that is on screen when it snaps back is identical to
+   the one that was there a frame earlier and the loop has no seam.
+
+   It is hidden while the phone drawer is open. The drawer is positioned at
+   the header height, and at scroll zero this strip pushes the header down
+   past that, so the drawer would cover the top of it. With the menu open
+   the page cannot scroll anyway, so there is nothing to lose. */
+.ticker{background:var(--bg-2);border-bottom:1px solid var(--line);overflow:hidden}
+.ticker-track{display:flex;width:max-content;animation:tick 34s linear infinite}
+.ticker:hover .ticker-track,.ticker:focus-within .ticker-track{animation-play-state:paused}
+.ticker-set{display:flex;align-items:center;list-style:none;margin:0;padding:0}
+.ticker-set li{display:flex;align-items:center;gap:9px;padding:0 30px;height:34px;
+  font-size:11px;letter-spacing:.15em;text-transform:uppercase;font-weight:700;
+  color:var(--dim);white-space:nowrap}
+.ticker-set li::before{content:"";width:4px;height:4px;border-radius:50%;
+  background:var(--gold);flex:none}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+body.menu-open .ticker{display:none}
+/* a strip that moves on its own is exactly what this setting is for: it
+   stops, and the duplicate copy goes with it so nothing reads twice */
+@media (prefers-reduced-motion:reduce){
+  .ticker-track{animation:none;width:100%;justify-content:center;flex-wrap:wrap}
+  .ticker-set[aria-hidden]{display:none}
+}
+@media (max-width:680px){
+  .ticker-set li{height:30px;padding:0 20px;font-size:10px;letter-spacing:.12em}
+}
+
 /* ---------- header ---------- */
 .hdr{position:sticky;top:0;z-index:90;background:color-mix(in srgb,var(--bg) 94%,transparent);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
@@ -272,6 +303,15 @@ body.menu-open .drawer{display:flex}
 /* the panel heading answers to the section heading above it, so it is smaller
    than the h2 it would have been on a page of its own */
 .trade-h{font-size:clamp(22px,2.6vw,30px);margin-bottom:12px}
+
+/* the long read on the story page: one column at a reading measure, centred,
+   with its aside underneath rather than beside it */
+.story{max-width:820px;margin:0 auto}
+.story-text p{max-width:none}
+/* the heading has no bottom margin of its own, so the first paragraph sits on
+   top of it without this */
+.story-text h2{margin-bottom:18px}
+.story-aside{margin-top:34px}
 
 /* ---------- proof strip ---------- */
 .strip{border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);background:var(--bg-2)}

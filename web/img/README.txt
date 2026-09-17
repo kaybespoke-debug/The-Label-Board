@@ -25,6 +25,22 @@ took the hero down to nearly black and lost the dress form and the rack.
 Every one is JPEG at quality 84, and the whole set is about 1.1MB. hero.jpg is
 also the sharing card, so it is the one a link pasted into WhatsApp shows.
 
+
+There are eleven of them: dash, orders, calendar, production, stock, delivery,
+finance, payroll, customers, marketing, records, plus phone. Each one is the
+view the pane beside it is describing. Four of them (calendar, delivery,
+marketing, records) were borrowing another pane's picture until 2026-09-11,
+because they were written before those views were ever captured, so the
+calendar pane showed the dashboard. If you add a pane, capture its view.
+THE PRODUCT SCREENS in img/screens/ are a separate set, captured from the
+running app rather than generated. They are 1700x1063, which is not arbitrary:
+the widest a screenshot is ever drawn on this site is 831 CSS pixels, and a 2x
+screen needs twice that. They were 1180 wide until 2026-09-11 and looked soft
+on every retina laptop. Recapture with --force-device-scale-factor=2 at a
+1180 wide window, then scale the 2360 result down to 1700; the supersample is
+what makes the text clean. phone.png is 480 wide for the same reason, since it
+is only ever drawn 158 CSS pixels wide.
+
 TO REPLACE ANY OF THEM: drop a file in with the same name. Nothing else needs
 to change. Keep each one under about 350KB, most phones here are on paid data.
 If you are converting from a PNG, tools/convert_images.ps1 in the scratch notes

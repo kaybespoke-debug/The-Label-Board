@@ -52,6 +52,26 @@ button. Four tabs and one action.
 
 ## Ten feature areas, not six
 
+**Four of them showed the wrong screen for two weeks.** When these panes were
+written there was no capture of the calendar, logistics, marketing or audit
+view, so each borrowed a picture from a pane that had one: the calendar pane
+showed the dashboard, delivery showed orders, marketing showed customers,
+records showed payroll. Kayode spotted it on 2026-09-11. All four have their
+own capture now.
+
+**They were also using the wrong component.** `.pic-panel` with `data-photo`
+is the photograph component: it lays a navy wash over the image (`.3` to `.42`
+alpha) so white text can sit on top. Over a screenshot that wash only dims the
+product, which is why those four looked flat beside the other six. They are
+plain `<img class="shot">` now, the same as every other pane, and there are no
+`.pic-panel` elements left on the page.
+
+**The rule that follows: a pane needs a capture of its own view.** Reusing a
+neighbour's picture passes every check the gate makes, because the file
+exists, it is referenced, it has an alt and it has dimensions. Nothing can
+tell the gate that the picture is of the wrong screen. That one is on whoever
+adds the pane.
+
 The Product page showed six areas while the app has twenty two screens, so
 whole parts of it went unmentioned. Four were added, and two things moved to
 where they belonged:
@@ -74,6 +94,108 @@ into your own email or WhatsApp broadcast. The roadmap band on the same page
 already says automatic sending is not built, so a claim that it sends would
 have contradicted the page it sits on. The copy says the app picks the people
 and writes the message, and that sending is still yours.
+
+## The decongestion pass
+
+Kayode, 2026-09-17: the pages were carrying too much. Seven changes, and the
+shape of every one of them is the same, which is that something was being
+said in two places or being said to somebody who had not asked.
+
+**The four claims left the hero and became a moving strip above the header.**
+They were a block of eight lines under the buttons, competing with the thing
+the hero is for. As a ticker they are a texture rather than a paragraph. Three
+things about it are load bearing:
+
+- It sits in normal flow ABOVE the sticky header, so it scrolls away. That
+  breaks the phone drawer, which is positioned at the header height and would
+  cover the top of the header while the strip is still on screen. The fix is
+  one line, `body.menu-open .ticker{display:none}`, and it is safe because
+  with the menu open the page cannot scroll anyway.
+- The claims are written twice and the track slides by half its own width, so
+  the copy on screen when it snaps back is identical to the one a frame
+  earlier. The duplicate is `aria-hidden`, so a screen reader hears them once.
+- Under `prefers-reduced-motion` it stops and the duplicate goes with it. A
+  strip that moves on its own is exactly what that setting is for.
+
+**What else came off.** The lede under the trade tiles, because the tiles say
+it. The city and opening hours from the footer. The "When we answer" card and
+the whole five step getting started section from Support, because neither is
+support: somebody lands there because something is wrong, and both were making
+them scroll past help to find help. Support went from 6.0 screens to 4.7.
+
+**The "Inside the product" paragraph moved to Features**, where it replaced the
+screen count line. It was making an argument about what the software is for,
+which belongs on the page about the software.
+
+**The booking page lost everything that competes with the form**: the
+walkthrough section and its screenshot, the three reassurance bullets, and
+four of the nine fields. City, team size, how they keep records and best time
+are all things we ask on the call, and each one was a reason to close the tab.
+Four required fields and one optional box now. It went from 4.3 screens to
+**2.6**. The four fields are easy to put back if we miss them.
+
+That removal orphaned `customers.png` and `finance.png`, which were only on
+the walkthrough. Deleted rather than rehomed, because the point of the pass is
+fewer things on a page. It also broke a gate check that compared the position
+of the form against the first screenshot: with no screenshots, `indexOf`
+returns -1 and the form is "after" it. That check now treats a page with no
+screenshots as a pass.
+
+**The story on About is one column now, with the naming note underneath.** It
+was a half width column with the note in a box beside it, which made a long
+read narrower than it needed to be. Note that "full screen length" cannot mean
+edge to edge for body copy: a line across this 1680px container is about two
+hundred characters and the eye loses its place coming back to the left. It is
+set at 820px and centred, which is what a long article is set at. **This is the
+one page that got longer**, 5.3 screens to 6.0, because what used to sit side
+by side is now stacked. That is the trade the change asks for.
+
+## Two trims to the home page
+
+**The trade tiles are centred.** A grid cannot centre an orphan row: with four
+fixed tracks, a last row of three sits against the left and leaves a hole on
+the right, which is what seven tiles were doing. Flex wrap can, so the strip is
+flex now, capped at 1124px so exactly four fit a line, with the tiles growing
+to fill a line but never past 272px, which is the size the photographs were cut
+for. The basis matters more than it looks: at 200px a fifth tile fitted the
+line and the row became five. It is 240px, which is the only range where four
+fit and five do not.
+
+**The finance screenshot came out of "Inside the product".** It was the second
+big product screenshot on one page, a few hundred pixels below the one in the
+hero, and it read as repetition rather than proof. The two cards sit side by
+side instead. finance.png is still used on the booking page, so nothing was
+orphaned, and .showcase, .stack and .shot-cap went with it. The home page came
+down from 5.6 screens to 5.3.
+
+## Haberdashery came off, and it should never have been on
+
+Taken off the site entirely on 2026-08-27. This was not a change of mind about
+a market. **It was never a business type the app offers.**
+
+`DEFAULT_ACTIVITIES` in the app is what decides what a shop can be set up as,
+and it holds five: bespoke, footwear, leather, ready to wear and fabrics.
+Haberdashery appears in the app only as a line of demo data, an expense note on
+an Ibadan stock purchase. So the site carried a tile, a photograph and a panel
+of promises for a setup a customer could not have chosen, on the page whose
+whole job is to get them to book a demo.
+
+The gate had already half noticed. It reads the five out of the app and asserts
+the site names each of them, and a comment in there records that the count
+used to come to five by accident, because the list it read then was a legacy
+one that never contained footwear or leather at all.
+
+**The check that would have caught it runs the other way now.** Naming every
+trade the app has was never enough; the site also has to offer no trade the app
+lacks. That, plus the picture being gone, is asserted by name.
+
+What went: the tile, the panel, the photograph, the card on the Features page,
+the footer link, and two lines of copy that listed it among the trades. The
+strip is seven tiles now rather than eight, so the second row is three rather
+than four. **The counts in the gate are derived rather than written down**, so
+this removal cost four failing checks that were only ever saying "the number I
+was written with", and they will not need editing again the next time a trade
+comes or goes.
 
 ## Four ways to pay us, and what each one is missing
 
@@ -406,6 +528,27 @@ drop them into `web/img/` with the same filenames and nothing else changes.
 
 ### Screenshots of the real product
 
+**They are 1700x1063, and the number is not arbitrary.** Kayode reported the
+screenshots looking blurry on a big screen on 2026-09-11, and he was right:
+they were 1180 wide. The widest a screenshot is ever drawn on this site is 831
+CSS pixels, in the hero, and 817 in the panes. A 1x display downscales 1180
+into 831 and looks sharp. A 2x display needs 1662 real pixels and had 1180, so
+the browser stretched it by 1.42 and every retina laptop saw soft text. The
+ratio of source pixels to needed pixels went from 0.71 to 1.02.
+
+Capture at `--force-device-scale-factor=2` on a 1180 wide window, which gives
+2360x1476, then scale that down to 1700 with `tools_pngcrop.js`. Rendering
+straight to 1700 would work, but the downscale from 2360 supersamples and the
+text comes out visibly cleaner.
+
+`phone.png` is 480 wide on the same reasoning: it is only ever drawn 158 CSS
+pixels wide, so 480 covers 3x. It was briefly 680, which cost the landing page
+68KB for pixels nothing could ever show.
+
+The set costs 1.7MB against 1.1MB before, and the landing page carries 378KB
+of screenshot against 232KB. That is the price of the product not looking
+blurry in the one picture that proves it is real.
+
 Every product screen on this site is a photograph of the running app, not a
 drawing of it. Kayode's reasoning, and it is right: a visitor who can see the
 actual dashboard knows what they are signing up for, and a drawn mockup is a
@@ -510,16 +653,16 @@ scrolling. Measured in a 390x844 viewport, after the real screenshots went in:
 
 | Page | Screens |
 | --- | --- |
-| Home | 5.6 |
-| Features | 4.9 |
-| Pricing | 7.0 |
-| Book a demo | 4.3 |
-| Partners | 6.0 |
+| Home | 4.8 |
+| Features | 5.1 |
+| Pricing | 7.6 |
+| Book a demo | 2.6 |
+| Partners | 6.1 |
 | Referrals | 5.6 |
-| About | 5.3 |
-| Support and contact | 6.0 |
-| Privacy | 2.7 |
-| Terms | 2.7 |
+| About | 6.0 |
+| Support and contact | 4.7 |
+| Privacy | 2.8 |
+| Terms | 2.8 |
 
 **Pricing is the one over the line, at 7.0**, and it is the one page where that
 is arguable rather than a mistake. Everybody else arrives at a page and skims;
@@ -681,7 +824,7 @@ references listed above.
 node audit_web.js
 ```
 
-1738 checks. It reads every page and asserts the things a person stops noticing
+1759 checks. It reads every page and asserts the things a person stops noticing
 after the third read: that every internal link and anchor resolves, that the
 header and footer are identical everywhere, that every form will actually reach
 Netlify and every input has a label, that the prices match the console and the
