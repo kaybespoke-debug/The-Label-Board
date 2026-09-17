@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 14 September 2026 (ninth session)
+Last updated: 17 September 2026 (eleventh session)
 
 ## How this run works
 
@@ -322,6 +322,82 @@ is in `CLAUDE.md` and in the file itself, and it was followed correctly on
 work when somebody does it.
 
 ---
+
+## Shipped 17 September 2026 — the console stops scrolling sideways
+
+`admin-deploy` → `48962f1`, live and verified against the running server.
+
+The Partners page was 606px of table inside a 375px screen, so the **document**
+was wider than the window and every heading, card and search box sat off the
+left edge. Nothing was wrong with any of them. That table was added two
+sessions ago with six columns and no `hide-sm`, which is the thing every other
+table in the console has.
+
+Two guards behind the fix: every cell may now break a long unbroken string (an
+email has no spaces, so `white-space:normal` cannot wrap it and one address
+sets a column's width), and `audit_safearea.js` refuses any table of four
+columns or more with nothing droppable.
+
+**Measured rather than reasoned about.** `build_overflow_harness.js` renders
+every page of the console and the portal — neither can be opened without
+signing in — into the real shell with the real stylesheet for a browser to
+measure. One page out of twenty-three overflowed. After the fix: none, at 320,
+414 and 768, plus all 24 views of the customer app at 320 and 375.
+
+The harness is committed, and its header documents the two ways this
+measurement lies: a single file holding both stylesheets and toggling
+`disabled` measures against whichever sheet was live a tick earlier, and
+measuring in the same call that resizes the viewport reads the old layout.
+Both produced confident, wrong answers first.
+
+## Shipped 15 September 2026 — `layi-v42`
+
+Live and verified against the running servers, not the repo. `main` → `56b5082`,
+`admin-deploy` → `dd72e99`, `admin-api` at version 7.
+
+- **The first-run screen holds its place.** Every tick rebuilt the modal and
+  scrolled it to the top, so answering the last question meant scrolling back
+  down to it, seven times over.
+- **Several studios are set up on the way in.** Saying "2 or 3" used to make one
+  branch and point at Settings, so somebody who had just said they run three
+  outlets opened the app with no switcher.
+- **Our example studio is locked away from real studios.** It REPLACES
+  everything, and on a live account the replacement syncs to the cloud and every
+  other phone on the account.
+- **The console stops blanking its own Subscribers page.** Three clicks into a
+  real studio, the Referrals tab read `.length` of a field a live row never had.
+- **The partner portal signs in with a password**, with a reset link for the day
+  somebody forgets, and an invitation that asks for a password instead of
+  spending its one-shot link on a single sign-in.
+- **Nothing sits under a status bar or a home bar** in any of the three apps.
+  New gate: `audit_safearea.js`.
+- **A partner who lands on the customer app is handed over** rather than told
+  they have no studio and left there.
+
+### The one thing still outstanding on the partner invitation
+
+The gateway is correct and deployed: `invitePartner` points at
+`partners.thelabelboard.com`, and the redirect is decided in the function rather
+than sent by the browser. **Supabase will still ignore it** unless the address is
+on the project's allow list, and when it ignores one it falls back to the Site
+URL silently, which is the customer app.
+
+So: **Authentication → URL Configuration → Redirect URLs** needs all three.
+
+```
+https://app.thelabelboard.com/**
+https://partners.thelabelboard.com/**
+https://admin.thelabelboard.com/**
+```
+
+The same setting governs the partner password-reset email.
+
+**To stop depending on a setting we cannot see from the code**, the gateway
+should generate the link itself (`generateLink`), check the link it got back
+actually points where we asked, and send the email through Resend rather than
+letting Supabase send it. That removes the silent fallback entirely, and gives
+us invitation emails in our own words instead of the Supabase default. It needs
+one new secret, `RESEND_API_KEY`. Not built yet — Kayode's call.
 
 ## Fixed after the first real end-to-end test — 14 September 2026
 

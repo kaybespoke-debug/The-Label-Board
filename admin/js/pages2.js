@@ -800,24 +800,33 @@ PAGES.partners = function () {
       'into a partner account in one step.</span></div></div>';
   }
 
+  /* Six columns and nothing droppable made this the one page in the console
+     that pushed the whole document sideways on a phone: 606px of table in a
+     375px screen, so every heading and every card sat off the left edge.
+     Every other table here sheds its secondary columns under 680px; this one
+     was written without them. The email moves under the name rather than
+     disappearing, because "who is this and are they in" is the whole job of
+     this list and the address is half of who. */
   const rows = list.map(p =>
     '<tr>' +
     '<td><b>' + esc(p.name || '(no name)') + '</b>' +
-    (p.business ? '<div class="note">' + esc(p.business) + '</div>' : '') + '</td>' +
-    '<td><code>' + esc(p.code) + '</code></td>' +
+    (p.business ? '<div class="note">' + esc(p.business) + '</div>' : '') +
+    (p.email ? '<div class="note show-sm brk">' + esc(p.email) + '</div>' : '') + '</td>' +
+    '<td class="hide-sm"><code>' + esc(p.code) + '</code></td>' +
     '<td>' + esc(TIER[p.tier] || p.tier) + '</td>' +
-    '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—') + '</td>' +
+    '<td class="hide-sm brk">' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—') + '</td>' +
     '<td>' + (p.pending
       ? '<span class="pill amber">Invited, not in yet</span>'
       : (p.status === 'active' ? '<span class="pill green">Active</span>'
         : '<span class="pill red">' + esc(p.status) + '</span>')) + '</td>' +
-    '<td class="note">' + (p.joined ? esc(p.joined) : '—') + '</td>' +
+    '<td class="note hide-sm">' + (p.joined ? esc(p.joined) : '—') + '</td>' +
     '</tr>').join('');
 
   return head + bar +
     (list.length
       ? '<div class="pnl"><div class="tw"><table><thead><tr>' +
-        '<th>Name</th><th>Code</th><th>Tier</th><th>Email</th><th>Access</th><th>Joined</th>' +
+        '<th>Name</th><th class="hide-sm">Code</th><th>Tier</th>' +
+        '<th class="hide-sm">Email</th><th>Access</th><th class="hide-sm">Joined</th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
       : '<div class="pnl"><div class="empty">Nothing matches.</div></div>');
 };

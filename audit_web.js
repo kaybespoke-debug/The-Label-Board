@@ -615,7 +615,10 @@ check(built.indexOf('book.html') !== -1, 'the booking page exists');
 
 /* the booking page is a form first, not a page with a form at the bottom */
 const bookMain = html['book.html'].slice(html['book.html'].indexOf('<main id="main">'));
-check(bookMain.indexOf('<form') < bookMain.indexOf('class="shot"'),
+/* a page with no screenshots on it passes: there is nothing for the form to
+   come before, which is the point of the page being this short */
+const bookShot = bookMain.indexOf('class="shot"');
+check(bookShot === -1 || bookMain.indexOf('<form') < bookShot,
   'the booking form comes before anything else on the page');
 check(attrs((html['book.html'].match(/<form[^>]*>/) || [''])[0], 'name') === 'demo',
   'the booking form is the one Netlify already knows by name');

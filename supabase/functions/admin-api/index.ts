@@ -32,12 +32,97 @@ const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
    browser can name is a redirect an attacker can name. There is nothing a
    console operator needs that this table does not already give them.
 
+   EVERY ONE OF THESE ENDS IN A SLASH, AND THAT IS NOT COSMETIC.
+   The project's allow list holds `https://partners.thelabelboard.com/**`, and
+   that pattern requires the slash: the bare origin does not match it. A redirect
+   that does not match is not refused, it is silently replaced with the Site URL
+   — which is the customer app. Measured against the live project on 15 Sep:
+
+     asked https://partners.thelabelboard.com   landed on app.thelabelboard.com
+     asked https://partners.thelabelboard.com/  landed on partners.thelabelboard.com
+
+   Studio invitations appeared to work through the whole of this because their
+   fallback and their destination are the same address. Partners and operators
+   were the only ones who could see it.
+
    Overridable by env so a staging project can point elsewhere without a code
    change; the defaults are the live addresses. */
+const withSlash = (u: string) => (u.endsWith('/') ? u : u + '/')
 const APP_URLS: Record<string, string> = {
-  inviteStudio:   Deno.env.get('STUDIO_APP_URL')   || 'https://app.thelabelboard.com',
-  invitePartner:  Deno.env.get('PARTNER_APP_URL')  || 'https://partners.thelabelboard.com',
-  inviteOperator: Deno.env.get('CONSOLE_APP_URL')  || 'https://admin.thelabelboard.com',
+  inviteStudio:   withSlash(Deno.env.get('STUDIO_APP_URL')   || 'https://app.thelabelboard.com/'),
+  invitePartner:  withSlash(Deno.env.get('PARTNER_APP_URL')  || 'https://partners.thelabelboard.com/'),
+  inviteOperator: withSlash(Deno.env.get('CONSOLE_APP_URL')  || 'https://admin.thelabelboard.com/'),
+}
+
+/* ===== SENDING THE INVITATION OURSELVES =====
+   With a Resend key we generate the link and send our own email, so the wording
+   is ours and the link is one we have looked at. Without one, Supabase sends its
+   default template. Both are correct, because the check below guards the link
+   rather than the sender. */
+const RESEND_KEY = Deno.env.get('RESEND_API_KEY') || ''
+const MAIL_FROM = Deno.env.get('INVITE_FROM') || 'The Label Board <hello@thelabelboard.com>'
+
+/* ===== WHERE WOULD THIS LINK ACTUALLY LAND? =====
+   GoTrue validates redirect_to when the link is FOLLOWED, not when it is made,
+   and a redirect it does not recognise is not refused — it is silently replaced
+   with the Site URL. So reading back what we asked for proves nothing; the only
+   honest way to know is to ask the thing that decides.
+
+   A deliberately invalid token does exactly that. The response is a 302 to
+   wherever a real link would have gone, carrying an error in the fragment, and
+   nothing is created or consumed. One request, before anything else happens. */
+async function wouldLandOn(redirectTo: string): Promise<string> {
+  try {
+    const probe = URL_ + '/auth/v1/verify?token=preflight-not-a-real-token&type=invite'
+      + '&redirect_to=' + encodeURIComponent(redirectTo)
+    const res = await fetch(probe, { method: 'GET', redirect: 'manual' })
+    const loc = res.headers.get('location') || ''
+    return new URL(loc).origin
+  } catch (_e) {
+    return ''      // could not tell; do not block the invitation on a probe
+  }
+}
+
+function inviteEmail(action: string, link: string, name: string) {
+  const who = action === 'invitePartner' ? 'partner'
+    : action === 'inviteOperator' ? 'operator' : 'studio'
+  const subject = who === 'partner' ? 'Your Label Board partner account is ready'
+    : who === 'operator' ? 'You have been added to the Label Board control centre'
+    : 'Your studio on The Label Board is ready'
+  const lead = who === 'partner'
+    ? 'Your partner account is set up. Choose a password and the portal is yours: your referrals, what they have earned, and when it gets paid.'
+    : who === 'operator'
+      ? 'You have been given access to the Label Board control centre. Choose a password to finish setting up.'
+      : 'Your studio is set up and waiting. Choose a password and you are in.'
+  const cta = who === 'partner' ? 'Set my password' : 'Set my password and sign in'
+  const esc = (s: string) => String(s).replace(/[<>&"]/g, c =>
+    ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' } as Record<string, string>)[c])
+  const html = `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;padding:28px 22px;color:#12151c">
+  <div style="letter-spacing:3px;font-size:11px;color:#8a8f9a">THE</div>
+  <div style="font-size:26px;letter-spacing:2px;margin-bottom:22px">LABEL BOARD</div>
+  <p style="font-size:16px;line-height:1.55">${name ? 'Hello ' + esc(name) + ',' : 'Hello,'}</p>
+  <p style="font-size:16px;line-height:1.55">${esc(lead)}</p>
+  <p style="margin:26px 0"><a href="${esc(link)}" style="background:#c9a86a;color:#12151c;text-decoration:none;padding:13px 22px;border-radius:9px;font-weight:700;font-size:15px;font-family:Helvetica,Arial,sans-serif">${esc(cta)}</a></p>
+  <p style="font-size:13px;line-height:1.5;color:#6b7280">This link is for you alone and works once. If it has expired by the time you get to it, ask us for another.</p>
+  <p style="font-size:13px;line-height:1.5;color:#6b7280">If you were not expecting this, you can ignore it and nothing happens.</p>
+</div>`
+  const text = (name ? 'Hello ' + name + ',\n\n' : 'Hello,\n\n') + lead
+    + '\n\n' + cta + ':\n' + link
+    + '\n\nThis link is for you alone and works once.\nIf you were not expecting this, ignore it and nothing happens.'
+  return { subject, html, text }
+}
+
+async function sendViaResend(to: string, subject: string, html: string, text: string) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: MAIL_FROM, to: [to], subject, html, text }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    return { ok: false, error: 'Resend refused it (' + res.status + '): ' + body.slice(0, 300) }
+  }
+  return { ok: true }
 }
 
 /* what each role is allowed to ask for. Anything not listed is refused. */
@@ -393,6 +478,24 @@ Deno.serve(async (req) => {
       const email = String(body.email || '').trim().toLowerCase()
       if (!email || !email.includes('@')) return json({ error: 'A valid email address is needed' }, 400)
 
+      /* BEFORE ANYTHING IS CREATED: find out where this invitation would
+         actually land. A redirect Supabase does not recognise is not refused,
+         it is quietly swapped for the Site URL, and the first anybody knows is
+         a partner staring at a studio sign-in screen a day later. Asked once,
+         costs one request, and turns a silent wrong answer into a loud one
+         that names its own fix. */
+      const wantUrl = APP_URLS[action]
+      const wantOrigin = new URL(wantUrl).origin
+      const landsOn = await wouldLandOn(wantUrl)
+      if (landsOn && landsOn !== wantOrigin) {
+        return json({
+          error: 'That invitation would land on ' + landsOn + ' instead of ' + wantOrigin
+            + ', so it has not been sent and no account was created. Add '
+            + wantOrigin + '/** to Authentication → URL Configuration → Redirect URLs. '
+            + 'The trailing /** matters: a bare address does not match it.',
+        }, 500)
+      }
+
       /* Prepare the record first. Each kind has its own table and its own idea
          of what the pending address is called. */
       let prepared: { table: string; id?: string } | null = null
@@ -464,11 +567,29 @@ Deno.serve(async (req) => {
         }
       }
 
-      /* Now the account. The invite email goes out from here. */
-      const { data: invited, error: inviteErr } =
-        await admin.auth.admin.inviteUserByEmail(email, {
-          redirectTo: APP_URLS[action],
+      /* Now the account, and the email.
+
+         With a Resend key we make the link ourselves and send our own message,
+         so an invitation reads like it came from us rather than from a database
+         vendor's default template. Without one, Supabase sends its own. The
+         preflight above guards the link in both cases, so neither can go to the
+         wrong app; the only difference is the wording. */
+      let invited: { user?: { id?: string } } | null = null
+      let inviteErr: { message?: string } | null = null
+      let link = ''
+
+      if (RESEND_KEY) {
+        const gen = await admin.auth.admin.generateLink({
+          type: 'invite', email, options: { redirectTo: wantUrl },
         })
+        inviteErr = gen.error
+        invited = gen.data as typeof invited
+        link = String((gen.data as Record<string, any>)?.properties?.action_link || '')
+      } else {
+        const sent = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: wantUrl })
+        inviteErr = sent.error
+        invited = sent.data as typeof invited
+      }
 
       if (inviteErr) {
         /* An address that already has an account is a decision, not a failure:
@@ -486,6 +607,23 @@ Deno.serve(async (req) => {
 
       const newUserId = invited?.user?.id
       if (!newUserId) return json({ error: 'The invitation was sent but no account came back' }, 500)
+
+      /* generateLink makes the account and the link but sends nothing, so this
+         is the half that reaches a human. A failure here leaves a real account
+         with no email behind it, which is recoverable and must be said plainly
+         rather than reported as success. */
+      if (RESEND_KEY) {
+        if (!link) return json({ error: 'The account was created but no invitation link came back. Nothing was emailed.' }, 500)
+        const msg = inviteEmail(action, link, String(body.name || '').trim())
+        const out = await sendViaResend(email, msg.subject, msg.html, msg.text)
+        if (!out.ok) {
+          await log({ invite: email, kind: action, created: newUserId, emailFailed: out.error })
+          return json({
+            error: 'The account was created, but the invitation email did not send. ' + out.error,
+            accountCreated: true,
+          }, 502)
+        }
+      }
 
       /* platform_admins is the one the trigger does not handle, because an
          operator is not something anybody self-provisions into. */
