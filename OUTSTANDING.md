@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 15 September 2026 (tenth session)
+Last updated: 17 September 2026 (eleventh session)
 
 ## How this run works
 
@@ -322,6 +322,33 @@ is in `CLAUDE.md` and in the file itself, and it was followed correctly on
 work when somebody does it.
 
 ---
+
+## Shipped 17 September 2026 — the console stops scrolling sideways
+
+`admin-deploy` → `48962f1`, live and verified against the running server.
+
+The Partners page was 606px of table inside a 375px screen, so the **document**
+was wider than the window and every heading, card and search box sat off the
+left edge. Nothing was wrong with any of them. That table was added two
+sessions ago with six columns and no `hide-sm`, which is the thing every other
+table in the console has.
+
+Two guards behind the fix: every cell may now break a long unbroken string (an
+email has no spaces, so `white-space:normal` cannot wrap it and one address
+sets a column's width), and `audit_safearea.js` refuses any table of four
+columns or more with nothing droppable.
+
+**Measured rather than reasoned about.** `build_overflow_harness.js` renders
+every page of the console and the portal — neither can be opened without
+signing in — into the real shell with the real stylesheet for a browser to
+measure. One page out of twenty-three overflowed. After the fix: none, at 320,
+414 and 768, plus all 24 views of the customer app at 320 and 375.
+
+The harness is committed, and its header documents the two ways this
+measurement lies: a single file holding both stylesheets and toggling
+`disabled` measures against whichever sheet was live a tick earlier, and
+measuring in the same call that resizes the viewport reads the old layout.
+Both produced confident, wrong answers first.
 
 ## Shipped 15 September 2026 — `layi-v42`
 
