@@ -24,6 +24,11 @@
 /waitlist     /waitlist.html  301
 /list         /waitlist.html  301
 
+# There are no reviews yet, so this page is not somewhere to send anybody.
+# sync_reviews.js removes these two lines the moment the first one lands.
+/reviews      /index.html     302
+/reviews.html /index.html     302
+
 /support      /contact.html   301
 /support.html /contact.html   301
 

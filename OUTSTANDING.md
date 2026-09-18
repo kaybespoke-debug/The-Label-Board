@@ -7,6 +7,56 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 19 September 2026 (thirteenth session)
 
+## Reviews: the landing place is built, the permission is not
+
+**Built 19 September, not deployed.** Kayode overruled my advice to wait for
+three real reviews before building anywhere to put them: *"reviews wont get
+anywhere to fall so it hangs in the cloud ... i mean we cant wait."* He was
+right. October is the month the first studios say something and it would have
+arrived with nowhere to go.
+
+There is now a `reviews.html`, a block on the home page and a block on the
+pricing page, all empty and all invisible. Nothing on the live site changes
+until a real review goes in.
+
+**In October the whole job is:**
+
+1. paste the card into `web/reviews.html` between the two markers, shape
+   documented in the file
+2. `node sync_reviews.js`
+3. `node audit_web.js`
+4. deploy
+
+Step 2 flips all seven things that have to agree: the two page blocks, the
+`hidden` attribute on each, the `noindex`, the sitemap, the footer link and the
+redirect that currently sends `/reviews` to the home page. `audit_web.js` fails
+if any one of them is done and the rest are not, so it cannot end up half on.
+Tested by doing it and then undoing it; nine mutants, none survived.
+
+### BLOCKING: nothing records permission to quote
+
+This is the real gap and it is **not** on the website.
+
+`public.feedback` has taken `kind = 'review'` since August, with a 1 to 5
+rating, a body and a contact, and the console reads it. The app offers it as
+"Something you like" with the hint "What is working well. **We may ask if we
+can quote you.**"
+
+We may ask. Asking is a conversation, the answer lives in somebody's WhatsApp,
+and a year from now nobody can point at it. Publishing a studio's name and their
+words off the back of that is not something to do.
+
+Three chats, none of them the website:
+
+| Where | What |
+|---|---|
+| `supabase/` | a migration adding `may_quote boolean not null default false`, `quote_name text` and `quote_role text` to `public.feedback`. Copy the shipped function bodies, do not retype them |
+| `site/` | the review form asks the question, only on `kind = 'review'`, and takes the name and the label they want printed |
+| `admin/` | the feedback screen shows the flag and generates the finished `<article class="rev">` to paste, so the October job really is paste and run |
+
+**Do this before October**, not during it. Without it the section stays empty
+however good the feedback is.
+
 ## Shipped 19 September 2026
 
 **All five queued commits are live.** `main` → `4845afa` (a merge), `admin-deploy`
@@ -40,8 +90,8 @@ Verified on the live site rather than assumed:
 **Still to decide:** whether the five deleted screenshots should be recaptured
 smaller and put back, or left out. They are in git history at `5b35f54~1`.
 
-**Still open from before:** where client reviews go, and the recommendation to
-wait until there are three real ones from the October cohort.
+**Where client reviews go is answered**, see the section above. The
+recommendation to wait was overruled on the same day and rightly.
 
 ## What went out, and why it waited
 

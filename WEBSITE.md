@@ -247,6 +247,94 @@ footer, in the Products menu and in the "How branches work" link on the home
 page. `audit_web.js` catches a dead anchor, and did catch that one.
 
 
+## Where a review lands
+
+Kayode, 19 September 2026, on my advice to wait for three real reviews before
+building anywhere to put them: *"we wait till october for reviews because it
+will be a problem when its time, reviews wont get anywhere to fall so it hangs
+in the cloud."* And then: *"i mean we cant wait."*
+
+He was right and the advice was wrong. The first studios open accounts in
+October. The first good thing one of them says about us would have arrived with
+nowhere to go, and the work of building somewhere would have been competing
+with everything else that happens in a launch month.
+
+So the destination exists now and is empty.
+
+### One source, six copies, and a single command
+
+`web/reviews.html` is the only file a review is ever typed into, between
+`<!-- REVIEWS START -->` and `<!-- REVIEWS END -->`. Then:
+
+```
+node sync_reviews.js
+node audit_web.js
+```
+
+`sync_reviews.js` copies the first three cards onto the home page and the
+pricing page, un-hides both of those sections, takes the `noindex` off
+`reviews.html`, adds it to `sitemap.xml`, puts a link in the footer, reruns
+`sync_web_shell.js` so all thirteen pages carry it, and drops the redirect that
+currently sends `/reviews` to the home page. Run it on an empty `reviews.html`
+and it does all six in reverse, which is how the site sits today.
+
+### Why the gate matters more than the script
+
+Seven things have to agree about whether there are any reviews. The script
+flips all seven. The gate fails the build if they ever disagree.
+
+That is not belt and braces. Switching this on is the sort of job that happens
+at eleven at night when the first good quote comes in, and the failure is not a
+crash: it is a live page with a heading and nothing under it, or a review
+sitting on `reviews.html` that nobody can reach because the redirect is still
+in place. Both would sit there for weeks.
+
+It was tested by doing it. A card went in, the switch flipped, every one of the
+seven was checked by hand and the page was looked at in a browser at 1280 and
+390, then the card came out and the site returned to exactly the shape it is
+deployed in. Nine mutants, one per way of half-switching it, and all nine were
+caught.
+
+### The card
+
+Initials rather than a photograph. A studio owner should not have to send us a
+picture before we can quote them, and a stock face on a real person's words is
+a lie. Five stars are always drawn; the unlit ones carry `class="off"`, so the
+count is always five and the gate checks that, along with the `aria-label` that
+tells a screen reader the rating.
+
+The grid is `auto-fit` with a centred track list rather than three fixed
+columns, because the first month there will be one review and then two, and
+three fixed columns would put a single card in the left third with a hole beside
+it. Below 900px it is the same swipe row as the trade tiles, for the same
+measured reason.
+
+### The part that is not built, and blocks all of it
+
+**Nothing anywhere records that a studio said we may quote them.**
+
+The collection half already exists and is better than it looks:
+`public.feedback` has taken `kind = 'review'` since August, with a 1 to 5
+`rating`, a title, a body and a contact, and the console reads it. The app's
+feedback form offers it as "Something you like" with the hint "What is working
+well. We may ask if we can quote you."
+
+We may **ask**. Asking is a conversation, and the answer lives in a WhatsApp
+thread. Publishing a studio's name and words off the back of that is not
+something to do, and a year from now nobody will be able to point at the
+permission.
+
+What that needs, and it is in three other apps so it is three other chats:
+
+- a migration adding `may_quote`, `quote_name` and `quote_role` to
+  `public.feedback`, so the permission is a column and not a memory
+- the app's review form gaining the question, only on `kind = 'review'`, with
+  the name and the label they want printed
+- the console showing the flag, and generating the finished
+  `<article class="rev">` so the October job really is paste and run
+
+Until that exists, this section stays empty however good the feedback is.
+
 ## The Products menu, which looked right and did nothing
 
 Kayode, 2026-09-19: *"this dropdown should be an actual dropdown that works not
