@@ -46,6 +46,48 @@
      Two slots, both of which have to look deliberate while empty. A tile
      photo sits over its icon and removes itself if the file is not there; a
      panel photo is only applied once the browser has actually loaded it. */
+  /* ---------------- how long until we open ----------------
+     The element already reads "Opening to new businesses in November." before
+     this runs, so a visitor with no JavaScript, or one who arrives before this
+     file does, gets a true sentence rather than an empty box or a zero.
+
+     Three rules this follows, and each one is a thing countdowns usually get
+     wrong:
+
+     1. DAYS ONLY. An hours-minutes-seconds clock is a pressure tactic, and
+        this site sells to people who have been sold to badly. "In 44 days" is
+        information; "43 days 21:14:07" is a shopping channel.
+     2. IT TAKES ITSELF OFF. On and after the launch date the sentence is
+        removed entirely. A countdown sitting at zero, or counting into
+        negative days, is worse than never having had one, and it always
+        happens on the one morning nobody is looking at the website.
+     3. A BAD DATE MEANS SILENCE, NOT NONSENSE. Anything unparseable and the
+        static sentence stays exactly as the HTML wrote it. */
+  function opensIn() {
+    var el = document.querySelector('[data-opens]');
+    if (!el) return;
+    var cfg = (typeof SITE !== 'undefined') ? SITE : null;
+    var raw = cfg && cfg.launchDate;
+    if (!raw) return;
+
+    /* Parsed as UTC midnight on purpose. A plain 'YYYY-MM-DD' is already UTC
+       in every browser that matters, and building it from local parts would
+       make the number differ by one between Lagos and London for half the
+       day. Rounding UP means the last day reads "in 1 day" rather than
+       "in 0 days". */
+    var day = Date.parse(raw + 'T00:00:00Z');
+    if (isNaN(day)) return;
+    var left = Math.ceil((day - Date.now()) / 86400000);
+
+    if (left <= 0) { el.remove(); return; }
+
+    var month = (cfg.text && cfg.text.launchMonth) || cfg.launchMonth || '';
+    el.textContent = left === 1
+      ? 'Opening to new businesses tomorrow.'
+      : 'Opening to new businesses in ' + left + ' days'
+        + (month ? ', in ' + month + '.' : '.');
+  }
+
   function photos() {
     $$('.pic img, .pic-panel img').forEach(function (img) {
       if (img.complete && img.naturalWidth === 0) { img.remove(); return; }
@@ -271,6 +313,10 @@
     window.__tlbReady = true;
     applyConfig();
     markCurrent();
+    /* after applyConfig, because it reads the month applyConfig has just
+       painted, and before reveal, so the sentence is its final length when
+       the reveal measures it */
+    opensIn();
     photos();
     reveal();
 

@@ -75,6 +75,21 @@ const SITE = {
      `audit_web.js` section 8 now fails if a trial is promised anywhere, so
      putting the key back is not enough to bring the offer back.           */
 
+  /* ---- when we open ----
+     The day the app goes on sale properly. ONE PLACE, because a date in
+     two places is a date that will disagree with itself.
+
+     CHANGE THIS AND NOTHING ELSE. The countdown on the home page, the word
+     the page falls back to with JavaScript off, and the day the countdown
+     takes itself off all read it.
+
+     It is deliberately a date and not a countdown target dressed up as one:
+     the page says "in November" on its own, and only becomes a number of
+     days once the browser has worked it out. So if this is wrong, the site
+     is vague rather than wrong.                                          */
+  launchDate: '2026-11-01',
+  launchMonth: 'November',
+
   /* ---- what each market pays -----------------------------------------
      Prices are SET per currency, not converted from naira in the browser.
      A live rate would change what the page says without anybody deciding
@@ -143,6 +158,7 @@ SITE.text = {
   phone: SITE.phoneDisplay,
   city: SITE.city,
   instagram: '@' + SITE.instagram,
+  launchMonth: SITE.launchMonth,
 };
 SITE.link = {
   email: 'mailto:' + SITE.email,

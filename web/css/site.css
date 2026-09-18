@@ -806,3 +806,9 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    highlight and nothing else */
 .pick label:has(input:checked){border-color:var(--gold);color:var(--text);
   background-color:color-mix(in srgb,var(--gold) 10%,var(--panel-2))}
+
+/* the line under the hero buttons saying when we open. Quiet on purpose: it
+   is information, not a third call to action competing with the two above it */
+.opens{margin-top:16px;font-size:13.5px;color:var(--faint);letter-spacing:.01em}
+.opens::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--gold);margin-right:9px;vertical-align:middle;opacity:.9}
