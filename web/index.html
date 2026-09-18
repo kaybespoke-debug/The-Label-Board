@@ -73,14 +73,9 @@
         <a href="features.html" aria-haspopup="true">Products<svg class="caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></a>
         <span class="nav-menu">
           <a href="features.html#orders">Orders and customers</a>
-          <a href="features.html#calendar">Calendar and fittings</a>
-          <a href="features.html#production">Production</a>
+          <a href="features.html#production">Production and delivery</a>
           <a href="features.html#inventory">Stock and suppliers</a>
-          <a href="features.html#delivery">Delivery and dispatch</a>
-          <a href="features.html#money">Money and books</a>
-          <a href="features.html#team">Team and branches</a>
-          <a href="features.html#marketing">Repeat business</a>
-          <a href="features.html#records">Records and control</a>
+          <a href="features.html#money">Money and people</a>
           <a href="features.html#offline">Phone and offline</a>
         </span>
       </span>
@@ -197,201 +192,74 @@
       <p class="lede lede-wide">Run every part of your business in one place. Orders, production, inventory, customers, staff and finance, whether you make it, sell it, supply it or all three.</p>
     </div>
 
-    <div class="industries" role="tablist" aria-label="Kinds of business">
-      <button class="industry on" type="button" data-group="trade" data-tab="tailors" role="tab" aria-selected="true" aria-label="Bespoke tailors">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v7"/><path d="M8 5c0 3 1.5 5 4 5s4-2 4-5"/><path d="M6 21c0-4 2.7-7 6-7s6 3 6 7"/></svg><img src="img/tailors.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Bespoke tailors</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="shoes" role="tab" aria-selected="false" aria-label="Shoe makers">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16h11l4-2 3 2v3H3z"/><path d="M3 16V9h4l3 4"/></svg><img src="img/shoes.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Shoe makers</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="bags" role="tab" aria-selected="false" aria-label="Bag makers">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><img src="img/bags.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Bag makers</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="readytowear" role="tab" aria-selected="false" aria-label="Ready to wear">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18"/><path d="M7 7v13"/><path d="M12 7v13"/><path d="M17 7v13"/><path d="M12 7V4"/></svg><img src="img/readytowear.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Ready to wear</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="fabrics" role="tab" aria-selected="false" aria-label="Fabric shops">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="5" height="13" rx="2"/><rect x="10" y="6" width="5" height="13" rx="2"/><rect x="17" y="6" width="4" height="13" rx="2"/></svg><img src="img/fabrics.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Fabric shops</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="accessories" role="tab" aria-selected="false" aria-label="Accessories makers">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 12.5 7 9a5 5 0 0 1 5-5z"/><circle cx="12" cy="9" r="1.8"/></svg><img src="img/accessories.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Accessories</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="madetomeasure" role="tab" aria-selected="false" aria-label="Made to measure">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18v6H3z"/><path d="M7 9v3M11 9v3M15 9v3M19 9v3"/></svg><img src="img/madetomeasure.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Made to measure</b>
-      </button>
-      <button class="industry" type="button" data-group="trade" data-tab="multilocation" role="tab" aria-selected="false" aria-label="Multi location businesses">
-        <span class="pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z"/><circle cx="10" cy="11" r="2.2"/><path d="M17 8.5a4.2 4.2 0 0 1 3 4c0 3-3.5 6-3.5 6"/></svg><img src="img/multilocation.jpg" alt="" loading="lazy" decoding="async"></span>
-        <b>Multi location</b>
-      </button>
+    <!-- Eight tiles, each carrying its own highlights, and nothing opening
+         underneath. The panels that used to sit here were 768 words of detail
+         about how the app works, which is more than a visitor reads and more
+         than we want published. A tile is now a statement, not a control.
+
+         The ids came across unchanged, because thirteen footers link to
+         index.html#tailors and the rest. -->
+    <div class="trade-tiles">
+      <article class="tt anchor" id="tailors">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v7"/><path d="M8 5c0 3 1.5 5 4 5s4-2 4-5"/><path d="M6 21c0-4 2.7-7 6-7s6 3 6 7"/></svg><img src="img/tailors.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Bespoke tailors</h3>
+          <ul><li>Measurements per customer</li><li>Fittings on the calendar</li><li>Deposits and balances</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="shoes">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16h11l4-2 3 2v3H3z"/><path d="M3 16V9h4l3 4"/></svg><img src="img/shoes.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Shoe makers</h3>
+          <ul><li>Your own bench stages</li><li>Leather and components</li><li>Cost per pair</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="bags">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><img src="img/bags.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Bag makers</h3>
+          <ul><li>Styles you repeat</li><li>Hides and hardware</li><li>Runs and one offs</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="readytowear">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18"/><path d="M7 7v13"/><path d="M12 7v13"/><path d="M17 7v13"/><path d="M12 7V4"/></svg><img src="img/readytowear.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Ready to wear</h3>
+          <ul><li>Boutique counter sales</li><li>Stock by size and colour</li><li>What is actually selling</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="fabrics">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="5" height="13" rx="2"/><rect x="10" y="6" width="5" height="13" rx="2"/><rect x="17" y="6" width="4" height="13" rx="2"/></svg><img src="img/fabrics.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Fabric shops</h3>
+          <ul><li>Sold by the yard or metre</li><li>Cut against the roll</li><li>Suppliers and what you owe</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="accessories">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 12.5 7 9a5 5 0 0 1 5-5z"/><circle cx="12" cy="9" r="1.8"/></svg><img src="img/accessories.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Accessories</h3>
+          <ul><li>Head and wrist sizes</li><li>Short runs</li><li>Bench and shelf together</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="madetomeasure">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18v6H3z"/><path d="M7 9v3M11 9v3M15 9v3M19 9v3"/></svg><img src="img/madetomeasure.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Made to measure</h3>
+          <ul><li>Workroom and rail</li><li>One stock room</li><li>One set of books</li></ul>
+        </div>
+      </article>
+      <article class="tt anchor" id="multilocation">
+        <span class="tt-pic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z"/><circle cx="10" cy="11" r="2.2"/><path d="M17 8.5a4.2 4.2 0 0 1 3 4c0 3-3.5 6-3.5 6"/></svg><img src="img/multilocation.jpg" alt="" loading="lazy" decoding="async"></span>
+        <div class="tt-body">
+          <h3 class="trade-h">Multi location</h3>
+          <ul><li>Every outlet its own type</li><li>Stock counted where it sits</li><li>Rolled up when you want it</li></ul>
+        </div>
+      </article>
     </div>
 
-    <div class="trade-detail">
-      <!-- ---- tailors ---- -->
-      <div class="pane on anchor" data-group="trade" data-pane="tailors" id="tailors">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Bespoke tailors</h3>
-            <p>The measurement book, the fitting diary and the balance list, in one place that cannot go home in somebody's bag.</p>
-            <ul class="checks">
-              <li><strong>Measurements per customer</strong>, with body notes and every piece you have made for them.</li>
-              <li><strong>Fittings on the calendar</strong>, with the customer messaged when the stage moves.</li>
-              <li><strong>Deposits and balances</strong> to the naira, and what is overdue surfaced without you looking.</li>
-              <li><strong>Job sheets</strong> for the bench with the measurements printed on the page.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/tailors.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 3v7"/><path d="M8 5c0 3 1.5 5 4 5s4-2 4-5"/><path d="M6 21c0-4 2.7-7 6-7s6 3 6 7"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- shoes ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="shoes" id="shoes">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Shoe makers</h3>
-            <p>Made to order work that does not go through cutting and sewing. Name your own stages and the board follows them.</p>
-            <ul class="checks">
-              <li><strong>Your stages, your words.</strong> Clicking, lasting, soling, finishing, whatever the bench actually calls them.</li>
-              <li><strong>Leather and components as stock</strong>, counted in hides, pairs, sheets or pieces.</li>
-              <li><strong>Size and fitting notes</strong> on the order, next to the photographs of the pair.</li>
-              <li><strong>Cost per pair</strong>, so you know what a style really makes before you price the next one.</li>
-            </ul>
-            <p class="note">Straight answer: the measurement fields are written for garments today, so foot measurements live in the order notes. If you make shoes and want proper fields, say so and it moves up the list.</p>
-          </div>
-          <div class="pic-panel" data-photo="img/shoes.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M3 16h11l4-2 3 2v3H3z"/><path d="M3 16V9h4l3 4"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- bags ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="bags" id="bags">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Bag and leather makers</h3>
-            <p>Small runs, one offs and repeat styles, with the materials each one ate accounted for properly.</p>
-            <ul class="checks">
-              <li><strong>Styles you repeat</strong>, with their components and their true cost saved.</li>
-              <li><strong>Hides, hardware and linings</strong> counted separately, with reorder levels.</li>
-              <li><strong>Made to order and off the shelf</strong> in the same list, because most benches do both.</li>
-              <li><strong>Batches</strong>, so a run of twenty moves through the board as one job.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/bags.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- ready to wear ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="readytowear" id="readytowear">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Ready to wear and boutiques</h3>
-            <p>Sell off the rail without a measurement screen in sight. Tell it you are retail and the workroom tools step out of the way.</p>
-            <ul class="checks">
-              <li><strong>Counter sales</strong> in a few taps, with the receipt on your own letterhead.</li>
-              <li><strong>Stock by size and colour</strong>, coming down as it goes out of the door.</li>
-              <li><strong>What is actually selling</strong>, by piece, by category and by outlet.</li>
-              <li><strong>Customers who come back</strong>, with what they bought and when they last did.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/readytowear.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M3 7h18"/><path d="M7 7v13"/><path d="M12 7v13"/><path d="M17 7v13"/><path d="M12 7V4"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- fabrics ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="fabrics" id="fabrics">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Fabric shops</h3>
-            <p>Stock that is sold by length, counted the way you actually count it, with the offcuts accounted for.</p>
-            <ul class="checks">
-              <li><strong>By the yard or the metre</strong>, in bolts or cut lengths, whichever the shop works in.</li>
-              <li><strong>Price per length</strong>, with a customer's cut recorded against the roll it came off.</li>
-              <li><strong>What is running low</strong> before a regular walks in for the last six yards.</li>
-              <li><strong>Suppliers</strong>, what you paid, and what you still owe them.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/fabrics.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="3" y="6" width="5" height="13" rx="2"/><rect x="10" y="6" width="5" height="13" rx="2"/><rect x="17" y="6" width="4" height="13" rx="2"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- accessories ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="accessories" id="accessories">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Accessories makers</h3>
-            <p>Caps, gele, scarves, beadwork and jewellery. Small pieces, short runs, and a bench that is making to order and stocking the shelf in the same week.</p>
-            <ul class="checks">
-              <li><strong>Head, wrist and ring sizes</strong> on the customer, not a body measurement sheet written for a suit.</li>
-              <li><strong>Made to order and ready made together</strong>, one bench and one shelf, without keeping two sets of books.</li>
-              <li><strong>Beading and trims as their own stages</strong>, so a piece waiting on a clasp is not sitting in Finishing.</li>
-              <li><strong>Quality checks for the trade</strong>: fastenings secure, trims even, nothing sharp or snagging.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/accessories.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 4a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 12.5 7 9a5 5 0 0 1 5-5z"/><circle cx="12" cy="9" r="1.8"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- made to measure ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="madetomeasure" id="madetomeasure">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">Made to measure and both at once</h3>
-            <p>A workroom at the back and a rail at the front. Most businesses that last end up here, and the two sides are counted separately and reported together.</p>
-            <ul class="checks">
-              <li><strong>Both kinds of sale</strong> in one list, each with its own profit line.</li>
-              <li><strong>One stock room</strong> feeding the bench and the shop floor, counted once.</li>
-              <li><strong>Every outlet its own type</strong>, so a Lagos workroom and an Abuja shop can sit under one account.</li>
-              <li><strong>One set of books</strong> across all of it, split by outlet whenever you want.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/madetomeasure.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M3 9h18v6H3z"/><path d="M7 9v3M11 9v3M15 9v3M19 9v3"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- multi location ---- -->
-      <div class="pane anchor" data-group="trade" data-pane="multilocation" id="multilocation">
-        <div class="row2">
-          <div class="row2-text">
-            <h3 class="trade-h">More than one address</h3>
-            <p>A workroom in Lagos, a counter in Abuja, a store in Kano. Each one runs its own day, and you see the whole thing without ringing round at month end for numbers.</p>
-            <ul class="checks">
-              <li><strong>Each outlet its own kind of business</strong>, so a workroom and a shop floor are not forced into the same screens.</li>
-              <li><strong>Stock counted where it sits</strong>, with what moves between outlets recorded rather than guessed at.</li>
-              <li><strong>Staff, rota and wages by outlet</strong>, and pay that follows the work to wherever it was done.</li>
-              <li><strong>One set of books</strong>, split by outlet the moment you want it and rolled up when you do not.</li>
-            </ul>
-            <div class="btn-row"><a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a></div>
-          </div>
-          <div class="pic-panel" data-photo="img/multilocation.jpg" aria-hidden="true">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z"/><circle cx="10" cy="11" r="2.2"/><path d="M17 8.5a4.2 4.2 0 0 1 3 4c0 3-3.5 6-3.5 6"/></svg>
-          </div>
-        </div>
-      </div>
+    <div class="btn-row center trade-cta">
+      <a class="btn btn-gold btn-sm" href="book.html">See it set up for you</a>
     </div>
   </div>
 </section>
@@ -408,7 +276,7 @@
       <div class="card">
         <h3>One person, or six branches</h3>
         <p>On your own, the team, rota and payroll screens are not there at all. Hire your second person and they appear. Open a second outlet and each one keeps its own staff, stock and takings, rolled up into one set of books when you want the whole picture.</p>
-        <a class="more" href="features.html#team">How branches work</a>
+        <a class="more" href="features.html#money">How branches work</a>
       </div>
       <div class="card">
         <h3>One system. Many workflows.</h3>
@@ -488,7 +356,7 @@
           <li><a href="features.html">What it does</a></li>
           <li><a href="pricing.html">Pricing</a></li>
           <li><a href="features.html#offline">Offline and phone</a></li>
-          <li><a href="features.html#team">Staff and branches</a></li>
+          <li><a href="features.html#money">Money and payroll</a></li>
           <li><a href="book.html">Book a demo</a></li>
         </ul>
       </div>

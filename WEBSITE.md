@@ -47,10 +47,19 @@ is the word people go looking for. The page keeps its address: `contact.html`
 is where support and contact were merged into one page, and `_redirects`
 already sent `/support` there.
 
-The nav is now Features, Pricing, Our story, Support, with Book a demo as the
-button. Four tabs and one action.
+The nav is now Home, Products, Pricing, Partners, Our story, Support, with Book
+a demo as the button.
+
+**Features became Products on 2026-09-17**, and it opens a menu. That menu
+listed all ten feature areas, which was a map of the app; it lists five as of
+the disclosure pass below.
 
 ## Ten feature areas, not six
+
+> **Superseded on 2026-09-18.** There are five, and three screenshots rather
+> than eight. See "The disclosure pass" below for what was folded into what and
+> why. The rest of this section is still worth reading: it is how four panes
+> came to show the wrong screen for a fortnight.
 
 **Four of them showed the wrong screen for two weeks.** When these panes were
 written there was no capture of the calendar, logistics, marketing or audit
@@ -149,6 +158,94 @@ hundred characters and the eye loses its place coming back to the left. It is
 set at 820px and centred, which is what a long article is set at. **This is the
 one page that got longer**, 5.3 screens to 6.0, because what used to sit side
 by side is now stacked. That is the trade the change asks for.
+
+## The disclosure pass
+
+Kayode, 2026-09-18: *"as much as we want to sell, we also dont wamt to give too
+much information that leaks all our key features to the public or for other
+developers to steal."*
+
+He was right, and the worst of it was not the trade tiles he pointed at. It was
+`features.html`, which had become a specification. Four cuts came out of that
+conversation. Each one removes something an ordinary marketing instinct will try
+to put straight back, so the reasoning is written down here rather than left in
+a commit message.
+
+**1. The roadmap is gone.** `features.html` carried a section called "Built and
+shipping soon": three cards naming collecting payment in the app, automatic
+WhatsApp, and orders dropping in from a storefront, each marked as not finished.
+It was written for honesty and it was honest. It was also a public list of where
+we are weakest and what to beat us to, on the page a competitor reads first, and
+it told a buyer what is missing in the same breath as what is there.
+
+`audit_web.js` used to **insist** that section stayed. That gate now runs the
+other way round. `NOT_BUILT_YET` holds the claim phrases, and any page that sells
+one of those three things as built fails the build. The honesty it protected is
+enforced from the other side now. Read the comment above the list before adding
+to it: "we never take a card" on the pricing page is true and has to keep
+passing, which is why "take payment" and "card payment" were tried and removed.
+
+**2. Five of the nine screenshots were deleted.** A 1700px capture of a working
+screen is the fastest thing on this site to copy. It hands over the layout, the
+column set and what sits next to what, in a way prose never does. `calendar`,
+`delivery`, `marketing`, `payroll` and `records` are gone; `dash`, `orders`,
+`production`, `stock` and `phone` stay, which is still enough to prove the app
+is real.
+
+They were **deleted from `web/img/screens`, not merely unlinked**. A file left
+in a published folder is fetchable by anyone who guesses its name, so removing
+the `<img>` tag alone would have changed nothing. The gate's minimum came down
+from eight tags to five, deliberately, with the reason in the comment.
+
+**3. Mechanism became outcome.** The old page wrote out the profit formula, the
+three ways an owner's draw can be set, the payroll model, the four customer
+groups the app works out and the ninety day threshold on one of them, the count
+of roles, the six importers and the fact that running one twice is safe. Those
+are design decisions that took months. Each is now a result instead: "what a job
+actually made, after everything it cost you" tells a studio exactly what it
+needs and a builder nothing at all.
+
+**4. Ten areas became five, and eight trade panels became eight tiles.** The
+Products menu was a map of the app. The home page's tiles each opened a panel of
+four detail lines. Both are compressed. The tile carries three short highlights
+and opens nothing.
+
+What it cost and what it saved, measured rather than guessed:
+
+| | Before | After |
+|---|---|---|
+| `features.html` words | 1,952 | 1,153 |
+| `index.html` words | 1,888 | 1,273 |
+| Trades section, 1280 | 1,032px | 744px |
+| Trades section, 390 | 801px | 460px |
+| `features.html` page, 1280 | 2,734px | 2,031px |
+| `features.html` page, 390 | 3,907px | 2,748px |
+| Screenshot files published | 10 | 5 |
+| Products menu items | 10 | 5 |
+
+### Eight tiles that stack into a swipe, not a column
+
+The obvious build was eight cards two up on a phone. It was measured before it
+was believed, and it came out at **1247px**, which is longer than the 801px of
+tiles and panel it replaced. Making a page shorter by adding eight cards to it
+only works on a laptop.
+
+So the row keeps the horizontal swipe it already had below 900px, and the tile
+grows only enough to hold its three lines: 196px wide, a 92px picture, 11.5px
+text. That is 460px on a 390 phone. The grid is four across above 900.
+
+**Check the phone before the laptop on anything in `web/`.** Kayode asked for
+this as a standing rule on the same day, and this section is why: the two
+viewports disagreed about whether the change was an improvement at all.
+
+### Ids, because thirteen footers point at them
+
+Thirteen pages carry a footer linking to `index.html#tailors` and five siblings.
+The tiles kept every id, so nothing broke. `features.html` lost five of its ten,
+and the two the footer used moved with it: `#team` became `#money` in the
+footer, in the Products menu and in the "How branches work" link on the home
+page. `audit_web.js` catches a dead anchor, and did catch that one.
+
 
 ## Two trims to the home page
 
@@ -289,6 +386,10 @@ of pricing, not a company, and the arithmetic is done on a number the reader
 supplies. Keep it that way.
 
 ## The trades are the home page
+
+> **Partly superseded on 2026-09-18.** The tiles are still the home page and
+> still carry every id. The panels that opened under them are gone, and with
+> them the tile as a control. See "The disclosure pass" below.
 
 The Solutions page is gone. Kayode's call, and the reasoning is right: the seven
 trades were already on the home page as tiles, so a whole separate page and a
@@ -527,6 +628,10 @@ generated, and they are the one thing a competitor cannot copy. When they exist,
 drop them into `web/img/` with the same filenames and nothing else changes.
 
 ### Screenshots of the real product
+
+> **Five of these were deleted on 2026-09-18.** The sizing reasoning below still
+> holds for the five that remain. See "The disclosure pass" for why the other
+> five had to leave the folder rather than just the page.
 
 **They are 1700x1063, and the number is not arbitrary.** Kayode reported the
 screenshots looking blurry on a big screen on 2026-09-11, and he was right:

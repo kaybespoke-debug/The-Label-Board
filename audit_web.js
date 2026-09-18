@@ -412,11 +412,37 @@ const homeCopy = visible(html['index.html']).toLowerCase();
 ['ready to wear', 'boutique', 'shoe maker', 'fabric', 'leather'].forEach(w =>
   check(homeCopy.includes(w), 'the home page speaks to more than tailors: "' + w + '"'));
 
-/* anything we say is not built yet must be marked as not built yet */
-check(/coming|on the way|being finished|shipping soon|Built and shipping soon/i.test(html['features.html']),
-  'the product page is honest about what is not built yet');
-['Collecting payment in the app', 'Automatic WhatsApp', 'Storefront to studio'].forEach(t => {
-  check(html['features.html'].includes(t), 'the product page lists "' + t + '" as still to come rather than as a feature');
+/* Nothing unbuilt may be sold as built.
+ *
+ * This check used to run the other way round. The product page carried a
+ * "Built and shipping soon" section naming the three things that are not
+ * finished, and this gate insisted that section stayed. Honest, but it was
+ * also a public list of where we are weakest and what a competitor could beat
+ * us to, sitting on the page a competitor reads first. The section is gone.
+ *
+ * The honesty it protected is not. It just has to be enforced from the other
+ * side now: if we no longer say these are coming, we must never say they are
+ * here. So this fails on the claim rather than on the absence of the caveat.
+ *
+ * Phrasing matters. "we never take a card" on the pricing page is the truth
+ * and must keep passing, so the forbidden phrases are the claims themselves
+ * and not the words they are built from. "take payment" and "card payment"
+ * were in this list and came straight back out: the pricing page says the cost
+ * would be stated plainly if we ever collected card payments on a studio's
+ * behalf, and that is the honest sentence this gate exists to protect. */
+const NOT_BUILT_YET = [
+  'pay from the invoice', 'pays from the invoice', 'pay online', 'pay in the app',
+  'pay by card', 'pays by card', 'payments in the app',
+  'collect payment', 'collects payment', 'collecting payment',
+  'flutterwave', 'paystack',
+  'automatic whatsapp', 'whatsapp automatically', 'sends itself', 'send themselves',
+  'sending itself', 'sent automatically', 'messages itself',
+  'your storefront', 'orders from your website', 'orders from your own website'
+];
+built.forEach(p => {
+  const words = visible(html[p]).toLowerCase();
+  NOT_BUILT_YET.forEach(phrase => check(words.indexOf(phrase) === -1,
+    p + ' sells something that is not built yet as though it were: "' + phrase + '"'));
 });
 
 /* ================= shipped like a real site ================= */
@@ -594,7 +620,14 @@ check(shotFiles.length >= 5, 'the site carries real screenshots of the app (' + 
 
 const everyPage = built.map(k => html[k]).join('');
 const shotTags = imgTags(everyPage).filter(t => / class="shot/.test(t) || /class="shot"/.test(t));
-check(shotTags.length >= 8, 'the product is shown as a screenshot in several places (' + shotTags.length + ')');
+/* Eight came down to five on purpose. A 1700px capture of a working screen is
+   the fastest thing on this site for somebody to copy: it hands over the
+   layout, the columns and what sits next to what, in a way prose never does.
+   Five is still enough to prove the app is real, which is all this gate was
+   ever for. The five that went are deleted from img/screens rather than just
+   unlinked, because a file left in a published folder is still fetchable by
+   anyone who guesses its name. */
+check(shotTags.length >= 5, 'the product is shown as a screenshot in several places (' + shotTags.length + ')');
 shotTags.forEach(tag => {
   const src = attrs(tag, 'src') || '';
   const name = src.split('/').pop();
@@ -659,41 +692,73 @@ built.forEach(p => {
   check(html[p].indexOf('href="demo.html"') === -1, p + ' has no link left to the retired demo page');
 });
 
-/* ---------- the seven trades, and the eighth shape, live on the home page ----
-   The Solutions page is gone. Its panes moved onto the home page under the
-   tiles, so a tile is now the thing that opens the detail rather than a link to
-   somewhere else. What has to keep working: every tile has a panel, every
-   panel has a tile, and the ids came across unchanged so that every link
-   written as solutions.html#shoes still finds the shoe maker's panel. */
+/* ---------- the eight trades live on the home page as tiles ----------
+   The Solutions page is gone, and so are the panels that replaced it. Each of
+   those eight panels was a heading, a paragraph and four lines of detail, 768
+   words in total, describing how the app works on the page that a competitor
+   and a developer read before any other. A tile now carries its own three
+   lines and opens nothing.
+
+   What has to keep working: the ids, because thirteen footers link to
+   index.html#tailors and the rest and a dead anchor is a silent 404 to the top
+   of the page; the photographs, because a tile naming a file that is not there
+   gives every visitor a real 404 on load; and the fact that nothing opened
+   below, because half a removal is worse than none. */
 check(!fs.existsSync(path.join(dir, 'solutions.html')), 'the separate Solutions page is gone');
 const home = html['index.html'];
-const tileTrades = all(home, /class="industry[^"]*"[^>]*data-tab="([a-z]+)"/g).map(m => m[1]);
-const paneTrades = all(home, /class="pane[^"]*"[^>]*data-pane="([a-z]+)"/g).map(m => m[1]);
+const tileTrades = all(home, /<article class="tt[^"]*" id="([a-z]+)">/g).map(m => m[1]);
 check(tileTrades.length >= 5, 'the home page shows several kinds of business (' + tileTrades.length + ')');
-check(paneTrades.length === tileTrades.length, 'every tile has a panel and every panel a tile (' + tileTrades.length + ' and ' + paneTrades.length + ')');
-tileTrades.forEach(t => {
-  check(paneTrades.indexOf(t) !== -1, 'the tile opens a panel that exists: ' + t);
-  check(home.indexOf('id="' + t + '"') !== -1, 'the panel keeps its own address: index.html#' + t);
-});
-paneTrades.forEach(t => check(tileTrades.indexOf(t) !== -1, 'the panel has a tile to open it: ' + t));
-/* and every one of them is inside the detail block. A panel that lands
-   somewhere else on the page still answers its tile and still carries its id,
-   so all of the checks above pass while it renders in the middle of the hero.
-   That is not a hypothetical: it is where the eighth one first landed. */
-const detailStart = home.indexOf('<div class="trade-detail">');
-const detailEndAt = home.indexOf('inside the product', detailStart);
-check(detailStart > 0 && detailEndAt > detailStart, 'the detail block is where it should be');
-const detailBlock = home.slice(detailStart, detailEndAt);
-check(all(detailBlock, /class="pane/g).length === tileTrades.length, 'every panel sits inside the detail block, not loose on the page');
-/* the section already has its own h2, so the panels head at h3 */
-check(all(detailBlock, /<h2[ >]/g).length === 0, 'no panel outranks the heading of the section it sits in');
-check(all(detailBlock, /<h3 class="trade-h">/g).length === tileTrades.length, 'every panel has its heading');
-/* exactly one open to begin with, or the section reads as empty or as noise */
-check(all(home, /class="industry on"/g).length === 1, 'one tile starts open');
-check(all(home, /class="pane on anchor"/g).length === 1, 'one panel starts open');
+check(new Set(tileTrades).size === tileTrades.length, 'no two tiles claim the same address');
 
-/* the tiles are controls, not links: a link would leave the page */
-check(!/class="industry"[^>]*href=/.test(home), 'the tiles are controls rather than links away');
+/* the panels are gone, not merely hidden. A pane left on the page with the
+   open class removed still ships every word of it to everyone who reads the
+   source, which is the whole point of taking them out. */
+check(home.indexOf('trade-detail') === -1, 'the panels under the tiles are gone, not hidden');
+check(home.indexOf('data-pane=') === -1, 'no tile on the home page still opens a panel');
+check(home.indexOf('class="industry') === -1, 'the old tile markup is gone with its panels');
+
+/* every tile sits inside the row, carries its heading and carries its lines.
+   A tile that lands outside the row still passes the id check above while it
+   renders in the middle of the hero, which is where the eighth one once did. */
+const tilesStart = home.indexOf('<div class="trade-tiles">');
+const tilesEnd = home.indexOf('trade-cta', tilesStart);
+check(tilesStart > 0 && tilesEnd > tilesStart, 'the tile row is where it should be');
+const tileBlock = home.slice(tilesStart, tilesEnd);
+/* Counting tiles between the row and the button is not enough, and a mutant
+   proved it: close the row early with a stray </div> and the last tile is still
+   textually before the button, so a slice still finds it. This walks the
+   nesting instead. Every tile has to be exactly one level inside the row, and
+   the row has to close before the button. */
+(function () {
+  const open = '<div class="trade-tiles">';
+  let i = home.indexOf(open) + open.length;
+  let depth = 1, seen = 0, astray = 0;
+  while (i < tilesEnd && depth > 0) {
+    const nx = home.indexOf('<', i);
+    if (nx < 0 || nx >= tilesEnd) break;
+    const tag = home.slice(nx, nx + 18);
+    if (tag.indexOf('<article class="tt') === 0) { if (depth !== 1) astray++; seen++; depth++; }
+    else if (tag.indexOf('</article') === 0) depth--;
+    else if (tag.indexOf('<div') === 0) depth++;
+    else if (tag.indexOf('</div') === 0) depth--;
+    i = nx + 1;
+  }
+  check(seen === tileTrades.length && astray === 0 && depth === 0,
+    'every tile is one level inside the row and the row closes (' + seen + ' tiles, '
+    + astray + ' astray, depth ' + depth + ')');
+})();
+check(home.indexOf('<article class="tt', tilesEnd) === -1, 'no tile has landed below the row');
+/* the section already has its own h2, so a tile heads at h3 */
+check(all(tileBlock, /<h2[ >]/g).length === 0, 'no tile outranks the heading of the section it sits in');
+check(all(tileBlock, /<h3 class="trade-h">/g).length === tileTrades.length, 'every tile has its heading');
+tileBlock.split('<article class="tt').slice(1).forEach((card, i) => {
+  check(all(card, /<li>/g).length >= 3,
+    'the ' + (tileTrades[i] || i) + ' tile carries its highlights, which is all it is now for');
+});
+
+/* the tiles are statements now, not controls, so nothing about them may imply
+   there is more to open */
+check(!/<button[^>]*class="tt/.test(home), 'a tile is not a button any more');
 built.forEach(p => {
   check(html[p].indexOf('solutions.html') === -1, p + ' has no link left to the retired Solutions page');
   check(html[p].indexOf('>Solutions<') === -1, p + ' has no Solutions tab');

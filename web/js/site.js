@@ -339,7 +339,7 @@
      tabs, the pictures are there. Same sweep as the reveals, for the same
      reason: an observer that never delivers would leave the panes cold. */
   function warmPanesWhenQuiet() {
-    var strips = $$('.tabs, .industries');
+    var strips = $$('.tabs');
     if (!strips.length) return;
     function sweep() {
       var h = window.innerHeight || 800;
@@ -444,32 +444,9 @@
 
     warmPanesWhenQuiet();
 
-    /* ---------------- the trade tiles ----------------
-       Kayode asked for the detail to appear when you point at a tile. Hover is
-       only half an answer, because a phone has no cursor and this site is read
-       on a phone first, so a tile is a real control: tapping or clicking it
-       opens its panel, which is what the click delegate below already does for
-       anything carrying data-tab.
-
-       Hover is then an extra, and only where there is a true cursor. The media
-       query matters: a touch screen reports hover on the tap that precedes the
-       click, so without it a tap would open one panel on touch and another on
-       click. The small delay stops a cursor dragged across the row from
-       flipping through all eight, and nothing closes on leaving, so the panel
-       you last looked at stays put. */
-    var fineCursor = window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches;
-    if (fineCursor) {
-      var hoverTimer = null;
-      $$('.industries [data-tab]').forEach(function (tile) {
-        tile.addEventListener('mouseenter', function () {
-          clearTimeout(hoverTimer);
-          hoverTimer = setTimeout(function () {
-            selectTab(tile.getAttribute('data-group'), tile.getAttribute('data-tab'));
-          }, 110);
-        });
-        tile.addEventListener('mouseleave', function () { clearTimeout(hoverTimer); });
-      });
-    }
+    /* The trade tiles used to be controls that opened a panel under the row,
+       on click and on hover. There is no panel any more: each tile carries its
+       own three lines. So the hover handler that lived here is gone with it. */
 
     document.addEventListener('click', function (ev) {
       var t = ev.target.closest ? ev.target.closest('[data-act],[data-cycle],[data-tab],[data-back],a[href^="#"]') : null;

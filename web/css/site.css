@@ -183,29 +183,31 @@ body.menu-open .drawer{display:flex}
 /* ---------- the product, shown as real screenshots of the app ---------- */
 .device{position:relative}
 
-/* ---------- industries strip ---------- */
+/* ---------- trade tiles ---------- */
 /* Flex rather than grid, so a last row that is not full is centred instead of
    pushed against the left. The container is capped at four tiles wide, and the
    tiles grow to fill a line but never past 272, which is what the photographs
    were cut for. */
-.industries{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;
+.trade-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;
   max-width:1124px;margin-left:auto;margin-right:auto}
-.industry{flex:1 1 240px;max-width:272px}
-.industry{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
-  overflow:hidden;display:block;color:var(--text);transition:border-color .2s ease,transform .2s ease;
-  padding:0;font:inherit;text-align:center;cursor:pointer;width:100%}
-/* the one that is open reads as chosen, not merely hovered */
-.industry.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
-.industry.on b{color:var(--gold-2)}
-.industry:hover{border-color:var(--gold);transform:translateY(-2px);color:var(--text)}
-.industry .pic{height:164px;position:relative;display:grid;place-items:center;
+.tt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
+  overflow:hidden;display:flex;flex-direction:column;color:var(--text);
+  transition:border-color .2s ease,transform .2s ease}
+.tt:hover{border-color:var(--gold);transform:translateY(-2px)}
+.tt-pic{height:118px;position:relative;display:grid;place-items:center;
   background:linear-gradient(150deg,var(--panel-2),var(--bg-2));border-bottom:1px solid var(--line);
   background-size:cover;background-position:center}
-.industry .pic svg{width:34px;height:34px;fill:none;stroke:var(--gold);stroke-width:1.3;
+.tt-pic svg{width:30px;height:30px;fill:none;stroke:var(--gold);stroke-width:1.3;
   stroke-linecap:round;stroke-linejoin:round;opacity:.85}
-.industry .pic.shot svg{display:none}
-.industry b{display:block;padding:11px 8px;text-align:center;font-family:var(--serif);
-  font-size:12.5px;font-weight:500}
+.tt-body{padding:12px 13px 14px}
+/* beats the global h3 clamp and the .trade-h the panels used to need */
+.tt .trade-h{font-family:var(--serif);font-size:14.5px;font-weight:500;margin-bottom:9px}
+.tt ul{list-style:none;margin:0;padding:0}
+.tt li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.5;
+  color:var(--faint);margin-top:5px}
+.tt li::before{content:"";position:absolute;left:0;top:7px;width:4px;height:4px;
+  border-radius:50%;background:var(--gold);opacity:.75}
+.trade-cta{margin-top:22px}
 
 /* ---------- panels, cards, lists ---------- */
 .grid{display:grid;gap:14px}
@@ -284,7 +286,6 @@ body.menu-open .drawer{display:flex}
 .pic-panel.shot svg{display:none}
 
 /* the detail a tile opens, in place rather than on another page */
-.trade-detail{margin-top:22px}
 /* the panel heading answers to the section heading above it, so it is smaller
    than the h2 it would have been on a page of its own */
 .trade-h{font-size:clamp(22px,2.6vw,30px);margin-bottom:12px}
@@ -523,8 +524,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    the page sideways, which is what a fixed 200px did between 938 and 681. */
 
 @media (max-width:1000px){
-  /* three a row rather than two, which would make seven tiles four rows deep */
-  .industry{flex-basis:200px}
   .hdr-nav{display:none}
   .hdr-act .login{display:none}
   .burger{display:block}
@@ -561,7 +560,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .g-2up .card .ico{width:26px;height:26px;border-radius:7px;margin-bottom:8px}
   .g-2up .card .ico svg{width:14px;height:14px}
   .g-2up .card a.more{font-size:12px;margin-top:9px}
-  .industry .pic{height:96px}
   .strip-in{grid-template-columns:repeat(2,minmax(0,1fr))}
   .fgrid{grid-template-columns:minmax(0,1fr)}
   .split-list{columns:1}
@@ -592,7 +590,7 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 }
 
 /* ---------- photographs, once they arrive ---------- */
-.industry .pic img,.pic-panel img{position:absolute;inset:0;z-index:1;width:100%;height:100%;
+.tt-pic img,.pic-panel img{position:absolute;inset:0;z-index:1;width:100%;height:100%;
   object-fit:cover;filter:brightness(.97) saturate(.9) contrast(1.03)}
 .pic-panel{position:relative;overflow:hidden}
 .pic-panel.has-photo{background-image:linear-gradient(rgba(6,16,29,.3),rgba(6,16,29,.42)),var(--photo)}
@@ -617,14 +615,25 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    Four rows of trade tiles is half a screen of scrolling for one idea, so on a
    phone they become one row you swipe. Same for anything else that stacks into
    a column of near empty boxes. */
-@media (max-width:680px){
-  .industries{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -16px;
+/* Below 900 the eight tiles become one row you swipe rather than a grid.
+   Stacking them two up measured 1247px on a 390 phone, which is longer than
+   the panels this replaced, so the swipe row that was already here stays and
+   the tile only grows enough to hold its three lines. */
+@media (max-width:900px){
+  .trade-tiles{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -16px;
     padding:0 16px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
     scrollbar-width:none}
-  .industries::-webkit-scrollbar{display:none}
-  .industry{flex:0 0 134px;scroll-snap-align:start}
-  .industry .pic{height:86px}
-  .industry b{padding:9px 6px;font-size:12px}
+  .trade-tiles::-webkit-scrollbar{display:none}
+  .tt{flex:0 0 196px;scroll-snap-align:start}
+  .tt:hover{transform:none}
+  .tt-pic{height:92px}
+  .tt-body{padding:10px 11px 12px}
+  .tt .trade-h{font-size:13px;margin-bottom:7px}
+  .tt li{font-size:11.5px;margin-top:4px;padding-left:12px}
+  .tt li::before{top:6px;width:3.5px;height:3.5px}
+}
+
+@media (max-width:680px){
   /* four small numbers fit across a phone perfectly well */
   .strip-in{grid-template-columns:repeat(4,minmax(0,1fr))}
   .strip-cell{padding:14px 6px}
@@ -674,11 +683,11 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    written here silently wins over both of them, and the phone ends up with a
    164px picture in a 134px wide swipe tile. That is exactly what happened. */
 
-.industry .pic{position:relative}
+.tt-pic{position:relative}
 /* a navy wash over every tile, so a bright studio and a dark workshop sit together */
-.industry .pic::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+.tt-pic::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
   background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 30%,transparent))}
-.industry .pic svg{position:relative;z-index:0}
+.tt-pic svg{position:relative;z-index:0}
 
 
 /* ---------- line length ----------
@@ -717,9 +726,9 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 .on-light .btn{border-color:rgba(12,22,36,.28);color:var(--text)}
 .on-light .btn:hover{border-color:var(--gold);color:var(--gold-2)}
 /* a photograph on the light ground is not fighting white text any more */
-.on-light .industry .pic img,.on-light .pic-panel img{filter:none}
-.on-light .industry .pic::after{background:linear-gradient(180deg,transparent,rgba(12,22,36,.10))}
-.on-light .industry .pic{background:linear-gradient(150deg,#e8e1d6,#f2ece3)}
+.on-light .tt-pic img,.on-light .pic-panel img{filter:none}
+.on-light .tt-pic::after{background:linear-gradient(180deg,transparent,rgba(12,22,36,.10))}
+.on-light .tt-pic{background:linear-gradient(150deg,#e8e1d6,#f2ece3)}
 .on-light .step::before{background:rgba(169,118,31,.15);color:var(--gold-2)}
 .on-light .checks li::before{border-color:rgba(169,118,31,.5);background:rgba(169,118,31,.14)}
 .on-light .checks li::after{border-left-color:var(--gold);border-bottom-color:var(--gold)}

@@ -5,7 +5,46 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 18 September 2026 (twelfth session)
+Last updated: 18 September 2026 (thirteenth session)
+
+## Waiting to deploy — four commits on `admin-deploy`
+
+Kayode said "dont deploy yet" on the batch of 17 September and has not lifted
+it. Nothing below is live. In order:
+
+| Commit | What it is |
+|---|---|
+| `8c4ad58` | Yearly is eleven months for twelve, not ten. A Products menu in place of the Features tab. Pricing page trimmed. **The eleven month change is in `admin/js/data.js` too**, so the console and the site quote the same number |
+| `c53c149` | The hero buttons and clock put back at the pixels they were at before the screenshot moved |
+| `5b35f54` | The dead band of photograph cut off the bottom of the hero |
+| *(this session)* | The disclosure pass: see below |
+
+When he says go: every gate, then
+`git checkout main && git merge --no-ff --no-commit admin-deploy && git checkout HEAD -- netlify.toml && git commit`,
+confirm `publish = "site"`, push `main` then `admin-deploy`, verify live.
+
+## The disclosure pass — 18 September, not deployed
+
+Kayode: "as much as we want to sell, we also dont wamt to give too much
+information that leaks all our key features to the public or for other
+developers to steal." Four cuts, all four done, reasoning in `WEBSITE.md`
+under "The disclosure pass".
+
+1. The "Built and shipping soon" roadmap is gone from `features.html`. The gate
+   that used to demand it now fails on the opposite: any page selling payments,
+   automatic WhatsApp or the storefront as built breaks the build.
+2. Five of the nine app screenshots **deleted** from `web/img/screens`, not
+   just unlinked. A file left in a published folder is still fetchable.
+3. Mechanism rewritten as outcome throughout `features.html`.
+4. Ten feature areas became five, the Products menu with them, and the eight
+   home page trade panels became eight tiles carrying their own highlights.
+
+**Still to decide:** whether the deleted five should be recaptured smaller and
+put back, or left out. They are in git history at `5b35f54~1` if wanted.
+
+**Standing rule from the same day:** check the phone before the laptop on
+anything in `web/`. The tile change was 258px shorter at 1280 and would have
+been 446px longer at 390 if it had been built the obvious way.
 
 **Shipped 18 September, second batch.** The home page carries a live
 countdown clock to the launch date and a Join waitlist button. The hero lede
