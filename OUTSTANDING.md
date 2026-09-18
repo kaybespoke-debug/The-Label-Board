@@ -7,6 +7,17 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 18 September 2026 (twelfth session)
 
+**Shipped 18 September, second batch.** The home page carries a live
+countdown clock to the launch date and a Join waitlist button. The hero lede
+moved down to the trades section. `main` -> `9542877`, `admin-deploy` ->
+`c6b7ca1`, and the two branches differ only by `netlify.toml`, as intended.
+
+**The launch date is `2026-11-01`, set in `web/js/config.js`.** Kayode said
+"November" and never a day; this was chosen and deployed on his word to go
+ahead. It is one line, in one place, and the clock, the fallback sentence and
+the day the clock removes itself all read it. Change it there and nothing else
+needs touching.
+
 **Shipped 18 September.** The free trial is off the site entirely, the website
 is decongested, October early access is built and deployed, and the waiting
 list is live at `thelabelboard.com/join`. Migration `early_access_cohort`
