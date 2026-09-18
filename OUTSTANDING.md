@@ -5,21 +5,57 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 18 September 2026 (thirteenth session, into the fourteenth)
+Last updated: 19 September 2026 (thirteenth session)
 
-## Waiting to deploy — four commits on `admin-deploy`
+## Shipped 19 September 2026
 
-Kayode said "dont deploy yet" on the batch of 17 September and has not lifted
-it. Nothing below is live. In order:
+**All five queued commits are live.** `main` → `4845afa` (a merge), `admin-deploy`
+→ `fbc7fe1`, and the two branches differ only by `netlify.toml`, as intended.
+`publish = "site"` on main was confirmed before the merge commit and again on
+the commit itself, and `app.thelabelboard.com` was checked afterwards: it serves
+the customer app, not the console, so the trap did not fire.
+
+What went out:
+
+| Commit | What it is |
+|---|---|
+| `8c4ad58` | Yearly is eleven months for twelve, a Products menu, a lighter pricing page |
+| `c53c149` | Hero buttons and clock back at the pixels they were at |
+| `5b35f54` | The dead band cut off the bottom of the hero |
+| `8933306` | The disclosure pass |
+| `fbc7fe1` | The Products menu made real, the phone type pass, the Lagos card off |
+
+Verified on the live site rather than assumed:
+
+- all five deleted screenshots return **404** at their old urls, and the five
+  kept return 200
+- the Products menu opens on click, is one column, switches the area without a
+  reload and closes behind the choice
+- the home page has eight tiles, no panels, and every one of the eight ids the
+  footers link to
+- all twelve pages at 390 match the local measurements to the pixel, and none
+  of them scrolls sideways
+- no broken image on the home page
+
+**Still to decide:** whether the five deleted screenshots should be recaptured
+smaller and put back, or left out. They are in git history at `5b35f54~1`.
+
+**Still open from before:** where client reviews go, and the recommendation to
+wait until there are three real ones from the October cohort.
+
+## What went out, and why it waited
+
+Kayode said "dont deploy yet" on the batch of 17 September, and lifted it on
+19 September once the menu and the phone type were done. In order:
 
 | Commit | What it is |
 |---|---|
 | `8c4ad58` | Yearly is eleven months for twelve, not ten. A Products menu in place of the Features tab. Pricing page trimmed. **The eleven month change is in `admin/js/data.js` too**, so the console and the site quote the same number |
 | `c53c149` | The hero buttons and clock put back at the pixels they were at before the screenshot moved |
 | `5b35f54` | The dead band of photograph cut off the bottom of the hero |
-| *(this session)* | The disclosure pass: see below |
+| `8933306` | The disclosure pass: see below |
 
-When he says go: every gate, then
+The recipe, for next time: every gate, then
 `git checkout main && git merge --no-ff --no-commit admin-deploy && git checkout HEAD -- netlify.toml && git commit`,
 confirm `publish = "site"`, push `main` then `admin-deploy`, verify live.
 
