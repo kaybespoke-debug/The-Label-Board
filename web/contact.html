@@ -28,24 +28,6 @@
 
 <a class="skip" href="#main">Skip to content</a>
 
-<div class="ticker">
-  <div class="ticker-track">
-    <ul class="ticker-set">
-      <li>Works offline</li>
-      <li>Built for your phone</li>
-      <li>Your data, your control</li>
-      <li>One shop or six</li>
-      <li>No commission on your sales</li>
-    </ul>
-    <ul class="ticker-set" aria-hidden="true">
-      <li>Works offline</li>
-      <li>Built for your phone</li>
-      <li>Your data, your control</li>
-      <li>One shop or six</li>
-      <li>No commission on your sales</li>
-    </ul>
-  </div>
-</div>
 <header class="hdr">
   <div class="wrap hdr-in">
     <a class="brand" href="index.html" aria-label="The Label Board, home">
@@ -93,7 +75,6 @@
   <div class="wrap">
     <span class="eyebrow">Help and contact</span>
     <h1>Support and contact</h1>
-    <p class="lede">No ticket number, no chatbot. Somebody who knows the product answers.</p>
   </div>
 </section>
 
@@ -131,14 +112,12 @@
 
 <section>
   <div class="wrap">
-    <div class="row2">
-      <div class="row2-text">
+    <!-- One centred column rather than prose on the left and the form squeezed
+         into the right half. Nobody reads the prose: they came to type. -->
+    <div class="form-wide">
+      <div class="sec-head center">
         <span class="eyebrow">Send a message</span>
-        <h2>Tell us what you need and we will come back to you</h2>
-        <p>Pricing, a feature you need, a problem with your account, or whether this would suit a business like yours.</p>
-        <div class="callout" style="margin-top:24px">
-          <p><strong>Urgent? Use WhatsApp.</strong> Forms are checked through the day; WhatsApp constantly.</p>
-        </div>
+        <h2>Tell us what you need</h2>
       </div>
 
       <form class="form" name="contact" method="POST" action="thanks.html" data-netlify="true" netlify-honeypot="site-url">
@@ -161,6 +140,17 @@
           <div class="field">
             <label for="c-phone">Phone or WhatsApp</label>
             <input id="c-phone" name="phone" type="tel" autocomplete="tel" placeholder="0801 234 5678">
+          </div>
+          <!-- This was a callout above the form telling people to use WhatsApp
+               if it was urgent. It is more useful as a question, because the
+               answer is theirs to give rather than ours to assume. -->
+          <div class="field full">
+            <span class="lbl" id="c-reply-label">How would you like us to reply <span class="req">*</span></span>
+            <div class="pick" role="radiogroup" aria-labelledby="c-reply-label">
+              <label for="c-reply-wa"><input id="c-reply-wa" type="radio" name="reply" value="WhatsApp" required><span>WhatsApp</span></label>
+              <label for="c-reply-call"><input id="c-reply-call" type="radio" name="reply" value="Phone call"><span>Phone call</span></label>
+              <label for="c-reply-email"><input id="c-reply-email" type="radio" name="reply" value="Email"><span>Email</span></label>
+            </div>
           </div>
           <div class="field full">
             <label for="c-topic">What is this about <span class="req">*</span></label>
@@ -188,7 +178,7 @@
 
         <div class="form-foot">
           <button class="btn btn-gold" type="submit">Send message</button>
-          <p class="small">One reply from a person. We do not add you to anything.</p>
+          <p class="small">In a hurry? <a data-cfg-link="whatsapp" href="https://wa.me/2347062738923">WhatsApp us</a>.</p>
         </div>
       </form>
     </div>
