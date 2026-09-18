@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
     }
 
     /* ---- enquiries from the public website -----------------------------
-       The four forms post to Netlify (unchanged, and still the fallback that
+       The five forms post to Netlify (unchanged, and still the fallback that
        works with no JavaScript) and to the database, so this is the console's
        copy rather than the only one. Read with the service role because the
        table has row-level security on and no policies at all: nobody but us
@@ -332,7 +332,12 @@ Deno.serve(async (req) => {
     if (action === 'setEnquiryState') {
       const id = String(body.id || '')
       const value = String(body.value || '')
-      const VALID = ['new', 'open', 'replied', 'converted', 'spam', 'closed']
+      /* The THIRD place this list is written, after the check constraint and
+         the function body. All three have to be widened together or the door
+         stays shut at whichever one was forgotten — and this is the one that
+         was forgotten, so "move to the November list" would have come back as
+         "state must be one of" with waiting missing from the list it printed. */
+      const VALID = ['new', 'open', 'replied', 'converted', 'waiting', 'spam', 'closed']
       if (!id) return json({ error: 'No enquiry id' }, 400)
       if (!VALID.includes(value)) return json({ error: `state must be one of: ${VALID.join(', ')}` }, 400)
       const { error } = await admin.rpc('set_enquiry_state', {

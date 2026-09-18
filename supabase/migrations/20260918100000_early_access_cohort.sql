@@ -87,12 +87,31 @@ create index if not exists businesses_cohort_idx
 -- have to be updated or the constraint widens and the door stays shut. That
 -- duplication is on purpose: it is what turns a bad p_kind into a clean
 -- refusal instead of a raised exception at the visitor.
+--
+-- THESE ARE THE SHIPPED FUNCTIONS WITH ONE LIST WIDENED IN EACH, AND NOTHING
+-- ELSE TOUCHED. The first attempt at this migration rewrote them from memory
+-- and quietly changed three things nobody had asked to change: the throttle
+-- window from five minutes to one, `left(btrim(x), n)` truncation to a nullif
+-- that stored no length limit at all, and the exception handler that stops a
+-- database error ever reaching an anonymous caller. set_enquiry_state lost its
+-- 'No such enquiry' check the same way.
+--
+-- Postgres refused it, but only because the return type happened to differ —
+-- `returns boolean`, not void. Had the signature matched, every one of those
+-- changes would have gone in silently under a migration whose stated purpose
+-- was to add one word to a list. Copy the shipped body, change the list.
 
 create or replace function public.submit_enquiry(
-  p_kind text, p_name text, p_email text, p_phone text,
-  p_business text, p_message text, p_source_page text,
-  p_extra jsonb default '{}'::jsonb, p_trap text default null)
-returns void
+  p_kind        text,
+  p_name        text default null,
+  p_email       text default null,
+  p_phone       text default null,
+  p_business    text default null,
+  p_message     text default null,
+  p_source_page text default null,
+  p_extra       jsonb default '{}'::jsonb,
+  p_trap        text default null      -- honeypot: filled in means a bot
+) returns boolean
 language plpgsql
 security definer
 set search_path = public, pg_temp
@@ -100,52 +119,60 @@ as $$
 declare
   v_recent int;
 begin
-  -- 1. a bot filled the honeypot. Write nothing, say nothing, and answer the
-  --    same way a success answers, so it learns no more from being refused.
-  if p_trap is not null and btrim(p_trap) <> '' then
-    return;
+  -- 1. the honeypot. Answer TRUE so a bot learns nothing from being refused,
+  --    and write nothing.
+  if p_trap is not null and length(btrim(p_trap)) > 0 then
+    return true;
   end if;
 
   -- 2. a kind we actually have a form for
   if p_kind is null or p_kind not in ('demo','contact','partner','referral','earlyaccess') then
-    return;
+    return false;
   end if;
 
-  -- 3. somebody has to be reachable, or there is nothing to do with it
-  if (p_email is null or btrim(p_email) = '') and (p_phone is null or btrim(p_phone) = '') then
-    return;
+  -- 3. something to act on. An enquiry with no way to reply is not an
+  --    enquiry, it is a row.
+  if coalesce(btrim(p_email),'') = '' and coalesce(btrim(p_phone),'') = '' then
+    return false;
   end if;
 
-  -- 4. one person hammering the form, or one bot that got past the honeypot,
+  -- 4. throttle. Not a defence against a determined flood — that is what the
+  --    edge is for — but enough that one broken script or one bored person
   --    cannot fill the table. Same email, or same kind from anywhere, in the
-  --    last minute.
+  --    last five minutes.
   select count(*) into v_recent
   from public.enquiries
-  where at > now() - interval '1 minute'
+  where at > now() - interval '5 minutes'
     and (
-      (p_email is not null and btrim(p_email) <> '' and lower(email) = lower(btrim(p_email)))
+      (p_email is not null and lower(email) = lower(btrim(p_email)))
       or kind = p_kind
     );
   if v_recent >= 20 then
-    return;
+    return false;
   end if;
 
   insert into public.enquiries
     (kind, name, email, phone, business, message, source_page, extra)
   values (
     p_kind,
-    nullif(btrim(coalesce(p_name, '')), ''),
-    nullif(lower(btrim(coalesce(p_email, ''))), ''),
-    nullif(btrim(coalesce(p_phone, '')), ''),
-    nullif(btrim(coalesce(p_business, '')), ''),
-    nullif(btrim(coalesce(p_message, '')), ''),
-    nullif(btrim(coalesce(p_source_page, '')), ''),
+    left(btrim(p_name), 160),
+    left(lower(btrim(p_email)), 200),
+    left(btrim(p_phone), 60),
+    left(btrim(p_business), 200),
+    left(btrim(p_message), 4000),
+    left(btrim(p_source_page), 200),
     coalesce(p_extra, '{}'::jsonb)
   );
-end $$;
+  return true;
+exception when others then
+  -- Never surface a database error to an anonymous caller, and never let a
+  -- failure here break the form: Netlify has the submission regardless.
+  return false;
+end
+$$;
 
-revoke all    on function public.submit_enquiry(text,text,text,text,text,text,text,jsonb,text) from public, anon, authenticated;
-grant  execute on function public.submit_enquiry(text,text,text,text,text,text,text,jsonb,text) to anon, authenticated;
+revoke all on function public.submit_enquiry(text,text,text,text,text,text,text,jsonb,text) from public, anon, authenticated;
+grant execute on function public.submit_enquiry(text,text,text,text,text,text,text,jsonb,text) to anon, authenticated;
 
 create or replace function public.set_enquiry_state(
   p_id uuid, p_state text, p_by text default null, p_notes text default null)
@@ -159,12 +186,16 @@ begin
     raise exception 'Unknown state: %', p_state;
   end if;
   update public.enquiries
-     set state      = p_state,
-         handled_by = coalesce(nullif(btrim(coalesce(p_by, '')), ''), handled_by),
+     set state = p_state,
+         handled_by = coalesce(p_by, handled_by),
          handled_at = now(),
-         notes      = coalesce(nullif(btrim(coalesce(p_notes, '')), ''), notes)
+         notes = coalesce(p_notes, notes)
    where id = p_id;
-end $$;
+  if not found then
+    raise exception 'No such enquiry';
+  end if;
+end
+$$;
 
 revoke execute on function public.set_enquiry_state(uuid,text,text,text) from public, anon, authenticated;
 grant  execute on function public.set_enquiry_state(uuid,text,text,text) to service_role;
