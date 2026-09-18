@@ -63,6 +63,38 @@
         happens on the one morning nobody is looking at the website.
      3. A BAD DATE MEANS SILENCE, NOT NONSENSE. Anything unparseable and the
         static sentence stays exactly as the HTML wrote it. */
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  /* What the clock says with `ms` left. Pulled out of the painting so it can
+     be handed a number and asked what it would say, which is the only way the
+     launch morning gets tested without waiting for it. */
+  function opensText(ms, month) {
+    var s = Math.floor(ms / 1000);
+    if (s >= 172800) {                               // two days or more: days
+      return 'Opening in ' + plural(Math.floor(s / 86400), 'day')
+        + (month ? ', in ' + month + '.' : '.');
+    }
+    if (s >= 86400) {                                // the last two days: hours
+      return 'Opening in ' + plural(Math.floor(s / 3600), 'hour') + '.';
+    }
+    if (s >= 3600) {                                 // the last day: hours and minutes
+      return 'Opening in ' + plural(Math.floor(s / 3600), 'hour')
+        + ' ' + plural(Math.floor(s % 3600 / 60), 'minute') + '.';
+    }
+    if (s >= 60) {                                   // the last hour: minutes and seconds
+      return 'Opening in ' + plural(Math.floor(s / 60), 'minute')
+        + ' ' + plural(s % 60, 'second') + '.';
+    }
+    return 'Opening in ' + plural(s, 'second') + '.'; // the last minute
+  }
+
+  /* How long to wait before saying it again. A one second timer is right for
+     the last hour and pointless for the next six weeks, so the wait matches
+     what is actually moving on screen. Scheduled one tick at a time rather
+     than on an interval, so it cannot drift and it re-reads the clock after a
+     laptop has been asleep. */
+  function opensWait(ms) { return ms > 172800000 ? 60000 : 1000; }
+
   function opensIn() {
     var el = document.querySelector('[data-opens]');
     if (!el) return;
@@ -72,20 +104,25 @@
 
     /* Parsed as UTC midnight on purpose. A plain 'YYYY-MM-DD' is already UTC
        in every browser that matters, and building it from local parts would
-       make the number differ by one between Lagos and London for half the
-       day. Rounding UP means the last day reads "in 1 day" rather than
-       "in 0 days". */
-    var day = Date.parse(raw + 'T00:00:00Z');
-    if (isNaN(day)) return;
-    var left = Math.ceil((day - Date.now()) / 86400000);
+       put Lagos and London a day apart for half of every day.
 
-    if (left <= 0) { el.remove(); return; }
+       An unusable date leaves the sentence exactly as the HTML wrote it, so a
+       typo here makes the page vague rather than wrong, and starts no timer. */
+    var at = Date.parse(raw + 'T00:00:00Z');
+    if (isNaN(at)) return;
 
     var month = (cfg.text && cfg.text.launchMonth) || cfg.launchMonth || '';
-    el.textContent = left === 1
-      ? 'Opening to new businesses tomorrow.'
-      : 'Opening to new businesses in ' + left + ' days'
-        + (month ? ', in ' + month + '.' : '.');
+
+    function paint() {
+      var ms = at - Date.now();
+      /* The morning it matters. A clock reading zero, or counting backwards,
+         is worse than never having had one, and it would happen on the one
+         day nobody is looking at the marketing site. */
+      if (ms <= 0) { el.remove(); return; }
+      el.textContent = opensText(ms, month);
+      setTimeout(paint, opensWait(ms));
+    }
+    paint();
   }
 
   function photos() {

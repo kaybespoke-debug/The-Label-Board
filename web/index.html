@@ -100,16 +100,21 @@
       <p class="lede">Run every part of your business in one place. Orders, production, inventory, customers, staff and finance, whether you make it, sell it, supply it or all three.</p>
       <div class="btn-row">
         <a class="btn btn-gold" href="book.html">Book a free demo</a>
-        <a class="btn btn-line" href="waitlist.html">Join the list</a>
-        <a class="btn btn-quiet" href="features.html">Explore features</a>
+        <a class="btn btn-line" href="features.html">Explore features</a>
       </div>
-      <!-- Reads "in November" on its own, and becomes a number of days once
-           the browser has worked it out from SITE.launchDate. So with no
-           JavaScript it is vague rather than wrong, and on the morning we
-           open it takes itself off rather than sitting at zero waiting for
-           somebody to remember it. Days only: an hours-and-seconds clock on
-           a page about running a business honestly is the wrong register. -->
-      <p class="opens" data-opens>Opening to new businesses in <span data-cfg="launchMonth">November</span>.</p>
+      <!-- The waiting list and the clock sit together, under the two main
+           actions, because they are one idea: we open on a date, and this is
+           how you are there when we do.
+
+           The sentence reads "Opening in November." before any script runs,
+           so no JavaScript means vague rather than blank. Once the browser
+           has the date it counts, and it gets finer as it closes: days, then
+           hours, then minutes, then the seconds. At zero it takes itself off
+           rather than sitting there at nothing. -->
+      <div class="opens-row">
+        <a class="btn btn-line btn-sm" href="waitlist.html">Join waitlist</a>
+        <p class="opens" data-opens>Opening in <span data-cfg="launchMonth">November</span>.</p>
+      </div>
     </div>
 
     <div class="device">
