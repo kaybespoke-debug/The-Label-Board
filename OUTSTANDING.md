@@ -136,6 +136,27 @@ Four things, in this order. The first three take a few minutes between them.
 
 ---
 
+## Why the waiting list page is only a form
+
+It shipped on 18 Sep with a hero above the form and a "What you are joining"
+section under that. Both came off the same day on Kayode's call, and the
+reasoning is worth keeping because it applies to every page of this kind:
+
+**Somebody who has clicked Join waitlist has already decided.** A page that
+keeps making the case to a person who has said yes is giving them time to
+change their mind. Everything those two blocks said is either on the home page
+they came from, where a clock is counting to the same date, or is something
+they hear on the call.
+
+The page is now the heading and the form. "Tell us about your studio" is the
+h1, because the one it had went with the hero.
+
+**No count of places appears anywhere public**, here or on the home page. A
+counter is a promise that has to be fed from the console or it is decoration,
+and `cohort_taken()` exists in the database for the day that changes.
+
+---
+
 ## The roll-out plan — Kayode's numbers, 18 September 2026
 
 **This is a planner, not copy. None of it goes on the website until it is
