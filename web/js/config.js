@@ -65,12 +65,15 @@ const SITE = {
   supabaseUrl: 'https://eskubrbgbcbaejynjxvh.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc',
 
-  /* ---- trial ----
-     One length, for both self-serve plans. Bespoke used to have a shorter
-     trial of its own, which read as a penalty for paying more; it is now
-     agreed and invoiced per business, so what it offers is a conversation
-     rather than a countdown.                                             */
-  trialDays: 14,
+  /* ---- no trial ----
+     There was a `trialDays: 14` here, quoted on eleven places across five
+     pages. Kayode took it out on 18 Sep: the October cohort already gets a
+     free month, so a trial on top of it gives the same business six weeks
+     free, and nothing on this site ever ran self-serve anyway. Nobody gets
+     an account until there has been a call, and the call is where they see
+     it working on their own numbers.
+     `audit_web.js` section 8 now fails if a trial is promised anywhere, so
+     putting the key back is not enough to bring the offer back.           */
 
   /* ---- what each market pays -----------------------------------------
      Prices are SET per currency, not converted from naira in the browser.
@@ -140,7 +143,6 @@ SITE.text = {
   phone: SITE.phoneDisplay,
   city: SITE.city,
   instagram: '@' + SITE.instagram,
-  trialDays: String(SITE.trialDays),
 };
 SITE.link = {
   email: 'mailto:' + SITE.email,

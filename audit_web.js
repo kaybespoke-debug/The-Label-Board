@@ -298,35 +298,56 @@ check(/first payment/.test(pp), 'the partner page is clear that commission is on
 check(/once per business|counted once per business/.test(pp), 'the partner page is clear it is counted once per business');
 check(/never rewrites the past|already been credited/.test(pp), 'the partner page explains that a promotion does not rewrite past credits');
 
-/* ================= 8. the trial is stated consistently ================= */
-const trial = S.trialDays;
-check(String(trial) === '14', 'the trial length in the configuration is the one the console offers');
-/* Premium is shorter on purpose, and both numbers come from the configuration
-   rather than being typed into the page, so they cannot drift apart. */
-/* There is no separate trial for the top plan any more. Bespoke is agreed and
-   invoiced per business, so what it offers is a conversation, not a countdown
-   — and a page that offered "start your free trial" on a plan nobody can buy
-   without talking to us was making a promise it could not keep.
-   The two SELF-SERVE plans must still both offer the standard trial. */
-check(S.trialDaysPremium === undefined,
-  'there is still a separate trial length for the top plan, which is now invoice-only');
+/* ================= 8. nothing offers a free trial ================= */
+/* Kayode took the trial out on 18 Sep. It had been quoted in eleven places
+   across five pages, all fed by `trialDays` in the configuration.
+
+   His reason: the October cohort already gets a free month, so a trial on top
+   of that is the same business free for six weeks. And the trial was never
+   self-serve anyway — nobody gets an account until there has been a call, and
+   the call is where somebody sees it working on their own numbers, which is
+   the job the trial was supposed to do.
+
+   These are the old checks inverted rather than deleted. A trial is the kind
+   of promise that creeps back one page at a time, and every page carrying it
+   is a promise we are held to, so the gate now fails on the offer itself
+   rather than on the offer being stated inconsistently. */
+check(S.trialDays === undefined, 'the configuration carries no trial length');
+check(S.trialDaysPremium === undefined, 'the configuration carries no second trial length either');
+
+/* The phrases a trial comes back as. "no card" on its own is deliberately NOT
+   here: the booking page still says "No card, and no account until we have
+   spoken", which is about the call rather than about a countdown. */
+const TRIAL_WORDS = [
+  [/\d+\s+days?\s+free/i, 'a number of days free'],
+  [/free\s+trial/i, 'a free trial'],
+  [/\d+\s+day\s+trial/i, 'a day trial'],
+  [/trials?\s+for\s+\d+/i, 'a trial of a number of days'],
+  [/start\s+free/i, 'a "start free" button'],
+  [/no card to start/i, 'a card-free start'],
+];
+built.forEach(p => {
+  const seen = visible(html[p]);
+  TRIAL_WORDS.forEach(pair => check(!pair[0].test(seen), p + ' does not offer ' + pair[1]));
+  /* an attribute rather than copy, so this one reads the raw page */
+  check(!html[p].includes('data-cfg="trialDays"'),
+    p + ' does not read a trial length from the configuration');
+  /* visible() strips <meta>, so a promise could survive in the search result
+     alone, which is the one place nobody looks */
+  const m = html[p].match(/<meta name="description" content="([^"]*)"/);
+  check(!m || !/trial|days free/i.test(m[1]),
+    p + ' does not advertise a trial in its search description');
+});
+
+/* Taking the trial out must not leave a plan with no way to act on it. Every
+   priced column and the invoice-only band send the reader to the same place,
+   which is the call. */
 {
-  const trialButtons = (html['pricing.html'].match(/data-cfg="trialDays"/g) || []).length;
-  check(trialButtons >= 2,
-    'both self-serve plans should offer the standard trial (' + trialButtons + ' found)');
+  const next = (html['pricing.html'].match(/href="book\.html"/g) || []).length;
+  check(next >= 3, 'every plan on the pricing page still has a next step (' + next + ' found)');
   check(/Talk to us/.test(html['pricing.html']),
     'the invoice-only plan does not offer a way to start the conversation');
 }
-check(html['pricing.html'].indexOf('Talk to us first') === -1,
-  'no plan sends a ready buyer away to a conversation instead of a trial');
-['pricing.html', 'book.html'].forEach(p => {
-  check(html[p].includes('data-cfg="trialDays"'), p + ' takes the trial length from the configuration');
-});
-/* nobody may hard code a different number of days next to the word "free" */
-built.forEach(p => {
-  const bad = all(visible(html[p]), /(\d+)\s+days free/g).filter(m => m[1] !== String(trial));
-  check(bad.length === 0, p + ' never quotes a trial length other than ' + trial + ' days');
-});
 
 /* ================= 9. it sounds like us ================= */
 built.forEach(p => {
