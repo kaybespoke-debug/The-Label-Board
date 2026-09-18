@@ -940,8 +940,15 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    :hover sticks after a tap and the menu would hang open. Below that width the
    drawer has a plain Products link instead.
 
-   The trigger is still a real link to features.html, so a keyboard, a search
-   engine and a browser with no CSS all get somewhere useful. */
+   The trigger is still a real link to features.html in the markup, so a search
+   engine and a browser with no script both get somewhere useful. With the
+   script running it stops navigating and opens the menu instead, which is what
+   a menu title is for: Kayode asked for clicking Products to open the list
+   rather than jump to a page, and for each item in the list to be the thing
+   that goes somewhere.
+
+   .open is set by the script on click. Hover and focus-within stay, so a
+   cursor and a keyboard both still work without touching anything. */
 .nav-drop{position:relative;display:inline-flex}
 .nav-drop>a{display:inline-flex;align-items:center;gap:6px;position:relative;
   font-size:14px;font-weight:500;color:var(--dim);padding:9px 13px;border-radius:6px;
@@ -952,16 +959,22 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   height:2px;border-radius:2px;background:var(--gold)}
 .nav-drop .caret{width:9px;height:6px;fill:none;stroke:currentColor;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:transform .16s ease}
-.nav-drop:hover .caret,.nav-drop:focus-within .caret{transform:rotate(180deg)}
+.nav-drop:hover .caret,.nav-drop:focus-within .caret,
+.nav-drop.open .caret{transform:rotate(180deg)}
 
+/* One column, not two. Two columns read as a panel of thumbnails rather than
+   a menu, and five items in two columns leaves an odd one hanging. */
 .nav-menu{position:absolute;top:100%;left:50%;transform:translateX(-50%) translateY(4px);
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;
-  min-width:460px;padding:7px;border-radius:var(--r);
+  display:grid;grid-template-columns:minmax(0,1fr);gap:1px;
+  min-width:232px;padding:7px;border-radius:var(--r);
   background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .14s ease,transform .14s ease}
-.nav-drop:hover .nav-menu,.nav-drop:focus-within .nav-menu{
+.nav-drop:hover .nav-menu,.nav-drop:focus-within .nav-menu,.nav-drop.open .nav-menu{
   opacity:1;visibility:visible;pointer-events:auto;transform:translateX(-50%) translateY(0)}
-.nav-menu a{display:block;padding:9px 11px;border-radius:7px;font-size:13.5px;
+/* a menu held open by the script must not be closed again by the cursor
+   leaving, or a click that opened it would shut on the way to the list */
+.nav-drop.open{pointer-events:auto}
+.nav-menu a{display:block;padding:8px 11px;border-radius:7px;font-size:13.5px;
   color:var(--dim);white-space:nowrap}
 .nav-menu a:hover{background:var(--panel-2);color:var(--text)}
 /* the gap between the trigger and the panel would drop the hover on the way
@@ -1031,4 +1044,75 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   /* on a phone this is already a single swipeable row, so centring it would
      just move the first tab off the left edge where the thumb starts */
   .features-tabs{justify-content:flex-start}
+}
+
+/* ---------- the phone, one more pass on type ----------
+   Kayode, 2026-09-18: "strip down all pages and tabs sizes for mobile view
+   especially font sizes."
+
+   What was actually wrong, measured at 390 rather than guessed. The product
+   page lede was 17px and 163px tall, seven lines of it, while the body text
+   under it was 13.5. A pane paragraph was 16px, so the supporting sentence was
+   LARGER than the page's own body. A card heading was 20px sitting on top of
+   14px card text, which is a magazine proportion on a screen 390 wide. The
+   phone was reading a laptop's type scale with nothing taken off it.
+
+   This block has to be last in the file. The retuned scale further up sets
+   h1, h2, .lede and the rest unscoped, so a phone block placed before it loses
+   on source order at equal specificity and silently does nothing. That has
+   already happened twice on this stylesheet.
+
+   Where a rule below looks over-specific it is not decoration: .card h3 has to
+   name the card, because a bare h3 loses to it, and .features-tabs .tab has to
+   name the strip for the same reason. */
+@media (max-width:680px){
+  h1{font-size:29px;line-height:1.14}
+  h2{font-size:20px}
+  h3{font-size:17px}
+  h4{font-size:14.5px}
+  .phero h1{font-size:24px;margin-bottom:9px}
+  .phero .lede{font-size:14.5px}
+  .lede{font-size:14.5px;line-height:1.58}
+  .eyebrow{font-size:10px;letter-spacing:.14em;margin-bottom:9px}
+  .sec-head{margin-bottom:14px}
+
+  .row2-text p,.pane p{font-size:14px;line-height:1.62}
+  .checks li{font-size:13.5px;padding-left:23px;margin-top:8px;line-height:1.55}
+  .checks li::before{width:14px;height:14px;top:4.5px}
+  .checks li::after{left:4.2px;top:8.5px}
+
+  .card{padding:15px}
+  .card h3{font-size:16px;margin-bottom:6px}
+  .card p{font-size:13px;line-height:1.58}
+  .card ul li{font-size:13px}
+  .card a.more{font-size:12.5px}
+
+  .plan h3{font-size:18px}
+  .faq .ans{font-size:13.5px;line-height:1.62}
+
+  .tab,.features-tabs .tab{font-size:12px;padding:7px 11px}
+  .btn{font-size:12.5px}
+
+  /* the rest of the headings that are set by name rather than by level, each
+     of which beats a bare h3 or h4 and so has to be named again here */
+  .faq summary{font-size:15px;padding:13px 38px 13px 0}
+  .faq summary::after{top:19px}
+  .faq details[open] summary::after{top:23px}
+  .disclose.legal>summary{font-size:15px;padding:12px 15px}
+  .callout-row h4{font-size:15px}
+  .banner h4{font-size:15.5px}
+  .step h4{font-size:14.5px}
+  .prose h3{font-size:15.5px;margin-top:22px}
+  .sig{font-size:16.5px;margin-top:26px;padding-top:16px}
+  .cta .lede,.hero .lede{font-size:14.5px}
+
+  /* the two long reads and the story, which run on the page default and so
+     were the only body text on the site still at 16 on a phone */
+  .prose p,.prose li{font-size:14px;line-height:1.7}
+  .prose h2{font-size:18px;margin-top:32px}
+  .story-text p{font-size:14.5px;line-height:1.66}
+  .tier .rt{font-size:28px}
+  /* the contact cards put the phone number and the address in a bare span,
+     which was inheriting the page default and reading larger than the body */
+  .more{font-size:13.5px}
 }

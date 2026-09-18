@@ -608,6 +608,53 @@ check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 1
   'the light ground is actually used across the site');
 check(!/layi_/.test(js), 'the website never touches the studio app storage keys');
 
+/* ---------- the Products menu is a menu, not a picture of one ----------
+   It was built looking right and doing nothing, and was caught in the preview
+   before it went anywhere: "this dropdown should be an actual dropdown that
+   works not just a pretend on cos right now it does nothing."
+
+   Two separate faults, and each has its own check here because fixing one
+   without the other puts it straight back.
+
+   The first was the hash. Every item points at features.html#something, so from
+   features.html itself the browser changes the hash on a document that is
+   already open. Nothing reloads. The code that opens the right area ran once,
+   on load, so it never ran again and the page sat there. The listener below is
+   the whole fix.
+
+   The second was the trigger. It was a plain link to features.html, so a click
+   left the page instead of opening the list. It is still a link in the markup,
+   which is what a crawler and a browser with no script need, and the script
+   turns it into a toggle. That only happens if data-drop is on it, and the
+   header is copied into twelve pages by sync_web_shell.js, so every page is
+   checked rather than index alone. */
+check(js.indexOf("addEventListener('hashchange'") !== -1,
+  'the menu still works from the page it points at: a hash change reopens the area');
+check(js.indexOf("$$('.nav-drop > a[data-drop]')") !== -1,
+  'the Products trigger is wired up as a menu toggle');
+/* This has to look inside the click handler and nowhere else. Written as a
+   loose search for preventDefault next to setOpen it passed a mutant that took
+   preventDefault off the click entirely, because the ArrowDown handler a few
+   lines below has the same pair and satisfied it. */
+const clickAt = js.indexOf("trigger.addEventListener('click'");
+const clickBlock = clickAt < 0 ? '' : js.slice(clickAt, js.indexOf('});', clickAt));
+check(clickBlock.indexOf('preventDefault') !== -1,
+  'clicking Products opens the list rather than navigating away');
+check(js.indexOf("ev.key !== 'Escape'") !== -1, 'Escape closes the menu');
+built.forEach(p => {
+  const drop = (html[p].match(/<a href="features\.html" data-drop[^>]*>/) || [])[0];
+  check(!!drop, p + ' carries the Products trigger the script looks for');
+  check(!!drop && drop.indexOf('aria-expanded=') !== -1,
+    p + ' tells a screen reader whether the menu is open');
+  const menu = html[p].slice(html[p].indexOf('<span class="nav-menu">'));
+  const items = (menu.slice(0, menu.indexOf('</span>')).match(/<a href="features\.html#/g) || []).length;
+  check(items >= 4, p + ' has the areas in the menu (' + items + ')');
+});
+/* one column. Two read as a panel of thumbnails rather than as a list, which
+   is the other half of what Kayode asked for. */
+check(/\.nav-menu\{[^}]*grid-template-columns:minmax\(0,1fr\)/.test(css),
+  'the menu is a single vertical list');
+
 /* ---------- the product is shown, not drawn ----------
    Every screen on this site is a capture of the running app, taken through
    capture/shot.html and scaled by tools_pngcrop.js. Two ways that rots: a

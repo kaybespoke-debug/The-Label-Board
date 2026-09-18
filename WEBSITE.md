@@ -247,6 +247,104 @@ footer, in the Products menu and in the "How branches work" link on the home
 page. `audit_web.js` catches a dead anchor, and did catch that one.
 
 
+## The Products menu, which looked right and did nothing
+
+Kayode, 2026-09-19: *"this dropdown should be an actual dropdown that works not
+just a pretend on cos right now it does nothing, clicking product shoulndnt open
+products but clicking each items in the dropdown list should open what the
+clicked button says, also make the list a vertical one."*
+
+It never reached the live site: the batch it came in is still queued, and he
+found it in the local preview.
+
+Two separate faults. Fixing either one alone leaves it broken, which is why
+`audit_web.js` now has a check for each.
+
+**The hash never fired twice.** Every item in the menu points at
+`features.html#something`. From `features.html` itself that is a hash change on
+a document the browser already has open: nothing reloads, so the code that
+opens the right area, which ran once in the load handler, never ran again. The
+pane stayed where it was and the click looked dead. `openFromHash` is now a
+named function called on load **and** on `hashchange`. On a click it also
+scrolls the tab strip into view, because the pane was hidden when the browser
+decided where to scroll, found nothing, and stayed put.
+
+**The trigger was a link.** Clicking Products went to `features.html` instead of
+opening the list. It is still `<a href="features.html">` in the markup, which is
+what a crawler and a browser with no script need, and the script turns it into a
+toggle: click opens and closes, Escape closes and returns focus, a click
+anywhere else closes, ArrowDown opens and moves into the list, and choosing an
+item closes the menu behind it. Hover still opens it on a fine cursor, in CSS,
+untouched. The nav does not exist below 1000px, so none of this is ever on a
+touch screen where a stuck `:hover` would leave the panel hanging.
+
+The trigger is found by `data-drop`, and the header is copied into twelve pages
+by `sync_web_shell.js`, so the gate checks every page rather than `index.html`
+alone. A page that lost the attribute in a bad sync would be a menu that does
+nothing on that page only, which is exactly the kind of thing nobody notices.
+
+**The list is one column.** Five items in two columns read as a panel of
+thumbnails with an odd one hanging, rather than as a menu.
+
+## The phone type pass
+
+Kayode, same day: *"strip down all pages and tabs sizes for mobile view
+especially font sizes."*
+
+Measured at 390 first, because the numbers say more than the impression did:
+
+- the product page lede was **17px and 163px tall**, seven lines, while the body
+  text below it was 13.5
+- a pane paragraph was **16px**, so the supporting sentence was larger than the
+  page's own body text
+- a card heading was **20px** on top of 14px card text, a magazine proportion on
+  a screen 390 wide
+- the two long reads, `privacy` and `terms`, ran entirely at **16px** because
+  `.prose` never set a size and inherited the page default
+
+The phone was reading a laptop's type scale with nothing taken off it.
+
+The new block is at the **end** of the stylesheet and has to stay there. The
+retuned scale further up sets `h1`, `h2`, `.lede` and the rest unscoped, so a
+phone block placed before it loses on source order at equal specificity and
+silently does nothing. That has now happened twice on this stylesheet.
+
+Where a rule in that block looks over-specific it is not decoration. `.card h3`
+has to name the card because a bare `h3` loses to it. `.features-tabs .tab` has
+to name the strip for the same reason. `.faq summary`, `.banner h4`,
+`.callout-row h4`, `.step h4`, `.prose h2`, `.sig` and `.tier .rt` are each set
+by name somewhere above and each had to be named again.
+
+What it saved, every page measured at 390 with the block on and then deleted
+from the CSSOM in the same run:
+
+| Page | Before | After | Saved |
+|---|---|---|---|
+| `partners` | 4,679 | 4,245 | 434px |
+| `about` | 3,320 | 2,952 | 368px |
+| `referrals` | 4,404 | 4,099 | 305px |
+| `features` | 2,748 | 2,518 | 230px |
+| `pricing` | 5,231 | 5,025 | 206px |
+| `privacy` | 2,234 | 2,074 | 160px |
+| `index` | 3,435 | 3,278 | 157px |
+| `thanks` | 1,508 | 1,366 | 142px |
+| `terms` | 2,075 | 1,935 | 140px |
+| `contact` | 2,826 | 2,693 | 133px |
+| `book` | 1,936 | 1,878 | 58px |
+| `waitlist` | 1,916 | 1,908 | 8px |
+
+2,341px across the twelve, and nothing above 16px left on a phone except
+headings, the prices, the countdown digits, the partner figures and the
+signature on the story page.
+
+## The offline area opens out
+
+The "Built for a real Lagos day" card came off at Kayode's request and the
+"It does not stop when the network does" area now runs the full width of the
+page, with its five lines in two columns above 680px and one below. It uses
+`.split-list`, which the partners page already had.
+
+
 ## Two trims to the home page
 
 **The trade tiles are centred.** A grid cannot centre an orphan row: with four

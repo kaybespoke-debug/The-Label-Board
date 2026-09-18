@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 18 September 2026 (thirteenth session)
+Last updated: 18 September 2026 (thirteenth session, into the fourteenth)
 
 ## Waiting to deploy — four commits on `admin-deploy`
 
@@ -38,6 +38,24 @@ under "The disclosure pass".
 3. Mechanism rewritten as outcome throughout `features.html`.
 4. Ten feature areas became five, the Products menu with them, and the eight
    home page trade panels became eight tiles carrying their own highlights.
+
+**Then, 19 September, still not deployed:** the Products menu is a real menu.
+It was built looking right and doing nothing, and never deployed, because every item points
+at `features.html#something` and the code that opens the right area ran only on
+load, so from the product page itself the hash changed and nothing happened. It
+runs on `hashchange` now, and the trigger opens the list rather than navigating
+away. The list is one column. Every page is checked rather than `index.html`
+alone, because the header is copied into twelve.
+
+**And a phone type pass.** Every page measured at 390, **2,341px saved across
+the twelve**, most of it on `partners`, `about` and `referrals`. The product
+page lede was 17px and seven lines tall sitting over 13.5px body text, and
+`privacy` and `terms` ran entirely at 16px. Nothing above 16px is left on a
+phone except headings, prices, the countdown digits, the partner figures and the
+signature on the story page.
+
+**The "Built for a real Lagos day" card came off** and the offline area runs the
+full width of the product page now.
 
 **Still to decide:** whether the deleted five should be recaptured smaller and
 put back, or left out. They are in git history at `5b35f54~1` if wanted.
