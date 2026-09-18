@@ -104,7 +104,7 @@ const SITE = {
      that market, not arithmetic on a rate. Change a number here and every plan, the
      yearly price and the comparison table all follow.
 
-     Yearly is ten months for twelve, worked out rather than typed, so it
+     Yearly is eleven months for twelve, worked out rather than typed, so it
      can never disagree with the monthly price.                          */
   /* Keyed by PLAN ID, not by the name a customer is sold. The ids are
      starter / pro and they are what the database stores; the names on the

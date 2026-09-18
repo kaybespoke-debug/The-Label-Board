@@ -271,7 +271,7 @@
       if (amount == null) return;
       var amt = el.querySelector('[data-monthly]');
       var sym = el.querySelector('.cur');
-      if (amt) amt.textContent = group(annual ? amount * 10 : amount);
+      if (amt) amt.textContent = group(annual ? amount * 11 : amount);
       if (sym) sym.textContent = c.symbol;
     });
     $$('[data-per]').forEach(function (el) {
@@ -339,7 +339,7 @@
      tabs, the pictures are there. Same sweep as the reveals, for the same
      reason: an observer that never delivers would leave the panes cold. */
   function warmPanesWhenQuiet() {
-    var strips = $$('.tabs, .industries');
+    var strips = $$('.tabs');
     if (!strips.length) return;
     function sweep() {
       var h = window.innerHeight || 800;
@@ -428,15 +428,37 @@
     reveal();
 
     /* A link like features.html#money has to open that area, not just scroll
-       to a hidden one. The hash is scrubbed before it goes near a selector. */
-    var hash = (location.hash || '').slice(1).replace(/[^a-z0-9-]/gi, '');
-    if (hash) {
+       to a hidden one. The hash is scrubbed before it goes near a selector.
+
+       This runs on load AND on every hash change. It used to run only on load,
+       which is the whole reason the Products menu looked broken: from
+       features.html every item in that menu points at features.html#something,
+       the browser treats it as a hash change on the document already open, so
+       nothing reloads, so nothing ran, so nothing happened. Kayode's words
+       were that the dropdown "does nothing". It was doing exactly one thing,
+       once, at the wrong time. */
+    function openFromHash(clicked) {
+      var hash = (location.hash || '').slice(1).replace(/[^a-z0-9-]/gi, '');
+      if (!hash) return;
       var pane = $('.pane[data-pane="' + hash + '"]');
-      if (pane) selectTab(pane.getAttribute('data-group'), hash);
+      if (pane) {
+        selectTab(pane.getAttribute('data-group'), hash);
+        /* The pane was hidden when the browser decided where to scroll, so it
+           found nothing and stayed put. Put the strip on screen ourselves, and
+           only on a click: doing it on load would fight the browser's own
+           restore when somebody reopens a tab partway down the page. */
+        if (clicked) {
+          var strip = $('.tabs[aria-label]') || pane;
+          var y = strip.getBoundingClientRect().top + (window.pageYOffset || 0) - 96;
+          window.scrollTo(0, Math.max(0, y));
+        }
+      }
       /* a folded section that is linked to has to be open when you land */
       var d = document.getElementById(hash);
       if (d && d.tagName === 'DETAILS') d.open = true;
     }
+    openFromHash(false);
+    window.addEventListener('hashchange', function () { openFromHash(true); });
 
     $$('[data-year]').forEach(function (el) { el.textContent = String(new Date().getFullYear()); });
 
@@ -444,32 +466,52 @@
 
     warmPanesWhenQuiet();
 
-    /* ---------------- the trade tiles ----------------
-       Kayode asked for the detail to appear when you point at a tile. Hover is
-       only half an answer, because a phone has no cursor and this site is read
-       on a phone first, so a tile is a real control: tapping or clicking it
-       opens its panel, which is what the click delegate below already does for
-       anything carrying data-tab.
+    /* The trade tiles used to be controls that opened a panel under the row,
+       on click and on hover. There is no panel any more: each tile carries its
+       own three lines. So the hover handler that lived here is gone with it. */
 
-       Hover is then an extra, and only where there is a true cursor. The media
-       query matters: a touch screen reports hover on the tap that precedes the
-       click, so without it a tap would open one panel on touch and another on
-       click. The small delay stops a cursor dragged across the row from
-       flipping through all eight, and nothing closes on leaving, so the panel
-       you last looked at stays put. */
-    var fineCursor = window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches;
-    if (fineCursor) {
-      var hoverTimer = null;
-      $$('.industries [data-tab]').forEach(function (tile) {
-        tile.addEventListener('mouseenter', function () {
-          clearTimeout(hoverTimer);
-          hoverTimer = setTimeout(function () {
-            selectTab(tile.getAttribute('data-group'), tile.getAttribute('data-tab'));
-          }, 110);
-        });
-        tile.addEventListener('mouseleave', function () { clearTimeout(hoverTimer); });
+    /* ---------------- the Products menu ----------------
+       In the markup the trigger is an ordinary link to features.html, so a
+       browser with no script, and a crawler, both get a real page out of it.
+       With the script running it becomes the title of a menu instead: clicking
+       Products opens the list and does nothing else, and the five items in the
+       list are the things that go somewhere. Kayode asked for exactly that,
+       and it is also how a menu is meant to behave.
+
+       Hover still opens it on a fine cursor, in CSS, untouched. The nav does
+       not exist below 1000px, so none of this is ever on a touch screen where
+       a stuck :hover would leave the panel hanging open after a tap. */
+    $$('.nav-drop > a[data-drop]').forEach(function (trigger) {
+      var drop = trigger.parentNode;
+      function setOpen(on) {
+        drop.classList.toggle('open', on);
+        trigger.setAttribute('aria-expanded', on ? 'true' : 'false');
+      }
+      trigger.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        setOpen(!drop.classList.contains('open'));
       });
-    }
+      trigger.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'ArrowDown') return;
+        ev.preventDefault();
+        setOpen(true);
+        var first = $('.nav-menu a', drop);
+        if (first) first.focus();
+      });
+      document.addEventListener('click', function (ev) {
+        if (!drop.contains(ev.target)) setOpen(false);
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape' || !drop.classList.contains('open')) return;
+        setOpen(false);
+        trigger.focus();
+      });
+      /* a chosen item closes the menu behind it, whether it navigated away or
+         only moved the hash on the page that was already open */
+      $$('.nav-menu a', drop).forEach(function (a) {
+        a.addEventListener('click', function () { setOpen(false); });
+      });
+    });
 
     document.addEventListener('click', function (ev) {
       var t = ev.target.closest ? ev.target.closest('[data-act],[data-cycle],[data-tab],[data-back],a[href^="#"]') : null;

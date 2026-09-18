@@ -183,29 +183,31 @@ body.menu-open .drawer{display:flex}
 /* ---------- the product, shown as real screenshots of the app ---------- */
 .device{position:relative}
 
-/* ---------- industries strip ---------- */
+/* ---------- trade tiles ---------- */
 /* Flex rather than grid, so a last row that is not full is centred instead of
    pushed against the left. The container is capped at four tiles wide, and the
    tiles grow to fill a line but never past 272, which is what the photographs
    were cut for. */
-.industries{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;
+.trade-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;
   max-width:1124px;margin-left:auto;margin-right:auto}
-.industry{flex:1 1 240px;max-width:272px}
-.industry{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
-  overflow:hidden;display:block;color:var(--text);transition:border-color .2s ease,transform .2s ease;
-  padding:0;font:inherit;text-align:center;cursor:pointer;width:100%}
-/* the one that is open reads as chosen, not merely hovered */
-.industry.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
-.industry.on b{color:var(--gold-2)}
-.industry:hover{border-color:var(--gold);transform:translateY(-2px);color:var(--text)}
-.industry .pic{height:164px;position:relative;display:grid;place-items:center;
+.tt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
+  overflow:hidden;display:flex;flex-direction:column;color:var(--text);
+  transition:border-color .2s ease,transform .2s ease}
+.tt:hover{border-color:var(--gold);transform:translateY(-2px)}
+.tt-pic{height:118px;position:relative;display:grid;place-items:center;
   background:linear-gradient(150deg,var(--panel-2),var(--bg-2));border-bottom:1px solid var(--line);
   background-size:cover;background-position:center}
-.industry .pic svg{width:34px;height:34px;fill:none;stroke:var(--gold);stroke-width:1.3;
+.tt-pic svg{width:30px;height:30px;fill:none;stroke:var(--gold);stroke-width:1.3;
   stroke-linecap:round;stroke-linejoin:round;opacity:.85}
-.industry .pic.shot svg{display:none}
-.industry b{display:block;padding:11px 8px;text-align:center;font-family:var(--serif);
-  font-size:12.5px;font-weight:500}
+.tt-body{padding:12px 13px 14px}
+/* beats the global h3 clamp and the .trade-h the panels used to need */
+.tt .trade-h{font-family:var(--serif);font-size:14.5px;font-weight:500;margin-bottom:9px}
+.tt ul{list-style:none;margin:0;padding:0}
+.tt li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.5;
+  color:var(--faint);margin-top:5px}
+.tt li::before{content:"";position:absolute;left:0;top:7px;width:4px;height:4px;
+  border-radius:50%;background:var(--gold);opacity:.75}
+.trade-cta{margin-top:22px}
 
 /* ---------- panels, cards, lists ---------- */
 .grid{display:grid;gap:14px}
@@ -284,7 +286,6 @@ body.menu-open .drawer{display:flex}
 .pic-panel.shot svg{display:none}
 
 /* the detail a tile opens, in place rather than on another page */
-.trade-detail{margin-top:22px}
 /* the panel heading answers to the section heading above it, so it is smaller
    than the h2 it would have been on a page of its own */
 .trade-h{font-size:clamp(22px,2.6vw,30px);margin-bottom:12px}
@@ -523,8 +524,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    the page sideways, which is what a fixed 200px did between 938 and 681. */
 
 @media (max-width:1000px){
-  /* three a row rather than two, which would make seven tiles four rows deep */
-  .industry{flex-basis:200px}
   .hdr-nav{display:none}
   .hdr-act .login{display:none}
   .burger{display:block}
@@ -561,7 +560,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .g-2up .card .ico{width:26px;height:26px;border-radius:7px;margin-bottom:8px}
   .g-2up .card .ico svg{width:14px;height:14px}
   .g-2up .card a.more{font-size:12px;margin-top:9px}
-  .industry .pic{height:96px}
   .strip-in{grid-template-columns:repeat(2,minmax(0,1fr))}
   .fgrid{grid-template-columns:minmax(0,1fr)}
   .split-list{columns:1}
@@ -592,7 +590,7 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 }
 
 /* ---------- photographs, once they arrive ---------- */
-.industry .pic img,.pic-panel img{position:absolute;inset:0;z-index:1;width:100%;height:100%;
+.tt-pic img,.pic-panel img{position:absolute;inset:0;z-index:1;width:100%;height:100%;
   object-fit:cover;filter:brightness(.97) saturate(.9) contrast(1.03)}
 .pic-panel{position:relative;overflow:hidden}
 .pic-panel.has-photo{background-image:linear-gradient(rgba(6,16,29,.3),rgba(6,16,29,.42)),var(--photo)}
@@ -617,14 +615,25 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    Four rows of trade tiles is half a screen of scrolling for one idea, so on a
    phone they become one row you swipe. Same for anything else that stacks into
    a column of near empty boxes. */
-@media (max-width:680px){
-  .industries{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -16px;
+/* Below 900 the eight tiles become one row you swipe rather than a grid.
+   Stacking them two up measured 1247px on a 390 phone, which is longer than
+   the panels this replaced, so the swipe row that was already here stays and
+   the tile only grows enough to hold its three lines. */
+@media (max-width:900px){
+  .trade-tiles{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -16px;
     padding:0 16px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
     scrollbar-width:none}
-  .industries::-webkit-scrollbar{display:none}
-  .industry{flex:0 0 134px;scroll-snap-align:start}
-  .industry .pic{height:86px}
-  .industry b{padding:9px 6px;font-size:12px}
+  .trade-tiles::-webkit-scrollbar{display:none}
+  .tt{flex:0 0 196px;scroll-snap-align:start}
+  .tt:hover{transform:none}
+  .tt-pic{height:92px}
+  .tt-body{padding:10px 11px 12px}
+  .tt .trade-h{font-size:13px;margin-bottom:7px}
+  .tt li{font-size:11.5px;margin-top:4px;padding-left:12px}
+  .tt li::before{top:6px;width:3.5px;height:3.5px}
+}
+
+@media (max-width:680px){
   /* four small numbers fit across a phone perfectly well */
   .strip-in{grid-template-columns:repeat(4,minmax(0,1fr))}
   .strip-cell{padding:14px 6px}
@@ -674,11 +683,11 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    written here silently wins over both of them, and the phone ends up with a
    164px picture in a 134px wide swipe tile. That is exactly what happened. */
 
-.industry .pic{position:relative}
+.tt-pic{position:relative}
 /* a navy wash over every tile, so a bright studio and a dark workshop sit together */
-.industry .pic::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+.tt-pic::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
   background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 30%,transparent))}
-.industry .pic svg{position:relative;z-index:0}
+.tt-pic svg{position:relative;z-index:0}
 
 
 /* ---------- line length ----------
@@ -717,9 +726,9 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 .on-light .btn{border-color:rgba(12,22,36,.28);color:var(--text)}
 .on-light .btn:hover{border-color:var(--gold);color:var(--gold-2)}
 /* a photograph on the light ground is not fighting white text any more */
-.on-light .industry .pic img,.on-light .pic-panel img{filter:none}
-.on-light .industry .pic::after{background:linear-gradient(180deg,transparent,rgba(12,22,36,.10))}
-.on-light .industry .pic{background:linear-gradient(150deg,#e8e1d6,#f2ece3)}
+.on-light .tt-pic img,.on-light .pic-panel img{filter:none}
+.on-light .tt-pic::after{background:linear-gradient(180deg,transparent,rgba(12,22,36,.10))}
+.on-light .tt-pic{background:linear-gradient(150deg,#e8e1d6,#f2ece3)}
 .on-light .step::before{background:rgba(169,118,31,.15);color:var(--gold-2)}
 .on-light .checks li::before{border-color:rgba(169,118,31,.5);background:rgba(169,118,31,.14)}
 .on-light .checks li::after{border-left-color:var(--gold);border-bottom-color:var(--gold)}
@@ -919,4 +928,191 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
     color:var(--gold-2);font:inherit;font-size:13px;font-weight:600;
     cursor:pointer;transition:border-color .16s ease,color .16s ease}
   .plan-more:hover{border-color:var(--gold);color:var(--gold)}
+}
+
+/* ---------- the Products dropdown ----------
+   Ten feature areas used to be a row of ten buttons on the page itself, which
+   made the page look like a control panel before anybody had read a word. They
+   are in the header now.
+
+   Opened by :hover and :focus-within, in CSS, with no script. That is only
+   safe because .hdr-nav is display:none below 1000px: on a touch screen a
+   :hover sticks after a tap and the menu would hang open. Below that width the
+   drawer has a plain Products link instead.
+
+   The trigger is still a real link to features.html in the markup, so a search
+   engine and a browser with no script both get somewhere useful. With the
+   script running it stops navigating and opens the menu instead, which is what
+   a menu title is for: Kayode asked for clicking Products to open the list
+   rather than jump to a page, and for each item in the list to be the thing
+   that goes somewhere.
+
+   .open is set by the script on click. Hover and focus-within stay, so a
+   cursor and a keyboard both still work without touching anything. */
+.nav-drop{position:relative;display:inline-flex}
+.nav-drop>a{display:inline-flex;align-items:center;gap:6px;position:relative;
+  font-size:14px;font-weight:500;color:var(--dim);padding:9px 13px;border-radius:6px;
+  transition:.16s}
+.nav-drop>a:hover,.nav-drop:focus-within>a{color:var(--text);background:var(--panel)}
+.nav-drop>a.on{color:var(--text)}
+.nav-drop>a.on::after{content:"";position:absolute;left:13px;right:13px;bottom:3px;
+  height:2px;border-radius:2px;background:var(--gold)}
+.nav-drop .caret{width:9px;height:6px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:transform .16s ease}
+.nav-drop:hover .caret,.nav-drop:focus-within .caret,
+.nav-drop.open .caret{transform:rotate(180deg)}
+
+/* One column, not two. Two columns read as a panel of thumbnails rather than
+   a menu, and five items in two columns leaves an odd one hanging. */
+.nav-menu{position:absolute;top:100%;left:50%;transform:translateX(-50%) translateY(4px);
+  display:grid;grid-template-columns:minmax(0,1fr);gap:1px;
+  min-width:232px;padding:7px;border-radius:var(--r);
+  background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .14s ease,transform .14s ease}
+.nav-drop:hover .nav-menu,.nav-drop:focus-within .nav-menu,.nav-drop.open .nav-menu{
+  opacity:1;visibility:visible;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+/* a menu held open by the script must not be closed again by the cursor
+   leaving, or a click that opened it would shut on the way to the list */
+.nav-drop.open{pointer-events:auto}
+.nav-menu a{display:block;padding:8px 11px;border-radius:7px;font-size:13.5px;
+  color:var(--dim);white-space:nowrap}
+.nav-menu a:hover{background:var(--panel-2);color:var(--text)}
+/* the gap between the trigger and the panel would drop the hover on the way
+   down, so the panel reaches up behind it */
+.nav-menu::before{content:"";position:absolute;left:0;right:0;top:-8px;height:8px}
+
+/* ---------- the hero: text higher, screenshot smaller ----------
+   Two things were wrong with the balance.
+
+   The grid was 1fr 1.02fr, so the screenshot column was WIDER than the words.
+   The product picture was winning an argument with the headline, on the one
+   screen where the headline has to win.
+
+   And both columns were vertically centred, which floated the text block down
+   into the middle of a 600px hero. The words now start at the top and the
+   screenshot stays centred against them, so the headline is the first thing at
+   eye level rather than the thing under the fold of the picture. */
+/* SCOPED TO THE TWO COLUMN WIDTHS. Written unscoped first, and because this
+   file is cascade-ordered it beat the single column rule at line 531, so on a
+   phone the hero stayed a 1.15/0.85 grid: the headline was squeezed into a
+   third of a 390px screen, one word per line, with the screenshot shrunk into
+   the gap beside it. A later rule wins, including on the screens you were not
+   thinking about. */
+@media (min-width:981px){
+  .hero-grid{grid-template-columns:1.15fr 0.85fr;
+    /* The hero was pinned to min-height:600px while its content only needs
+       532 at 1280, so the bottom 121px was photograph with nothing on it. It
+       showed as a dead band under the clock. Height comes from the content
+       now, and the padding below it is the only space left down there.
+       Measured at three widths: 601px everywhere before, 488 / 532 / 541
+       after, with nothing moved except the floor coming out. */
+    min-height:0}
+  /* Both columns start at the top of the hero rather than floating in the
+     middle of it: the headline is the first thing at eye level, and the
+     screenshot sits alongside it instead of below its fold. */
+  .hero-grid>div:first-child{align-self:start}
+  .hero .device{align-self:start}
+
+  /* THE BUTTONS MUST NOT COME UP WITH THE HEADLINE.
+     Top-aligning the column lifted everything inside it by 68px, measured,
+     and Kayode asked for the headline to move and the buttons to stay. So
+     they get the 68px back: 90 + 68. The 90 is the gap he picked himself off
+     the spacing tool, and it is still the gap he picked, applied from a
+     headline that now starts higher up. */
+  .hero .btn-row{margin-top:158px}
+}
+/* a ceiling as well as a share of the grid, so it stops growing on a wide
+   screen where 0.85fr of 1680px is still enormous */
+.hero .device{max-width:760px;margin-left:auto}
+@media (max-width:980px){
+  /* stacked, so the share of a row means nothing and the cap is what matters.
+     Nothing above applies here, so the phone keeps the 104px it was given. */
+  .hero-grid>div:first-child{align-self:auto}
+  .hero .device{max-width:none;margin-left:0;align-self:auto}
+}
+
+/* ---------- the product tab row ----------
+   Ten tabs left aligned wrapped into two ragged rows with a long gap at the
+   end of the second, which read as a control panel rather than a choice. The
+   same ten are in the header's Products menu now, so this row is a second way
+   in rather than the only one, and it can afford to be quieter: centred, so
+   whatever falls onto a second line is centred under the first, and tighter,
+   so ten of them do not sprawl. */
+.features-tabs{justify-content:center;gap:5px;margin-bottom:16px}
+.features-tabs .tab{font-size:12.5px;padding:8px 13px}
+@media (max-width:680px){
+  /* on a phone this is already a single swipeable row, so centring it would
+     just move the first tab off the left edge where the thumb starts */
+  .features-tabs{justify-content:flex-start}
+}
+
+/* ---------- the phone, one more pass on type ----------
+   Kayode, 2026-09-18: "strip down all pages and tabs sizes for mobile view
+   especially font sizes."
+
+   What was actually wrong, measured at 390 rather than guessed. The product
+   page lede was 17px and 163px tall, seven lines of it, while the body text
+   under it was 13.5. A pane paragraph was 16px, so the supporting sentence was
+   LARGER than the page's own body. A card heading was 20px sitting on top of
+   14px card text, which is a magazine proportion on a screen 390 wide. The
+   phone was reading a laptop's type scale with nothing taken off it.
+
+   This block has to be last in the file. The retuned scale further up sets
+   h1, h2, .lede and the rest unscoped, so a phone block placed before it loses
+   on source order at equal specificity and silently does nothing. That has
+   already happened twice on this stylesheet.
+
+   Where a rule below looks over-specific it is not decoration: .card h3 has to
+   name the card, because a bare h3 loses to it, and .features-tabs .tab has to
+   name the strip for the same reason. */
+@media (max-width:680px){
+  h1{font-size:29px;line-height:1.14}
+  h2{font-size:20px}
+  h3{font-size:17px}
+  h4{font-size:14.5px}
+  .phero h1{font-size:24px;margin-bottom:9px}
+  .phero .lede{font-size:14.5px}
+  .lede{font-size:14.5px;line-height:1.58}
+  .eyebrow{font-size:10px;letter-spacing:.14em;margin-bottom:9px}
+  .sec-head{margin-bottom:14px}
+
+  .row2-text p,.pane p{font-size:14px;line-height:1.62}
+  .checks li{font-size:13.5px;padding-left:23px;margin-top:8px;line-height:1.55}
+  .checks li::before{width:14px;height:14px;top:4.5px}
+  .checks li::after{left:4.2px;top:8.5px}
+
+  .card{padding:15px}
+  .card h3{font-size:16px;margin-bottom:6px}
+  .card p{font-size:13px;line-height:1.58}
+  .card ul li{font-size:13px}
+  .card a.more{font-size:12.5px}
+
+  .plan h3{font-size:18px}
+  .faq .ans{font-size:13.5px;line-height:1.62}
+
+  .tab,.features-tabs .tab{font-size:12px;padding:7px 11px}
+  .btn{font-size:12.5px}
+
+  /* the rest of the headings that are set by name rather than by level, each
+     of which beats a bare h3 or h4 and so has to be named again here */
+  .faq summary{font-size:15px;padding:13px 38px 13px 0}
+  .faq summary::after{top:19px}
+  .faq details[open] summary::after{top:23px}
+  .disclose.legal>summary{font-size:15px;padding:12px 15px}
+  .callout-row h4{font-size:15px}
+  .banner h4{font-size:15.5px}
+  .step h4{font-size:14.5px}
+  .prose h3{font-size:15.5px;margin-top:22px}
+  .sig{font-size:16.5px;margin-top:26px;padding-top:16px}
+  .cta .lede,.hero .lede{font-size:14.5px}
+
+  /* the two long reads and the story, which run on the page default and so
+     were the only body text on the site still at 16 on a phone */
+  .prose p,.prose li{font-size:14px;line-height:1.7}
+  .prose h2{font-size:18px;margin-top:32px}
+  .story-text p{font-size:14.5px;line-height:1.66}
+  .tier .rt{font-size:28px}
+  /* the contact cards put the phone number and the address in a bare span,
+     which was inheriting the page default and reading larger than the body */
+  .more{font-size:13.5px}
 }

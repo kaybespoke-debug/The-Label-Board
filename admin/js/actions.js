@@ -314,7 +314,7 @@ function formConvert(id) {
   modal('Convert to paid', s.name + ' · trial ends ' + fmtD(s.renewsOn),
     '<div class="fg"><label>Plan</label><select id="cvPlan" onchange="togglePlanPrice(\'cvPlan\',\'cvPriceWrap\')">' +
     DB.plans.filter(p => p.id !== 'trial').map(p => '<option value="' + p.id + '">' + p.name + (p.invoiceOnly ? ' — invoiced' : ' — ' + money(p.monthly) + '/mo') + '</option>').join('') +
-    '</select></div><div class="fg"><label>Billing cycle</label><select id="cvCycle"><option value="monthly">Monthly</option><option value="annual">Annual (2 months free)</option></select></div>' +
+    '</select></div><div class="fg"><label>Billing cycle</label><select id="cvCycle"><option value="monthly">Monthly</option><option value="annual">Annual (1 month free)</option></select></div>' +
     agreedPriceField('cvPlan', 'cvPriceWrap', 'cvPrice', '', false),
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doConvert(' + id + ')">Convert</button>');
