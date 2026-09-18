@@ -139,6 +139,61 @@
     paint();
   }
 
+  /* ---------------- the plan feature lists, on a phone ----------------
+     Three plan cards stack into one column below 680px, and between them they
+     carry 23 feature rows. Measured: that one section is 2986px of the pricing
+     page's 5903, which is half the page and four screens of thumb.
+
+     So on a phone each card shows its first four and keeps the rest behind a
+     button. Four is enough to tell the plans apart; the rest is for somebody
+     who has already narrowed it down and is now comparing.
+
+     DONE IN JAVASCRIPT, NOT IN CSS, and that is the whole point. If the rule
+     lived in the stylesheet, a visitor whose JavaScript did not arrive would
+     get a list with seven features silently missing and no way to reach them.
+     Written this way, no script means the full list, which is the honest
+     failure. The collapse only exists once there is a button to undo it. */
+  function collapsePlans() {
+    var SHOW = 4;
+    $$('.plan-feats').forEach(function (ul) {
+      var items = [].slice.call(ul.children);
+      var feats = items.filter(function (li) { return !li.classList.contains('hd') });
+      if (feats.length <= SHOW) return;
+
+      var seen = 0, cutting = false;
+      items.forEach(function (li) {
+        if (!li.classList.contains('hd')) seen++;
+        if (cutting || seen > SHOW) { cutting = true; li.classList.add('over') }
+      });
+      /* A sub-heading whose items have all gone is a label pointing at nothing,
+         so it goes too. Walked backwards, because hiding one can orphan the
+         one above it. */
+      for (var i = items.length - 1; i >= 0; i--) {
+        var li = items[i];
+        if (!li.classList.contains('hd') || li.classList.contains('over')) continue;
+        var next = items[i + 1];
+        if (!next || next.classList.contains('over')) li.classList.add('over');
+      }
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'plan-more';
+      ul.classList.add('is-collapsed');
+
+      function paint() {
+        var shut = ul.classList.contains('is-collapsed');
+        btn.textContent = shut ? 'See all ' + feats.length + ' features' : 'Show fewer';
+        btn.setAttribute('aria-expanded', shut ? 'false' : 'true');
+      }
+      btn.addEventListener('click', function () {
+        ul.classList.toggle('is-collapsed');
+        paint();
+      });
+      paint();
+      if (ul.parentNode) ul.parentNode.insertBefore(btn, ul.nextSibling);
+    });
+  }
+
   function photos() {
     $$('.pic img, .pic-panel img').forEach(function (img) {
       if (img.complete && img.naturalWidth === 0) { img.remove(); return; }
@@ -368,6 +423,7 @@
        painted, and before reveal, so the sentence is its final length when
        the reveal measures it */
     opensIn();
+    collapsePlans();
     photos();
     reveal();
 
