@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#06101d">
 <meta name="color-scheme" content="dark">
-<title>Join the list · The Label Board</title>
+<title>Join the waitlist · The Label Board</title>
 <meta name="description" content="The Label Board opens to fashion businesses in November. Tell us about your studio and we will come to you first.">
 <link rel="canonical" href="https://thelabelboard.com/waitlist.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Label Board">
-<meta property="og:title" content="Join the list">
+<meta property="og:title" content="Join the waitlist">
 <meta property="og:description" content="We open to fashion businesses in November. Tell us about your studio and we will come to you first.">
 <meta property="og:url" content="https://thelabelboard.com/waitlist.html">
 <meta property="og:image" content="https://thelabelboard.com/img/hero.jpg">
@@ -71,33 +71,27 @@
 
 <main id="main">
 
-<!-- The November list. No count of places on this page, deliberately: the
-     October group is small and invited directly, and a public countdown is a
-     promise that has to be fed by the console or it becomes decoration. If a
-     counter is ever wanted, cohort_taken() in the database exists for it. -->
-<section class="phero">
-  <div class="wrap">
-    <span class="eyebrow">Opening in November</span>
-    <h1>Be one of the first studios on it</h1>
-    <p class="lede">The Label Board opens to fashion businesses in November. A small number of studios are running on it before that, and when we open we go to this list first, in the order it was written.</p>
-  </div>
-</section>
-
-<!-- A "What you are joining" section sat here explaining that we contact you
-     once, that there is no card, and why we are not opening to everybody at
-     the same time. Removed 18 Sep: somebody who clicked Join waitlist has
-     already decided, and a page that argues with a person who has said yes is
-     a page that loses them. The headline says what this is and the form is
-     directly under it. -->
-
-<hr class="rule">
-
+<!-- This page is a form and nothing else.
+     Two blocks used to sit above it. A hero, "Be one of the first studios on
+     it", with a paragraph explaining that we open in November and work through
+     the list in order. And a "What you are joining" section explaining that we
+     contact you once and why we are not opening to everybody at the same time.
+     Both came off on 18 Sep.
+     Somebody who has clicked Join waitlist has already decided. Everything
+     those blocks said is either on the home page they came from or is
+     something they hear on the call, and a page that keeps making the case to
+     a person who has said yes is giving them time to change their mind.
+     The countdown on the home page is the thing that says November. There is
+     deliberately no count of places anywhere public: the October group is
+     small and invited directly, and a public counter is a promise that has to
+     be fed from the console or it is decoration. cohort_taken() exists in the
+     database for the day that changes. -->
 <section class="tight" id="join">
   <div class="wrap">
     <div class="form-wide">
       <div class="sec-head center">
-        <span class="eyebrow">Join the list</span>
-        <h2>Tell us about your studio</h2>
+        <span class="eyebrow">Join the waitlist</span>
+        <h1>Tell us about your studio</h1>
       </div>
 
       <form class="form" name="waitlist" method="POST" action="thanks.html" data-netlify="true" netlify-honeypot="studio-url">
@@ -195,7 +189,7 @@
         </div>
 
         <div class="form-foot">
-          <button class="btn btn-gold" type="submit">Join the list</button>
+          <button class="btn btn-gold" type="submit">Join the waitlist</button>
           <p class="small">One message when it is your turn. <a data-cfg-link="whatsapp" href="https://wa.me/2347062738923">WhatsApp us</a> if you would rather just ask something.</p>
         </div>
       </form>
