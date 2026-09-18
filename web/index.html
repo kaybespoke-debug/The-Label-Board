@@ -97,10 +97,38 @@
     <div>
       <span class="eyebrow">Fashion business software</span>
       <h1>The operating system for <em>fashion businesses.</em></h1>
-      <p class="lede">Run every part of your business in one place. Orders, production, inventory, customers, staff and finance, whether you make it, sell it, supply it or all three.</p>
       <div class="btn-row">
         <a class="btn btn-gold" href="book.html">Book a free demo</a>
         <a class="btn btn-line" href="features.html">Explore features</a>
+      </div>
+      <!-- The waiting list and the clock sit together, under the two main
+           actions, because they are one idea: we open on a date, and this is
+           how you are there when we do.
+
+           The sentence reads "Opening in November." before any script runs,
+           so no JavaScript means vague rather than blank. Once the browser
+           has the date it counts, and it gets finer as it closes: days, then
+           hours, then minutes, then the seconds. At zero it takes itself off
+           rather than sitting there at nothing. -->
+      <div class="opens-row">
+        <a class="btn btn-line btn-sm" href="waitlist.html">Join waitlist</a>
+
+        <!-- The clock ships hidden and holds no numbers. Only the script that
+             knows the real date is allowed to fill it and reveal it, because a
+             countdown with numbers typed into the HTML is a countdown that is
+             wrong for everybody whose JavaScript did not arrive.
+
+             The sentence below it is the truth without JavaScript. When the
+             clock takes over, the sentence stays for screen readers and goes
+             visually, because four numbers changing every second is not
+             something anybody wants read aloud to them. -->
+        <div class="clock" data-opens hidden aria-hidden="true">
+          <div class="seg"><b data-cd="d">--</b><span>days</span></div>
+          <div class="seg"><b data-cd="h">--</b><span>hrs</span></div>
+          <div class="seg"><b data-cd="m">--</b><span>mins</span></div>
+          <div class="seg"><b data-cd="s">--</b><span>secs</span></div>
+        </div>
+        <p class="opens" data-opens-text>Opening in <span data-cfg="launchMonth">November</span>.</p>
       </div>
     </div>
 
@@ -136,8 +164,16 @@
      fewer to get through. With no JavaScript every panel is simply open. -->
 <section id="trades" class="tight on-light anchor">
   <div class="wrap">
-    <div class="sec-head center">
+    <!-- This line was the hero's lede. It reads better here, against the
+         tiles it is actually describing, than above two buttons.
+
+         It runs wider than an ordinary lede on purpose: .lede holds itself to
+         62ch for readability in a column, and at that width this sentence
+         stacks into a cramped block under a centred heading. .lede-wide gives
+         it room to breathe and centres whatever falls onto the second line. -->
+    <div class="sec-head center wide">
       <h2 style="font-size:clamp(21px,2.4vw,26px)">Built for every kind of fashion business</h2>
+      <p class="lede lede-wide">Run every part of your business in one place. Orders, production, inventory, customers, staff and finance, whether you make it, sell it, supply it or all three.</p>
     </div>
 
     <div class="industries" role="tablist" aria-label="Kinds of business">

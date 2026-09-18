@@ -46,6 +46,99 @@
      Two slots, both of which have to look deliberate while empty. A tile
      photo sits over its icon and removes itself if the file is not there; a
      panel photo is only applied once the browser has actually loaded it. */
+  /* ---------------- how long until we open ----------------
+     The element already reads "Opening to new businesses in November." before
+     this runs, so a visitor with no JavaScript, or one who arrives before this
+     file does, gets a true sentence rather than an empty box or a zero.
+
+     Three rules this follows, and each one is a thing countdowns usually get
+     wrong:
+
+     1. DAYS ONLY. An hours-minutes-seconds clock is a pressure tactic, and
+        this site sells to people who have been sold to badly. "In 44 days" is
+        information; "43 days 21:14:07" is a shopping channel.
+     2. IT TAKES ITSELF OFF. On and after the launch date the sentence is
+        removed entirely. A countdown sitting at zero, or counting into
+        negative days, is worse than never having had one, and it always
+        happens on the one morning nobody is looking at the website.
+     3. A BAD DATE MEANS SILENCE, NOT NONSENSE. Anything unparseable and the
+        static sentence stays exactly as the HTML wrote it. */
+  /* What the four segments read with `ms` left. Pulled out of the painting so
+     it can be handed a number and asked what it would show, which is the only
+     way the last minute before launch gets tested without being there for it.
+
+     Every part floors. A countdown that rounds up overstates the time you have
+     left, and the four parts have to agree with each other: 47 hours and 59
+     minutes is what one day, 23 hours, 59 minutes actually is. */
+  function opensParts(ms) {
+    var s = Math.floor(ms / 1000);
+    return {
+      d: Math.floor(s / 86400),
+      h: Math.floor(s % 86400 / 3600),
+      m: Math.floor(s % 3600 / 60),
+      s: s % 60,
+    };
+  }
+  /* Two digits minimum, so the row does not change width as numbers shrink.
+     Days above 99 simply get three, which is what a three digit number is. */
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function opensIn() {
+    var clock = document.querySelector('[data-opens]');
+    var line = document.querySelector('[data-opens-text]');
+    if (!clock) return;
+    var cfg = (typeof SITE !== 'undefined') ? SITE : null;
+    var raw = cfg && cfg.launchDate;
+    if (!raw) return;
+
+    /* Parsed as UTC midnight on purpose. A plain 'YYYY-MM-DD' is already UTC
+       in every browser that matters, and building it from local parts would
+       put Lagos and London a day apart for half of every day.
+
+       An unusable date leaves the page exactly as the HTML wrote it: the
+       sentence stays, the clock stays hidden, no timer starts. A typo here
+       makes the page vague rather than wrong. */
+    var at = Date.parse(raw + 'T00:00:00Z');
+    if (isNaN(at)) return;
+
+    var cell = {};
+    ['d', 'h', 'm', 's'].forEach(function (k) {
+      cell[k] = clock.querySelector('[data-cd="' + k + '"]');
+    });
+
+    function paint() {
+      var ms = at - Date.now();
+      /* The morning it matters. A clock sitting at zero, or counting
+         backwards, is worse than never having had one, and it would happen on
+         the one day nobody is looking at the marketing site. Both the clock
+         and its sentence go. */
+      if (ms <= 0) {
+        clock.remove();
+        if (line) line.remove();
+        return;
+      }
+      var p = opensParts(ms);
+      if (cell.d) cell.d.textContent = pad2(p.d);
+      if (cell.h) cell.h.textContent = pad2(p.h);
+      if (cell.m) cell.m.textContent = pad2(p.m);
+      if (cell.s) cell.s.textContent = pad2(p.s);
+
+      /* First paint only: the clock has real numbers in it now, so it may be
+         seen. The sentence stays in the page for anything reading it aloud,
+         because four numbers changing every second is not something to
+         announce, but it is no longer shown twice. */
+      if (clock.hasAttribute('hidden')) {
+        clock.removeAttribute('hidden');
+        if (line) line.classList.add('sr-only');
+      }
+      /* One tick at a time rather than an interval, so it cannot drift and it
+         re-reads the real clock after a laptop has been asleep. A second,
+         because seconds are on the screen. */
+      setTimeout(paint, 1000);
+    }
+    paint();
+  }
+
   function photos() {
     $$('.pic img, .pic-panel img').forEach(function (img) {
       if (img.complete && img.naturalWidth === 0) { img.remove(); return; }
@@ -271,6 +364,10 @@
     window.__tlbReady = true;
     applyConfig();
     markCurrent();
+    /* after applyConfig, because it reads the month applyConfig has just
+       painted, and before reveal, so the sentence is its final length when
+       the reveal measures it */
+    opensIn();
     photos();
     reveal();
 

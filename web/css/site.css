@@ -806,3 +806,82 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    highlight and nothing else */
 .pick label:has(input:checked){border-color:var(--gold);color:var(--text);
   background-color:color-mix(in srgb,var(--gold) 10%,var(--panel-2))}
+
+
+/* ---------- a section heading whose supporting line runs wide ----------
+   .sec-head holds itself to 64ch, which is right for a heading and its lede
+   sitting in a column of text. Under a centred heading, on a full width band,
+   that same 64ch stacks a long sentence into a cramped little block with a
+   lot of empty page either side of it.
+
+   .wide lifts the cap off the container and .lede-wide sets its own, longer
+   measure. Still centred, so whatever falls onto a second line is centred
+   under the first rather than hanging off to the left. */
+.sec-head.wide{max-width:none}
+.lede-wide{max-width:88ch;margin-left:auto;margin-right:auto}
+@media (max-width:680px){
+  /* on a phone there is no room to run wide and a centred ragged block is
+     harder to read than a left aligned one, so it goes back to normal */
+  .lede-wide{max-width:none;text-align:left}
+}
+
+/* ---------- the waiting list and the countdown ----------
+   One row under the hero's two buttons: the thing that does something, and
+   the clock that says why you might want to do it now. Below rather than
+   beside, because three equal buttons in a hero is three things competing and
+   none of them winning. */
+.opens-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+
+/* Four segments, in the same shape as the numbers everywhere else on this
+   site: a panel, a serif figure in gold, a small uppercase label under it. */
+.clock{display:flex;gap:7px}
+.clock[hidden]{display:none}
+.seg{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  padding:8px 4px 7px;min-width:52px;text-align:center}
+.seg b{display:block;font-family:var(--serif);font-weight:600;font-size:21px;
+  line-height:1;color:var(--gold-2);
+  /* the seconds change every second, and in a proportional face the whole row
+     re-flows as the digits change width, which reads as a twitch */
+  font-variant-numeric:tabular-nums}
+.seg span{display:block;margin-top:5px;font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;font-weight:600;color:var(--faint)}
+
+/* the sentence the clock replaces, which stays for anything reading the page
+   aloud. Not display:none, which would take it out of the accessibility tree
+   along with everything else. */
+.opens{font-size:13.5px;color:var(--faint);margin:0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+@media (max-width:680px){
+  /* the button goes full width like every other button on a phone, and the
+     clock sits under it on its own line rather than being squeezed alongside */
+  .opens-row .btn{width:100%}
+  .clock{width:100%}
+  .seg{flex:1;min-width:0}
+}
+@media (prefers-reduced-motion:reduce){
+  /* the numbers still count: this is information, not decoration, and nothing
+     here animates. Left as a note so nobody adds a flip or a fade later. */
+  .seg b{transition:none}
+}
+
+
+/* ---------- air in the hero ----------
+   Kayode's numbers, off the spacing tool, at 1280 and at 390.
+
+   The shape of it is the part worth keeping: the buttons, the waiting list
+   and the clock are ONE group, and all the air goes above them. I had it
+   backwards twice, putting space between the buttons and the waiting list to
+   separate them, which is what made it read as three crowded things instead
+   of two calm ones.
+
+   The phone wants MORE than the laptop, not less, which is why this is not a
+   clamp. A clamp only scales up with the viewport. On a phone the hero is a
+   tall single column and the headline needs more room under it, not less. */
+.hero .eyebrow{margin-bottom:clamp(16px,2vw,24px)}
+.hero .btn-row{margin-top:104px}
+.hero .opens-row{margin-top:8px}
+@media (min-width:900px){
+  .hero .btn-row{margin-top:90px}
+}

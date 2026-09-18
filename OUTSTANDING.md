@@ -5,7 +5,13 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 17 September 2026 (eleventh session)
+Last updated: 18 September 2026 (twelfth session)
+
+**Shipped 18 September.** The free trial is off the site entirely, the website
+is decongested, October early access is built and deployed, and the waiting
+list is live at `thelabelboard.com/join`. Migration `early_access_cohort`
+applied, `admin-api` at **version 10**, `main` → `6dd9e74`,
+`admin-deploy` → `7cf0e34`. Every gate green, including a new one.
 
 ## How this run works
 
@@ -96,6 +102,29 @@ Checked in the code, not assumed.
 
 ---
 
+## In the morning — 19 September
+
+Four things, in this order. The first three take a few minutes between them.
+
+1. **Read the 3 demo submissions** on the website's Netlify Forms tab, the last
+   dated 15 Sep. Real people asked for a walkthrough and nothing told us. They
+   sat there because notifications were only turned on last night.
+2. **Check `contact` for a submission in spam.** That form showed "No
+   submissions yet" and "Last submission on Sep 16" at the same time, which
+   usually means one was filtered rather than lost.
+3. **Test the waiting list end to end.** Fill it in on the live site, confirm
+   the email reaches `hello@`, confirm the row appears on the console's Early
+   access tab, then delete the Netlify submission. This is the one thing the
+   deploy checks could not prove: the curl test called the database directly
+   and never went through Netlify, so it exercised one half of the chain.
+4. **Clear the deploy check row** from the console: "Deploy Check / Deploy Check
+   Studio", `deploy-check-18sep@thelabelboard.test`, sitting on Early access as
+   `new`. Mark it spam or closed. It could not be removed when it was made
+   because the SQL tool is read only, and deleting one row through the
+   migration tool would have recorded a data delete as a schema change.
+
+---
+
 ## The roll-out plan — Kayode's numbers, 18 September 2026
 
 **This is a planner, not copy. None of it goes on the website until it is
@@ -140,7 +169,7 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 4 | **Move Supabase off Free before the first studio uploads photos** | Free is **1GB of file storage**, and Basic is sold as **20GB**. One studio cannot use a twentieth of what it is promised. Also 500MB database and 5GB egress, about 15 studio-months of data and 3 of traffic. Pro is $25/mo ≈ ₦33,300, roughly one Basic subscriber. Checked 11 Sep: 30MB of 500MB used, 0 of 1GB storage, 11 monthly active users |
 | 5 | ~~Delete the old project `gcdrkoitjqwbidcfgyzl`~~ | **Done 11 Sep.** One project left: ref `eskubrbgbcbaejynjxvh`, eu-west-2, renamed to `The Label Board` the same day. A rename does not change the ref or the URL, so no config moved. The CLI link on any machine that pointed at the old project must be redone: `supabase link --project-ref eskubrbgbcbaejynjxvh` |
 | 6 | **Change the password that appeared in a screenshot** | It was visible in an image shared into a session |
-| 6b | **Turn on Netlify form notifications, then send a test through all four forms** | The site is live now, so this stopped being theoretical. `book`, `contact`, `partners` and `referrals` all post to Netlify. **A form that silently goes nowhere looks exactly like a form that works**, and the first one to go missing is a customer |
+| 6b | ~~Turn on Netlify form notifications~~ | **Done 18 Sep.** One rule, `hello@thelabelboard.com` on a new submission from **any form**, which covers all five and does not need updating when a sixth appears. A waitlist-specific rule was added first and removed, because "any form" already included it and two copies of one enquiry in a shared inbox get worked twice. **Still to do: send a real submission through and confirm the email lands** |
 | 6c | **Have a Nigerian lawyer read `privacy.html` and `terms.html`** | Both are honest plain-language drafts that match how the site, the app and the partner programme actually behave, but neither has been reviewed. This was only ever recorded as an HTML comment inside the two pages, which means it was being served to the public until 18 Sep. Re-read them the day analytics, a payment provider or an email list is added, because each one changes what the privacy notice has to say |
 | 7 | Netlify: **over 75% of the monthly credit allowance used** on 11 Sep | Check Usage & billing for whether it is builds or bandwidth. Four pushes in one hour on 11 Sep each rebuilt the admin site, which did not help. Batch pushes |
 
@@ -219,14 +248,30 @@ free, three domains on the free tier.
 **Kayode enters the API key, not me.** It is a credential.
 
 ---
-## Netlify — two apps of four are deployed
+## Netlify — all four apps are deployed
+
+**This table said "two of four" and listed the portal and the website as
+"nowhere" until 18 Sep, while the table below it said all four had been live
+since 12 Sep. Two tables on one page disagreeing is worse than either being
+wrong, and a stale doc has now cost two wrong answers in this repo — CLAUDE.md
+also claimed `web/` was not connected to Netlify.**
 
 | App | Netlify site | Deploys from | State |
 |---|---|---|---|
-| Customer app | `thelabelboard` | GitHub, `main` | **live**, `layi-v40` |
+| Customer app | `thelabelboard` | GitHub, `main` | **live** |
 | Admin console | `thelabelboard-admin` | GitHub, `admin-deploy` | **live** |
-| Partner portal | — | — | **nowhere** |
-| Public website | — | — | **nowhere** |
+| Partner portal | `thelabelboard-partners` | GitHub, `admin-deploy` | **live** |
+| Public website | `thelabelboard-web` | GitHub, `main` | **live** |
+
+**The website is the site whose Forms tab holds the five public forms**, and the
+only one of the four where form notifications matter. The other three carry no
+forms at all.
+
+*On its name:* this file recorded the slug `thelabelboard-web`, but the Netlify
+UI shows the project as **`thelabelboard.com`** (seen in the breadcrumb on 18
+Sep). Either it was renamed or the newer UI displays the custom domain rather
+than the slug. Go by what the breadcrumb says when you are looking for it, and
+correct this line once somebody has the URL in front of them.
 
 Also on the account: `layi-website` (Netlify Drop, 4 Aug) and
 `loquacious-pika-32f045` (Netlify Drop, 5 Jul), neither connected to this repo.
