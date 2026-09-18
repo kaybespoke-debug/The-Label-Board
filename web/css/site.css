@@ -977,7 +977,14 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    the gap beside it. A later rule wins, including on the screens you were not
    thinking about. */
 @media (min-width:981px){
-  .hero-grid{grid-template-columns:1.15fr 0.85fr}
+  .hero-grid{grid-template-columns:1.15fr 0.85fr;
+    /* The hero was pinned to min-height:600px while its content only needs
+       532 at 1280, so the bottom 121px was photograph with nothing on it. It
+       showed as a dead band under the clock. Height comes from the content
+       now, and the padding below it is the only space left down there.
+       Measured at three widths: 601px everywhere before, 488 / 532 / 541
+       after, with nothing moved except the floor coming out. */
+    min-height:0}
   /* Both columns start at the top of the hero rather than floating in the
      middle of it: the headline is the first thing at eye level, and the
      screenshot sits alongside it instead of below its fold. */
