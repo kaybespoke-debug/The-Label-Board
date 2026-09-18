@@ -741,7 +741,17 @@ tagline should widen too.
 
 ## Editing it
 
-Three rules keep it maintainable.
+Four rules keep it maintainable.
+
+**An HTML comment is published.** Everything in `web/` is served to the public
+web, comments included, and anyone can read them with View Source. On 18 Sep
+three of them were found live: one on `pricing.html` explaining that a
+withdrawn offer "would have been sold at a loss", and one on each of
+`privacy.html` and `terms.html` saying to have a Nigerian lawyer read the page
+before relying on it. A legal page whose own source doubts it is worse than no
+comment at all. Design notes are fine, and there are plenty. Commercial
+reasoning, anything about money we have not decided, and anything addressed to
+the owner go in `OUTSTANDING.md`, which is not published.
 
 **The header and footer live in `index.html` and nowhere else.** Every other
 page carries a copy. `audit_web.js` fails if any copy drifts. To change the
