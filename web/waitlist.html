@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#06101d">
 <meta name="color-scheme" content="dark">
-<title>Book a demo · The Label Board</title>
-<meta name="description" content="Twenty minutes on a call. We put your own orders, stock and staff into an account while you watch, so what you see is your business rather than ours.">
-<link rel="canonical" href="https://thelabelboard.com/book.html">
+<title>Join the list · The Label Board</title>
+<meta name="description" content="The Label Board opens to fashion businesses in November. Tell us about your studio and we will come to you first.">
+<link rel="canonical" href="https://thelabelboard.com/waitlist.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Label Board">
-<meta property="og:title" content="Book a demo of The Label Board">
-<meta property="og:description" content="Twenty minutes on a call, set up with your own numbers.">
-<meta property="og:url" content="https://thelabelboard.com/book.html">
+<meta property="og:title" content="Join the list">
+<meta property="og:description" content="We open to fashion businesses in November. Tell us about your studio and we will come to you first.">
+<meta property="og:url" content="https://thelabelboard.com/waitlist.html">
 <meta property="og:image" content="https://thelabelboard.com/img/hero.jpg">
-<meta property="og:image:alt" content="A maker at the bench, and The Label Board dashboard">
+<meta property="og:image:alt" content="A cutting table, a rail and a dress form in a Lagos workroom">
 <meta name="twitter:image" content="https://thelabelboard.com/img/hero.jpg">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -71,72 +71,149 @@
 
 <main id="main">
 
+<!-- The November list. No count of places on this page, deliberately: the
+     October group is small and invited directly, and a public countdown is a
+     promise that has to be fed by the console or it becomes decoration. If a
+     counter is ever wanted, cohort_taken() in the database exists for it. -->
 <section class="phero">
   <div class="wrap">
-    <span class="eyebrow">Book a demo</span>
-    <h1>We set it up with you</h1>
-    <p class="lede">Twenty minutes on a call. Bring however you keep records today and we will put your own orders, stock and staff into an account while you watch, so what you are looking at is your business rather than a made up one.</p>
+    <span class="eyebrow">Opening in November</span>
+    <h1>Be one of the first studios on it</h1>
+    <p class="lede">The Label Board opens to fashion businesses in November. A small number of studios are running on it before that, and when we open we go to this list first, in the order it was written.</p>
   </div>
 </section>
 
-<!-- ============ the form, which is the point of this page ============ -->
-<section id="book" class="tight on-light anchor">
+<hr class="rule">
+
+<section class="tight on-light">
   <div class="wrap">
     <div class="row2">
       <div class="row2-text">
-        <span class="eyebrow">Tell us about your shop</span>
-        <h2>A few details and we will find a time</h2>
-        <p>We reply within one working day with a couple of times to choose from. No card, and no account until we have spoken.</p>
-        <div class="callout" style="margin-top:26px">
-          <p><strong>Prefer to just message?</strong></p>
-          <p><a data-cfg-link="whatsapp" href="https://wa.me/2347062738923">Send us a WhatsApp</a> or email <a data-cfg-link="email" href="mailto:hello@thelabelboard.com"><span data-cfg="email">hello@thelabelboard.com</span></a>. We answer during working hours, Lagos time.</p>
-        </div>
+        <span class="eyebrow">What you are joining</span>
+        <h2>A list, not a mailing list</h2>
+        <p>We will contact you once, when it is your turn, with a time for a walkthrough. Your own orders, your own stock and your own staff go into an account with you on the call, so what you are judging is your business rather than a made up one.</p>
+        <p>No card, and no account until we have spoken. If the timing is wrong when we call, say so and we will leave you where you are.</p>
+      </div>
+      <div class="callout">
+        <p><strong>Why we are not just opening it</strong></p>
+        <p>Every studio we take on gets set up on a call and gets our attention while they are finding their feet. That is the part that cannot be done a hundred at a time, so we are going in the order people asked.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="tight" id="join">
+  <div class="wrap">
+    <div class="form-wide">
+      <div class="sec-head center">
+        <span class="eyebrow">Join the list</span>
+        <h2>Tell us about your studio</h2>
       </div>
 
-      <form class="form" name="demo" method="POST" action="thanks.html" data-netlify="true" netlify-honeypot="studio-url">
-        <input type="hidden" name="form-name" value="demo">
+      <form class="form" name="waitlist" method="POST" action="thanks.html" data-netlify="true" netlify-honeypot="studio-url">
+        <input type="hidden" name="form-name" value="waitlist">
         <p class="hp"><label>Leave this empty <input name="studio-url" tabindex="-1" autocomplete="off"></label></p>
 
         <div class="fgrid">
           <div class="field">
-            <label for="d-name">Your name <span class="req">*</span></label>
-            <input id="d-name" name="name" type="text" required autocomplete="name" placeholder="Amaka Okafor">
+            <label for="w-name">Your name <span class="req">*</span></label>
+            <input id="w-name" name="name" type="text" required autocomplete="name" placeholder="Your name">
           </div>
           <div class="field">
-            <label for="d-studio">Business name <span class="req">*</span></label>
-            <input id="d-studio" name="studio" type="text" required autocomplete="organization" placeholder="House of Zuri">
+            <label for="w-business">Business name <span class="req">*</span></label>
+            <input id="w-business" name="business" type="text" required autocomplete="organization" placeholder="What it is called">
           </div>
           <div class="field">
-            <label for="d-phone">Phone or WhatsApp <span class="req">*</span></label>
-            <input id="d-phone" name="phone" type="tel" required autocomplete="tel" placeholder="0801 234 5678">
+            <label for="w-email">Email <span class="req">*</span></label>
+            <input id="w-email" name="email" type="email" required autocomplete="email" placeholder="you@yourlabel.com">
           </div>
           <div class="field">
-            <label for="d-email">Email <span class="req">*</span></label>
-            <input id="d-email" name="email" type="email" required autocomplete="email" placeholder="you@yourlabel.com">
+            <label for="w-phone">Phone or WhatsApp <span class="req">*</span></label>
+            <input id="w-phone" name="phone" type="tel" required autocomplete="tel" placeholder="0801 234 5678">
           </div>
+
+          <!-- These three decide which trade setup the walkthrough opens on and
+               which plan is worth quoting, so the call starts warm instead of
+               starting with twenty minutes of questions. -->
           <div class="field full">
-            <label for="d-note">Anything you want us to look at</label>
-            <textarea id="d-note" name="note" placeholder="The thing that is costing you time or money right now. Chasing balances, fabric going missing, working out what to pay the tailors, knowing whether the month was good."></textarea>
+            <label for="w-trade">What do you make or sell <span class="req">*</span></label>
+            <select id="w-trade" name="trade" required>
+              <option value="">Choose one</option>
+              <option>Bespoke, made to order</option>
+              <option>Ready to wear, off the rail</option>
+              <option>Both at once</option>
+              <option>Shoes</option>
+              <option>Bags and leather</option>
+              <option>Fabrics, sold by length</option>
+              <option>Accessories, caps, gele, beadwork</option>
+              <option>Something else</option>
+            </select>
           </div>
+
+          <div class="field">
+            <label for="w-size">How many people work with you</label>
+            <select id="w-size" name="size">
+              <option value="">Choose one</option>
+              <option>Just me</option>
+              <option>2 to 5</option>
+              <option>6 to 15</option>
+              <option>More than 15</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="w-outlets">How many shops or workrooms</label>
+            <select id="w-outlets" name="outlets">
+              <option value="">Choose one</option>
+              <option>One</option>
+              <option>Two or three</option>
+              <option>More than three</option>
+            </select>
+          </div>
+
+          <div class="field full">
+            <label for="w-records">How do you keep records today</label>
+            <select id="w-records" name="records">
+              <option value="">Choose one</option>
+              <option>A notebook</option>
+              <option>A spreadsheet</option>
+              <option>WhatsApp and my memory</option>
+              <option>Other software</option>
+              <option>Nothing consistent</option>
+            </select>
+          </div>
+
+          <div class="field full">
+            <label for="w-msg">What is hardest about running it today</label>
+            <textarea id="w-msg" name="message" placeholder="As much or as little as you like. This is the part we read first."></textarea>
+          </div>
+
+          <div class="field full">
+            <span class="lbl" id="w-reply-label">How should we reach you <span class="req">*</span></span>
+            <div class="pick" role="radiogroup" aria-labelledby="w-reply-label">
+              <label for="w-r1"><input id="w-r1" type="radio" name="reply" value="WhatsApp" required><span>WhatsApp</span></label>
+              <label for="w-r2"><input id="w-r2" type="radio" name="reply" value="Phone call"><span>Phone call</span></label>
+              <label for="w-r3"><input id="w-r3" type="radio" name="reply" value="Email"><span>Email</span></label>
+            </div>
+          </div>
+
           <div class="field full">
             <label class="check">
               <input type="checkbox" name="consent" required>
-              <span>You may contact me about this request. I have read the <a href="privacy.html">privacy notice</a>.</span>
+              <span>You may contact me when it is my turn. I have read the <a href="privacy.html">privacy notice</a>.</span>
             </label>
           </div>
         </div>
 
         <div class="form-foot">
-          <button class="btn btn-gold" type="submit">Request a demo</button>
-          <p class="small">We reply within one working day.</p>
+          <button class="btn btn-gold" type="submit">Join the list</button>
+          <p class="small">One message when it is your turn. <a data-cfg-link="whatsapp" href="https://wa.me/2347062738923">WhatsApp us</a> if you would rather just ask something.</p>
         </div>
       </form>
     </div>
   </div>
 </section>
-
-
-<hr class="rule">
 
 </main>
 

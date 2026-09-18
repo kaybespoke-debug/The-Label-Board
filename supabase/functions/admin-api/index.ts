@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
     }
 
     /* ---- enquiries from the public website -----------------------------
-       The four forms post to Netlify (unchanged, and still the fallback that
+       The five forms post to Netlify (unchanged, and still the fallback that
        works with no JavaScript) and to the database, so this is the console's
        copy rather than the only one. Read with the service role because the
        table has row-level security on and no policies at all: nobody but us
@@ -332,7 +332,12 @@ Deno.serve(async (req) => {
     if (action === 'setEnquiryState') {
       const id = String(body.id || '')
       const value = String(body.value || '')
-      const VALID = ['new', 'open', 'replied', 'converted', 'spam', 'closed']
+      /* The THIRD place this list is written, after the check constraint and
+         the function body. All three have to be widened together or the door
+         stays shut at whichever one was forgotten — and this is the one that
+         was forgotten, so "move to the November list" would have come back as
+         "state must be one of" with waiting missing from the list it printed. */
+      const VALID = ['new', 'open', 'replied', 'converted', 'waiting', 'spam', 'closed']
       if (!id) return json({ error: 'No enquiry id' }, 400)
       if (!VALID.includes(value)) return json({ error: `state must be one of: ${VALID.join(', ')}` }, 400)
       const { error } = await admin.rpc('set_enquiry_state', {
@@ -514,10 +519,32 @@ Deno.serve(async (req) => {
       if (action === 'inviteStudio') {
         const name = String(body.businessName || '').trim().slice(0, 200)
         if (!name) return json({ error: 'The studio needs a name' }, 400)
+
+        /* Which intake this studio is coming in with, e.g. october-2026 for an
+           early access tester. Empty for everybody who arrives normally.
+
+           This is the ONLY place it is ever set, which is what makes the count
+           on the console right. A studio invited straight from the console and
+           a studio accepted from a website enquiry both come through here, so
+           they land in the same column and the number is one `count(*)` rather
+           than two lists somebody has to keep in step.
+
+           Shape-checked rather than trusted: it ends up in a URL-free text
+           column, but it is operator input reaching the database and there is
+           no reason for it to be anything but a slug. */
+        const cohort = String(body.cohort || '').trim().toLowerCase().slice(0, 40)
+        if (cohort && !/^[a-z0-9][a-z0-9-]{1,39}$/.test(cohort)) {
+          return json({ error: 'A cohort is letters, numbers and hyphens' }, 400)
+        }
+
         const { data: existing } = await admin
           .from('businesses').select('id').eq('pending_owner_email', email).maybeSingle()
         if (existing) {
           prepared = { table: 'businesses', id: existing.id as string }
+          /* Re-inviting somebody who was already prepared must still be able to
+             put them in the cohort, or the second attempt after a bounced email
+             silently drops the free month. Only ever sets, never clears. */
+          if (cohort) await admin.from('businesses').update({ cohort }).eq('id', existing.id)
         } else {
           /* businesses.slug is NOT NULL, and the trigger only generates one on
              the path where it invents a studio from scratch. A studio prepared
@@ -535,7 +562,8 @@ Deno.serve(async (req) => {
           }
           const { data: made, error } = await admin.from('businesses')
             .insert({ name, slug, plan: 'trial', status: 'active',
-                      contact_email: email, pending_owner_email: email })
+                      contact_email: email, pending_owner_email: email,
+                      cohort: cohort || null })
             .select('id').maybeSingle()
           if (error) return json({ error: 'Could not create the studio: ' + error.message }, 500)
           prepared = { table: 'businesses', id: made?.id as string }

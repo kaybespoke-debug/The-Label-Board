@@ -703,35 +703,73 @@ PAGES.enquiries = function () {
   if (q) list = list.filter(e => matches(q, [e.name, e.email, e.phone, e.business, e.message, e.kind]));
   list.sort((a, b) => String(b.at).localeCompare(String(a.at)));
 
+  /* Two of the tabs are a queue rather than an inbox, and a queue reads oldest
+     first. Newest first is right everywhere else: an inbox is about what just
+     arrived, a queue is about whose turn it is. */
+  const queue = f === 'earlyaccess' || f === 'waiting';
+  if (queue) list.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+  /* Position is order of arrival across every early access enquiry, worked out
+     once over the whole set rather than over the filtered view, so somebody
+     moved to the November list keeps the number they had. Twenty places is a
+     promise, and the first thing the person who misses out asks is whether
+     somebody jumped them. */
+  const POS = {};
+  (DB.enquiries || [])
+    .filter(e => e.kind === 'earlyaccess')
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)))
+    .forEach((e, i) => { POS[e.id] = i + 1; });
+
   const all = DB.enquiries || [];
   const nu = all.filter(e => e.state === 'new').length;
-  const KIND = { demo: 'Demo request', contact: 'Contact', partner: 'Partner application', referral: 'Referral' };
-  const TONE = { new: 'amber', open: 'blue', replied: 'green', converted: 'green', spam: 'grey', closed: 'grey' };
+  const KIND = { demo: 'Demo request', contact: 'Contact', partner: 'Partner application',
+    referral: 'Referral', earlyaccess: 'Early access' };
+  const TONE = { new: 'amber', open: 'blue', replied: 'green', converted: 'green',
+    waiting: 'blue', spam: 'grey', closed: 'grey' };
 
-  const tabs = [['new', 'New'], ['open', 'Needs a reply'], ['demo', 'Demo requests'],
+  const tabs = [['new', 'New'], ['open', 'Needs a reply'], ['earlyaccess', 'Early access'],
+    ['waiting', 'November list'], ['demo', 'Demo requests'],
     ['partner', 'Partners'], ['referral', 'Referrals'], ['contact', 'Contact'],
     ['converted', 'Converted'], ['spam', 'Spam'], ['all', 'Everything']];
 
+  /* Places left is counted from the studios, not from this table. Most of the
+     first group are invited directly and never fill in a form, so a count of
+     enquiries would be wrong from the first day. */
+  const taken = (typeof cohortTaken === 'function') ? cohortTaken() : 0;
+  const cap = (typeof COHORT === 'object') ? COHORT.places : 0;
+  const left = Math.max(0, cap - taken);
+
   return '<div class="stats">' +
+    statCard({ label: 'Places left', value: left + ' <span style="font-size:15px;opacity:.6">of ' + cap + '</span>',
+      tone: left ? 'warn' : 'good',
+      sub: left ? 'October early access' : 'All taken, the rest go on the November list',
+      onclick: "UI.page='subscribers';UI.filters.subscribers='cohort';render()" }) +
     statCard({ label: 'Waiting on us', value: nu, tone: nu ? 'warn' : 'money', sub: 'Nobody has picked these up yet' }) +
-    statCard({ label: 'Demo requests', value: all.filter(e => e.kind === 'demo').length, tone: 'info', sub: 'The ones closest to buying' }) +
+    statCard({ label: 'November list', value: all.filter(e => e.state === 'waiting').length, tone: 'info',
+      sub: 'Told they are on the list' }) +
     statCard({ label: 'Converted', value: all.filter(e => e.state === 'converted').length, tone: 'money', sub: 'Became a subscriber' }) +
-    statCard({ label: 'In ' + PERIOD.label.toLowerCase(), value: all.filter(e => inPeriod(e.at)).length, tone: 'info', sub: 'Arrived inside the selected period' }) +
     '</div>' +
     '<div class="bar">' +
     tabs.map(t => '<button class="tab' + (f === t[0] ? ' on' : '') + '" onclick="setFilter(\'enquiries\',\'' + t[0] + '\')">' + t[1] + '</button>').join('') +
     '</div>' +
-    '<div class="bar">' + searchBox('enquiries', 'Search a name, an email, a message…') + '</div>' +
+    '<div class="bar">' + searchBox('enquiries', 'Search a name, an email, a message…') +
+    '<span class="spacer"></span>' +
+    '<button class="btn gold" onclick="inviteIntoCohort()">Invite a studio directly</button>' +
+    '</div>' +
     '<div class="pnl"><div class="ph"><div><h3>Website enquiries</h3>' +
     '<div class="ph-sub">' + list.length + ' shown' +
+    (queue ? ' · oldest first, because the queue is the fair order' : '') +
     (LIVE.on() ? '' : ' · not connected, so these are the worked example rather than real enquiries') +
     '</div></div></div>' +
-    (list.length ? '<div class="tw"><table><thead><tr><th>Who</th><th class="hide-sm">About</th>' +
+    (list.length ? '<div class="tw"><table><thead><tr>' +
+      (queue ? '<th>#</th>' : '') +
+      '<th>Who</th><th class="hide-sm">About</th>' +
       '<th class="hide-sm">Message</th><th>State</th><th class="hide-sm">When</th><th></th></tr></thead><tbody>' +
       list.slice(0, 200).map(e =>
         '<tr class="klik" onclick="openDetail(\'enquiry\',\'' + esc(String(e.id)) + '\')">' +
+        (queue ? '<td>' + (POS[e.id] || '') + '</td>' : '') +
         '<td><div class="t-main">' + esc(e.name || '(no name given)') + '</div>' +
-        '<div class="t-sub">' + esc(e.email || e.phone || '') + '</div></td>' +
+        '<div class="t-sub brk">' + esc(e.email || e.phone || '') + '</div></td>' +
         '<td class="hide-sm"><div class="t-main">' + esc(KIND[e.kind] || e.kind) + '</div>' +
         (e.business ? '<div class="t-sub">' + esc(e.business) + '</div>' : '') + '</td>' +
         '<td class="hide-sm" style="white-space:normal;max-width:320px">' +

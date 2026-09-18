@@ -18,6 +18,12 @@
 /demo         /book.html      301
 /demo.html    /book.html      301
 
+# Short enough to say out loud and to sit in an Instagram bio, which is where
+# this one is going. /trial already points at the booking form and stays there.
+/join         /waitlist.html  301
+/waitlist     /waitlist.html  301
+/list         /waitlist.html  301
+
 /support      /contact.html   301
 /support.html /contact.html   301
 
