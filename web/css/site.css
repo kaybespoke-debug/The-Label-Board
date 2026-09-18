@@ -45,27 +45,42 @@ button,input,select,textarea{font:inherit;color:inherit}
 .skip:focus{left:0}
 
 /* ---------- type helpers ---------- */
-.eyebrow{display:block;color:var(--gold-2);font-size:11px;letter-spacing:.16em;
-  text-transform:uppercase;font-weight:700;margin-bottom:16px}
+.eyebrow{display:block;color:var(--gold-2);font-size:10.5px;letter-spacing:.15em;
+  text-transform:uppercase;font-weight:700;margin-bottom:11px}
 .eyebrow.dim{color:var(--faint)}
-.lede{color:var(--dim);font-size:17px;line-height:1.7;max-width:62ch}
+/* 17px at 1.7 is a lot of air on a phone, where a lede is usually three or
+   four lines directly under a heading. It scales now instead of being one
+   size everywhere. */
+.lede{color:var(--dim);font-size:clamp(15.5px,1.2vw,17px);line-height:1.6;max-width:62ch}
 .small{font-size:13px;color:var(--faint);line-height:1.6}
 .num{font-variant-numeric:tabular-nums}
 .hl{color:var(--gold-2)}
 .center{text-align:center}
 .center .lede{margin-left:auto;margin-right:auto}
 
-h1{font-size:clamp(38px,5.6vw,68px)}
-h2{font-size:clamp(28px,3.6vw,44px);line-height:1.05}
-h3{font-size:clamp(20px,2.2vw,24px)}
-h4{font-size:17px}
+/* ---------- the type scale ----------
+   Retuned on 18 Sep. Measured before: on a 390px phone h1 was 38px, h2 was
+   28px, and the pricing page ran to 6134px, which is seven and a third screens
+   of scrolling. A 28px section heading on a 390px screen is the main offender,
+   because every section has one and it sets the spacing around itself too.
+
+   The headings came down and the body did not. 16px body text is correct and
+   is not what made the pages long; oversized headings were, along with the
+   space they demand either side of them. */
+h1{font-size:clamp(32px,4.6vw,56px)}
+h2{font-size:clamp(22px,2.7vw,34px);line-height:1.1}
+h3{font-size:clamp(18px,1.7vw,21px)}
+h4{font-size:16px}
 h1 em,h2 em{font-style:normal;color:var(--gold-2)}
 
-section{padding:clamp(46px,5.6vw,72px) 0;position:relative;border-bottom:1px solid var(--line-soft)}
-section.tight{padding:clamp(32px,4vw,52px) 0}
+/* Padding is top AND bottom, so every number here is paid twice at every seam
+   between two sections. 46px on a phone was 92px of empty ground between one
+   idea and the next, six or seven times down a page. */
+section{padding:clamp(32px,4.4vw,58px) 0;position:relative;border-bottom:1px solid var(--line-soft)}
+section.tight{padding:clamp(24px,3.2vw,42px) 0}
 section:last-of-type{border-bottom:0}
 .rule{height:1px;background:var(--line-soft);border:0;margin:0}
-.sec-head{margin-bottom:clamp(22px,2.8vw,34px);max-width:64ch}
+.sec-head{margin-bottom:clamp(16px,2.2vw,26px);max-width:64ch}
 .sec-head.center{margin-left:auto;margin-right:auto}
 .sec-head h2+.lede,.sec-head h3+.lede{margin-top:14px}
 /* the reference's split heading: title left, supporting line right */
@@ -464,7 +479,7 @@ html.js-on .pane.on{display:block;animation:rise .28s ease both}
   width:900px;height:560px;pointer-events:none;
   background:radial-gradient(ellipse,color-mix(in srgb,var(--gold) 10%,transparent) 0%,transparent 68%)}
 .phero .wrap{position:relative}
-.phero h1{font-size:clamp(31px,4.4vw,50px);margin-bottom:15px}
+.phero h1{font-size:clamp(27px,3.5vw,42px);margin-bottom:12px}
 .phero .lede{font-size:17px}
 
 /* ---------- misc ---------- */
@@ -884,4 +899,24 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 .hero .opens-row{margin-top:8px}
 @media (min-width:900px){
   .hero .btn-row{margin-top:90px}
+}
+
+/* ---------- the plan feature lists, folded on a phone ----------
+   Above 680px nothing here applies: all three cards sit side by side, the
+   lists are short enough to read at a glance, and the button is not shown.
+
+   Below it, the cards stack and the lists become four screens of thumb, so
+   each one shows four and the rest waits behind the button.
+
+   `is-collapsed` and `over` are both put on by JavaScript. Nothing is hidden
+   until the button that reveals it exists, so a visitor with no script gets
+   the whole list rather than a shortened one with no way to open it. */
+.plan-more{display:none}
+@media (max-width:680px){
+  .plan-feats.is-collapsed li.over{display:none}
+  .plan-more{display:block;width:100%;margin-top:14px;padding:11px 12px;
+    background:transparent;border:1px solid var(--line);border-radius:var(--r-btn);
+    color:var(--gold-2);font:inherit;font-size:13px;font-weight:600;
+    cursor:pointer;transition:border-color .16s ease,color .16s ease}
+  .plan-more:hover{border-color:var(--gold);color:var(--gold)}
 }
