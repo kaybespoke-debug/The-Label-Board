@@ -219,14 +219,24 @@ free, three domains on the free tier.
 **Kayode enters the API key, not me.** It is a credential.
 
 ---
-## Netlify — two apps of four are deployed
+## Netlify — all four apps are deployed
+
+**This table said "two of four" and listed the portal and the website as
+"nowhere" until 18 Sep, while the table below it said all four had been live
+since 12 Sep. Two tables on one page disagreeing is worse than either being
+wrong, and a stale doc has now cost two wrong answers in this repo — CLAUDE.md
+also claimed `web/` was not connected to Netlify.**
 
 | App | Netlify site | Deploys from | State |
 |---|---|---|---|
-| Customer app | `thelabelboard` | GitHub, `main` | **live**, `layi-v40` |
+| Customer app | `thelabelboard` | GitHub, `main` | **live** |
 | Admin console | `thelabelboard-admin` | GitHub, `admin-deploy` | **live** |
-| Partner portal | — | — | **nowhere** |
-| Public website | — | — | **nowhere** |
+| Partner portal | `thelabelboard-partners` | GitHub, `admin-deploy` | **live** |
+| Public website | `thelabelboard-web` | GitHub, `main` | **live** |
+
+**The website is `thelabelboard-web`.** That is the site whose Forms tab holds
+the five public forms, and the only one where form notifications matter. The
+other three carry no forms at all.
 
 Also on the account: `layi-website` (Netlify Drop, 4 Aug) and
 `loquacious-pika-32f045` (Netlify Drop, 5 Jul), neither connected to this repo.
