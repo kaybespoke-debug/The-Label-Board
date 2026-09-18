@@ -96,6 +96,38 @@ Checked in the code, not assumed.
 
 ---
 
+## The roll-out plan — Kayode's numbers, 18 September 2026
+
+**This is a planner, not copy. None of it goes on the website until it is
+decided and written properly.**
+
+A "founding members" band sat on the pricing page promising the first seventy
+five businesses **forty percent off the list price, for life**. Nobody had
+agreed those numbers, and at that discount the offer loses money on every
+business it wins. It came off on 18 Sep.
+
+What Kayode actually intends:
+
+| When | What | The point of it |
+|---|---|---|
+| **October 2026** | Early access | The **first 20 sign-ups get one month free** |
+| **November 2026** | Full roll-out | The app opens properly, at list price |
+
+The month is not a discount, it is a trade: real studios using it on real work,
+telling us what breaks, and leaving a review at the end. Three things follow,
+and none of them are built:
+
+1. **Somebody has to count the twenty.** A free month for the first twenty
+   means the console knows which twenty and stops at twenty. Nothing counts
+   sign-ups today.
+2. **A free month is a billing state, not a coupon.** `trialEndsOn` exists on a
+   subscriber record but nothing sets it from a rule.
+3. **Collecting the feedback is the whole reason for the month.** The feedback
+   channel is built and reaches the console. What is missing is asking at the
+   moment somebody has just done the thing.
+
+---
+
 ## Waiting on Kayode
 
 Needs a password, a dashboard setting on a live service, or a commercial call.

@@ -65,11 +65,16 @@ explains what each gate exists to catch.
 
 ## Branches and deploys
 
-- `main` publishes `site/` — **the customer app ships from here**
-- `admin-deploy` publishes `admin/` — the operator console, and where the
-  partner portal lives
-- `web/` is not connected to Netlify yet. It still carries placeholders and an
-  unsettled domain, so pushing it publishes nothing.
+- `main` publishes `site/` — **the customer app ships from here** — and also
+  `web/`, the public website at thelabelboard.com
+- `admin-deploy` publishes `admin/` — the operator console — and `partners/`,
+  the partner portal
+
+This file used to say `web/` was not connected to Netlify. It is, and has been
+since the domain settled: a push to `main` rebuilds the marketing site as well
+as the app. That was believed for a whole session and cost a wrong answer, so
+check a claim like this against the Netlify dashboard rather than against this
+paragraph.
 
 Day-to-day work happens on `admin-deploy`. Releasing the customer app means
 merging it into `main`.
