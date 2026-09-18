@@ -112,7 +112,23 @@
            rather than sitting there at nothing. -->
       <div class="opens-row">
         <a class="btn btn-line btn-sm" href="waitlist.html">Join waitlist</a>
-        <p class="opens" data-opens>Opening in <span data-cfg="launchMonth">November</span>.</p>
+
+        <!-- The clock ships hidden and holds no numbers. Only the script that
+             knows the real date is allowed to fill it and reveal it, because a
+             countdown with numbers typed into the HTML is a countdown that is
+             wrong for everybody whose JavaScript did not arrive.
+
+             The sentence below it is the truth without JavaScript. When the
+             clock takes over, the sentence stays for screen readers and goes
+             visually, because four numbers changing every second is not
+             something anybody wants read aloud to them. -->
+        <div class="clock" data-opens hidden aria-hidden="true">
+          <div class="seg"><b data-cd="d">--</b><span>days</span></div>
+          <div class="seg"><b data-cd="h">--</b><span>hrs</span></div>
+          <div class="seg"><b data-cd="m">--</b><span>mins</span></div>
+          <div class="seg"><b data-cd="s">--</b><span>secs</span></div>
+        </div>
+        <p class="opens" data-opens-text>Opening in <span data-cfg="launchMonth">November</span>.</p>
       </div>
     </div>
 

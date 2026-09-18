@@ -1,18 +1,24 @@
-// The one sentence on the website that changes by itself.
+// The countdown clock on the home page.
 //
-// "Opening to new businesses in 44 days" is the only thing on this site whose
-// correctness depends on what day it is. It goes wrong on exactly one morning:
-// the one we open. Nobody is looking at the marketing site that day, and a
-// countdown sitting at "in 0 days", or counting into negatives, is worse than
-// never having had one.
+// It is the only thing on this website whose correctness depends on what time
+// it is, and it goes wrong on exactly one morning: the one we open. Nobody is
+// looking at the marketing site that day, and four segments sitting at
+// 00:00:00:00, or counting backwards, is worse than never having had a clock.
 //
 // So it is tested at the boundary rather than looked at. site.js runs inside a
-// fake document here, the way the console gates run the console, and the date
-// is moved around it.
+// fake document here, the way the console gates run the console, and the clock
+// is frozen at exact distances from launch: both sides of every rollover, the
+// second before, the second after.
 //
-// Written after trying to check this in a real browser and finding that
-// `opensIn` lives inside site.js's IIFE, so every call silently did nothing and
-// every case "passed" against the untouched static sentence.
+// Two things this was written after.
+//
+// Trying to check it in a real browser: `opensIn` lives inside site.js's IIFE,
+// so every call silently did nothing and every case "passed" against an
+// untouched page. A test that cannot fail is not a test.
+//
+// And the clock's numbers must never be in the HTML. A countdown with numbers
+// typed into the markup is wrong for everybody whose JavaScript did not
+// arrive, and it looks completely fine while it is wrong.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -30,6 +36,9 @@ const CONFIG_JS = fs.readFileSync(path.join(root, 'web/js/config.js'), 'utf8');
    page ever stops shipping a readable sentence, this string stops matching the
    page and the check below it catches that separately. */
 const SHIPPED = 'Opening in <span data-cfg="launchMonth">November</span>.';
+/* what that sentence reads as once the config has been painted into it, which
+   is what a visitor with no JavaScript, or a broken date, is left with */
+const STATIC = 'Opening in November.';
 
 /* A Date whose `now` is whatever we say. Everything else on it is the real
    one, because site.js and config.js both use Date.parse and this must not
@@ -46,25 +55,53 @@ function frozenDate(nowMs) {
   return D;
 }
 
-function run(launchDate, nowMs) {
-  const el = {
-    _text: 'Opening in November.',
-    _attrs: { 'data-opens': '', class: 'opens' },
+function node(attrs, text) {
+  return {
+    _text: text === undefined ? '' : text,
+    _attrs: Object.assign({}, attrs),
+    _classes: [],
     _gone: false,
     get textContent() { return this._text },
     set textContent(v) { this._text = String(v) },
     getAttribute(k) { return k in this._attrs ? this._attrs[k] : null },
     setAttribute(k, v) { this._attrs[k] = String(v) },
     removeAttribute(k) { delete this._attrs[k] },
+    hasAttribute(k) { return k in this._attrs },
     remove() { this._gone = true },
-    classList: { add() {}, remove() {}, contains() { return false }, toggle() {} },
+    classList: {
+      _o: null,
+      add(c) { if (this._o._classes.indexOf(c) < 0) this._o._classes.push(c) },
+      remove(c) { this._o._classes = this._o._classes.filter(x => x !== c) },
+      contains(c) { return this._o._classes.indexOf(c) >= 0 },
+      toggle() {},
+    },
     style: {}, addEventListener() {}, querySelectorAll() { return [] },
   };
+}
+
+function run(launchDate, nowMs) {
+  /* The four segments, exactly as index.html ships them: hidden, and with no
+     numbers in them. If the code ever reveals the clock before filling it, or
+     fills it without revealing it, these say so. */
+  const cells = { d: node({ 'data-cd': 'd' }, '--'), h: node({ 'data-cd': 'h' }, '--'),
+                  m: node({ 'data-cd': 'm' }, '--'), s: node({ 'data-cd': 's' }, '--') };
+  const el = node({ 'data-opens': '', hidden: '', class: 'clock' });
+  el.querySelector = sel => {
+    const m = /\[data-cd="(\w)"\]/.exec(sel);
+    return m ? cells[m[1]] : null;
+  };
+  const line = node({ 'data-opens-text': '', class: 'opens' }, 'Opening in November.');
+  [el, line, cells.d, cells.h, cells.m, cells.s].forEach(n => { n.classList._o = n });
+
   let booted = null;
   const doc = {
     addEventListener(ev, fn) { if (ev === 'DOMContentLoaded') booted = fn },
     removeEventListener() {},
-    querySelector(sel) { return sel === '[data-opens]' ? (el._gone ? null : el) : null },
+    querySelector(sel) {
+      if (sel === '[data-opens]') return el._gone ? null : el;
+      if (sel === '[data-opens-text]') return line._gone ? null : line;
+      return null;
+    },
     querySelectorAll(sel) {
       if (el._gone) return [];
       if (sel === '[data-opens]') return [el];
@@ -109,7 +146,15 @@ function run(launchDate, nowMs) {
   vm.runInContext(SITE_JS, sb, { filename: 'site.js' });
   if (!booted) throw new Error('site.js never registered a DOMContentLoaded handler');
   booted();
-  return { removed: el._gone, text: el._text, delays: delays };
+  return {
+    removed: el._gone,
+    lineRemoved: line._gone,
+    hidden: el.hasAttribute('hidden'),
+    lineHidden: line._classes.indexOf('sr-only') >= 0,
+    lineText: line._text,
+    read: cells.d._text + ':' + cells.h._text + ':' + cells.m._text + ':' + cells.s._text,
+    delays: delays,
+  };
 }
 
 const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
@@ -119,105 +164,108 @@ const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
    checks keep testing the bands after somebody changes the real date. */
 const LAUNCH_AT = Date.parse('2026-11-01T00:00:00Z');
 const standingAt = ms => run('2026-11-01', LAUNCH_AT - ms);
-const text = ms => { const r = standingAt(ms); return r.removed ? null : r.text; };
+const reads = ms => standingAt(ms).read;
 const schedules = ms => { const r = standingAt(ms); return r.delays.length ? r.delays[0] : 0; };
 
-/* ---- the page ships a sentence that is true before any script runs ---- */
+/* ---- the page ships something true before any script runs ---- */
 const index = fs.readFileSync(path.join(root, 'web/index.html'), 'utf8');
 check(index.includes(SHIPPED),
   'the home page ships a readable sentence, so no JavaScript means vague rather than blank');
-check(/data-opens/.test(index), 'the countdown has something to attach to');
+check(/data-opens\b/.test(index), 'the countdown has something to attach to');
+/* The one that would be embarrassing: a countdown whose numbers are typed
+   into the HTML is wrong for everybody whose JavaScript did not arrive, and
+   it looks completely fine while it is wrong. */
+check(/<b data-cd="d">--<\/b>/.test(index) && !/<b data-cd="d">\d/.test(index),
+  'the clock ships with no numbers in it, so only the script that knows the date can fill it');
+check(/class="clock"[^>]*\shidden\b/.test(index),
+  'the clock ships hidden, so a browser with no JavaScript never shows an empty one');
+['d', 'h', 'm', 's'].forEach(k => check(index.includes('data-cd="' + k + '"'),
+  'the clock has a ' + k + ' segment to fill'));
 
-/* ---- the clock gets finer as it closes ----
-   Asserted as the WHOLE sentence, never as a pattern somewhere inside it. An
-   earlier version checked /in 44 days/ and !/\d\d:\d\d/, and a mutant that
-   appended an hours clock survived, because at a single digit hour "3:00"
-   does not match \d\d:\d\d. A check that looks at part of a string passes for
-   every string that happens to contain that part.
+/* ---- what the four segments read, at exact distances from launch ----
+   Asserted as all four together, never as one number or a pattern inside a
+   string. An earlier version of this gate checked /in 44 days/ and a mutant
+   that appended an hours clock survived, because a check that looks at part
+   of a string passes for every string containing that part.
 
-   These go through `ms`, so the bands are tested at the second rather than at
-   whatever today happens to be. The launch morning is not something you can
-   wait for twice. */
-const STATIC = 'Opening in November.';
+   These go through a frozen clock, so the last minute before launch is tested
+   at the second rather than waited for. */
 const SEC = 1000, MIN = 60 * SEC, HOUR = 60 * MIN, DAY = 24 * HOUR;
 
-const BANDS = [
-  [44 * DAY,                  'Opening in 44 days, in November.',      'six weeks out: days, and the month for context'],
-  [3 * DAY,                   'Opening in 3 days, in November.',       'three days out: still days'],
-  [2 * DAY,                   'Opening in 2 days, in November.',       'exactly two days: the last moment it says days'],
-  [2 * DAY - 1 * SEC,         'Opening in 47 hours.',                  'a second under two days: it switches to hours'],
-  [30 * HOUR,                 'Opening in 30 hours.',                  'thirty hours out: hours'],
-  [24 * HOUR,                 'Opening in 24 hours.',                  'exactly a day: hours'],
-  [24 * HOUR - 1 * SEC,       'Opening in 23 hours 59 minutes.',       'a second under a day: minutes appear'],
-  [5 * HOUR + 12 * MIN,       'Opening in 5 hours 12 minutes.',        'the last day: hours and minutes'],
-  [1 * HOUR,                  'Opening in 1 hour 0 minutes.',          'exactly an hour, and "1 hour" is not "1 hours"'],
-  [1 * HOUR - 1 * SEC,        'Opening in 59 minutes 59 seconds.',     'a second under an hour: the seconds appear'],
-  [14 * MIN + 32 * SEC,       'Opening in 14 minutes 32 seconds.',     'the last hour: minutes and seconds'],
-  [1 * MIN + 1 * SEC,         'Opening in 1 minute 1 second.',         'singulars are singular, both of them'],
-  [60 * SEC,                  'Opening in 1 minute 0 seconds.',        'exactly a minute'],
-  [59 * SEC,                  'Opening in 59 seconds.',                'the last minute: seconds alone'],
-  [1 * SEC,                   'Opening in 1 second.',                  'the last second, singular'],
+const AT = [
+  [43 * DAY + 20 * HOUR + 14 * MIN + 8 * SEC, '43:20:14:08', 'six weeks out, all four segments'],
+  [100 * DAY,                                 '100:00:00:00', 'three digit days are three digits, not truncated'],
+  [2 * DAY,                                   '02:00:00:00', 'exactly two days'],
+  [2 * DAY - 1 * SEC,                         '01:23:59:59', 'a second under two days rolls every segment at once'],
+  [1 * DAY,                                   '01:00:00:00', 'exactly one day'],
+  [1 * DAY - 1 * SEC,                         '00:23:59:59', 'a second under a day: days fall to zero, hours do not'],
+  [5 * HOUR + 12 * MIN,                       '00:05:12:00', 'the last day'],
+  [1 * HOUR,                                  '00:01:00:00', 'exactly an hour'],
+  [1 * HOUR - 1 * SEC,                        '00:00:59:59', 'a second under an hour'],
+  [14 * MIN + 32 * SEC,                       '00:00:14:32', 'the last hour'],
+  [60 * SEC,                                  '00:00:01:00', 'exactly a minute'],
+  [59 * SEC,                                  '00:00:00:59', 'the last minute'],
+  [1 * SEC,                                   '00:00:00:01', 'the last second'],
 ];
-BANDS.forEach(b => {
-  const got = text(b[0]);
-  check(got === b[1], b[2] + ' — expected "' + b[1] + '", got "' + got + '"');
+AT.forEach(t => {
+  const got = reads(t[0]);
+  check(got === t[1], t[2] + ' — expected ' + t[1] + ', got ' + got);
 });
+
+/* every segment is padded to two, so the row does not change width as the
+   numbers shrink and the digits do not jump about */
+check(/^\d\d:\d\d:\d\d:\d\d$/.test(reads(5 * DAY)), 'every segment is padded to at least two digits');
+
+/* ---- revealing it ---- */
+let r = standingAt(10 * DAY);
+check(!r.hidden, 'once it has real numbers the clock is revealed');
+check(!r.lineRemoved, 'the sentence stays in the page for anything reading it aloud');
+check(r.lineHidden, 'the sentence is hidden visually, so it is not shown twice');
 
 /* ---- THE MOMENT IT MATTERS ---- */
-/* The live path, on the real clock rather than a frozen one. The number is
-   worked out here the same way the code does rather than typed in, because
-   "44 days away" in calendar terms is 43 days and some hours in real ones,
-   and the clock floors everywhere. Flooring is what keeps the bands
-   consistent: 47 hours, 59 minutes, 1 second all floor too, and a countdown
-   that rounds up is a countdown that overstates the time you have left. */
+check(standingAt(0).removed, 'at zero the clock is gone, not sitting at 00:00:00:00');
+check(standingAt(0).lineRemoved, 'and its sentence goes with it');
+check(standingAt(-1 * SEC).removed, 'one second past, it is gone');
+
+const day0 = run(day(0));
+check(day0.removed, 'ON the launch day the clock removes itself');
+check(run(day(-1)).removed, 'the day after, it is gone rather than counting backwards');
+check(run(day(-400)).removed, 'a launch date left behind for a year does not resurface');
+
+/* ---- the live path, on the real clock ----
+   Worked out here the same way the code does rather than typed in. "44 days
+   away" in calendar terms is 43 days and some hours in real ones, because
+   every segment floors. Flooring is what keeps the four consistent with each
+   other, and a countdown that rounds up overstates the time you have left. */
 const liveAt = Date.parse(day(44) + 'T00:00:00Z');
-const liveDays = Math.floor((liveAt - Date.now()) / 86400000);
-let r = run(day(44));
-check(!r.removed && r.text === 'Opening in ' + liveDays + ' days, in November.',
-  'the live path on the real clock paints what the band function would (' + r.text + ')');
+const ms = liveAt - Date.now();
+const p = { d: Math.floor(ms / DAY), h: Math.floor(ms % DAY / HOUR), m: Math.floor(ms % HOUR / MIN) };
+const live = run(day(44));
+check(!live.removed && !live.hidden, 'the live path fills and reveals the clock');
+check(live.read.indexOf(String(p.d).padStart(2, '0') + ':' + String(p.h).padStart(2, '0') + ':' + String(p.m).padStart(2, '0')) === 0,
+  'the live path on the real clock reads what the parts function would (' + live.read + ')');
 
-check(text(0) === null, 'at zero the clock is gone, not reading "in 0 seconds"');
-check(text(-1 * SEC) === null, 'one second past, it is gone');
-
-r = run(day(0));
-check(r.removed, 'ON the launch day the sentence removes itself');
-
-r = run(day(-1));
-check(r.removed, 'the day after, it is gone rather than counting backwards');
-
-r = run(day(-400));
-check(r.removed, 'a launch date left behind for a year does not resurface as a negative number');
-
-/* ---- it has to keep saying it ----
-   A clock that paints once and stops is a screenshot. */
-check(schedules(44 * DAY) > 0, 'far out, it schedules itself to say it again');
-check(schedules(30 * SEC) > 0, 'in the last minute, it schedules itself to say it again');
-check(schedules(30 * SEC) <= 1000,
-  'in the last minute it repaints at least every second (' + schedules(30 * SEC) + 'ms)');
-/* `>= 1000` was here first and a mutant that returned a flat 1000 survived it,
-   because 1000 >= 1000. A bound that the thing you are forbidding satisfies is
-   not a bound. Nothing on screen moves faster than once a day out here, so a
-   repaint should be at least a minute apart. */
-check(schedules(44 * DAY) >= 60000,
-  'six weeks out it waits at least a minute, rather than ticking every second for nothing ('
-  + schedules(44 * DAY) + 'ms)');
+/* ---- it has to keep ticking ----
+   A clock that paints once and stops is a screenshot of a clock. */
+check(schedules(44 * DAY) > 0, 'far out, it schedules itself to tick again');
+check(schedules(30 * SEC) > 0, 'in the last minute, it schedules itself to tick again');
+check(schedules(44 * DAY) <= 1000 && schedules(30 * SEC) <= 1000,
+  'it ticks at least once a second, because seconds are on the screen ('
+  + schedules(44 * DAY) + 'ms / ' + schedules(30 * SEC) + 'ms)');
 
 /* ---- a wrong date must make it quiet, not wrong ----
-   Exact match again, and for the same reason. /in November\.$/ passed happily
-   on "Opening to new businesses in NaN days, in November." because that also
-   ends in November. A dropped isNaN guard survived the first version of this
-   check while printing NaN on the home page. */
+   Whole-string assertions, because /in November\.$/ once passed happily on
+   "in NaN days, in November." A dropped isNaN guard survived that check while
+   printing NaN on the home page. */
 ['the first of never', '', 'November-ish', '2026-13-45'].forEach(bad => {
   const out = run(bad);
-  check(!out.removed && out.text === STATIC,
-    'an unusable date (' + JSON.stringify(bad) + ') leaves the static sentence untouched (' + out.text + ')');
-});
-/* said separately, because "no NaN on the page" is the thing a reader cares
-   about and it should fail by that name rather than as a string mismatch */
-['the first of never', '2026-13-45'].forEach(bad => {
-  const out = run(bad);
-  check(!/NaN|undefined|Invalid/.test(out.text),
+  check(out.hidden && !out.removed && out.lineText === STATIC,
+    'an unusable date (' + JSON.stringify(bad) + ') leaves the clock hidden and the sentence untouched ('
+    + out.lineText + ')');
+  check(!/NaN|undefined|Invalid/.test(out.read + out.lineText),
     'an unusable date (' + JSON.stringify(bad) + ') never prints NaN at a visitor');
+  check(out.delays.length === 0,
+    'an unusable date (' + JSON.stringify(bad) + ') starts no timer');
 });
 
 /* ---- the date lives in one place ---- */
