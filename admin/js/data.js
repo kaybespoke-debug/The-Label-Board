@@ -91,10 +91,10 @@ function initials(s) {
    businesses.plan; the names are what the customer is sold. seats: 0 means
    unlimited — Pro no longer counts people. */
 const PLANS = [
-  { id: 'starter', name: 'Basic', monthly: 27000, annual: 270000, seats: 3, live: true,
+  { id: 'starter', name: 'Basic', monthly: 27000, annual: 297000, seats: 3, live: true,
     features: ['1 studio', '3 team seats', 'Orders, production & client records',
                'Invoices, and who owes what', 'Basic finance (money in, money out)'] },
-  { id: 'pro', name: 'Pro', monthly: 65000, annual: 650000, seats: 0, live: true,
+  { id: 'pro', name: 'Pro', monthly: 65000, annual: 715000, seats: 0, live: true,
     features: ['3 studios, each scoped & reported separately', 'Unlimited team seats & roles',
                'Receivables & the chase list, with one-tap reminders', 'Full finance & reporting lines',
                'Fitting & measurement history', 'Onboarding, migration & priority support'] },

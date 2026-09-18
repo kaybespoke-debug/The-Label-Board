@@ -271,7 +271,7 @@
       if (amount == null) return;
       var amt = el.querySelector('[data-monthly]');
       var sym = el.querySelector('.cur');
-      if (amt) amt.textContent = group(annual ? amount * 10 : amount);
+      if (amt) amt.textContent = group(annual ? amount * 11 : amount);
       if (sym) sym.textContent = c.symbol;
     });
     $$('[data-per]').forEach(function (el) {

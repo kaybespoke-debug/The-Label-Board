@@ -60,9 +60,29 @@
       </span>
     </a>
 
+    <!-- Products is a dropdown rather than a tenth row of buttons on the page
+         it leads to. It opens on hover and on keyboard focus, in CSS, with no
+         script: the nav does not exist below 1000px, so this is never on a
+         touch screen where a hover would stick open after a tap. -->
     <nav class="hdr-nav" aria-label="Main">
-      <a href="features.html">Features</a>
+      <a href="index.html">Home</a>
+      <span class="nav-drop">
+        <a href="features.html" aria-haspopup="true">Products<svg class="caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></a>
+        <span class="nav-menu">
+          <a href="features.html#orders">Orders and customers</a>
+          <a href="features.html#calendar">Calendar and fittings</a>
+          <a href="features.html#production">Production</a>
+          <a href="features.html#inventory">Stock and suppliers</a>
+          <a href="features.html#delivery">Delivery and dispatch</a>
+          <a href="features.html#money">Money and books</a>
+          <a href="features.html#team">Team and branches</a>
+          <a href="features.html#marketing">Repeat business</a>
+          <a href="features.html#records">Records and control</a>
+          <a href="features.html#offline">Phone and offline</a>
+        </span>
+      </span>
       <a href="pricing.html">Pricing</a>
+      <a href="partners.html">Partners</a>
       <a href="about.html">Our story</a>
       <a href="contact.html">Support</a>
     </nav>
@@ -76,11 +96,12 @@
 </header>
 
 <div class="drawer" id="drawer">
-  <a href="features.html">Features</a>
+  <a href="index.html">Home</a>
+  <a href="features.html">Products</a>
   <a href="pricing.html">Pricing</a>
+  <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
   <a href="contact.html">Support and contact</a>
-  <a href="partners.html">Partners</a>
   <a class="btn btn-gold" href="book.html">Book a demo</a>
   <a class="btn btn-line" data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a>
 </div>
@@ -97,7 +118,7 @@
         <button type="button" data-cycle="monthly" class="on" aria-pressed="true">Monthly</button>
         <button type="button" data-cycle="annual" aria-pressed="false">Yearly</button>
       </span>
-      <span class="save-note">Two months free on yearly</span>
+      <span class="save-note">One month free on yearly</span>
       <span id="ccy-slot" class="ccy-slot"></span>
     </div>
   </div>
@@ -110,8 +131,8 @@
       <div class="plan">
         <h3>Basic</h3>
         <p class="who">Get your studio in order. One studio, two or three of you. The solo designer or the new brand leaving spreadsheets behind.</p>
-        <div class="price" data-plan="starter"><span class="cur">₦</span><span class="amt num" data-monthly="27,000" data-annual="270,000">27,000</span><span class="per" data-per>per month</span></div>
-        <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, two months free">Billed monthly, cancel any time</p>
+        <div class="price" data-plan="starter"><span class="cur">₦</span><span class="amt num" data-monthly="27,000" data-annual="297,000">27,000</span><span class="per" data-per>per month</span></div>
+        <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, one month free">Billed monthly, cancel any time</p>
         <a class="btn btn-line btn-wide" href="book.html"><span>Book a demo</span></a>
         <ul class="plan-feats">
           <li class="hd">The essentials</li>
@@ -126,15 +147,14 @@
           <li class="no">A second studio</li>
           <li class="no">Payroll, rota and leave</li>
         </ul>
-        <p class="note">The honest sting: you can see what you are owed and invoice for it, but not chase it. Enough to run a small operation. The day you are chasing unpaid balances or your team grows, you feel the ceiling.</p>
       </div>
 
       <div class="plan feat">
         <span class="plan-tag">Most chosen</span>
         <h3>Pro</h3>
         <p class="who">Run the entire business. Everything, with no feature held back, and as many people as you employ.</p>
-        <div class="price" data-plan="pro"><span class="cur">₦</span><span class="amt num" data-monthly="65,000" data-annual="650,000">65,000</span><span class="per" data-per>per month</span></div>
-        <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, two months free">Billed monthly, cancel any time</p>
+        <div class="price" data-plan="pro"><span class="cur">₦</span><span class="amt num" data-monthly="65,000" data-annual="715,000">65,000</span><span class="per" data-per>per month</span></div>
+        <p class="price-note" data-note-monthly="Billed monthly, cancel any time" data-note-annual="Billed yearly, one month free">Billed monthly, cancel any time</p>
         <a class="btn btn-gold btn-wide" href="book.html"><span>Book a demo</span></a>
         <ul class="plan-feats">
           <li class="hd">Everything in Basic, and</li>
@@ -147,7 +167,6 @@
           <li>200GB for photos and documents</li>
           <li>Onboarding, data migration and priority support</li>
         </ul>
-        <p class="note">Basic shows you who owes you and lets you invoice them. Pro chases them down and collects, and runs your whole team, every studio and your real numbers.</p>
       </div>
 
       <div class="plan">
@@ -183,13 +202,13 @@
 
     <div class="callout callout-row" style="margin-top:26px">
       <div>
-        <h4>None of these three fit?</h4>
-        <p>A group of shops under one owner, an association buying for its members, or a business that needs something built around it. Tell us what you need and we will agree what is in it, what it costs and how you are invoiced.</p>
+        <h4>Neither of the two fit?</h4>
+        <p>That is what Bespoke is for. A group of shops under one owner, an association buying for its members, or a business that needs something built around it. Tell us what you need and we will agree what is in it, what it costs and how you are invoiced.</p>
       </div>
       <a class="btn btn-line" href="book.html">Tell us what you need</a>
     </div>
 
-    <p class="note center" style="margin-top:18px">Prices exclude VAT where it applies. Yearly is ten months for twelve. Bespoke is agreed and invoiced per business.</p>
+    <p class="note center" style="margin-top:18px">Prices exclude VAT where it applies. Yearly is eleven months for twelve. Bespoke is agreed and invoiced per business.</p>
   </div>
 </section>
 
@@ -198,7 +217,7 @@
     <div class="strip-in">
       <div class="strip-cell"><div class="v num">0%</div><div class="k">taken from what you sell, on every plan</div></div>
       <div class="strip-cell"><div class="v num">Unlimited</div><div class="k">orders, customers and invoices</div></div>
-      <div class="strip-cell"><div class="v num">2</div><div class="k">months free when you pay for the year</div></div>
+      <div class="strip-cell"><div class="v num">1</div><div class="k">month free when you pay for the year</div></div>
       <div class="strip-cell"><div class="v num">100%</div><div class="k">of your data exportable, any day you ask</div></div>
     </div>
   </div>

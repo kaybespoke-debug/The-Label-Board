@@ -228,7 +228,7 @@ plans.forEach(pl => {
       'pricing.html prints the ' + pl.name + ' monthly price the console bills (' + naira(pl.monthly) + ')');
     check(html['pricing.html'].includes('data-annual="' + naira(pl.annual) + '"'),
       'pricing.html prints the ' + pl.name + ' yearly price the console bills (' + naira(pl.annual) + ')');
-    check(pl.annual === pl.monthly * 10, pl.name + ' yearly really is ten months for twelve');
+    check(pl.annual === pl.monthly * 11, pl.name + ' yearly really is eleven months for twelve');
     check(html['pricing.html'].includes('data-plan="' + pl.id + '"'),
       pl.name + ' is not wired to the currency table, so it never changes currency');
   }
@@ -899,9 +899,18 @@ prPlans.forEach((block, i) => {
   }
 });
 
-/* the fourth offer is a band, not a fourth column: it has no price and no self
-   serve sign up, so in the grid it would look like the top of a ladder */
-check(html['pricing.html'].indexOf('None of these three fit?') !== -1, 'there is somewhere to go when no plan fits');
+/* The band under the three columns. It has no price and no self serve sign up,
+   so in the grid it would look like the top of a ladder.
+
+   It used to ask "None of these three fit?", which counted Bespoke among the
+   three and then offered Bespoke as the answer. Kayode's correction on 18 Sep:
+   it is the two priced plans that might not fit, and Bespoke is what you take
+   when neither does. Checked on the invitation rather than the wording, so a
+   rewrite does not fail this and a deletion still does. */
+check(/href="book\.html"[^>]*>Tell us what you need</.test(html['pricing.html']),
+  'there is somewhere to go when neither priced plan fits');
+check(!/None of these three/.test(html['pricing.html']),
+  'the band does not count Bespoke among the plans it is the answer to');
 check(html['pricing.html'].indexOf('callout-row') !== -1, 'the fourth offer is a band rather than a priced column');
 
 /* ---------- we only offer what a shop can actually choose ----------

@@ -44,9 +44,29 @@
       </span>
     </a>
 
+    <!-- Products is a dropdown rather than a tenth row of buttons on the page
+         it leads to. It opens on hover and on keyboard focus, in CSS, with no
+         script: the nav does not exist below 1000px, so this is never on a
+         touch screen where a hover would stick open after a tap. -->
     <nav class="hdr-nav" aria-label="Main">
-      <a href="features.html">Features</a>
+      <a href="index.html">Home</a>
+      <span class="nav-drop">
+        <a href="features.html" aria-haspopup="true">Products<svg class="caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></a>
+        <span class="nav-menu">
+          <a href="features.html#orders">Orders and customers</a>
+          <a href="features.html#calendar">Calendar and fittings</a>
+          <a href="features.html#production">Production</a>
+          <a href="features.html#inventory">Stock and suppliers</a>
+          <a href="features.html#delivery">Delivery and dispatch</a>
+          <a href="features.html#money">Money and books</a>
+          <a href="features.html#team">Team and branches</a>
+          <a href="features.html#marketing">Repeat business</a>
+          <a href="features.html#records">Records and control</a>
+          <a href="features.html#offline">Phone and offline</a>
+        </span>
+      </span>
       <a href="pricing.html">Pricing</a>
+      <a href="partners.html">Partners</a>
       <a href="about.html">Our story</a>
       <a href="contact.html">Support</a>
     </nav>
@@ -60,11 +80,12 @@
 </header>
 
 <div class="drawer" id="drawer">
-  <a href="features.html">Features</a>
+  <a href="index.html">Home</a>
+  <a href="features.html">Products</a>
   <a href="pricing.html">Pricing</a>
+  <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
   <a href="contact.html">Support and contact</a>
-  <a href="partners.html">Partners</a>
   <a class="btn btn-gold" href="book.html">Book a demo</a>
   <a class="btn btn-line" data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a>
 </div>
@@ -85,7 +106,7 @@
 
     <a class="backlink" href="index.html#product" data-back>Back to the overview</a>
 
-    <div class="tabs" role="tablist" aria-label="Areas of the product">
+    <div class="tabs features-tabs" role="tablist" aria-label="Areas of the product">
       <button class="tab on" type="button" data-group="feat" data-tab="orders" role="tab" aria-selected="true">Orders and customers</button>
       <button class="tab" type="button" data-group="feat" data-tab="calendar" role="tab" aria-selected="false">Calendar and fittings</button>
       <button class="tab" type="button" data-group="feat" data-tab="production" role="tab" aria-selected="false">Production</button>

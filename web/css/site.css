@@ -920,3 +920,86 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
     cursor:pointer;transition:border-color .16s ease,color .16s ease}
   .plan-more:hover{border-color:var(--gold);color:var(--gold)}
 }
+
+/* ---------- the Products dropdown ----------
+   Ten feature areas used to be a row of ten buttons on the page itself, which
+   made the page look like a control panel before anybody had read a word. They
+   are in the header now.
+
+   Opened by :hover and :focus-within, in CSS, with no script. That is only
+   safe because .hdr-nav is display:none below 1000px: on a touch screen a
+   :hover sticks after a tap and the menu would hang open. Below that width the
+   drawer has a plain Products link instead.
+
+   The trigger is still a real link to features.html, so a keyboard, a search
+   engine and a browser with no CSS all get somewhere useful. */
+.nav-drop{position:relative;display:inline-flex}
+.nav-drop>a{display:inline-flex;align-items:center;gap:6px;position:relative;
+  font-size:14px;font-weight:500;color:var(--dim);padding:9px 13px;border-radius:6px;
+  transition:.16s}
+.nav-drop>a:hover,.nav-drop:focus-within>a{color:var(--text);background:var(--panel)}
+.nav-drop>a.on{color:var(--text)}
+.nav-drop>a.on::after{content:"";position:absolute;left:13px;right:13px;bottom:3px;
+  height:2px;border-radius:2px;background:var(--gold)}
+.nav-drop .caret{width:9px;height:6px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:transform .16s ease}
+.nav-drop:hover .caret,.nav-drop:focus-within .caret{transform:rotate(180deg)}
+
+.nav-menu{position:absolute;top:100%;left:50%;transform:translateX(-50%) translateY(4px);
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;
+  min-width:460px;padding:7px;border-radius:var(--r);
+  background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .14s ease,transform .14s ease}
+.nav-drop:hover .nav-menu,.nav-drop:focus-within .nav-menu{
+  opacity:1;visibility:visible;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+.nav-menu a{display:block;padding:9px 11px;border-radius:7px;font-size:13.5px;
+  color:var(--dim);white-space:nowrap}
+.nav-menu a:hover{background:var(--panel-2);color:var(--text)}
+/* the gap between the trigger and the panel would drop the hover on the way
+   down, so the panel reaches up behind it */
+.nav-menu::before{content:"";position:absolute;left:0;right:0;top:-8px;height:8px}
+
+/* ---------- the hero: text higher, screenshot smaller ----------
+   Two things were wrong with the balance.
+
+   The grid was 1fr 1.02fr, so the screenshot column was WIDER than the words.
+   The product picture was winning an argument with the headline, on the one
+   screen where the headline has to win.
+
+   And both columns were vertically centred, which floated the text block down
+   into the middle of a 600px hero. The words now start at the top and the
+   screenshot stays centred against them, so the headline is the first thing at
+   eye level rather than the thing under the fold of the picture. */
+/* SCOPED TO THE TWO COLUMN WIDTHS. Written unscoped first, and because this
+   file is cascade-ordered it beat the single column rule at line 531, so on a
+   phone the hero stayed a 1.15/0.85 grid: the headline was squeezed into a
+   third of a 390px screen, one word per line, with the screenshot shrunk into
+   the gap beside it. A later rule wins, including on the screens you were not
+   thinking about. */
+@media (min-width:981px){
+  .hero-grid{grid-template-columns:1.15fr 0.85fr}
+  .hero-grid>div:first-child{align-self:start}
+}
+/* a ceiling as well as a share of the grid, so it stops growing on a wide
+   screen where 0.85fr of 1680px is still enormous */
+.hero .device{max-width:760px;margin-left:auto}
+@media (max-width:980px){
+  /* stacked, so the share of a row means nothing and the cap is what matters */
+  .hero-grid>div:first-child{align-self:auto}
+  .hero .device{max-width:none;margin-left:0}
+}
+
+/* ---------- the product tab row ----------
+   Ten tabs left aligned wrapped into two ragged rows with a long gap at the
+   end of the second, which read as a control panel rather than a choice. The
+   same ten are in the header's Products menu now, so this row is a second way
+   in rather than the only one, and it can afford to be quieter: centred, so
+   whatever falls onto a second line is centred under the first, and tighter,
+   so ten of them do not sprawl. */
+.features-tabs{justify-content:center;gap:5px;margin-bottom:16px}
+.features-tabs .tab{font-size:12.5px;padding:8px 13px}
+@media (max-width:680px){
+  /* on a phone this is already a single swipeable row, so centring it would
+     just move the first tab off the left edge where the thumb starts */
+  .features-tabs{justify-content:flex-start}
+}
