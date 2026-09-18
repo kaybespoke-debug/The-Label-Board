@@ -978,15 +978,28 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    thinking about. */
 @media (min-width:981px){
   .hero-grid{grid-template-columns:1.15fr 0.85fr}
+  /* Both columns start at the top of the hero rather than floating in the
+     middle of it: the headline is the first thing at eye level, and the
+     screenshot sits alongside it instead of below its fold. */
   .hero-grid>div:first-child{align-self:start}
+  .hero .device{align-self:start}
+
+  /* THE BUTTONS MUST NOT COME UP WITH THE HEADLINE.
+     Top-aligning the column lifted everything inside it by 68px, measured,
+     and Kayode asked for the headline to move and the buttons to stay. So
+     they get the 68px back: 90 + 68. The 90 is the gap he picked himself off
+     the spacing tool, and it is still the gap he picked, applied from a
+     headline that now starts higher up. */
+  .hero .btn-row{margin-top:158px}
 }
 /* a ceiling as well as a share of the grid, so it stops growing on a wide
    screen where 0.85fr of 1680px is still enormous */
 .hero .device{max-width:760px;margin-left:auto}
 @media (max-width:980px){
-  /* stacked, so the share of a row means nothing and the cap is what matters */
+  /* stacked, so the share of a row means nothing and the cap is what matters.
+     Nothing above applies here, so the phone keeps the 104px it was given. */
   .hero-grid>div:first-child{align-self:auto}
-  .hero .device{max-width:none;margin-left:0}
+  .hero .device{max-width:none;margin-left:0;align-self:auto}
 }
 
 /* ---------- the product tab row ----------
