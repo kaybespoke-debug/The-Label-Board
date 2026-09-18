@@ -868,23 +868,20 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 
 
 /* ---------- air in the hero ----------
-   The lede used to sit between the headline and the buttons and was worth
-   about 110px of vertical space. Moving it down to the trades section took
-   that with it and left the headline, the two buttons and the waiting list
-   row stacked 26px and 18px apart: three separate things reading as one
-   crowded block.
+   Kayode's numbers, off the spacing tool, at 1280 and at 390.
 
-   The first attempt at this went to 58px and 32px and still read as crowded,
-   which is the lesson here: the gap after a display headline has to be
-   measured against the headline, not against a number that sounds generous.
-   At 1280 that h1 is three lines of 68px, about 220px of type. Against a
-   block that size, 58px of space underneath it is a quarter of its height
-   and the eye reads the two as touching.
+   The shape of it is the part worth keeping: the buttons, the waiting list
+   and the clock are ONE group, and all the air goes above them. I had it
+   backwards twice, putting space between the buttons and the waiting list to
+   separate them, which is what made it read as three crowded things instead
+   of two calm ones.
 
-   Scoped to .hero deliberately. Every other .btn-row on the site sits under a
-   paragraph that is still there and does not need any of this. */
+   The phone wants MORE than the laptop, not less, which is why this is not a
+   clamp. A clamp only scales up with the viewport. On a phone the hero is a
+   tall single column and the headline needs more room under it, not less. */
 .hero .eyebrow{margin-bottom:clamp(16px,2vw,24px)}
-.hero .btn-row{margin-top:clamp(36px,7vw,88px)}
-/* the waiting list and the clock are a different kind of thing from the two
-   buttons above them, and the gap is what says so */
-.hero .opens-row{margin-top:clamp(26px,3.6vw,46px)}
+.hero .btn-row{margin-top:104px}
+.hero .opens-row{margin-top:8px}
+@media (min-width:900px){
+  .hero .btn-row{margin-top:90px}
+}
