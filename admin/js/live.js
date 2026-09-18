@@ -445,7 +445,13 @@ function liveToSubscriber(row) {
     paymentsCount: 0,
     trialEndsOn: null,
     lastSeen: String(row.last_active_at || '').slice(0, 10),
-    ordersLast30: null,
+    /* A lifetime order count only ever goes up, so it cannot tell you that a
+       tester stopped on day nine. platform_tenant_summary counts the last
+       thirty days as well, which is the number that can fall. */
+    ordersLast30: row.orders_30d === undefined || row.orders_30d === null
+      ? null : Number(row.orders_30d),
+    /* Which intake they came in with, or empty for a normal signup. */
+    cohort: row.cohort || '',
     notes: []
   };
 }
@@ -657,10 +663,61 @@ async function liveInviteOperator(email, name, role) {
   return await liveCall('inviteOperator', { email: email, name: name, role: role });
 }
 
-async function liveInviteStudio(email, businessName, enquiryId) {
+/* `cohort` is which intake the studio is coming in with, e.g. october-2026 for
+   an early access tester. Empty for a normal invitation. It is set at the
+   gateway and nowhere else, so a studio invited straight from here and one
+   accepted from a website enquiry both land in the same column and the count
+   of places taken is one query rather than two lists kept in step by hand. */
+async function liveInviteStudio(email, businessName, enquiryId, cohort) {
   return await liveCall('inviteStudio', {
-    email: email, businessName: businessName, enquiryId: enquiryId || ''
+    email: email, businessName: businessName, enquiryId: enquiryId || '',
+    cohort: cohort || ''
   });
+}
+
+/* The cohort is a date, so it cannot be a constant that goes stale: October
+   2026 is the first one and there will be others. Kept here rather than in
+   each caller so the console never has two spellings of the same intake. */
+var COHORT = { key: 'october-2026', label: 'October early access', places: 8 };
+
+/* How many places are gone. Counted from the studios themselves rather than
+   from the enquiry list, because most of the first group are invited directly
+   and never fill in a form. Everything the console shows about this number
+   reads it from here. */
+function cohortTaken(key) {
+  return (DB.subscribers || []).filter(function (s) { return s.cohort === (key || COHORT.key); }).length;
+}
+function cohortLeft(key) {
+  return Math.max(0, COHORT.places - cohortTaken(key));
+}
+
+/* Invite a studio Kayode already knows straight into the cohort, with no
+   enquiry behind it. This is the primary path for October: recruiting takes
+   longer than building a form, and the studios worth having are ones he can
+   name today. */
+async function inviteIntoCohort() {
+  if (!LIVE.on()) { toast('Not connected to the live site.'); return; }
+  if (cohortLeft() <= 0) {
+    toast('All ' + COHORT.places + ' places are taken. Raise the number in COHORT first if that is deliberate.');
+    return;
+  }
+  var named = (prompt('Studio name\n\nWhat the business is called.') || '').trim();
+  if (!named) return;
+  var email = (prompt('Owner email for ' + named + '\n\nThe invitation goes here. They set their own password.') || '')
+    .trim().toLowerCase();
+  if (!email) return;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('That does not look like an email address.'); return; }
+  if (!confirm('Invite ' + named + ' into ' + COHORT.label + '?\n\n'
+    + 'This takes place ' + (cohortTaken() + 1) + ' of ' + COHORT.places + ' and emails '
+    + email + ' an invitation.')) return;
+  try {
+    await liveInviteStudio(email, named, '', COHORT.key);
+    await liveLoadTenants();
+    toast('Invitation sent to ' + email);
+    render();
+  } catch (err) {
+    toast(String(err.message || err));
+  }
 }
 
 async function liveInvitePartner(email, name, code, tier, enquiryId) {
@@ -693,13 +750,30 @@ async function approveEnquiry(id) {
     if (!code) return;
   }
 
+  /* An early access enquiry accepted from here takes one of the places, so it
+     is the same act as inviting somebody directly and goes in with the same
+     cohort. The cap is checked before the confirm rather than after it, so
+     nobody is asked to agree to something that is about to be refused. */
+  var intoCohort = e.kind === 'earlyaccess';
+  if (intoCohort && cohortLeft() <= 0) {
+    toast('All ' + COHORT.places + ' places are taken. Move them to the November list instead.');
+    return;
+  }
+
   if (!confirm('Create a ' + what + ' account for ' + named + ' and email an invitation to '
-    + e.email + '?\n\nThey set their own password. Nothing is sent to you.')) return;
+    + e.email + '?'
+    + (intoCohort ? '\n\nThis takes place ' + (cohortTaken() + 1) + ' of ' + COHORT.places
+        + ' in ' + COHORT.label + '.' : '')
+    + '\n\nThey set their own password. Nothing is sent to you.')) return;
 
   try {
     if (isPartner) await liveInvitePartner(e.email, named, code, 'bronze', e.id);
-    else await liveInviteStudio(e.email, named, e.id);
+    else await liveInviteStudio(e.email, named, e.id, intoCohort ? COHORT.key : '');
     await liveLoadEnquiries();
+    /* The places-left figure is counted from the studios, so it does not move
+       until the tenant list is read again. Without this the operator accepts
+       somebody and the counter beside them still says the old number. */
+    if (intoCohort) await liveLoadTenants();
     toast('Invitation sent to ' + e.email);
     render();
   } catch (err) {

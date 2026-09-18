@@ -25,7 +25,7 @@ const check = (cond, msg) => (cond ? ok : fail).push(msg);
 
 const PAGES = ['index.html', 'features.html', 'pricing.html', 'book.html',
   'partners.html', 'referrals.html', 'about.html', 'contact.html',
-  'privacy.html', 'terms.html', 'thanks.html', '404.html'];
+  'waitlist.html', 'privacy.html', 'terms.html', '404.html', 'thanks.html'];
 /* the pages search engines should be offered, which is everything except the
    two that only exist as a destination */
 const INDEXABLE = PAGES.filter(p => p !== 'thanks.html' && p !== '404.html');
@@ -149,7 +149,7 @@ built.forEach(p => {
     check(html[p].includes('href="privacy.html"'), p + ' form "' + name + '" points at the privacy notice');
   });
 });
-check(forms.length === 4, 'there are four forms, one each for the booking, partners, referrals and contact');
+check(forms.length === 5, 'there are five forms: booking, partners, referrals, contact and the waiting list');
 check(new Set(forms.map(f => f.name)).size === forms.length, 'no two forms share a name, which would merge their submissions');
 
 /* every field a person types into has a label tied to it */

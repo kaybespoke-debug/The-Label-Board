@@ -116,6 +116,62 @@ PAGES.dashboard = function () {
     '</tbody></table></div></div>';
 };
 
+/* The studios testing the app for us, and whether they are actually using it.
+   ---------------------------------------------------------------------------
+   This is the whole reason for running a cohort. A tester who stops on day
+   nine is the most valuable conversation of the month and is never the one who
+   gets in touch: they work around whatever broke, get quietly annoyed, and
+   tell you at the end that it was "fine".
+
+   So the list is sorted with the quiet ones first. Everywhere else in the
+   console the healthy end of a list is the top; here it would bury the only
+   rows worth acting on.
+
+   Both numbers come from platform_tenant_summary. `orders_30d` can fall, which
+   is what makes it worth having — the lifetime count beside it only ever goes
+   up and so can never show somebody stopping. */
+function cohortDays(lastSeen) {
+  if (!lastSeen) return null;
+  const then = Date.parse(lastSeen + 'T00:00:00Z');
+  if (isNaN(then)) return null;
+  return Math.max(0, Math.floor((Date.now() - then) / 86400000));
+}
+function cohortHealth(s) {
+  const d = cohortDays(s.lastSeen);
+  if (d === null) return { k: 'never', t: 'Never opened it', tone: 'red', rank: 0 };
+  if (d >= 7) return { k: 'quiet', t: 'Quiet ' + d + ' days', tone: 'red', rank: 1 };
+  if (d >= 3) return { k: 'slowing', t: 'Quiet ' + d + ' days', tone: 'amber', rank: 2 };
+  return { k: 'working', t: d <= 1 ? 'Today' : d + ' days ago', tone: 'green', rank: 3 };
+}
+function cohortPanel(rows) {
+  const label = (typeof COHORT === 'object') ? COHORT.label : 'Cohort';
+  const cap = (typeof COHORT === 'object') ? COHORT.places : rows.length;
+  const list = rows.slice().sort((a, b) =>
+    cohortHealth(a).rank - cohortHealth(b).rank || a.name.localeCompare(b.name));
+  const needing = list.filter(s => cohortHealth(s).rank <= 1).length;
+
+  return '<div class="pnl"><div class="ph"><div><h3>' + esc(label) + '</h3>' +
+    '<div class="ph-sub">' + rows.length + ' of ' + cap + ' places taken' +
+    (needing ? ' · <b>' + needing + ' to chase today</b>' : ' · everybody has opened it this week') +
+    '</div></div></div>' +
+    (list.length
+      ? '<div class="tw"><table><thead><tr><th>Studio</th><th>Last opened</th>' +
+        '<th class="num hide-sm">Orders, 30 days</th><th class="hide-sm">Plan</th><th></th></tr></thead><tbody>' +
+        list.map(s => {
+          const h = cohortHealth(s);
+          return '<tr class="klik" onclick="openDetail(\'sub\',\'' + esc(String(s.id)) + '\')">' +
+            '<td><div class="t-main">' + esc(s.name) + '</div>' +
+            '<div class="t-sub brk">' + esc(s.owner || s.email || '') + '</div></td>' +
+            '<td><span class="pill ' + h.tone + '">' + esc(h.t) + '</span></td>' +
+            '<td class="num hide-sm">' + (s.ordersLast30 === null || s.ordersLast30 === undefined
+              ? '<span class="note">—</span>' : s.ordersLast30) + '</td>' +
+            '<td class="hide-sm"><span class="tier">' + esc(s.planName || '') + '</span></td>' +
+            '<td class="chev">&rsaquo;</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="empty">Nobody is in this cohort yet. Invite the first studio from Enquiries.</div>') +
+    '</div>';
+}
+
 /* =================== SUBSCRIBERS =================== */
 PAGES.subscribers = function () {
   const f = UI.filters.subscribers;
@@ -129,7 +185,11 @@ PAGES.subscribers = function () {
     pastdue: all.filter(s => s.pastDue),
     premium: all.filter(s => s.plan === 'premium'),
     pro: all.filter(s => s.plan === 'pro'),
-    starter: all.filter(s => s.plan === 'starter')
+    starter: all.filter(s => s.plan === 'starter'),
+    /* The studios testing the app for us. A cohort is a month of somebody's
+       real work given to us, so it gets a tab of its own rather than being
+       something you find by searching. */
+    cohort: all.filter(s => s.cohort && s.cohort === (typeof COHORT === 'object' ? COHORT.key : ''))
   };
   let list = (buckets[f] || all).slice();
 
@@ -176,7 +236,9 @@ PAGES.subscribers = function () {
       { k: 'renewing', t: 'Renewing soon', n: buckets.renewing.length },
       { k: 'pastdue', t: 'Past due', n: buckets.pastdue.length },
       { k: 'expired', t: 'Expired', n: buckets.expired.length }
-    ]) +
+    ].concat(buckets.cohort.length
+      ? [{ k: 'cohort', t: (typeof COHORT === 'object' ? COHORT.label : 'Cohort'), n: buckets.cohort.length }]
+      : [])) +
     '<span class="spacer"></span>' +
     '<select class="sel" onchange="UI.planFilter=this.value;render()">' +
     [['any', 'Any plan']].concat(PLANS.slice().reverse().map(p => [p.id, p.name]))
@@ -194,6 +256,8 @@ PAGES.subscribers = function () {
     '<button class="btn gold" onclick="formAddSubscriber()">+ Add subscriber</button>' +
     '</div>' +
     '<div class="bar">' + searchBox('subscribers', 'Search business, owner, email, city…') + '</div>' +
+
+    (f === 'cohort' ? cohortPanel(buckets.cohort) : '') +
 
     /* The directory collapses, so the panels under it are reachable without
        scrolling 128 rows on a phone. */

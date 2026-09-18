@@ -390,7 +390,11 @@
    cancelled mid-flight.
    ========================================================================== */
 (function () {
-  var FORM_KIND = { demo: 'demo', contact: 'contact', partner: 'partner', referral: 'referral' };
+  /* The form's own name on the left, the kind the database stores on the right.
+     They differ for the waiting list because the page is called what a visitor
+     would call it and the record is called what the console filters on. */
+  var FORM_KIND = { demo: 'demo', contact: 'contact', partner: 'partner',
+    referral: 'referral', waitlist: 'earlyaccess' };
   /* The honeypot on each form. A bot fills every field it can see; a person
      never sees these, so anything in one means we write nothing and say
      nothing — the database answers "fine" so the bot learns no more from
