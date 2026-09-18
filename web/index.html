@@ -97,7 +97,6 @@
     <div>
       <span class="eyebrow">Fashion business software</span>
       <h1>The operating system for <em>fashion businesses.</em></h1>
-      <p class="lede">Run every part of your business in one place. Orders, production, inventory, customers, staff and finance, whether you make it, sell it, supply it or all three.</p>
       <div class="btn-row">
         <a class="btn btn-gold" href="book.html">Book a free demo</a>
         <a class="btn btn-line" href="features.html">Explore features</a>
@@ -149,8 +148,16 @@
      fewer to get through. With no JavaScript every panel is simply open. -->
 <section id="trades" class="tight on-light anchor">
   <div class="wrap">
-    <div class="sec-head center">
+    <!-- This line was the hero's lede. It reads better here, against the
+         tiles it is actually describing, than above two buttons.
+
+         It runs wider than an ordinary lede on purpose: .lede holds itself to
+         62ch for readability in a column, and at that width this sentence
+         stacks into a cramped block under a centred heading. .lede-wide gives
+         it room to breathe and centres whatever falls onto the second line. -->
+    <div class="sec-head center wide">
       <h2 style="font-size:clamp(21px,2.4vw,26px)">Built for every kind of fashion business</h2>
+      <p class="lede lede-wide">Run every part of your business in one place. Orders, production, inventory, customers, staff and finance, whether you make it, sell it, supply it or all three.</p>
     </div>
 
     <div class="industries" role="tablist" aria-label="Kinds of business">
