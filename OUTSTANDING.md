@@ -9,6 +9,13 @@ Last updated: 19 September 2026 (thirteenth session)
 
 ## Reviews: the landing place is built, the permission is not
 
+**Deployed 19 September.** `main` -> `ce23e06`, `admin-deploy` -> `5889cea`.
+Nothing on the live site looks any different, which is the point: the blocks
+are hidden, `/reviews` and `/reviews.html` both redirect to the home page,
+`reviews.html` is noindex and out of the sitemap, and no footer links to it.
+All seven flip together the day the first real review goes in.
+
+
 **Built 19 September, not deployed.** Kayode overruled my advice to wait for
 three real reviews before building anywhere to put them: *"reviews wont get
 anywhere to fall so it hangs in the cloud ... i mean we cant wait."* He was
