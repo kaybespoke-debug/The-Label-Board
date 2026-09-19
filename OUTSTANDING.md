@@ -7,6 +7,41 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 19 September 2026 (thirteenth session)
 
+## Shipped 19 September 2026, third batch
+
+`main` -> `f108ce9`, `admin-deploy` -> `c4bddf4`. Verified live rather than
+assumed: the partner ladder reads 0, 6, 7 and 8 per cent under the new names,
+the product page opens with the area you picked and has no tab strip, the
+drawer carries the five areas, the screenshots are the cropped ones at
+1328x1063, and all twelve pages render at 390 with no broken image and no
+sideways scroll. `app.thelabelboard.com` still serves the customer app.
+
+## BLOCKING: two migrations are written and NOT applied
+
+The whole partner commission engine is in the repo and proven by a 137 check
+harness, and **none of it is in the live database**. Nothing deployed calls
+it, so the site is consistent either way, but no commission is being accrued
+and no milestone awarded.
+
+| Migration | What it adds |
+|---|---|
+| `20260919120000_partner_commission.sql` | the rate ladder, the four year clock, the monthly accrual |
+| `20260919160000_partner_milestones_and_payouts.sql` | the milestones, clearing, the yearly payout run |
+
+**Check this before applying.** The first migration adds
+`check (stage <> 'lapsed' or lapsed_on is not null)` to `partner_referrals`.
+If any live row is marked lapsed with no date, the migration fails and stops.
+Run this first and expect zero:
+
+```sql
+select count(*) from public.partner_referrals
+ where stage = 'lapsed' and lapsed_on is null;
+```
+
+**Also still to build:** nothing calls `partner_accrue_month`,
+`partner_award_milestones`, `partner_clear_ledger` or `partner_payout_run` on
+a schedule. They are functions waiting for a monthly job and a yearly one.
+
 ## Reviews: the landing place is built, the permission is not
 
 **Deployed 19 September.** `main` -> `ce23e06`, `admin-deploy` -> `5889cea`.
