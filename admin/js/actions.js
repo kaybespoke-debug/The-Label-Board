@@ -924,6 +924,22 @@ async function doInviteStudio() {
   }
 }
 
+/* A subscriber becomes a partner.
+
+   It opens the ordinary partner invitation prefilled from the business, so a
+   studio joining the programme goes through exactly the same door as anybody
+   else: same code rules, same tier ladder, same email. Two doors into one
+   programme is how the two end up disagreeing about what somebody earns.
+
+   The tier is not chosen here. A new partner starts at the bottom of the
+   ladder, which is 0% until five of their referrals are paying, and the
+   database works the rest out from their live count. */
+function makeSubscriberAPartner(id) {
+  const s = (DB.subscribers || []).find(x => String(x.id) === String(id));
+  if (!s) { toast("That subscriber is not on this screen any more."); return; }
+  formInvitePartner(s.email || s.ownerEmail || "", s.owner || s.name || "");
+}
+
 function formInvitePartner(prefillEmail, prefillName) {
   const suggested = String(prefillName || '').toUpperCase()
     .replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);

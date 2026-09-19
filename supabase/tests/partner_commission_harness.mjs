@@ -353,12 +353,208 @@ try {
 ok('a lapsed referral with no lapsed_on is refused', needsDate);
 
 /* =====================================================================
+   MILESTONE BONUSES AND THE YEARLY PAYOUT RUN
+   ===================================================================== */
+/* The page is checked against the portal by audit_web.js. This checks the
+   portal against the DATABASE, which closes the loop: page, portal and the
+   rows money is actually paid from all have to agree, and no two of them can
+   be edited into agreement while the third drifts. */
+section('Milestones agree with the portal, which agrees with the page');
+{
+  const portal = readFileSync(join(repo, 'partners', 'js', 'data.js'), 'utf8');
+  const m = portal.match(/const MILESTONES = {([^}]+)}/);
+  ok('the portal still declares its milestones', !!m);
+  const fromPortal = (m ? m[1] : '').split(',')
+    .map(s => s.split(':').map(x => Number(x.trim())))
+    .filter(pair => pair.length === 2 && Number.isFinite(pair[0]));
+  const fromDb = (await q('select at_active, amount from public.partner_milestones order by at_active'))
+    .map(r => [Number(r.at_active), Number(r.amount)]);
+  eq('the same number of milestones in both', fromPortal.length, fromDb.length);
+  fromPortal.forEach(function (pair, i) {
+    eq('milestone at ' + pair[0] + ' pays the same in the portal and the database',
+       JSON.stringify(fromDb[i]), JSON.stringify(pair));
+  });
+
+  const bands = await q('select min_active, rate_pct from public.partner_rate_bands order by min_active');
+  /* Parsed by splitting rather than by a pattern. The first version of this
+     line was written through a shell heredoc, which ate the backslashes and
+     turned \s and \d into the literals s and d, so it matched nothing and the
+     check reported "0 bands" instead of comparing them. The repo has a note
+     about exactly this; it has now happened three times. */
+  const tiersSrc = (portal.split('const TIERS = [')[1] || '').split('];')[0];
+  ok('the portal still declares its rate ladder', tiersSrc.length > 0);
+  const tiers = tiersSrc.split('{ id:').slice(1)
+    .map(chunk => {
+      const min = Number((chunk.split('min:')[1] || '').split(',')[0]);
+      const pct = Number((chunk.split('pct:')[1] || '').split('}')[0]);
+      return [min, pct];
+    })
+    .filter(pair => Number.isFinite(pair[0]) && Number.isFinite(pair[1]));
+  eq('the same number of rate bands in both', tiers.length, bands.length);
+  tiers.forEach(function (pair, i) {
+    eq('band at ' + pair[0] + ' is the same rate in the portal and the database',
+       Number(bands[i].rate_pct), pair[1]);
+    eq('band at ' + pair[0] + ' starts at the same count', Number(bands[i].min_active), pair[0]);
+  });
+}
+
+section('Milestones are the ones printed on the partners page');
+{
+  const rows = await q('select at_active, amount from public.partner_milestones order by at_active');
+  eq('four milestones', rows.length, 4);
+  eq('5 pays 25,000',  rows[0].amount, '25000.00');
+  eq('10 pays 50,000', rows[1].amount, '50000.00');
+  eq('20 pays 100,000', rows[2].amount, '100000.00');
+  eq('30 pays 150,000', rows[3].amount, '150000.00');
+}
+
+section('Reaching several at once awards all of them');
+const pm = await makePartner('MILES');
+for (let i = 0; i < 4; i++) await addReferral(pm, { paidOn: '2026-01-10' });
+eq('four paying awards nothing', await one('select public.partner_award_milestones($1, $2)', [pm, '2026-02-01']), 0);
+
+for (let i = 0; i < 6; i++) await addReferral(pm, { paidOn: '2026-03-01' });
+eq('ten active', await active(pm, '2026-03-31'), 10);
+eq('crossing straight to ten awards the 5 AND the 10',
+   await one('select public.partner_award_milestones($1, $2)', [pm, '2026-03-31']), 75000);
+eq('two bonus rows exist', await one(
+  `select count(*) from public.partner_ledger where partner_id = $1 and milestone is not null`, [pm]), 2);
+
+section('A milestone is awarded once, for ever');
+eq('running it again awards nothing', await one('select public.partner_award_milestones($1, $2)', [pm, '2026-04-30']), 0);
+
+/* fall to six, then climb back past ten */
+const fallers = (await q(
+  `select id from public.partner_referrals where partner_id = $1 order by created_at limit 4`, [pm])).map(r => r.id);
+for (const id of fallers) {
+  await db.query(`update public.partner_referrals set stage='lapsed', lapsed_on='2026-05-01' where id=$1`, [id]);
+}
+eq('six active after the churn', await active(pm, '2026-05-31'), 6);
+for (const id of fallers) {
+  await db.query(`update public.partner_referrals set stage='subscribed', lapsed_on=null where id=$1`, [id]);
+}
+eq('ten active again', await active(pm, '2026-06-30'), 10);
+eq('crossing the same line twice pays nothing the second time',
+   await one('select public.partner_award_milestones($1, $2)', [pm, '2026-06-30']), 0);
+eq('still exactly two bonus rows', await one(
+  `select count(*) from public.partner_ledger where partner_id = $1 and milestone is not null`, [pm]), 2);
+eq('and the first two were never voided', await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and milestone is not null and status = 'void'`, [pm]), '0');
+
+section('The database itself refuses a second bonus for a milestone');
+let twice = false;
+try {
+  await db.query(
+    `insert into public.partner_ledger (partner_id, kind, amount, rate_pct, basis, credited_on, clears_on, milestone)
+     values ($1, 'bonus', 50000, 0, 0, current_date, current_date, 10)`, [pm]);
+} catch (e) { twice = true; }
+ok('a duplicate milestone row is refused by the index', twice);
+
+let notABonus = false;
+try {
+  await db.query(
+    `insert into public.partner_ledger (partner_id, kind, amount, rate_pct, basis, credited_on, clears_on, period, milestone)
+     values ($1, 'recurring', 10, 1, 1000, current_date, current_date, '2026-09-01', 5)`, [pm]);
+} catch (e) { notABonus = true; }
+ok('a milestone on a row that is not a bonus is refused', notABonus);
+
+section('Clearing is separate from paying');
+const pp = await makePartner('PAYOUT');
+for (let i = 0; i < 5; i++) await addReferral(pp, { paidOn: '2026-01-10', mrr: 50000 });
+await accrue('2026-02-01', pp);
+await accrue('2026-03-01', pp);
+await one('select public.partner_award_milestones($1, $2)', [pp, '2026-02-28']);
+
+eq('nothing is cleared yet', await one(
+  `select count(*) from public.partner_ledger where partner_id = $1 and status = 'cleared'`, [pp]), '0');
+await one('select public.partner_clear_ledger($1)', ['2026-04-01']);
+eq('February cleared once its hold was up', await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and status = 'cleared' and period = '2026-02-01'`, [pp]), '5');
+eq('March has not, its hold is still running', await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and status = 'pending' and period = '2026-03-01'`, [pp]), '5');
+
+section('The payout run refuses to pay an account nobody checked');
+let noAccount = false;
+try { await one('select public.partner_payout_run($1, $2)', [pp, '2026-04-02']); }
+catch (e) { noAccount = /no primary account/.test(e.message); }
+ok('a partner with no primary account is not paid', noAccount);
+
+await db.query(
+  `insert into public.partner_accounts (partner_id, account_name, bank_name, account_number, is_primary, verified)
+   values ($1, 'A Partner', 'Test Bank', '0123456789', true, false)`, [pp]);
+let unverified = false;
+try { await one('select public.partner_payout_run($1, $2)', [pp, '2026-04-02']); }
+catch (e) { unverified = /unverified account/.test(e.message); }
+ok('an unverified account is not paid', unverified);
+
+await db.query(`update public.partner_accounts set verified = true where partner_id = $1`, [pp]);
+
+section('The run pays everything cleared, once');
+const clearedTotal = await one(
+  `select coalesce(sum(amount),0) from public.partner_ledger
+   where partner_id = $1 and status = 'cleared'`, [pp]);
+const clearedRows = await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and status = 'cleared'`, [pp]);
+const payoutId = await one('select public.partner_payout_run($1, $2)', [pp, '2026-04-02']);
+ok('a payout was created', !!payoutId);
+eq('for exactly the cleared balance', await one(
+  `select amount from public.partner_payouts where id = $1`, [payoutId]), clearedTotal);
+eq('every paid row points at it', await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and status = 'paid' and payout_id = $2`, [pp, payoutId]), clearedRows);
+eq('nothing cleared is left unpaid', await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and status = 'cleared' and payout_id is null`, [pp]), '0');
+eq('the March rows are still pending, they were never in this run', await one(
+  `select count(*) from public.partner_ledger
+   where partner_id = $1 and status = 'pending' and period = '2026-03-01'`, [pp]), '5');
+
+section('   the account is stamped by value, not by reference');
+{
+  const row = (await q(`select account_name, bank_name, account_number from public.partner_payouts where id = $1`, [payoutId]))[0];
+  eq('the account name is on the payout', row.account_name, 'A Partner');
+  eq('the bank is on the payout', row.bank_name, 'Test Bank');
+  eq('the number is on the payout', row.account_number, '0123456789');
+  await db.query(`update public.partner_accounts set account_name = 'Changed Later' where partner_id = $1`, [pp]);
+  const after = (await q(`select account_name from public.partner_payouts where id = $1`, [payoutId]))[0];
+  eq('changing the account afterwards does not rewrite the statement', after.account_name, 'A Partner');
+}
+
+section('   a second run with nothing owed creates no payout');
+eq('the run returns nothing', await one('select public.partner_payout_run($1, $2)', [pp, '2026-04-03']), null);
+eq('and there is still exactly one payout', await one(
+  `select count(*) from public.partner_payouts where partner_id = $1`, [pp]), '1');
+
+section('   a paid row must belong to a payout, and the schema says so');
+let orphan = false;
+try {
+  await db.query(
+    `insert into public.partner_ledger (partner_id, kind, amount, rate_pct, basis, credited_on, clears_on, status)
+     values ($1, 'adjustment', 10, 0, 0, current_date, current_date, 'paid')`, [pp]);
+} catch (e) { orphan = true; }
+ok('a paid row with no payout is refused', orphan);
+
+section('Milestones are paid on top of commission, not instead of it');
+{
+  const byKind = await q(
+    `select kind, count(*)::int n from public.partner_ledger where partner_id = $1 group by kind order by kind`, [pp]);
+  const kinds = Object.fromEntries(byKind.map(r => [r.kind, r.n]));
+  ok('the same partner has both recurring rows and a bonus row  (' + JSON.stringify(kinds) + ')',
+     kinds.recurring > 0 && kinds.bonus > 0);
+}
+
+/* =====================================================================
    NOBODY BUT US RUNS THE ENGINE
    Testing the GRANT, not the call: a function that throws for its own
    reasons looks exactly like one that was refused.
    ===================================================================== */
 section('The rules cannot be run from a browser');
-for (const fn of ['partner_accrue_month', 'partner_referral_rate', 'partner_active_paying']) {
+for (const fn of ['partner_accrue_month', 'partner_referral_rate', 'partner_active_paying',
+                  'partner_award_milestones', 'partner_clear_ledger', 'partner_payout_run']) {
   for (const who of ['anon', 'authenticated']) {
     const granted = await one(
       `select count(*) from information_schema.role_routine_grants

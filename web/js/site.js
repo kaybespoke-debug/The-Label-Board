@@ -362,14 +362,41 @@
      and the photograph tiles on the home page. Selecting .tab only would leave
      a tile's highlight behind while its panel opened, which it did. */
   function selectTab(group, name) {
+    var chosen = null;
     $$('[data-group="' + group + '"][data-tab]').forEach(function (b) {
       var on = b.getAttribute('data-tab') === name;
+      if (on) chosen = b;
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     $$('.pane[data-group="' + group + '"]').forEach(function (p) {
       p.classList.toggle('on', p.getAttribute('data-pane') === name);
     });
+
+    /* The product page is called after the area you are looking at. Kayode:
+       "if i click orders and customers, i only want to see orders and
+       customers". The panes already did that; the heading did not, so the page
+       still said "Everything your business runs on" over one fifth of it.
+
+       The name comes off the tab rather than out of a list here, so there is
+       one place to change it and the two can never drift. If the tab is
+       missing the heading is left alone rather than blanked: a page with no
+       title is worse than a page with a stale one. */
+    var title = $('[data-feat-title]');
+    if (title) {
+      /* The pane's own data-title first, the tab's label second. It used to
+         read the tab only, and then the tab strip was taken off the product
+         page because the Products menu already said the same five things. The
+         heading went on saying "Orders and customers" whatever you picked,
+         which is a worse bug than the duplication it replaced. */
+      var pane = $('.pane[data-group="' + group + '"][data-pane="' + name + '"]');
+      var label = (pane && pane.getAttribute('data-title')) ||
+                  (chosen && (chosen.textContent || '').trim());
+      if (label) {
+        title.textContent = label;
+        document.title = label + ' · The Label Board';
+      }
+    }
   }
 
   /* ---------------- in page links ----------------

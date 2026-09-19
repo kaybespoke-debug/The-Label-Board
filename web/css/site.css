@@ -1181,3 +1181,8 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 @media (min-width:981px){
   .hero .device .shot{max-height:440px;width:auto;max-width:100%;margin-left:auto}
 }
+
+/* the five product areas inside the drawer, one step in from their parent */
+.drawer a.sub{padding-left:30px;font-size:14px;color:var(--dim);position:relative}
+.drawer a.sub::before{content:"";position:absolute;left:14px;top:50%;width:6px;height:1px;
+  background:var(--gold);opacity:.55}

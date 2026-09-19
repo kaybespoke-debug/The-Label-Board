@@ -160,6 +160,12 @@ DETAIL.sub = function (id) {
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="formEditSubscriber(' + s.id + ')">Edit</button>' +
     (s.live ? '<button class="btn" onclick="formRecordPayment(' + s.id + ')">Record a payment</button>' +
               '<button class="btn" onclick="formStorageCap(' + s.id + ')">Storage</button>' : '') +
+    /* A studio that sends us another studio becomes a partner. Kayode, 19
+       September 2026: "business referring other business becomes partner once
+       they start referring". The invitation is the same one the Partners page
+       sends, prefilled from this business, so there is one path into the
+       programme and not two that can drift. */
+    '<button class="btn" onclick="makeSubscriberAPartner(' + s.id + ')">Make a partner</button>' +
     '<button class="btn gold" onclick="formChangePlan(' + s.id + ')">Change plan</button></div></div>' +
     '<div class="dstats">' +
     dstat(s.mrr ? money(s.mrr) : '—', 'MRR', 'm') +
