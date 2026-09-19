@@ -295,6 +295,24 @@ seven was checked by hand and the page was looked at in a browser at 1280 and
 deployed in. Nine mutants, one per way of half-switching it, and all nine were
 caught.
 
+### The redirect needs an exclamation mark
+
+It shipped once without one. Netlify applies a redirect only where no file
+matches the path, and `reviews.html` is a real file, so
+`/reviews /index.html 302` was accepted, deployed and quietly ignored. The
+empty page was live at `thelabelboard.com/reviews` until the post-deploy fetch
+went looking for it. `302!` forces the rule over the file.
+
+The gate demands the mark now, but the real lesson is about the release and
+not the rule. **No static gate can prove what Netlify will do with a
+redirect.** Fetching the url after the deploy is what caught this, and it is
+the last step of a release rather than a formality.
+
+The block in `_redirects` also sits between markers now. The first version of
+`sync_reviews.js` removed it by matching its exact text, so the day the rule
+was corrected the old one could not be recognised and the file ended up
+carrying both.
+
 ### The card
 
 Initials rather than a photograph. A studio owner should not have to send us a
