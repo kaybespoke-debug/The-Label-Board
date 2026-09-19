@@ -306,6 +306,30 @@
 <hr class="rule">
 
 <!-- ============ FAQ ============ -->
+<!-- ============ what studios say ============
+     Hidden, and it stays hidden until there is something real to put in it.
+     An empty heading, a placeholder or a line apologising for having no
+     reviews are all worse than nothing at all.
+
+     Do not edit the cards here. reviews.html is the source and
+     sync_reviews.js copies the first three down into this block and takes the
+     hidden attribute off. audit_web.js fails if these ever disagree. -->
+<section id="reviews" class="tight on-light anchor" data-reviews hidden>
+  <div class="wrap">
+    <div class="sec-head center wide">
+      <span class="eyebrow">From the bench</span>
+      <h2 style="font-size:clamp(21px,2.4vw,26px)">What studios say</h2>
+    </div>
+    <div class="reviews">
+<!-- REVIEWS START -->
+<!-- REVIEWS END -->
+    </div>
+    <div class="btn-row center rev-more">
+      <a class="btn btn-line btn-sm" href="reviews.html">Read them all</a>
+    </div>
+  </div>
+</section>
+
 <section id="faq" class="anchor">
   <div class="wrap">
     <div class="sec-head">

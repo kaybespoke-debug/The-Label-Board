@@ -25,10 +25,8 @@ const check = (cond, msg) => (cond ? ok : fail).push(msg);
 
 const PAGES = ['index.html', 'features.html', 'pricing.html', 'book.html',
   'partners.html', 'referrals.html', 'about.html', 'contact.html',
-  'waitlist.html', 'privacy.html', 'terms.html', '404.html', 'thanks.html'];
-/* the pages search engines should be offered, which is everything except the
-   two that only exist as a destination */
-const INDEXABLE = PAGES.filter(p => p !== 'thanks.html' && p !== '404.html');
+  'waitlist.html', 'reviews.html', 'privacy.html', 'terms.html',
+  '404.html', 'thanks.html'];
 
 const read = f => fs.readFileSync(path.join(dir, f), 'utf8');
 const html = {};
@@ -38,6 +36,16 @@ PAGES.forEach(p => {
   html[p] = read(p);
 });
 const built = Object.keys(html);
+
+/* The pages search engines should be offered: everything except the two that
+   only exist as a destination, and anything carrying a noindex of its own.
+   reviews.html is the third kind. It is a real page with a real shell, waiting
+   for the October studios to say something, and until one of them does it is
+   noindex and unreachable rather than an empty page with a heading on it. So
+   it is checked like every other page for structure, and skipped for the
+   things that only make sense once a stranger is meant to find it. */
+const INDEXABLE = built.filter(p => p !== 'thanks.html' && p !== '404.html'
+  && !/<meta name="robots" content="noindex">/.test(html[p]));
 
 /* ---------- helpers ---------- */
 /* Strip out everything a visitor never reads, so the copy checks below only
@@ -607,6 +615,84 @@ check(!/\.scrollIntoView\s*\(/.test(js), 'nothing relies on scrollIntoView');
 check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
   'the light ground is actually used across the site');
 check(!/layi_/.test(js), 'the website never touches the studio app storage keys');
+
+/* ---------- reviews are on or off, never half on ----------
+   Kayode, 19 September 2026: "we cant wait ... reviews wont get anywhere to
+   fall so it hangs in the cloud." The first studios open accounts in October,
+   so the destination was built before the thing that fills it.
+
+   There are seven separate places that have to agree about whether there are
+   any reviews: the source page, the home page block, the pricing block, the
+   noindex, the sitemap, the footer and the redirect. Switching on is the kind
+   of job that gets done at eleven at night when the first good quote comes in,
+   and the failure mode is not a crash, it is a live page with a heading and
+   nothing under it, or a review sitting on reviews.html that nobody can reach.
+
+   So none of those seven is trusted to a memory. sync_reviews.js flips all of
+   them and this fails the build if they ever disagree. */
+const REV_START = '<!-- REVIEWS START -->';
+const REV_END = '<!-- REVIEWS END -->';
+function reviewCards(src, where) {
+  const a = src.indexOf(REV_START);
+  const b = src.indexOf(REV_END, a);
+  check(a >= 0 && b > a, where + ' keeps the markers sync_reviews.js writes between');
+  return a < 0 || b < a ? '' : src.slice(a + REV_START.length, b);
+}
+const revSource = reviewCards(html['reviews.html'], 'reviews.html');
+const revCount = (revSource.match(/<article class="rev"/g) || []).length;
+const revLive = revCount > 0;
+
+/* every card is whole, and says who said it. A quote with no name against it
+   is the thing every fake testimonial on the internet has in common. */
+revSource.split('<article class="rev"').slice(1).forEach((card, i) => {
+  const n = 'review ' + (i + 1);
+  check(card.indexOf('<blockquote>') !== -1, n + ' has the words');
+  check(card.indexOf('class="ini"') !== -1, n + ' has the initials');
+  check(/<b>[^<]{2,}<\/b>/.test(card), n + ' has a name against it');
+  check(/<span>[^<]{3,}<\/span>/.test(card), n + ' says the trade and the city');
+  const stars = (card.match(/<svg/g) || []).length;
+  check(stars === 5, n + ' shows five stars, lit or not (' + stars + ')');
+  check(/aria-label="(One|Two|Three|Four|Five) out of five"/.test(card),
+    n + ' tells a screen reader the rating');
+});
+
+['index.html', 'pricing.html'].forEach(p => {
+  const here = reviewCards(html[p], p);
+  const openTag = (html[p].match(/<section id="reviews"[^>]*>/) || [''])[0];
+  check(!!openTag, p + ' has the reviews section at all');
+  check(/ hidden>/.test(openTag) === !revLive,
+    p + ' shows its reviews section only when there is a review in it');
+  const n = (here.match(/<article class="rev"/g) || []).length;
+  check(n === Math.min(revCount, 3),
+    p + ' carries the first three reviews and no more (' + n + ' of ' + revCount + ')');
+  /* and they are the same words, not a second copy somebody edited */
+  if (n) check(revSource.indexOf(here.trim().slice(0, 120)) !== -1,
+    p + ' quotes the same review as reviews.html rather than a drifted copy');
+});
+
+const revRedirects = read('_redirects');
+const revSitemap = read('sitemap.xml');
+check(/<meta name="robots" content="noindex">/.test(html['reviews.html']) === !revLive,
+  'reviews.html is offered to search engines only once it has something on it');
+check((revSitemap.indexOf('reviews.html') !== -1) === revLive,
+  'the sitemap offers the reviews page only once it has something on it');
+check((revRedirects.indexOf('/reviews      /index.html') !== -1) === !revLive,
+  'an empty reviews page is redirected away rather than shown to anybody');
+check((refFooter.indexOf('reviews.html') !== -1) === revLive,
+  'the footer links to the reviews page only once there is a review on it');
+/* And no page offers a way to the reviews page while it is empty.
+   The block's own "Read them all" button does not count as an offer: it lives
+   inside the hidden section, so it is not on the page in any sense a visitor
+   can act on, and it has to stay there because sync_reviews.js un-hides the
+   section as one piece. Everything outside that section does count, which is
+   what this cuts away before looking. */
+built.forEach(p => {
+  const a = html[p].indexOf('<section id="reviews"');
+  const rest = a < 0 ? html[p]
+    : html[p].slice(0, a) + html[p].slice(html[p].indexOf('</section>', a));
+  check((rest.indexOf('href="reviews.html"') !== -1) === revLive,
+    p + ' offers a way to the reviews page only once there is a review on it');
+});
 
 /* ---------- the Products menu is a menu, not a picture of one ----------
    It was built looking right and doing nothing, and was caught in the preview

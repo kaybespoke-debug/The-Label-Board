@@ -1116,3 +1116,51 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
      which was inheriting the page default and reading larger than the body */
   .more{font-size:13.5px}
 }
+
+/* ---------- what studios say ----------
+   Kayode, 19 September: "we cant wait ... reviews wont get anywhere to fall so
+   it hangs in the cloud." He is right. The first studios open accounts in
+   October and the first thing one of them says about us would have had nowhere
+   to go, so the destination is built before the thing that fills it exists.
+
+   There are none yet, and the section is hidden rather than showing an empty
+   box or an apology. hidden is a real attribute, so it works with no script;
+   the rule below only guards against a later display rule outranking the
+   browser's own. sync_reviews.js is what takes the attribute off. */
+[hidden]{display:none !important}
+
+/* auto-fit and a centred track list rather than three fixed columns. The
+   first month there will be one review, then two. Three fixed columns would
+   put a single card in the left third with a hole beside it. */
+.reviews{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,360px));
+  gap:14px;justify-content:center;max-width:1124px;margin-left:auto;margin-right:auto}
+.rev{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px;display:flex;flex-direction:column}
+.rev .stars{display:flex;gap:3px;margin-bottom:12px}
+.rev .stars svg{width:14px;height:14px;fill:var(--gold);stroke:none}
+.rev .stars svg.off{fill:none;stroke:var(--gold);stroke-width:1.4;opacity:.45}
+.rev blockquote{margin:0;font-family:var(--serif);font-size:16px;line-height:1.6;
+  color:var(--text)}
+.rev .who{display:flex;align-items:center;gap:11px;margin-top:auto;padding-top:16px}
+/* initials rather than a photograph: a studio owner should not have to send us
+   one before we can quote them, and a stock face would be a lie */
+.rev .ini{width:34px;height:34px;border-radius:50%;flex:0 0 34px;display:grid;
+  place-items:center;font-size:12px;font-weight:700;letter-spacing:.04em;
+  background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold-2)}
+.rev .who b{display:block;font-size:13.5px;font-weight:600;color:var(--text)}
+.rev .who span{display:block;font-size:12px;color:var(--faint);margin-top:2px}
+.rev-more{margin-top:20px}
+
+/* same swipe row as the trade tiles, for the same measured reason */
+@media (max-width:900px){
+  .reviews{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:10px;margin:0 -16px;
+    padding:0 16px 4px;scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .reviews::-webkit-scrollbar{display:none}
+  .rev{flex:0 0 268px;scroll-snap-align:start;padding:16px}
+}
+@media (max-width:680px){
+  .rev blockquote{font-size:14.5px;line-height:1.55}
+  .rev .who b{font-size:13px}
+  .rev .who span{font-size:11.5px}
+}
