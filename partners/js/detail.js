@@ -26,7 +26,7 @@ DETAIL.ref = function (id) {
     r.addedBy === 'partner' ? 'You set the account up with them' : 'Through your ' + esc(link.label)]);
   if (r.subscribedOn) {
     events.push(['Started paying', fmtD(r.subscribedOn),
-      r.planName + ', ' + (r.cycle === 'annual' ? 'annual' : 'monthly') + ' · ' + money(r.firstPayment) + ' first payment']);
+      r.planName + ', ' + (r.cycle === 'annual' ? 'annual' : 'monthly') + ' · ' + money(r.firstPayment) + ' when they started']);
     if (sig) {
       events.push(['You earned ' + money(sig.amount), fmtD(sig.date),
         sig.rate + '% as a ' + sig.tier + ' partner']);
@@ -86,8 +86,9 @@ DETAIL.ref = function (id) {
           '<div class="row"><div><b>Milestone bonus</b><small>' + esc(x.note) + '</small></div>' +
           '<b>' + money(x.amount) + '</b></div>').join('')
       : '') +
-    '<p class="note" style="margin-top:12px">Commission is a share of a first payment, once per business. This ' +
-    'account will not earn you anything further, whatever they go on to spend.</p></div>';
+    '<p class="note" style="margin-top:12px">Commission is a share of every month this ' +
+    'account pays, for four years from the day they first paid. Years one and two at your ' +
+    'rate, years three and four at 3%. If they leave it stops that day.</p></div>';
 };
 
 /* =================== A PAYOUT =================== */

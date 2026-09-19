@@ -77,6 +77,13 @@
 <div class="drawer" id="drawer">
   <a href="index.html">Home</a>
   <a href="features.html">Products</a>
+  <!-- The header dropdown does not exist below 1000px, and the product page
+       no longer has a tab strip, so these five are how a phone changes area. -->
+  <a class="sub" href="features.html#orders">Orders and customers</a>
+  <a class="sub" href="features.html#production">Production and delivery</a>
+  <a class="sub" href="features.html#inventory">Stock and suppliers</a>
+  <a class="sub" href="features.html#money">Money and people</a>
+  <a class="sub" href="features.html#offline">Phone and offline</a>
   <a href="pricing.html">Pricing</a>
   <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
@@ -87,11 +94,18 @@
 
 <main id="main">
 
+<!-- The page now opens with the name of the area you are looking at, and
+     nothing else. It used to open with an eyebrow saying "The product" and a
+     paragraph of positioning, which is three lines every visitor reads past
+     on the way to the thing they clicked.
+
+     The heading follows the tabs: pick Money and people and that is what the
+     page is called. With no script it stays on the first area, which is the
+     one the markup ships open, so it is never wrong. site.js keeps it in
+     step from the tab strip, the Products menu and the back button. -->
 <section class="phero">
   <div class="wrap">
-    <span class="eyebrow">The product</span>
-    <h1>Everything your business runs on, in one app</h1>
-    <p class="lede">Most software for this trade stops at a list of orders. The part that decides whether a business survives growing is the part underneath: stock that comes off the shelf, wages that follow the work, and books you could hand to a bank.</p>
+    <h1 data-feat-title>Orders and customers</h1>
   </div>
 </section>
 
@@ -103,18 +117,19 @@
 <section class="tight">
   <div class="wrap">
 
-    <a class="backlink" href="index.html#product" data-back>Back to the overview</a>
+    <a class="backlink" href="index.html#product" data-back>Back</a>
 
-    <div class="tabs features-tabs" role="tablist" aria-label="Areas of the product">
-      <button class="tab on" type="button" data-group="feat" data-tab="orders" role="tab" aria-selected="true">Orders and customers</button>
-      <button class="tab" type="button" data-group="feat" data-tab="production" role="tab" aria-selected="false">Production and delivery</button>
-      <button class="tab" type="button" data-group="feat" data-tab="inventory" role="tab" aria-selected="false">Stock and suppliers</button>
-      <button class="tab" type="button" data-group="feat" data-tab="money" role="tab" aria-selected="false">Money and people</button>
-      <button class="tab" type="button" data-group="feat" data-tab="offline" role="tab" aria-selected="false">Phone and offline</button>
-    </div>
+    <!-- The tab strip that used to sit here is gone. Kayode: "this is already
+         in the dropdown, i dont think we should still see it here". It was the
+         same five names twice on one screen.
+
+         The Products menu is now the only way in, which means it has to exist
+         on a phone as well: the header nav does not, so the five are in the
+         drawer. Without that the strip would have been the only way to change
+         area on a phone and removing it would have stranded the page. -->
 
     <!-- ---- orders ---- -->
-    <div class="pane on anchor" data-group="feat" data-pane="orders" id="orders">
+    <div class="pane on anchor" data-group="feat" data-pane="orders" data-title="Orders and customers" id="orders">
       <div class="row2">
         <div class="row2-text">
           <h3>An order that carries everything about itself</h3>
@@ -126,12 +141,12 @@
             <li><strong>Invoices, receipts and job sheets</strong> on your own letterhead.</li>
           </ul>
         </div>
-        <img class="shot" src="img/screens/orders.png" width="1700" height="1063" loading="lazy" decoding="async" alt="The orders list: every order with its client, items, value, profit and status">
+        <img class="shot" src="img/screens/orders.png" width="1328" height="1063" loading="lazy" decoding="async" alt="The orders list: every order with its client, items, value, profit and status">
       </div>
     </div>
 
     <!-- ---- production ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="production" id="production">
+    <div class="pane anchor" data-group="feat" data-pane="production" data-title="Production and delivery" id="production">
       <div class="row2">
         <div class="row2-text">
           <h3>A board that answers the only question that matters today</h3>
@@ -143,12 +158,12 @@
             <li><strong>Dispatch and delivery on the same record</strong>, so what has left the workroom is still accounted for.</li>
           </ul>
         </div>
-        <img class="shot" src="img/screens/production.png" width="1700" height="1063" loading="lazy" decoding="async" alt="The production pipeline: every piece, the stage it is at, and who is responsible">
+        <img class="shot" src="img/screens/production.png" width="1328" height="1063" loading="lazy" decoding="async" alt="The production pipeline: every piece, the stage it is at, and who is responsible">
       </div>
     </div>
 
     <!-- ---- inventory ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="inventory" id="inventory">
+    <div class="pane anchor" data-group="feat" data-pane="inventory" data-title="Stock and suppliers" id="inventory">
       <div class="row2">
         <div class="row2-text">
           <h3>The shelf and the screen agree</h3>
@@ -160,12 +175,12 @@
             <li><strong>Vendors and suppliers</strong> with what you paid and what you still owe.</li>
           </ul>
         </div>
-        <img class="shot" src="img/screens/stock.png" width="1700" height="1063" loading="lazy" decoding="async" alt="Inventory: what is on hand, in what units, and what is running low">
+        <img class="shot" src="img/screens/stock.png" width="1328" height="1063" loading="lazy" decoding="async" alt="Inventory: what is on hand, in what units, and what is running low">
       </div>
     </div>
 
     <!-- ---- money and people ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="money" id="money">
+    <div class="pane anchor" data-group="feat" data-pane="money" data-title="Money and people" id="money">
       <div class="sec-head">
         <h3>Real books, and pay that follows the work</h3>
         <p class="lede">Every order, wage, roll of fabric and expense lands in the same ledger, so the profit figure is arrived at rather than guessed.</p>
@@ -181,7 +196,7 @@
     </div>
 
     <!-- ---- phone, offline, and who is allowed to do what ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="offline" id="offline">
+    <div class="pane anchor" data-group="feat" data-pane="offline" data-title="Phone and offline" id="offline">
       <div class="sec-head">
         <h3>It does not stop when the network does</h3>
         <p class="lede">Install it from the browser and it sits on your home screen like any other app. With no signal it still opens, still saves and still prints. When you are back it catches up on its own.</p>

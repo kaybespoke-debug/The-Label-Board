@@ -573,6 +573,69 @@ section('An invited operator can actually get in');
      /clearConsoleArrival\(\)/.test((srcOf('js/signin.js').match(/async function doAcceptInvite[\s\S]*?\n\}/) || [''])[0]));
 }
 
+// ---------------------------------------------------------------------
+section('Only partners earn, and the console says so');
+// ---------------------------------------------------------------------
+/* Kayode's rule, 19 September 2026: a business that refers another business
+   is NOT paid a commission. It goes on the partner programme and earns from
+   there. The website has said that since the same day.
+
+   The console had its own subscriber referral programme with a rate, a ledger
+   carrying amounts, four money stat cards, three money columns and an editable
+   "Referral commission %". None of it was reachable from the website, which is
+   exactly what made it dangerous: an operator could have changed that rate and
+   paid somebody on it, and nothing would have disagreed with them.
+
+   What stays is the referral GRAPH, because that is how you spot who to invite
+   as a partner. What had to go is every figure that looks like money owed to a
+   referring business. MRR from referrals stays too: that is OUR revenue from
+   accounts the channel brought, not a payment to anybody. */
+{
+  const s0 = run('DB.subscribers[0]');
+  const s1 = run('DB.subscribers[1]');
+  run('(function(){ var a=DB.subscribers[0], b=DB.subscribers[1];' +
+      ' b.referredBy = a.id; a.referrals = [b.id];' +
+      ' a.referralLedger = [{subId:b.id, name:b.name, plan:b.planName, status:b.status, joined:b.joined, converted:true}];' +
+      ' a.referralConverted = 1; })()');
+
+  const refPage = run('referralBody()');
+  ok('the referral page still renders', typeof refPage === 'string' && refPage.length > 0);
+  ok('it does not offer a commission rate to change', !/referralPct/.test(refPage));
+  ok('it does not call anything a commission rate', !/commission rate/i.test(refPage));
+  ok('it points at the partner programme instead', /partner programme/i.test(refPage));
+  ok('it still counts what the channel brought in', /MRR from referrals/.test(refPage));
+
+  /* nothing anywhere in the console edits that setting any more */
+  const everyScript = files.map(f => srcOf(f)).join('\n');
+  ok('no screen edits a referral commission percentage', !/referralPct/.test(everyScript));
+  ok('and the field itself is gone from the data', run('typeof DB.settings.referralPct') === 'undefined');
+
+  /* the per subscriber tab */
+  run("UI.vtab['sub' + DB.subscribers[0].id] = 'referrals';");
+  const tab = run("DETAIL.sub(DB.subscribers[0].id)");
+  ok('the subscriber referral tab renders', typeof tab === 'string' && tab.length > 0);
+  if (typeof tab === 'string') {
+    ok('it shows who they brought', tab.indexOf(run('DB.subscribers[1].name')) !== -1);
+    ok('it does not show a commission owed to them', !/Commission earned|Outstanding|Paid out/.test(tab));
+    ok('it sends the operator to Make a partner', /Make a partner/.test(tab));
+  }
+
+  /* and the button that does it exists on the record */
+  run("UI.vtab['sub' + DB.subscribers[0].id] = 'overview';");
+  const head = run("DETAIL.sub(DB.subscribers[0].id)");
+  ok('a subscriber can be made a partner from their record',
+     /makeSubscriberAPartner\(/.test(head) || /makeSubscriberAPartner\(/.test(everyScript));
+  ok('and that opens the ordinary partner invitation rather than a second one',
+     /function makeSubscriberAPartner[\s\S]{0,400}formInvitePartner\(/.test(everyScript));
+
+  /* the partner ladder reached the console */
+  ['Getting started, 0%', 'Unlocked, 6%', 'Established, 7%', 'Senior, 8%'].forEach(label => {
+    ok('the console knows the tier "' + label + '"', everyScript.indexOf(label) !== -1);
+  });
+  ok('and none of the old rates are still printed anywhere',
+     !/Bronze'|15%|18%|22%|25%/.test(everyScript.split('Housing is 15%').join('')));
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass + ' passed, ' + failures.length + ' FAILED:');

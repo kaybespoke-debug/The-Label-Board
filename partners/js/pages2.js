@@ -106,7 +106,7 @@ PAGES.account = function () {
   /* The ladder and the rules that govern it, in one place. They are the same
      subject, and a partner reading one wants the other. */
   const paidHow =
-    '<div class="tierline"><b>' + tier.name + '</b><span>' + tier.pct + '% of every first payment</span></div>' +
+    '<div class="tierline"><b>' + tier.name + '</b><span>' + tier.pct + '% of every month they pay</span></div>' +
     '<div class="tierbar"><i style="width:' + Q.tierProgress() + '%"></i></div>' +
     '<p class="note">' + (nxt
       ? plural(n, 'paying account') + ' referred. ' + plural(nxt.min - n, 'more') + ' and you move to ' +
@@ -120,14 +120,15 @@ PAGES.account = function () {
         '<div class="rung-d">' + (t.min === 0 ? 'from your first' : t.min + ' accounts') + '</div></div>';
     }).join('') + '</div>' +
     '<div class="sec-t">The rules</div>' +
-    kv('What you earn', tier.pct + '% of a first payment') +
-    kv('On an annual plan', tier.pct + '% of the whole year') +
-    kv('When it clears', DB.settings.holdDays + ' days after they pay') +
-    kv('When it reaches you', 'The ' + DB.settings.payoutDay + 'th of the month') +
-    kv('Minimum payout', money(DB.settings.minPayout)) +
-    '<p class="note" style="margin-top:12px">Your rate is fixed on the day an account starts paying, so moving up ' +
-    'a tier lifts what you earn from then on and never changes what you have already been credited. Commission is ' +
-    'earned once per business, on a first payment only.</p>';
+    kv('What you earn', tier.pct + '% of every month a referred account pays') +
+    kv('For how long', TERM_YEARS + ' years from the day that account first paid') +
+    kv('Years ' + (TAPER_AFTER_YEARS + 1) + ' and ' + TERM_YEARS, TAPER_PCT + '%, then it ends') +
+    kv('When it clears', DB.settings.holdDays + ' days after it is credited') +
+    kv('When it reaches you', 'Once a year, in naira') +
+    '<p class="note" style="margin-top:12px">Your rate follows how many of your accounts are active and paying ' +
+    'right now. It lifts when you grow and eases back if some leave, and either way it applies from that day ' +
+    'forward: nothing already credited to you is ever recalculated or taken back. Each account carries its own ' +
+    'clock, and an account that leaves stops earning that day.</p>';
 
   const notify =
     '<div>' +
@@ -167,7 +168,7 @@ PAGES.account = function () {
     grp(ic('color-mix(in srgb,var(--green) 22%,var(--panel))', '<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/>'),
       'Payout accounts', DB.accounts.length ? esc((Q.primaryAccount() || {}).bankName) : 'None yet', accounts) +
     grp(ic('color-mix(in srgb,var(--amber) 22%,var(--panel))', '<path d="M12 3.5l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 17.2 6.7 20l1.1-6L3.4 9.8l6-.8z"/>'),
-      'How you get paid', tier.name + ' · ' + tier.pct + '% of every first payment', paidHow) +
+      'How you get paid', tier.name + ' \u00b7 ' + tier.pct + '% of every month', paidHow) +
     grp(ic('color-mix(in srgb,var(--blue) 22%,var(--panel))', '<path d="M18 15V10a6 6 0 1 0-12 0v5l-1.5 2.5h15z"/><path d="M9.5 20.5a2.6 2.6 0 0 0 5 0"/>'),
       'Notifications', 'What we tell you about', notify) +
     grp(ic('color-mix(in srgb,var(--purple) 22%,var(--panel))', '<path d="M21 12a8 8 0 0 1-8 8H8l-4 3v-4.5A8 8 0 0 1 13 4a8 8 0 0 1 8 8z"/>'),

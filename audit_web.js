@@ -298,13 +298,38 @@ if (msMatch) {
       'the partner page prints the ' + n + ' account bonus the portal pays (₦' + naira(amt) + ')');
   });
 }
-/* the money rules that PARTNERS.md says the portal is built on */
+/* The money rules, rewritten on 19 September 2026 along with the programme.
+ *
+ * These checks used to insist the page said commission was "on the first
+ * payment", "counted once per business", and paid "on the 5th". Every one of
+ * those was true of the old programme and is now false, so a gate that kept
+ * demanding them would have been holding the page to a promise we no longer
+ * make. That is the failure mode worth naming: a check can rot into enforcing
+ * the opposite of the truth, and it does it silently, because it keeps passing.
+ *
+ * What replaces them is the part a partner would be angry about if the page
+ * and the ledger disagreed: that it recurs, how long for, what happens in the
+ * taper years, that the rate follows their live count in BOTH directions, and
+ * that nothing already credited is ever recalculated. The numbers themselves
+ * are checked against the portal's ladder above, and the ladder is checked
+ * against the database by partner_commission_harness.mjs. */
 check(/31 days/.test(pp) || /thirty one days/.test(pp), 'the partner page states the 31 day hold');
-check(/5th of the month|on the 5th/.test(pp), 'the partner page states when payouts run');
-check(pp.includes('₦10,000'), 'the partner page states the minimum payout');
-check(/first payment/.test(pp), 'the partner page is clear that commission is on the first payment');
-check(/once per business|counted once per business/.test(pp), 'the partner page is clear it is counted once per business');
-check(/never rewrites the past|already been credited/.test(pp), 'the partner page explains that a promotion does not rewrite past credits');
+check(/recurring|every month a business you brought pays/i.test(pp),
+  'the partner page is clear the commission recurs rather than paying once');
+check(/four years/i.test(pp), 'the partner page states the four year term');
+check(/3%/.test(pp), 'the partner page states the taper rate');
+check(/own clock/i.test(pp), 'the partner page says the clock is per business');
+check(/paid out once a year|paid yearly/i.test(pp), 'the partner page states when payouts run');
+check(/active and paying/i.test(pp), 'the partner page says the rate follows the live count');
+check(/can go down|back down if some leave/i.test(pp),
+  'the partner page admits the rate can fall, which is the half a partner would otherwise find out the hard way');
+check(/from that day forward/i.test(pp), 'the partner page says a change applies forward only');
+check(/never recalculated or taken back|ever recalculated or taken back/i.test(pp),
+  'the partner page promises nothing already credited is rewritten');
+check(/stops that day/i.test(pp), 'the partner page says a business that leaves stops earning that day');
+/* the one number that has to match the schema rather than the copy */
+check(/in naira|Nigerian account/i.test(pp),
+  'the partner page says partners are paid in naira, which is what partner_accounts holds');
 
 /* ================= 8. nothing offers a free trial ================= */
 /* Kayode took the trial out on 18 Sep. It had been quoted in eleven places
@@ -615,6 +640,54 @@ check(!/\.scrollIntoView\s*\(/.test(js), 'nothing relies on scrollIntoView');
 check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
   'the light ground is actually used across the site');
 check(!/layi_/.test(js), 'the website never touches the studio app storage keys');
+
+/* ---------- the product page has one way in, and it works on a phone ----
+   The tab strip came off on 19 September: "this is already in the dropdown, i
+   dont think we should still see it here". It was the same five names twice on
+   one screen and he is right.
+
+   The strip was also the only way to change area on a PHONE, because the
+   header nav does not exist below 1000px. Taking it out without putting the
+   five somewhere else would have left the product page stranded on the area it
+   happens to ship open, on the device most of this site is read on. So the
+   drawer carries them, and these checks refuse the half of the change that
+   looks finished from a laptop. */
+{
+  const feat = html['features.html'];
+  check(feat.indexOf('features-tabs') === -1, 'the product page no longer repeats the menu as a tab strip');
+  check(all(feat, /<button class="tab/g).length === 0, 'and no tab buttons are left behind');
+
+  /* every area names itself, because the heading is built from it */
+  const panes = all(feat, /data-pane="([a-z]+)" data-title="([^"]+)"/g).map(m => ({ id: m[1], title: m[2] }));
+  check(panes.length >= 5, 'every area on the product page carries its own name (' + panes.length + ')');
+  check(/<h1 data-feat-title>/.test(feat), 'the page has a heading the areas can write into');
+  check(feat.indexOf('>' + (panes[0] || {}).title + '<') !== -1,
+    'the heading ships with the name of the area that ships open, so it is right with no script');
+
+  /* the menu, the drawer and the panes are the same five */
+  const menu = refHeader.slice(refHeader.indexOf('<span class="nav-menu">'));
+  const inMenu = all(menu.slice(0, menu.indexOf('</span>')), /features\.html#([a-z]+)">([^<]+)</g)
+    .map(m => ({ id: m[1], title: m[2] }));
+  const drawer = html['index.html'].slice(html['index.html'].indexOf('<div class="drawer"'));
+  const inDrawer = all(drawer.slice(0, drawer.indexOf('</div>')), /class="sub" href="features\.html#([a-z]+)">([^<]+)</g)
+    .map(m => ({ id: m[1], title: m[2] }));
+
+  check(inDrawer.length === inMenu.length,
+    'the drawer offers the same number of areas as the menu (' + inDrawer.length + ' and ' + inMenu.length + ')');
+  inMenu.forEach(item => {
+    const pane = panes.filter(p => p.id === item.id)[0];
+    check(!!pane, 'the menu points at an area that exists: ' + item.id);
+    check(!!pane && pane.title === item.title,
+      'the area calls itself what the menu calls it: ' + item.id + ' (' + (pane || {}).title + ' vs ' + item.title + ')');
+    const d = inDrawer.filter(x => x.id === item.id)[0];
+    check(!!d, 'a phone can reach ' + item.id + ', which the tab strip used to be for');
+    check(!!d && d.title === item.title, 'and the drawer calls it the same thing: ' + item.id);
+  });
+  /* the drawer link only does anything because site.js listens for a hash
+     change; without that it is a link to the page you are already on */
+  check(js.indexOf("addEventListener('hashchange'") !== -1,
+    'a drawer link on the product page itself still changes the area');
+}
 
 /* ---------- reviews are on or off, never half on ----------
    Kayode, 19 September 2026: "we cant wait ... reviews wont get anywhere to

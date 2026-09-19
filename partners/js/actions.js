@@ -370,9 +370,11 @@ function downloadStatement(ref) {
   lines.push('-'.repeat(70));
   lines.push(pad('', 55) + 'TOTAL  ' + money(p.amount));
   lines.push('');
-  lines.push('Commission is ' + DB.settings.baseRatePct + '% or more of a referred account\'s first payment,');
-  lines.push('cleared ' + DB.settings.holdDays + ' days after that payment and paid on the ' +
-    DB.settings.payoutDay + 'th of the month.');
+  lines.push('Commission is ' + DB.settings.baseRatePct + '% of what each referred account pays,');
+  lines.push('every month, for four years from the day they first paid. Years three and four');
+  lines.push('are at 3%. Your rate follows how many accounts are active and paying now and');
+  lines.push('applies from that day forward. Nothing already credited is ever recalculated.');
+  lines.push('Each month clears ' + DB.settings.holdDays + ' days after it is credited.');
   lines.push('Questions: ' + DB.me.manager.email);
 
   download('statement-' + p.ref + '.txt', lines.join('\n'));

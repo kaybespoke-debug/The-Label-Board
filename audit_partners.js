@@ -829,7 +829,16 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
     check(db.referrals[0].trialEndsIn === null, 'one that has already subscribed does not');
 
     /* the tier drives the rate a partner is told about */
-    check(db.settings.baseRatePct === 18, 'a silver partner is shown the silver rate, not the bronze default');
+    /* The ladder moved on 19 September 2026: a one off 15 to 25 per cent of
+       the first payment became a recurring 0 to 8 per cent, so silver is 6
+       rather than 18. The check is the same check, aimed at the same bug: a
+       partner being shown the bottom of the ladder because the tier was not
+       read. It reads the ladder rather than a literal now, so the next time
+       Kayode moves a rate this asks the right question on its own. */
+    const silverPct = G("(TIERS.find(function(t){return t.id==='silver'})||{}).pct");
+    check(silverPct !== undefined, 'the silver rate was read out of the ladder');
+    check(db.settings.baseRatePct === silverPct,
+      'a silver partner is shown the silver rate (' + silverPct + '%), not the bottom of the ladder');
 
     /* the thing that must never happen: a failed request drawn as a confident zero */
     sandbox.supaFetch = async (path) =>
@@ -852,6 +861,62 @@ process.exit(fail.length ? 1 : 0);
 /* ---------- report ---------- */
 function report() {
   console.log('\nPartner Portal audit\n' + '='.repeat(60));
+/* =====================================================================
+   The portal actually renders the programme we now run
+   =====================================================================
+   Every check above this reads the portal's SOURCE. These render its
+   pages, because the programme changed on 19 September from a one off
+   share of a first payment to a recurring share on a four year clock,
+   and a page can keep the right numbers in a constant while still
+   telling a partner the old story in a sentence next to them.
+
+   It caught one: a console page kept a footer row summing variables the
+   change had removed, so the page threw for a real operator while every
+   static check passed. */
+{
+  const pages = G('Object.keys(PAGES)');
+  const rendered = {};
+  pages.forEach(function (name) {
+    try {
+      const html = G('PAGES.' + name + '()');
+      rendered[name] = typeof html === 'string' ? html : '';
+      check(typeof html === 'string' && html.length > 0,
+        'the ' + name + ' page renders (' + String(html).length + ' chars)');
+    } catch (e) {
+      rendered[name] = '';
+      check(false, 'the ' + name + ' page renders — threw: ' + e.message);
+    }
+  });
+
+  const all = Object.keys(rendered).map(function (k) { return rendered[k]; }).join('\n');
+
+  /* the old programme must not survive in a sentence */
+  check(!/of a first payment|once per business|first payment, once/i.test(all),
+    'no page still describes commission as a one off share of a first payment');
+
+  /* and the new one has to be visible somewhere a partner reads */
+  const src = fs.readFileSync(path.join(dir, 'js/data.js'), 'utf8') + fs.readFileSync(path.join(dir, 'js/detail.js'), 'utf8') +
+              fs.readFileSync(path.join(dir, 'js/actions.js'), 'utf8') + fs.readFileSync(path.join(dir, 'js/pages.js'), 'utf8');
+  check(/four years/i.test(src), 'the portal tells a partner the term is four years');
+  check(/years three and four/i.test(src), 'and what happens in the taper years');
+  check(/active and paying/i.test(src) || /accounts are active and paying/i.test(src),
+    'and that the rate follows the live count');
+  check(/never recalculated|ever recalculated/i.test(src),
+    'and that nothing already credited is recalculated');
+
+  /* the ladder the portal shows is the ladder the database pays */
+  const tiers = G('JSON.stringify(TIERS)');
+  check(/"pct":0/.test(tiers) && /"pct":6/.test(tiers) && /"pct":7/.test(tiers) && /"pct":8/.test(tiers),
+    'the portal carries the 0, 6, 7 and 8 per cent ladder');
+  check(G('TAPER_PCT') === 3, 'and the 3 per cent taper');
+  check(G('TERM_YEARS') === 4, 'and the four year term');
+  check(G('TAPER_AFTER_YEARS') === 2, 'and that the taper starts after two years');
+
+  /* an unrecognised tier must not fall back to somebody else's rate */
+  check(/LIVE_TIER_PCT\[me\.tier\] != null/.test(fs.readFileSync(path.join(dir, 'js/live.js'), 'utf8')),
+    'a partner whose tier we could not read is shown 0, not a number borrowed from another band');
+}
+
   ok.forEach(m => console.log('  pass  ' + m));
   if (fail.length) {
     console.log('\n' + '-'.repeat(60));

@@ -27,7 +27,10 @@ async function supaSelect(table, query, token) {
   return r.body;
 }
 
-const LIVE_TIER_PCT = { bronze: 15, silver: 18, gold: 22, platinum: 25 };
+/* Display only, and it has to agree with TIERS in data.js and with
+   partner_rate_bands in the database. The figure a partner is actually paid
+   comes off the ledger row, which stores the rate it was worked out at. */
+const LIVE_TIER_PCT = { bronze: 0, silver: 6, gold: 7, platinum: 8 };
 
 /* The portal wants a plan NAME on a referral for its captions; the database
    stores the plan id. PLANS already exists for the demo and is the same list
@@ -178,7 +181,10 @@ async function buildLiveDB(session) {
     links: L, referrals: R, ledger: X, accounts: A, payouts: P,
     updates: (typeof buildUpdates === 'function') ? buildUpdates() : [],
     settings: {
-      baseRatePct: LIVE_TIER_PCT[me.tier] || 15,
+      /* No fallback to a number. A partner whose tier we failed to read must
+         not be shown somebody elses rate: 0 is the honest answer, and it is
+         also what an unrecognised tier actually earns. */
+      baseRatePct: LIVE_TIER_PCT[me.tier] != null ? LIVE_TIER_PCT[me.tier] : 0,
       holdDays: HOLD_DAYS,
       payoutDay: PAYOUT_DAY,
       minPayout: MIN_PAYOUT,

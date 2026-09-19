@@ -212,7 +212,7 @@ PAGES.subscribers = function () {
     oldest: (a, b) => a.joined.localeCompare(b.joined),
     renewal: (a, b) => a.renewIn - b.renewIn,
     users: (a, b) => b.users - a.users,
-    referrals: (a, b) => b.referralEarned - a.referralEarned,
+    referrals: (a, b) => b.referralConverted - a.referralConverted,
     active: (a, b) => b.lastSeen.localeCompare(a.lastSeen),
     health: (a, b) => ['at-risk', 'onboarding', 'steady', 'healthy', 'churned'].indexOf(a.health) - ['at-risk', 'onboarding', 'steady', 'healthy', 'churned'].indexOf(b.health)
   };
@@ -414,11 +414,12 @@ PAGES.billing = function () {
 
 /* The referral programme, its own tab. */
 function referralBody() {
+  /* Sorted by how many they have brought, not by what they earned. A
+     business that refers another business earns nothing: it goes on the
+     partner programme and earns there. This tab is now for spotting who to
+     invite, which is the only decision it was ever really used for. */
   const referrers = DB.subscribers.filter(s => s.referralConverted > 0)
-    .sort((a, b) => b.referralEarned - a.referralEarned);
-  const earned = Q.refCommissionTotal();
-  const paid = DB.subscribers.reduce((t, s) => t + s.referralPaid, 0);
-  const pending = DB.subscribers.reduce((t, s) => t + s.referralPending, 0);
+    .sort((a, b) => b.referralConverted - a.referralConverted);
   const converted = DB.subscribers.reduce((t, s) => t + s.referralConverted, 0);
   const invited = DB.subscribers.reduce((t, s) => t + s.referrals.length, 0);
   const mrrFromRef = DB.subscribers.filter(s => s.referredBy && s.status === 'active').reduce((t, s) => t + s.mrr, 0);
@@ -428,25 +429,24 @@ function referralBody() {
       sub: converted + ' converted · ' + pct(converted, invited) + '% conversion' }) +
     statCard({ label: 'MRR from referrals', value: moneyShort(mrrFromRef), tone: 'money', onclick: "drill('referrers')",
       sub: pct(mrrFromRef, Q.mrr()) + '% of all MRR' }) +
-    statCard({ label: 'Commission earned', value: moneyShort(earned), tone: 'money', onclick: "drill('referrers')",
-      sub: 'Across ' + referrers.length + ' referring subscribers' }) +
-    statCard({ label: 'Outstanding', value: moneyShort(pending), tone: pending ? 'warn' : 'good',
-      sub: pending ? 'Inside the 31-day hold' : 'Nothing owing' }) +
+    statCard({ label: 'Referring subscribers', value: referrers.length, tone: 'money', onclick: "drill('referrers')",
+      sub: 'Each one worth making a partner' }) +
     '</div>' +
 
-    '<div class="pnl"><div class="ph"><div><h3>How the programme works</h3></div>' +
-    '<button class="btn" onclick="editSetting(\'referralPct\',\'Referral commission %\',\'number\')">Change rate</button></div>' +
-    '<p class="note">A subscriber earns <b style="color:var(--gold)">' + DB.settings.referralPct + '%</b> of a referred ' +
-    'account\'s first month, credited 31 days after that account converts to a paid plan. The hold exists so a refund ' +
-    'inside the first month does not leave commission paid on revenue we gave back. Referrals are recognised from the ' +
-    'invite link, never self-reported, so the attribution is reliable.</p>' +
+    '<div class="pnl"><div class="ph"><div><h3>How the programme works</h3></div></div>' +
+    '<p class="note">A subscriber who refers another business is <b>not paid a commission</b>. ' +
+    'They are put on the <b style="color:var(--gold)">partner programme</b>, where they earn a share of every ' +
+    'month the businesses they bring keep paying, for four years, at a rate set by how many of those ' +
+    'businesses are active and paying. Open a subscriber and use <b>Make a partner</b>.</p>' +
+    '<p class="note">Referrals are recognised from the invite link, never self-reported, so the ' +
+    'attribution is reliable.</p>' +
     '<div class="cols2" style="margin-top:14px">' +
-    '<div>' + kv('Commission rate', DB.settings.referralPct + '% of first month') +
-    kv('Hold period', '31 days after conversion') +
+    '<div>' + kv('What a referring business earns', 'Nothing, until they are a partner') +
+    kv('What a partner earns', '0 to 8% of every month, for four years') +
     kv('Attribution', 'Inferred from the invite link') + '</div>' +
-    '<div>' + kv('Earned to date', money(earned)) +
-    kv('Paid out', money(paid) + ' <span class="note">(' + pct(paid, earned) + '%)</span>') +
-    kv('Still on hold', '<span style="color:var(--amber)">' + money(pending) + '</span>') + '</div>' +
+    '<div>' + kv('Accounts referred', String(invited)) +
+    kv('Of those, converted', converted + ' (' + pct(converted, invited) + '%)') +
+    kv('Referring subscribers', String(referrers.length)) + '</div>' +
     '</div></div>' +
 
     '<div class="pnl"><div class="ph"><div><h3>Top referrers</h3>' +
@@ -454,22 +454,16 @@ function referralBody() {
     '<button class="lnk" onclick="drill(\'referrers\')">Full breakdown &rsaquo;</button></div>' +
     (referrers.length
       ? '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Plan</th><th class="num hide-sm">Referred</th>' +
-      '<th class="num">Converted</th><th class="num">Earned</th><th class="num hide-sm">Paid</th>' +
-      '<th class="num hide-sm">Outstanding</th><th></th></tr></thead><tbody>' +
+      '<th class="num">Converted</th><th></th></tr></thead><tbody>' +
       referrers.slice(0, 12).map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',\'' + s.id + '\')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
         '<td class="num hide-sm">' + s.referrals.length + '</td>' +
         '<td class="num">' + s.referralConverted + '</td>' +
-        '<td class="num">' + money(s.referralEarned) + '</td>' +
-        '<td class="num hide-sm">' + money(s.referralPaid) + '</td>' +
-        '<td class="num hide-sm"' + (s.referralPending ? ' style="color:var(--amber)"' : '') + '>' +
-        (s.referralPending ? money(s.referralPending) : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
       '<tr class="hide-sm"><td colspan="2" style="text-align:right;font-weight:600">All ' + referrers.length + ' referrers</td>' +
       '<td class="num"><b>' + invited + '</b></td><td class="num"><b>' + converted + '</b></td>' +
-      '<td class="num"><b>' + money(earned) + '</b></td><td class="num"><b>' + money(paid) + '</b></td>' +
-      '<td class="num"><b>' + money(pending) + '</b></td><td></td></tr>' +
+      '<td></td></tr>' +
       '</tbody></table></div>'
       : '<div class="empty">Nobody has referred anyone yet.</div>') + '</div>';
 }

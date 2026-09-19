@@ -87,16 +87,31 @@ const PLANS = [
 const planById = id => PLANS.find(p => p.id === id);
 
 /* ---------------- the tier ladder ----------------
-   Base rate 15%, the figure the admin console publishes. Volume moves you
-   along it, and the rate that applies to a referral is the rate you were on
-   the day that account started paying, so nothing already earned is ever
-   recalculated behind a partner's back. */
+   Rewritten 19 September 2026. This used to be a one off share of each
+   referred business's FIRST payment, 15 to 25 per cent. It is now a
+   RECURRING share of what they keep paying, 0 to 8 per cent, on a four year
+   clock per business with a 3% taper in years three and four.
+
+   The rate is decided by the partner's CURRENT count of active paying
+   businesses, so it moves both ways, and it applies from that day forward.
+   Nothing already credited is ever recalculated. The ids are unchanged
+   because partners.tier in the database holds them.
+
+   THIS IS A DISPLAY COPY. The rate that decides money is worked out by
+   partner_referral_rate() in the database, which the browser cannot run.
+   supabase/tests/partner_commission_harness.mjs is what proves it. */
 const TIERS = [
-  { id: 'bronze', name: 'Bronze', min: 0, pct: 15 },
-  { id: 'silver', name: 'Silver', min: 5, pct: 18 },
-  { id: 'gold', name: 'Gold', min: 15, pct: 22 },
-  { id: 'platinum', name: 'Platinum', min: 30, pct: 25 }
+  { id: 'bronze', name: 'Getting started', min: 0, pct: 0 },
+  { id: 'silver', name: 'Unlocked', min: 5, pct: 6 },
+  { id: 'gold', name: 'Established', min: 15, pct: 7 },
+  { id: 'platinum', name: 'Senior', min: 30, pct: 8 }
 ];
+
+/* Years one and two at the tier rate, years three and four here, then it
+   ends. Per business, from the day that business first paid. */
+const TAPER_PCT = 3;
+const TERM_YEARS = 4;
+const TAPER_AFTER_YEARS = 2;
 function tierFor(n) {
   let t = TIERS[0];
   TIERS.forEach(x => { if (n >= x.min) t = x; });
@@ -312,9 +327,9 @@ function buildLedger(referrals) {
       date: r.subscribedOn, clearsOn,
       rate: tier.pct, tier: tier.name,
       basis: r.firstPayment,
-      basisLabel: r.cycle === 'annual' ? 'first year, paid up front' : 'first month',
+      basisLabel: r.cycle === 'annual' ? 'a year, paid up front' : 'a month',
       amount: Math.round(r.firstPayment * tier.pct / 100),
-      note: r.planName + ' · ' + tier.pct + '% of ' + money(r.firstPayment)
+      note: r.planName + ' · ' + tier.pct + '% of ' + money(r.firstPayment) + ', recurring'
     });
 
     const n = i + 1;
@@ -392,7 +407,7 @@ function buildPayouts(runs, accounts) {
 function buildUpdates() {
   const seed = [
     ['Gold partners now earn 22%', 'programme', -6,
-      'From this month Gold partners earn 22% of every first payment, up from 20%. The new rate applies to accounts that start paying from 1 August onward. Nothing you have already earned changes.'],
+      'The programme is now recurring: you earn a share of every month a referred account pays, for four years, instead of a single share when they started paying. Your rate follows how many accounts are active and paying right now. Nothing you have already earned changes.'],
     ['August payouts landed on the 5th', 'payouts', -22,
       'Every cleared commission went out on schedule. If your bank has not shown it yet, give it one working day before raising a ticket, and check that the account marked primary is the one you expect.'],
     ['Co-branded launch kit for Gold and above', 'programme', -33,
@@ -452,7 +467,7 @@ function buildDB(profile) {
     links, referrals, ledger, accounts, payouts,
     updates: buildUpdates(),
     settings: {
-      baseRatePct: 15,
+      baseRatePct: 6,
       holdDays: HOLD_DAYS,
       payoutDay: PAYOUT_DAY,
       minPayout: MIN_PAYOUT,

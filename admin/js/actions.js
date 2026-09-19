@@ -246,7 +246,7 @@ function doAddSubscriber() {
     renewIn: planId === 'trial' ? DB.settings.trialDays : 30,
     mrr: planMrr(p, cycle, document.getElementById('asPrice') && document.getElementById('asPrice').value),
     channel: 'Added by admin', businesses: [{ name: 'Main outlet', city: document.getElementById('asCity').value || 'Lagos', staff: 1, openedOn: iso(DB.today) }],
-    referredBy: null, referrals: [], referralLedger: [], referralEarned: 0, referralPaid: 0, referralPending: 0, referralConverted: 0,
+    referredBy: null, referrals: [], referralLedger: [], referralConverted: 0,
     lastSeen: iso(DB.today), ordersLast30: 0, notes: []
   });
   logAction('sub_edit', 'Subscriber created', 'Kayode Ojomo created ' + name + ' on the ' + p.name + ' plan', 'subscriber:' + id);
@@ -789,7 +789,7 @@ function exportSubscribers() {
   exportCsv('subscribers',
     ['ID', 'Business', 'Owner', 'Email', 'Phone', 'City', 'Plan', 'Cycle', 'Status', 'Health', 'Users', 'Seats', 'Joined', 'Renews', 'MRR', 'Referrals', 'Commission'],
     Q.subsAsOf().map(s => ['TLB-S' + String(s.id).padStart(4, '0'), s.name, s.owner, s.email, s.phone, s.city,
-      s.planName, s.cycle, s.status, s.health, s.users, s.seats, s.joined, s.renewsOn, s.mrr, s.referralConverted, s.referralEarned]));
+      s.planName, s.cycle, s.status, s.health, s.users, s.seats, s.joined, s.renewsOn, s.mrr, s.referralConverted]));
 }
 function exportPayments() {
   exportCsv('payments', ['Date', 'Subscriber', 'Reference', 'Invoice', 'Amount', 'Provider', 'Method', 'Status', 'Plan', 'Cycle'],
@@ -924,6 +924,22 @@ async function doInviteStudio() {
   }
 }
 
+/* A subscriber becomes a partner.
+
+   It opens the ordinary partner invitation prefilled from the business, so a
+   studio joining the programme goes through exactly the same door as anybody
+   else: same code rules, same tier ladder, same email. Two doors into one
+   programme is how the two end up disagreeing about what somebody earns.
+
+   The tier is not chosen here. A new partner starts at the bottom of the
+   ladder, which is 0% until five of their referrals are paying, and the
+   database works the rest out from their live count. */
+function makeSubscriberAPartner(id) {
+  const s = (DB.subscribers || []).find(x => String(x.id) === String(id));
+  if (!s) { toast("That subscriber is not on this screen any more."); return; }
+  formInvitePartner(s.email || s.ownerEmail || "", s.owner || s.name || "");
+}
+
 function formInvitePartner(prefillEmail, prefillName) {
   const suggested = String(prefillName || '').toUpperCase()
     .replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
@@ -935,7 +951,8 @@ function formInvitePartner(prefillEmail, prefillName) {
     '<div class="f2"><div class="fg"><label>Referral code</label>' +
     '<input id="ipCode" placeholder="TUNDE" value="' + esc(suggested) + '"></div>' +
     '<div class="fg"><label>Tier</label><select id="ipTier">' +
-    [['bronze', 'Bronze'], ['silver', 'Silver'], ['gold', 'Gold'], ['platinum', 'Platinum']]
+    [['bronze', 'Getting started, 0%'], ['silver', 'Unlocked, 6%'],
+     ['gold', 'Established, 7%'], ['platinum', 'Senior, 8%']]
       .map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('') +
     '</select></div></div>' +
     '<p class="hint">The code is what they share, so it has to be unique and it is worth it being ' +

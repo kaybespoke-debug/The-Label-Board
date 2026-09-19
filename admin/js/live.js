@@ -435,9 +435,6 @@ function liveToSubscriber(row) {
        referrals in the database yet, so zero and empty is the truthful answer
        rather than a placeholder: when it is tracked, this is where it lands. */
     referralLedger: [],
-    referralEarned: 0,
-    referralPaid: 0,
-    referralPending: 0,
     referralConverted: 0,
     /* Filled in by liveLoadBilling a moment later. Present here so the detail
        view never reads undefined in the window before that call returns. */

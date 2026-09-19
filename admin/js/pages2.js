@@ -492,7 +492,6 @@ PAGES.settings = function () {
     kvEdit('Default currency', s.currency + ' ₦', "editSetting('currency','Default currency','text')") +
     kvEdit('Trial length', s.trialDays + ' days', "editSetting('trialDays','Trial length in days','number')") +
     kvEdit('Support SLA', s.slaHours + ' hours', "editSetting('slaHours','Support SLA in hours','number')") +
-    kvEdit('Referral commission', s.referralPct + '% of first month', "editSetting('referralPct','Referral commission %','number')") +
     kvEdit('Tax rate', s.taxPct + '% VAT', "editSetting('taxPct','Tax rate %','number')") +
     '<div class="sec-t">Pay policy</div>' +
     '<div class="kv klik" style="cursor:pointer" onclick="formAllowances()">' +
@@ -808,7 +807,18 @@ PAGES.partners = function () {
   };
   const list = buckets[f] || all;
 
-  const TIER = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' };
+  /* The ladder was renamed and repriced on 19 September 2026: a one off 15
+     to 25 per cent of a referred business's first payment became a recurring
+     0 to 8 per cent of what they keep paying, on a four year clock. The ids
+     did not change, because partners.tier holds them.
+
+     The rate is shown next to the name because an operator looking at this
+     table is usually about to answer "what does this partner earn", and the
+     answer used to be a word they had to go and look up. What a partner is
+     actually PAID comes off partner_ledger, which stores the rate each month
+     was worked out at; this is a label, not a calculation. */
+  const TIER = { bronze: 'Getting started, 0%', silver: 'Unlocked, 6%',
+                 gold: 'Established, 7%', platinum: 'Senior, 8%' };
 
   const head = '<div class="stats">' +
     statCard({ label: 'Partners', value: all.length, tone: 'info',

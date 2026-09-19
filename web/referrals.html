@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#06101d">
 <meta name="color-scheme" content="dark">
 <title>Refer a business · The Label Board</title>
-<meta name="description" content="Tell another business about The Label Board. When they pay their first month, you both get a free month. Refer three and you can be paid in cash instead.">
+<meta name="description" content="Tell another business about The Label Board. When they pay, you both get a free month, and one referral puts you on the partner programme.">
 <link rel="canonical" href="https://thelabelboard.com/referrals.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Label Board">
@@ -77,6 +77,13 @@
 <div class="drawer" id="drawer">
   <a href="index.html">Home</a>
   <a href="features.html">Products</a>
+  <!-- The header dropdown does not exist below 1000px, and the product page
+       no longer has a tab strip, so these five are how a phone changes area. -->
+  <a class="sub" href="features.html#orders">Orders and customers</a>
+  <a class="sub" href="features.html#production">Production and delivery</a>
+  <a class="sub" href="features.html#inventory">Stock and suppliers</a>
+  <a class="sub" href="features.html#money">Money and people</a>
+  <a class="sub" href="features.html#offline">Phone and offline</a>
   <a href="pricing.html">Pricing</a>
   <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
@@ -114,9 +121,9 @@
         <p>Credited the same way, against their first bill. It means you are handing a friend something worth having rather than doing us a favour.</p>
       </div>
       <div class="card">
-        <span class="badge-soft">After three</span>
-        <h3 style="margin-top:14px">Cash, if you prefer</h3>
-        <p>Refer three businesses that stay and we will offer you a place on the partner programme, where the reward is money in your account rather than credit on a bill.</p>
+        <span class="badge-soft">From the first one</span>
+        <h3 style="margin-top:14px">And it makes you a partner</h3>
+        <p>Send us one business and we set you up on the <a href="partners.html">partner programme</a> there and then. From that point what you refer pays you money rather than credit, every month they keep paying, and your rate climbs as more of them stay.</p>
       </div>
     </div>
   </div>
@@ -150,16 +157,15 @@
 <!-- ============ refer form ============ -->
 <section id="refer" class="anchor">
   <div class="wrap">
-    <div class="row2">
-      <div class="row2-text">
+    <!-- One centred column, the same as every other form on this site. The
+         one line worth keeping out of the four paragraphs that were here is
+         the one asking people not to send a cold list, because that one is
+         about somebody else being messaged without their say so. -->
+    <div class="form-wide">
+      <div class="sec-head center">
         <span class="eyebrow">Refer a business</span>
         <h2>Who should we be talking to</h2>
-        <p>Only send us someone you would actually recommend it to. We will contact them once, politely, and mention that you sent us. If they are not interested that is the end of it.</p>
-        <div class="callout" style="margin-top:24px">
-          <p><strong>Please ask them first.</strong></p>
-          <p>We would rather a warm introduction than a cold list. Tell them we will be in touch, and we will keep the message short and useful.</p>
-        </div>
-        <p class="note">Referring several at once, or on behalf of an association? The <a href="partners.html">partner programme</a> is built for that and pays cash.</p>
+        <p class="lede">Please ask them first. We would rather a warm introduction than a cold list, and we contact them once.</p>
       </div>
 
       <form class="form" name="referral" method="POST" action="thanks.html" data-netlify="true" netlify-honeypot="extra-url">
@@ -205,7 +211,7 @@
 
         <div class="form-foot">
           <button class="btn btn-gold" type="submit">Send the referral</button>
-          <p class="small">We contact them once.</p>
+          <p class="small">Several at once? The <a href="partners.html">partner programme</a> is built for that.</p>
         </div>
       </form>
     </div>
