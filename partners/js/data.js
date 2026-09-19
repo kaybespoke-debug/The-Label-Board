@@ -407,7 +407,7 @@ function buildPayouts(runs, accounts) {
 function buildUpdates() {
   const seed = [
     ['Gold partners now earn 22%', 'programme', -6,
-      'The programme is now recurring: you earn a share of every month a referred account pays, for four years, rather than one share of their first payment. Your rate follows how many accounts are active and paying right now. Nothing you have already earned changes.'],
+      'The programme is now recurring: you earn a share of every month a referred account pays, for four years, instead of a single share when they started paying. Your rate follows how many accounts are active and paying right now. Nothing you have already earned changes.'],
     ['August payouts landed on the 5th', 'payouts', -22,
       'Every cleared commission went out on schedule. If your bank has not shown it yet, give it one working day before raising a ticket, and check that the account marked primary is the one you expect.'],
     ['Co-branded launch kit for Gold and above', 'programme', -33,

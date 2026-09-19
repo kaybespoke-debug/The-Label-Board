@@ -252,7 +252,7 @@ function buildSubscribers() {
     }
   });
 
-  /* ---- referrals: build a real referral graph with commission ---- */
+  /* ---- referrals: who brought whom. No money: only partners earn ---- */
   const active = out.filter(s => s.status !== 'expired');
   out.forEach(s => { s.referrals = []; });
   // ~34 referral links
@@ -270,8 +270,12 @@ function buildSubscribers() {
   out.forEach(s => {
     if (s.channelSource === 'signup' && s.plan === 'premium' && rnd() < 0.3) s.channelSource = 'demo-request';
   });
-  // commission = 15% of first month for each converted referral, paid once
+  // No commission. Only partners earn: a business that refers another
+  // business is put on the partner programme and earns from there.
   out.forEach(s => {
+    /* No commission. A business that refers another business is not paid;
+       it is put on the partner programme and earns there. This list is the
+       graph only: who they brought and whether it converted. */
     s.referralLedger = s.referrals.map(rid => {
       const r = out.find(x => x.id === rid);
       const converted = r.status === 'active' || r.status === 'expired';
@@ -279,15 +283,9 @@ function buildSubscribers() {
       return {
         subId: rid, name: r.name, plan: r.planName, status: r.status,
         joined: r.joined,
-        converted,
-        commission: Math.round(base * 0.15),
-        paid: converted && new Date(r.joined) < dAgo(30),
-        creditedOn: converted ? iso(new Date(new Date(r.joined).getTime() + 31 * DAY)) : null
+        converted
       };
     });
-    s.referralEarned = s.referralLedger.reduce((t, r) => t + r.commission, 0);
-    s.referralPaid = s.referralLedger.filter(r => r.paid).reduce((t, r) => t + r.commission, 0);
-    s.referralPending = s.referralEarned - s.referralPaid;
     s.referralConverted = s.referralLedger.filter(r => r.converted).length;
   });
 
@@ -972,7 +970,6 @@ const DB = (function () {
       currency: 'NGN',
       trialDays: 14,
       slaHours: 4,
-      referralPct: 15,
       taxPct: 7.5,
       invoicePrefix: 'INV',
       settlement: {

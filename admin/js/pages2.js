@@ -492,7 +492,6 @@ PAGES.settings = function () {
     kvEdit('Default currency', s.currency + ' ₦', "editSetting('currency','Default currency','text')") +
     kvEdit('Trial length', s.trialDays + ' days', "editSetting('trialDays','Trial length in days','number')") +
     kvEdit('Support SLA', s.slaHours + ' hours', "editSetting('slaHours','Support SLA in hours','number')") +
-    kvEdit('Referral commission', s.referralPct + '% of first month', "editSetting('referralPct','Referral commission %','number')") +
     kvEdit('Tax rate', s.taxPct + '% VAT', "editSetting('taxPct','Tax rate %','number')") +
     '<div class="sec-t">Pay policy</div>' +
     '<div class="kv klik" style="cursor:pointer" onclick="formAllowances()">' +

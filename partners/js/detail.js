@@ -26,7 +26,7 @@ DETAIL.ref = function (id) {
     r.addedBy === 'partner' ? 'You set the account up with them' : 'Through your ' + esc(link.label)]);
   if (r.subscribedOn) {
     events.push(['Started paying', fmtD(r.subscribedOn),
-      r.planName + ', ' + (r.cycle === 'annual' ? 'annual' : 'monthly') + ' · ' + money(r.firstPayment) + ' first payment']);
+      r.planName + ', ' + (r.cycle === 'annual' ? 'annual' : 'monthly') + ' · ' + money(r.firstPayment) + ' when they started']);
     if (sig) {
       events.push(['You earned ' + money(sig.amount), fmtD(sig.date),
         sig.rate + '% as a ' + sig.tier + ' partner']);

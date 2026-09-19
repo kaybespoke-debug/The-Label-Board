@@ -88,24 +88,16 @@ const ROWS = {
     if (!list.length) return '<div class="empty">Nobody has referred anyone yet.</div>';
     return '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Plan</th>' +
       '<th class="num hide-sm">Referred</th>' +
-      '<th class="num hide-sm">Converted</th><th class="num">Earned</th><th class="num hide-sm">Paid</th>' +
-      '<th class="num hide-sm">Outstanding</th><th></th></tr></thead><tbody>' +
+      '<th class="num hide-sm">Converted</th><th></th></tr></thead><tbody>' +
       list.map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
         '<td class="num hide-sm">' + s.referrals.length + '</td>' +
         '<td class="num hide-sm">' + s.referralConverted + '</td>' +
-        '<td class="num">' + money(s.referralEarned) + '</td>' +
-        '<td class="num hide-sm">' + money(s.referralPaid) + '</td>' +
-        '<td class="num hide-sm"' + (s.referralPending ? ' style="color:var(--amber)"' : '') + '>' +
-        (s.referralPending ? money(s.referralPending) : '—') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') +
       '<tr class="hide-sm"><td colspan="2" style="text-align:right;font-weight:600">' + list.length + ' referrers</td>' +
       '<td class="num"><b>' + list.reduce((t, s) => t + s.referrals.length, 0) + '</b></td>' +
       '<td class="num"><b>' + list.reduce((t, s) => t + s.referralConverted, 0) + '</b></td>' +
-      '<td class="num"><b>' + money(list.reduce((t, s) => t + s.referralEarned, 0)) + '</b></td>' +
-      '<td class="num"><b>' + money(list.reduce((t, s) => t + s.referralPaid, 0)) + '</b></td>' +
-      '<td class="num"><b>' + money(list.reduce((t, s) => t + s.referralPending, 0)) + '</b></td>' +
       '<td></td></tr></tbody></table></div>';
   },
   tasks(list) {
@@ -562,28 +554,25 @@ const METRICS = {
   /* ----- referrals ----- */
   'referrers': () => {
     const referrers = DB.subscribers.filter(s => s.referralConverted > 0)
-      .sort((a, b) => b.referralEarned - a.referralEarned);
-    const earned = Q.refCommissionTotal();
+      .sort((a, b) => b.referralConverted - a.referralConverted);
     const invited = DB.subscribers.reduce((t, s) => t + s.referrals.length, 0);
     const converted = DB.subscribers.reduce((t, s) => t + s.referralConverted, 0);
     const mrrFromRef = DB.subscribers.filter(s => s.referredBy && s.status === 'active').reduce((t, s) => t + s.mrr, 0);
     return {
       title: 'Top referrers', value: referrers.length, tone: 'money',
-      how: 'Subscribers who have brought in at least one account that converted to a paid plan. Commission is ' +
-        DB.settings.referralPct + '% of the referred account\'s first month, credited 31 days after they convert — ' +
-        'the hold exists so a refund inside the first month does not leave commission paid on revenue we gave back.',
+      how: 'Subscribers who have brought in at least one account that converted to a paid plan. They are not ' +
+        'paid a commission for it: only partners earn. Each of these is somebody to put on the partner ' +
+        'programme, where they earn a share of every month the businesses they bring keep paying.',
       facts: [['Accounts referred in total', invited],
         ['Of those, converted', converted + ' (' + pct(converted, invited) + '%)'],
         ['MRR now coming from referrals', money(mrrFromRef) + ' — ' + pct(mrrFromRef, Q.mrr()) + '% of all MRR'],
-        ['Commission earned', money(earned)],
-        ['Commission paid out', money(DB.subscribers.reduce((t, s) => t + s.referralPaid, 0))],
-        ['Still inside the hold', money(DB.subscribers.reduce((t, s) => t + s.referralPending, 0))],
-        ['Best single referrer', referrers.length ? referrers[0].name + ' — ' + money(referrers[0].referralEarned) : '—']],
+        ['Best single referrer', referrers.length
+          ? referrers[0].name + ' \u00b7 ' + referrers[0].referralConverted + ' paying' : '—']],
       breakdown: {
-        title: 'Commission earned, per referrer',
+        title: 'Businesses brought, per referrer',
         html: hBars(referrers.slice(0, 8).map((s, i) => ({
           label: s.name.length > 14 ? s.name.slice(0, 13) + '…' : s.name,
-          value: s.referralEarned,
+          value: s.referralConverted,
           color: ['var(--gold)', 'var(--green)', 'var(--blue)', 'var(--purple)', 'var(--amber)'][i % 5],
           onclick: "UI.vtab['sub" + s.id + "']='referrals';openDetail('sub'," + s.id + ")"
         })), { money: true })

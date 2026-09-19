@@ -77,30 +77,29 @@ DETAIL.sub = function (id) {
   }
 
   else if (tab === 'referrals') {
-    body = '<div class="sec-t">Referral earnings</div>' +
+    body = '<div class="sec-t">Who they have brought</div>' +
       '<div class="stats" style="margin-bottom:8px">' +
       statCard({ label: 'People referred', value: s.referrals.length, tone: 'info', sub: s.referralConverted + ' converted to paid' }) +
-      statCard({ label: 'Commission earned', value: money(s.referralEarned), tone: 'money', sub: DB.settings.referralPct + '% of each first month' }) +
-      statCard({ label: 'Paid out', value: money(s.referralPaid), tone: 'good', sub: 'Credited to the account' }) +
-      statCard({ label: 'Outstanding', value: money(s.referralPending), tone: s.referralPending ? 'warn' : 'good', sub: s.referralPending ? 'Clears 31 days after signup' : 'Nothing owing' }) +
+      statCard({ label: 'Paying now', value: s.referralConverted, tone: s.referralConverted ? 'money' : 'info',
+        sub: s.referralConverted ? 'Worth making them a partner' : 'Nothing converted yet' }) +
       '</div>' +
       (s.referralLedger.length
         ? '<div class="tw"><table><thead><tr><th>Business referred</th><th class="hide-sm">Plan</th>' +
         '<th class="hide-sm">Status</th><th class="hide-sm">Joined</th>' +
-        '<th class="num">Commission</th><th>Paid</th><th></th></tr></thead><tbody>' +
+        '<th>Converted</th><th></th></tr></thead><tbody>' +
         s.referralLedger.map(r => '<tr class="klik" onclick="openDetail(\'sub\',\'' + r.subId + '\')">' +
           '<td class="t-main">' + esc(r.name) + '</td>' +
           '<td class="hide-sm"><span class="tier">' + r.plan + '</span></td>' +
           '<td class="hide-sm">' + statusPill(r.status) + '</td>' +
           '<td class="hide-sm">' + fmtD(r.joined) + '</td>' +
-          '<td class="num">' + (r.commission ? money(r.commission) : '—') + '</td>' +
-          '<td>' + (r.paid ? '<span class="pill green">Paid ' + fmtDShort(r.creditedOn) + '</span>' : r.converted ? '<span class="pill amber">Pending</span>' : '<span class="pill grey">Not converted</span>') + '</td>' +
+          '<td>' + (r.converted ? '<span class="pill green">Paying</span>' : '<span class="pill grey">Not converted</span>') + '</td>' +
           '<td class="chev">&rsaquo;</td></tr>').join('') +
-        '<tr class="hide-sm"><td colspan="4" style="text-align:right;font-weight:600">Total</td>' +
-        '<td class="num"><b>' + money(s.referralEarned) + '</b></td><td colspan="2"></td></tr>' +
-        '</tbody></table></div>'
+        '</tbody></table></div>' +
+        '<p class="note" style="margin-top:10px">A business that refers another business is not paid a ' +
+        'commission. It is put on the <b>partner programme</b>, where it earns a share of every month ' +
+        'the businesses it brings keep paying. Use <b>Make a partner</b> at the top of this record.</p>'
         : '<div class="empty">This subscriber has not referred anyone yet.<br>' +
-        '<span class="note">Commission is ' + DB.settings.referralPct + '% of the referred account\'s first month, credited 31 days after they convert.</span></div>');
+        '<span class="note">When they do, make them a partner and they earn from the programme.</span></div>');
   }
 
   else if (tab === 'businesses') {
@@ -171,7 +170,7 @@ DETAIL.sub = function (id) {
     dstat(s.mrr ? money(s.mrr) : '—', 'MRR', 'm') +
     dstat(money(lifetime), 'Lifetime revenue', 'g') +
     dstat(tenureLbl, 'Subscriber for') +
-    dstat(s.referralConverted + (s.referralEarned ? ' · ' + moneyShort(s.referralEarned) : ''), 'Referrals', s.referralEarned ? 'm' : '') +
+    dstat(String(s.referralConverted), 'Referrals paying', s.referralConverted ? 'm' : '') +
     dstat(s.seats ? s.users + '/' + s.seats : s.users + ' / ∞', 'Seats used') +
     (s.pastDue ? dstat(money(s.mrr), 'Past due', 'r') : '') +
     '</div>' +

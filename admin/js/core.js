@@ -311,7 +311,6 @@ const Q = {
   staffM(id) { return DB.staff.find(s => String(s.id) === String(id)); },
   role(id) { return DB.roles.find(r => r.id === id); },
   ticket(id) { return DB.tickets.find(t => String(t.id) === String(id)); },
-  refCommissionTotal() { return DB.subscribers.reduce((t, s) => t + (s.referralEarned || 0), 0); },
   tasksFor(f) {
     if (f === 'mine') return DB.tasks.filter(t => t.assignedTo === 1 || t.createdBy === 1);
     if (f === 'overdue') return DB.tasks.filter(t => !t.done && t.dueIn < 0);

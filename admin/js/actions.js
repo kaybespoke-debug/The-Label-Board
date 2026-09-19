@@ -246,7 +246,7 @@ function doAddSubscriber() {
     renewIn: planId === 'trial' ? DB.settings.trialDays : 30,
     mrr: planMrr(p, cycle, document.getElementById('asPrice') && document.getElementById('asPrice').value),
     channel: 'Added by admin', businesses: [{ name: 'Main outlet', city: document.getElementById('asCity').value || 'Lagos', staff: 1, openedOn: iso(DB.today) }],
-    referredBy: null, referrals: [], referralLedger: [], referralEarned: 0, referralPaid: 0, referralPending: 0, referralConverted: 0,
+    referredBy: null, referrals: [], referralLedger: [], referralConverted: 0,
     lastSeen: iso(DB.today), ordersLast30: 0, notes: []
   });
   logAction('sub_edit', 'Subscriber created', 'Kayode Ojomo created ' + name + ' on the ' + p.name + ' plan', 'subscriber:' + id);
@@ -789,7 +789,7 @@ function exportSubscribers() {
   exportCsv('subscribers',
     ['ID', 'Business', 'Owner', 'Email', 'Phone', 'City', 'Plan', 'Cycle', 'Status', 'Health', 'Users', 'Seats', 'Joined', 'Renews', 'MRR', 'Referrals', 'Commission'],
     Q.subsAsOf().map(s => ['TLB-S' + String(s.id).padStart(4, '0'), s.name, s.owner, s.email, s.phone, s.city,
-      s.planName, s.cycle, s.status, s.health, s.users, s.seats, s.joined, s.renewsOn, s.mrr, s.referralConverted, s.referralEarned]));
+      s.planName, s.cycle, s.status, s.health, s.users, s.seats, s.joined, s.renewsOn, s.mrr, s.referralConverted]));
 }
 function exportPayments() {
   exportCsv('payments', ['Date', 'Subscriber', 'Reference', 'Invoice', 'Amount', 'Provider', 'Method', 'Status', 'Plan', 'Cycle'],
