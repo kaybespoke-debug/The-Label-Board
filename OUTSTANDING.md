@@ -16,7 +16,44 @@ drawer carries the five areas, the screenshots are the cropped ones at
 1328x1063, and all twelve pages render at 390 with no broken image and no
 sideways scroll. `app.thelabelboard.com` still serves the customer app.
 
-## BLOCKING: two migrations are written and NOT applied
+## The commission engine is live in the database, 19 September
+
+Both migrations applied to `eskubrbgbcbaejynjxvh`, plus a third the Supabase
+linter asked for. The pre-flight check came back clean: **0 referrals marked
+lapsed without a date**, and none lapsed at all.
+
+| Applied | |
+|---|---|
+| `20260919171055` | `partner_commission` |
+| `20260919171119` | `partner_milestones_and_payouts` |
+| `20260919171236` | `partner_tier_rate_invoker` |
+
+Verified against the live database rather than assumed: the ladder reads
+0/5/15/30 to 0/6/7/8 under the new labels, the four milestones are 25k, 50k,
+100k and 150k, all four new constraints exist, and the two historic ledger
+rows at 30% are untouched, one paid and one pending. Forward only held.
+
+Grants, checked with `has_function_privilege` rather than by calling:
+all seven functions executable by `service_role`, **none by `anon`**, and only
+`partner_tier_rate` by `authenticated`, which is the ladder the portal shows.
+
+**The linter found one of mine.** `partner_tier_rate` was SECURITY DEFINER out
+of habit and sat on `/rest/v1/rpc` callable by any signed-in user. It reads
+nothing they cannot already read, so it is INVOKER now and the warning is
+gone. The four remaining security findings are older and deliberate:
+`submit_enquiry` is anon-callable because the website forms use it,
+`my_storage_usage` is a studio reading its own, and four service-role-only
+tables have RLS on with no policy on purpose.
+
+**Nothing is scheduled yet.** No job calls `partner_accrue_month`,
+`partner_award_milestones`, `partner_clear_ledger` or `partner_payout_run`.
+Until one does, no commission accrues. Today that costs nothing: one partner
+has a single paying referral, which is under the five needed to unlock
+earning, and the other three have none.
+
+**Next, and it is the last piece:** a monthly job and a yearly one. A Supabase
+scheduled function is the obvious home, and it needs the service role key,
+which is Kayode's to put in.
 
 The whole partner commission engine is in the repo and proven by a 137 check
 harness, and **none of it is in the live database**. Nothing deployed calls
