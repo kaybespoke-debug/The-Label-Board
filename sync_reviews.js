@@ -123,16 +123,44 @@ const share = live ? firstCards(all, ON_HOME) : eol;
 {
   let s = read('_redirects');
   const e = nl(s);
+  /* The exclamation mark is load bearing and this shipped once without it.
+     Netlify applies a redirect only when no file matches the path, and
+     reviews.html is a real file, so the plain rule was ignored and the empty
+     page was served at /reviews on the live site. The ! forces the rule to win
+     over the file. Nothing in a static gate can prove Netlify honours it, so
+     the check that caught this was fetching the url after the deploy, and that
+     stays the last step of a release. */
+  /* Markers, not a text match on the rule itself. The first version of this
+     removed the block by searching for its exact lines, so the day the rule
+     was corrected the old one had no way of being recognised and the file
+     ended up with both. Everything between the markers is this script's, and
+     it is thrown away and rewritten every run. */
+  const TOP = '# --- REVIEWS, MANAGED BY sync_reviews.js, DO NOT EDIT BY HAND ---';
+  const BOT = '# --- END REVIEWS ---';
   const rule = [
+    TOP,
     '# There are no reviews yet, so this page is not somewhere to send anybody.',
-    '# sync_reviews.js removes these two lines the moment the first one lands.',
-    '/reviews      /index.html     302',
-    '/reviews.html /index.html     302',
+    '# The ! is load bearing. Netlify applies a redirect only when no file',
+    '# matches the path, and reviews.html is a real file, so without it Netlify',
+    '# serves the empty page and ignores the rule. It did exactly that once.',
+    '/reviews      /index.html     302!',
+    '/reviews.html /index.html     302!',
+    BOT,
     ''
   ].join(e);
-  const has = s.indexOf('/reviews      /index.html') >= 0;
-  if (!live && !has) s = s.split('/support      /contact.html').join(rule + e + '/support      /contact.html');
-  if (live && has) s = s.split(rule + e).join('');
+
+  const a = s.indexOf(TOP);
+  if (a >= 0) {
+    const b = s.indexOf(BOT, a);
+    s = s.slice(0, a) + s.slice(b < 0 ? a : b + BOT.length + e.length);
+  } else {
+    /* the first version had no markers, so clear its lines by hand, once */
+    s = s.split(e).filter(l => l.indexOf('/reviews') !== 0
+      && l !== '# There are no reviews yet, so this page is not somewhere to send anybody.'
+      && l !== '# sync_reviews.js removes these two lines the moment the first one lands.').join(e);
+  }
+  while (s.indexOf(e + e + e) >= 0) s = s.split(e + e + e).join(e + e);
+  if (!live) s = s.split('/support      /contact.html').join(rule + e + '/support      /contact.html');
   if (write('_redirects', s)) changed.push('_redirects');
 }
 

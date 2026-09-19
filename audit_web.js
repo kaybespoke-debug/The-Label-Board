@@ -678,6 +678,17 @@ check((revSitemap.indexOf('reviews.html') !== -1) === revLive,
   'the sitemap offers the reviews page only once it has something on it');
 check((revRedirects.indexOf('/reviews      /index.html') !== -1) === !revLive,
   'an empty reviews page is redirected away rather than shown to anybody');
+/* The exclamation mark, on its own line of the gate, because leaving it off is
+   not a typo that shows up as a broken build. Netlify applies a redirect only
+   where no file matches the path, and reviews.html is a real file, so the rule
+   without the ! is accepted, deployed, and quietly ignored. It went out like
+   that once and the empty page was live at /reviews until the post-deploy
+   check fetched the url. This is why that fetch is the last step of a release
+   and not a formality: no static gate can prove what Netlify will do. */
+check((revRedirects.indexOf('/reviews      /index.html     302!') !== -1) === !revLive,
+  'the redirect away from the empty page is forced, or Netlify serves the file and ignores it');
+check((revRedirects.indexOf('/reviews.html /index.html     302!') !== -1) === !revLive,
+  'the .html form of the empty page is forced away too');
 check((refFooter.indexOf('reviews.html') !== -1) === revLive,
   'the footer links to the reviews page only once there is a review on it');
 /* And no page offers a way to the reviews page while it is empty.

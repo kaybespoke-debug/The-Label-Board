@@ -27,6 +27,15 @@ until a real review goes in.
 3. `node audit_web.js`
 4. deploy
 
+**The redirect needs a `!` and went out once without one.** Netlify applies a
+redirect only where no file matches the path, and `reviews.html` is a real
+file, so the plain rule was accepted, deployed and silently ignored: the empty
+page was live at `thelabelboard.com/reviews` until the post-deploy fetch found
+it. Fixed the same hour with `302!`, and the gate now demands the mark. The
+lesson is about the release rather than the rule: **no static gate can prove
+what Netlify will do, so fetching the url after a deploy is the last step and
+not a formality.**
+
 Step 2 flips all seven things that have to agree: the two page blocks, the
 `hidden` attribute on each, the `noindex`, the sitemap, the footer link and the
 redirect that currently sends `/reviews` to the home page. `audit_web.js` fails
