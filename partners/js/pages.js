@@ -109,7 +109,7 @@ PAGES.earnings = function () {
         '<tr><td colspan="3" style="text-align:right;font-weight:600">Total</td>' +
         '<td class="num"><b>' + money(list.reduce((t, r) => t + r.amount, 0)) + '</b></td></tr>' +
         '</tbody></table></div>'
-      : '<div class="empty">Nothing here.<br><span class="note">Commission appears the day a business you referred makes its first payment.</span></div>') +
+      : '<div class="empty">Nothing here.<br><span class="note">Commission appears the month after a business you referred starts paying, and every month after that.</span></div>') +
     '<div class="bar" style="margin:14px 0 0"><span class="spacer"></span>' +
     '<button class="btn sm" onclick="exportEarnings()">Export</button></div>' +
     '</div>';

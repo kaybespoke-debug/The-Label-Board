@@ -1164,3 +1164,20 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .rev .who b{font-size:13px}
   .rev .who span{font-size:11.5px}
 }
+
+/* ---------- the hero screenshot after the crop ----------
+   The app's left navigation was cut off every capture on 19 September, so a
+   developer reading this site does not get a list of what the product has.
+   That changed the shape of the picture from 1700x1063 to 1328x1063, and a
+   squarer picture at the same width is a taller one: the hero went from 541 to
+   635 at 1680 and 672 at 1920, which is the opposite of what Kayode asked for
+   when he said the screenshot might be taking over the whole space.
+
+   So above the phone breakpoint the picture is capped by height rather than
+   width. It stops growing once it is as tall as the words beside it, and the
+   hero goes back to being sized by its own text at every width. The buttons
+   and the clock never moved through any of this; they are measured at 446 and
+   498 at 1280, the same pixels as before the crop. */
+@media (min-width:981px){
+  .hero .device .shot{max-height:440px;width:auto;max-width:100%;margin-left:auto}
+}

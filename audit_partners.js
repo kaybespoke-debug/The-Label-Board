@@ -829,7 +829,16 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
     check(db.referrals[0].trialEndsIn === null, 'one that has already subscribed does not');
 
     /* the tier drives the rate a partner is told about */
-    check(db.settings.baseRatePct === 18, 'a silver partner is shown the silver rate, not the bronze default');
+    /* The ladder moved on 19 September 2026: a one off 15 to 25 per cent of
+       the first payment became a recurring 0 to 8 per cent, so silver is 6
+       rather than 18. The check is the same check, aimed at the same bug: a
+       partner being shown the bottom of the ladder because the tier was not
+       read. It reads the ladder rather than a literal now, so the next time
+       Kayode moves a rate this asks the right question on its own. */
+    const silverPct = G("(TIERS.find(function(t){return t.id==='silver'})||{}).pct");
+    check(silverPct !== undefined, 'the silver rate was read out of the ladder');
+    check(db.settings.baseRatePct === silverPct,
+      'a silver partner is shown the silver rate (' + silverPct + '%), not the bottom of the ladder');
 
     /* the thing that must never happen: a failed request drawn as a confident zero */
     sandbox.supaFetch = async (path) =>

@@ -534,7 +534,15 @@ section('11. Whole-schema audit of the partner tables');
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'partner%'
     order by 1`);
-  ok('every partner table has RLS on', rls.length === 6 && rls.every(r => r.relrowsecurity),
+  /* Counted, not hardcoded. This said length === 6 and went red the day
+     partner_rate_bands was added, which is the wrong reaction: the new table
+     HAD its RLS on, and a gate that fails on arrival of a correctly built
+     table teaches people to edit the number rather than look. What matters is
+     that every partner table has it, whatever the count, and that there are
+     enough of them to suggest the query found the schema at all. */
+  ok('the partner tables were found (' + rls.map(r => r.relname).join(', ') + ')',
+     rls.length >= 6);
+  ok('every partner table has RLS on', rls.every(r => r.relrowsecurity),
     rls.filter(r => !r.relrowsecurity).map(r => r.relname).join(','));
   ok('and FORCED, so the owner does not bypass its own policies',
     rls.every(r => r.relforcerowsecurity),

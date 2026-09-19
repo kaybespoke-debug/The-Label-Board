@@ -298,13 +298,38 @@ if (msMatch) {
       'the partner page prints the ' + n + ' account bonus the portal pays (₦' + naira(amt) + ')');
   });
 }
-/* the money rules that PARTNERS.md says the portal is built on */
+/* The money rules, rewritten on 19 September 2026 along with the programme.
+ *
+ * These checks used to insist the page said commission was "on the first
+ * payment", "counted once per business", and paid "on the 5th". Every one of
+ * those was true of the old programme and is now false, so a gate that kept
+ * demanding them would have been holding the page to a promise we no longer
+ * make. That is the failure mode worth naming: a check can rot into enforcing
+ * the opposite of the truth, and it does it silently, because it keeps passing.
+ *
+ * What replaces them is the part a partner would be angry about if the page
+ * and the ledger disagreed: that it recurs, how long for, what happens in the
+ * taper years, that the rate follows their live count in BOTH directions, and
+ * that nothing already credited is ever recalculated. The numbers themselves
+ * are checked against the portal's ladder above, and the ladder is checked
+ * against the database by partner_commission_harness.mjs. */
 check(/31 days/.test(pp) || /thirty one days/.test(pp), 'the partner page states the 31 day hold');
-check(/5th of the month|on the 5th/.test(pp), 'the partner page states when payouts run');
-check(pp.includes('₦10,000'), 'the partner page states the minimum payout');
-check(/first payment/.test(pp), 'the partner page is clear that commission is on the first payment');
-check(/once per business|counted once per business/.test(pp), 'the partner page is clear it is counted once per business');
-check(/never rewrites the past|already been credited/.test(pp), 'the partner page explains that a promotion does not rewrite past credits');
+check(/recurring|every month a business you brought pays/i.test(pp),
+  'the partner page is clear the commission recurs rather than paying once');
+check(/four years/i.test(pp), 'the partner page states the four year term');
+check(/3%/.test(pp), 'the partner page states the taper rate');
+check(/own clock/i.test(pp), 'the partner page says the clock is per business');
+check(/paid out once a year|paid yearly/i.test(pp), 'the partner page states when payouts run');
+check(/active and paying/i.test(pp), 'the partner page says the rate follows the live count');
+check(/can go down|back down if some leave/i.test(pp),
+  'the partner page admits the rate can fall, which is the half a partner would otherwise find out the hard way');
+check(/from that day forward/i.test(pp), 'the partner page says a change applies forward only');
+check(/never recalculated or taken back|ever recalculated or taken back/i.test(pp),
+  'the partner page promises nothing already credited is rewritten');
+check(/stops that day/i.test(pp), 'the partner page says a business that leaves stops earning that day');
+/* the one number that has to match the schema rather than the copy */
+check(/in naira|Nigerian account/i.test(pp),
+  'the partner page says partners are paid in naira, which is what partner_accounts holds');
 
 /* ================= 8. nothing offers a free trial ================= */
 /* Kayode took the trial out on 18 Sep. It had been quoted in eleven places

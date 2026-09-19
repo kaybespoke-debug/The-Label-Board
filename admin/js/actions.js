@@ -935,7 +935,8 @@ function formInvitePartner(prefillEmail, prefillName) {
     '<div class="f2"><div class="fg"><label>Referral code</label>' +
     '<input id="ipCode" placeholder="TUNDE" value="' + esc(suggested) + '"></div>' +
     '<div class="fg"><label>Tier</label><select id="ipTier">' +
-    [['bronze', 'Bronze'], ['silver', 'Silver'], ['gold', 'Gold'], ['platinum', 'Platinum']]
+    [['bronze', 'Getting started, 0%'], ['silver', 'Unlocked, 6%'],
+     ['gold', 'Established, 7%'], ['platinum', 'Senior, 8%']]
       .map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('') +
     '</select></div></div>' +
     '<p class="hint">The code is what they share, so it has to be unique and it is worth it being ' +
