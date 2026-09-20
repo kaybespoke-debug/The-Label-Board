@@ -1359,3 +1359,30 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .plan-feats li.hd{margin-top:0;font-size:9.5px}
   .trial-note{margin:7px 0 8px;font-size:11px;line-height:1.4}
 }
+
+/* ---------- the footer, on a phone ----------
+   461px on every page, which is more than half a screen of links under
+   every single one. Kayode asked for it after the pricing cards.
+
+   The bulk of it is two six-link columns side by side, and the reason they
+   are tall is not the links, it is that several of the LABELS wrap at 166px
+   and a wrapped link was inheriting the body line height. So the leading
+   comes down and the gaps come in. Nothing is removed: what is in the
+   footer is a navigation decision rather than a spacing one. */
+@media (max-width:680px){
+  .ftr{padding:18px 0 14px}
+  .ftr-top{gap:12px 10px;padding-bottom:10px}
+  .ftr h5{margin-bottom:6px}
+  .ftr ul li{margin-bottom:3px}
+  /* Each row was 26px of which only 16 was clickable: the li kept the body
+     line height and the anchor sat on that line box. So the 10px was dead
+     space AND not a tap target, which is the worst of both. The leading
+     comes off the li and goes back on the anchor as real padding, so the
+     row gets shorter and the thing you aim at gets bigger. */
+  .ftr ul li{line-height:1.3}
+  .ftr ul a{line-height:1.3;display:inline-block;padding:3px 0}
+  .ftr-talk{padding-top:10px}
+  .ftr-talk ul{gap:4px 16px}
+  .ftr-talk .small{margin-top:6px}
+  .ftr-bot{padding-top:9px;gap:6px}
+}

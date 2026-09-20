@@ -7,6 +7,42 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## The footer on a phone, and a tap target that was not one
+
+461px under every page, which is more than half a screen. Now **401px**,
+and pricing is 4.69 screens.
+
+**Most of it came from one thing, and it was a bug rather than a
+preference.** Each footer link row was 26px tall of which only 16px was
+clickable: the `li` kept the body line height and the anchor sat on that
+line box with no padding of its own. So the extra 10px was dead space AND
+not a tap target, which is the worst of both. The leading came off the li
+and went back on the anchor as real padding, so the row got SHORTER and the
+thing you aim at got BIGGER: 23px row, 22px tap target, up from 16.
+
+That supersedes the note from earlier today that said the footer links were
+left small on purpose and that making them comfortable would cost 250px.
+It would have, as padding on top of what was there. Replacing the dead
+space rather than adding to it costs nothing.
+
+**Nothing was removed.** What is in the footer is a navigation decision
+rather than a spacing one.
+
+### What is left, and it is not spacing
+
+The phone footer is now essentially `links in the longest column x 23px`.
+Product and Company have six each and sit side by side, so the row is as
+tall as six links whatever the other column does. **Taking a link out of
+one column alone saves nothing**, which is worth knowing before anybody
+tries it: they have to come out in pairs.
+
+One duplicate exists and is worth fixing for its own sake rather than for
+height: **Become a partner** and **Refer a business** both point at
+`partners.html`. Two links, one destination, in the same column.
+
+Desktop was deliberately not touched: 398px, and the 17px tap target there
+is a mouse rather than a thumb.
+
 ## The pricing cards, tightened
 
 Kayode: "cut off the excess spaces on each of the tier card / tighten the
