@@ -1,6 +1,19 @@
 # Subscription billing with Flutterwave
 
-**Status: PLAN ONLY. Nothing in this document is built.**
+**Status: the database half is BUILT. The Flutterwave half is not, and
+cannot be until there is an account and a key.**
+
+What exists, applied nowhere yet but green on its own suite:
+
+| Built | What it does |
+|---|---|
+| `20260920150000_free_trial.sql` | the 14 day trial, and the wall that stops it paying commission |
+| `trial_harness.mjs` | 41 checks: a trial that converts, and one that is cancelled |
+
+The two functions a webhook will call already exist and are already proved:
+`convert_trial_to_paid()` for a settled charge and `cancel_trial()` for
+somebody stopping. When Flutterwave arrives it is a third caller of the
+same two functions, not a new set of rules.
 
 Written 20 September 2026 for Kayode to approve or change before any code
 exists. Every phase below is a thing that can be shown working on its own.

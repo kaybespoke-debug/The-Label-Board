@@ -127,6 +127,34 @@ const SITE = {
      the guess back: restore them, restore guessCcy in site.js, and change
      one line to `remembered() || guessCcy()`.                           */
 
+  /* ---- the free trial, and it matches the billing system exactly ----
+
+     Kayode, 20 Sep 2026: "The website trial terms must exactly match the
+     billing system. Do not invent different terms."
+
+     So every number here has a counterpart in the database, and the two
+     are checked against each other rather than kept in step by hand:
+
+       days 14          start_free_trial(business, 14)
+       plan pro         plan_limits/plan_features give a trial Pro
+       card required    payment_methods, and the anti-fraud that needs it
+       charged day 15   convert_trial_to_paid(), the only thing that
+                        starts a commission clock
+
+     NEVER write "no card needed" anywhere on this site. A card IS
+     required. It is the thing that stops a fourteen day Pro account with
+     five studios being worth farming, and softening it in the copy would
+     be the website and the billing disagreeing in the one direction that
+     matters to somebody deciding whether to trust us.                 */
+  trial: {
+    days: 14,
+    plan: 'pro',
+    cardRequired: true,
+    chargesOnDay: 15,
+    label: 'Start your 14-day free trial',
+    reassurance: 'Start free for 14 days. Card required, nothing charged until day 15. Cancel any time before then.'
+  },
+
   /* ---- partner programme, mirrors PARTNERS.md and the portal ---- */
   partner: {
     base: 15, silver: 18, gold: 22, platinum: 25,

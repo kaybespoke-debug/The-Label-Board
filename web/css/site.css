@@ -617,6 +617,14 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .head{display:block}
   .head p{margin-top:14px}
 }
+/* The one sentence that sits under every trial button on the site. It is
+   held in SITE.trial.reassurance and repeated verbatim rather than
+   paraphrased, because a card IS required and three wordings of that is
+   three chances for one of them to soften into a promise we do not keep. */
+.trial-note{margin:8px 0 14px;font-size:12.5px;line-height:1.5;color:var(--muted);max-width:42ch}
+.center .trial-note,.plan .trial-note{margin-left:auto;margin-right:auto}
+.btn-row+.trial-note{margin-top:12px;max-width:52ch}
+
 @media (max-width:680px){
   .wrap{width:calc(100% - 32px)}
   /* On a phone the tabs are gone and the burger is back beside the buttons, so
@@ -1326,4 +1334,8 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .tw td .no::before{content:"\2013";font-size:13px;line-height:1}
   /* nothing scrolls sideways any more, so the instruction to swipe is a lie */
   .tw-hint{display:none}
+}
+
+@media (max-width:680px){
+  .trial-note{font-size:11.5px;line-height:1.45}
 }

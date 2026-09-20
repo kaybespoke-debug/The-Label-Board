@@ -197,6 +197,12 @@ await db.query(
           mrr = 49000, first_payment = 49000,
           signed_up_on = '2026-03-01', subscribed_on = '2026-03-10'
     where id = $1`, [refId]);
+/* A subscriber has paid us. Since 20 Sep the ledger refuses a commission
+   row for a business with no completed payment, which is what stops a free
+   trial earning anybody anything, so saying "subscribed" is no longer
+   enough on its own. See supabase/tests/trial_harness.mjs. */
+await db.query('select public.record_studio_payment($1, 49000, $2, $3, $4)',
+  [unrelated.business, 'card', 'SEED-MAR', 'first payment']);
 eq('March accrues', await one(`select public.partner_accrue_month('2026-03-01', null)`), 1);
 eq('April accrues', await one(`select public.partner_accrue_month('2026-04-01', null)`), 1);
 eq('two months at 8% of 49,000',
@@ -241,6 +247,8 @@ await db.query(
           mrr = 20000, first_payment = 20000,
           signed_up_on = '2026-06-01', subscribed_on = '2026-06-05'
     where id = $1`, [ref2]);
+await db.query('select public.record_studio_payment($1, 20000, $2, $3, $4)',
+  [kemi2.business, 'card', 'SEED-JUN', 'first payment']);
 await db.query(`select public.partner_accrue_month('2026-06-01', null)`);
 eq('one month accrued', await one(
   `select count(*)::int from public.partner_ledger where referral_id = $1`, [ref2]), 1);

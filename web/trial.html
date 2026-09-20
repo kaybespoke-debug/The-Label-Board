@@ -5,10 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#06101d">
 <meta name="color-scheme" content="dark">
-<title>Thank you · The Label Board</title>
-<meta name="description" content="Your message reached us. We reply within one working day.">
+<title>Start your free trial · The Label Board</title>
+<meta name="description" content="Fourteen days of the full Pro plan. A card is required at signup and nothing is charged until day 15. Cancel any time before then.">
+<!-- noindex until the Flutterwave hosted form is connected. The terms on this
+     page are the ones the billing system will enforce, but the billing system
+     does not exist yet, and a page that search engines send people to in order
+     to start something they cannot start is worse than no page. Remove this
+     line in the same release that connects the card step. -->
 <meta name="robots" content="noindex">
-<link rel="canonical" href="https://thelabelboard.com/thanks.html">
+<link rel="canonical" href="https://thelabelboard.com/trial.html">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -75,27 +80,41 @@
 
 <section class="phero">
   <div class="wrap center">
-    <span class="badge-soft green">Message received</span>
-    <h1 style="margin-top:18px">Thank you. It reached us.</h1>
-    <p class="lede">A person will read it and come back to you within one working day, usually sooner. If it is urgent, send a WhatsApp and we will pick it up straight away.</p>
-    <div class="btn-row center">
-      <a class="btn btn-gold" data-cfg-link="whatsapp" href="https://wa.me/2347062738923">Message us on WhatsApp</a>
-      <a class="btn btn-line" href="features.html">See the features</a>
-    </div>
+    <h1>Start your 14-day free trial</h1>
+    <p class="lede" style="margin-top:12px">Start free for 14 days. Card required, nothing charged until day 15. Cancel any time before then.</p>
   </div>
 </section>
 
 <section class="tight">
   <div class="wrap">
-    <div class="sec-head center">
-      <h2>While you are here</h2>
-      <p class="lede">Three things worth five minutes each.</p>
-    </div>
-    <div class="grid g3">
-      <a class="card" href="features.html"><h3>See what it does</h3><p>Orders, production, stock, customers, staff and books, with a screen from the running app for each of them.</p></a>
-      <a class="card" href="features.html"><h3>See what it actually does</h3><p>Orders, production, stock, real books, payroll and an app that works with the network off.</p></a>
-      <a class="card" href="pricing.html"><h3>Check the pricing</h3><p>One fee for the business, and no cut of your sales.</p></a>
-    </div>
+    <!-- Every line below has a counterpart in the database, and the two are
+         checked against each other rather than kept in step by hand. If one of
+         these sentences ever needs changing, the rule it describes is in
+         supabase/migrations/20260920150000_free_trial.sql and the proof is in
+         supabase/tests/trial_harness.mjs. Change both or neither. -->
+    <ul class="checks split-list">
+      <li><strong>Fourteen days of the full Pro plan</strong>, with nothing held back. Five studios, fifty logins, every feature.</li>
+      <li><strong>A card is required to start.</strong> It is what keeps the trial worth giving away, and it is not charged while the trial runs.</li>
+      <li><strong>Day 15 is the first charge</strong>, for the plan you chose, unless you cancelled before then.</li>
+      <li><strong>Cancel any time before day 15</strong> and nothing is taken. You keep the account until the last day you were promised.</li>
+      <li><strong>Your records are yours either way</strong>, and export in full whether you carry on or not.</li>
+    </ul>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="tight center">
+  <div class="wrap">
+    <!-- THE CARD STEP IS NOT CONNECTED YET.
+         When Flutterwave is live this button opens their hosted form, on
+         their domain, and no card number ever touches this site or this
+         repo. Until then it goes to the booking page, which is a real thing
+         that really happens, rather than a button that does nothing.
+         See BILLING.md phase 2. -->
+    <a class="btn btn-gold" href="book.html">Set up my trial</a>
+    <p class="trial-note">Start free for 14 days. Card required, nothing charged until day 15. Cancel any time before then.</p>
+    <p class="small">We are taking studios on carefully in these first months, so a person sets your trial up with you rather than leaving you to it.</p>
   </div>
 </section>
 

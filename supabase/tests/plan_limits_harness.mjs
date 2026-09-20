@@ -116,8 +116,15 @@ ok('Pro is 5 studios', Number(limits.pro.max_studios) === 5, JSON.stringify(limi
 ok('Pro is 50 team logins', Number(limits.pro.max_seats) === 50, JSON.stringify(limits.pro));
 ok('Bespoke has no fixed studio ceiling', limits.premium.max_studios === null);
 ok('Bespoke has no fixed login ceiling', limits.premium.max_seats === null);
-ok('the trial is 1 studio and 3 logins',
-  Number(limits.trial.max_studios) === 1 && Number(limits.trial.max_seats) === 3);
+/* The trial used to be 1 studio and 3 logins. It is Pro's ceilings from
+   20 September 2026, because the 14 day trial is sold as full Pro access
+   and a studio told that and then refused a second studio would be right
+   to say we had lied. What makes it safe to hand out is the card: a trial
+   needs a real instrument, so it cannot be farmed anonymously. */
+ok('a trial gets Pro ceilings, because it is sold as full Pro access',
+  Number(limits.trial.max_studios) === Number(limits.pro.max_studios) &&
+  Number(limits.trial.max_seats) === Number(limits.pro.max_seats),
+  JSON.stringify(limits.trial));
 
 /* =====================================================================
    2. A BASIC ACCOUNT, FAILING THEN PASSING
