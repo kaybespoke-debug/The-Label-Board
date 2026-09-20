@@ -452,6 +452,30 @@ built.forEach(p => {
 check(!built.some(p => visible(html[p]).includes(REASSURANCE)),
   'the reassurance line is not repeated beside every button any more');
 
+/* Kayode, 20 Sep, on being shown the line a second time: "i dont want this
+   notes anywhere, i said this a lot of times". He was right that he had.
+   The first pass removed the long version and left a shortened one in its
+   place, which is not removing it.
+
+   So it is a gate rather than a memory. The class goes with it: a styled
+   hook for a thing that should not exist is an invitation to reattach it. */
+built.forEach(p => {
+  check(!/class="trial-note"/.test(html[p]),
+    p + ' carries no small note under a call to action');
+});
+check(!read('css/site.css').includes('.trial-note'),
+  'and the stylesheet keeps no hook for one either');
+
+/* A page shorter than the window used to end the footer where the content
+   ended and leave the rest of the screen empty below it, which reads as
+   though the page failed to finish loading. trial.html, thanks.html and
+   404.html are all shorter than a desktop window. */
+const cssSrc = read('css/site.css');
+check(/body{[^}]*display:flex[^}]*flex-direction:column/.test(cssSrc),
+  'the body is a column so a short page can push its footer down');
+check(/main{flex:1 0 auto}/.test(cssSrc),
+  'and main takes the slack, so the footer sits at the bottom rather than in mid air');
+
 /* The two cards that can actually be started: trial primary, demo secondary.
    Bespoke has neither, on purpose: it is priced per contract, so there is
    nothing for a card to be charged for on day 15. */

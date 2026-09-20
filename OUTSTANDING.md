@@ -7,6 +7,58 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## Launch day, a floating footer, and a note that would not die
+
+### The countdown takes the waiting list with it
+
+The clock removed itself at zero and left "Join waitlist" on a row of its
+own with a gap where the numbers had been. The WHOLE row goes now.
+
+Kayode: "there’s no need for a join waitlist when the timer goes off, they
+work today, waitlist ends when the timer ends." A waiting list is for a
+thing you cannot have yet. The morning it opens, the answer to "how do I
+get in" stops being "wait" and becomes the trial button three inches above
+it, and a list still offering to queue you is the site contradicting itself
+on the one day it matters.
+
+**Tested by moving `launchDate` to 2020 and loading the page**, not by
+reading the code: clock gone, row gone, no link to the waiting list left
+anywhere on the site, three buttons closed up with no hole. Then the real
+date went back and the clock came back at 41 days.
+
+It is the only link to `waitlist.html` on the site, so removing that row
+retires the offer rather than hiding one of several doors.
+
+### The footer was floating on short pages
+
+`trial.html`, `thanks.html` and `404.html` are all shorter than a desktop
+window, so the footer ended where the content ended and the rest of the
+screen was empty below it. It reads as though the page failed to load.
+
+The body is a flex column with `main` taking the slack. The drawer is
+`position:fixed` and the skip link is absolute, so neither is a flex child
+and nothing else moved. `svh` rather than `vh`, because on a phone `vh` is
+the tallest the viewport ever gets and every page would gain a scrollbar it
+does not need. Verified at 1900x1300: zero gap on all three, long pages
+unaffected.
+
+### The note I was asked to remove, twice
+
+"i dont want this notes anywhere, i said this a lot of times". He had. The
+first pass took out the long version and left a SHORTER one in its place,
+which is not removing it.
+
+It is a gate now rather than a memory: no page may carry `class="trial-note"`
+and the stylesheet may not keep a hook for one. A styled class for a thing
+that should not exist is an invitation to reattach it.
+
+### The FAQ order, his
+
+My guess was a buying journey with money first. His is **The software, your
+data, and us > Getting started > Paying for it > The partner programme**:
+the product first and the money third, which reads as wanting somebody to
+understand what the thing is before being asked what it costs.
+
 ## The repeated trial line, the footer again, and the FAQ order
 
 ### The trial terms are said once now, not five times
