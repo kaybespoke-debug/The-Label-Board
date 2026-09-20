@@ -134,21 +134,23 @@ const ALLOWED: Record<string, string[]> = {
      agent who can do that can quietly promote themselves. */
   owner:     ['me', 'tenants', 'tenant', 'setPlan', 'setStatus', 'setNote', 'audit',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
-              'billing', 'payments', 'recordPayment', 'setStorageCap',
-              'enquiries', 'setEnquiryState', 'partners',
+              'billing', 'payments', 'recordPayment', 'setStorageCap', 'setStudioLimits',
+              'enquiries', 'setEnquiryState', 'partners', 'partnerCommission',
+              'referralRisk', 'setPayoutFrozen',
               'inviteOperator', 'inviteStudio', 'invitePartner'],
   // Finance is the role that exists to do this. Support and developer are not
   // given it: what every subscriber pays is not something a support agent needs
   // to answer a ticket, and a role that can read it will eventually be given to
   // somebody because it was easier than making a new one.
   finance:   ['me', 'tenants', 'tenant', 'setPlan', 'setStatus',
-              'billing', 'payments', 'recordPayment', 'setStorageCap',
-              'enquiries', 'setEnquiryState', 'partners',
+              'billing', 'payments', 'recordPayment', 'setStorageCap', 'setStudioLimits',
+              'enquiries', 'setEnquiryState', 'partners', 'partnerCommission',
+              'referralRisk', 'setPayoutFrozen',
               'inviteStudio', 'invitePartner'],
   support:   ['me', 'tenants', 'tenant', 'setNote',
               'feedback', 'feedbackThread', 'setFeedbackState', 'replyFeedback',
               'enquiries', 'setEnquiryState', 'partners',
-              'inviteStudio', 'invitePartner'],
+              'inviteStudio', 'invitePartner'],   // not partnerCommission: money is finance's
   // a developer reads what studios reported and can move it along, but does
   // not write to a studio in our name
   developer: ['me', 'tenants', 'tenant', 'feedback', 'feedbackThread', 'setFeedbackState'],
@@ -315,6 +317,73 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
+    /* The patterns worth a second look, from platform_referral_risk().
+       Every row is a PATTERN, not an accusation: three of the four kinds
+       have innocent explanations and the console says so. An association
+       signing twelve members up at an event looks exactly like a fraud
+       ring until you know it is an association. */
+    if (action === 'referralRisk') {
+      const { data, error } = await admin.rpc('platform_referral_risk')
+      if (error) return json({ error: error.message }, 500)
+      await log({ count: (data || []).length })
+      return json({ ok: true, risk: data || [] })
+    }
+
+    /* Stop paying one referrer while a pattern is looked at.
+       A reason is required by the database, not just by this handler, so
+       a freeze can never be a thing somebody did that nobody can explain
+       six months later. */
+    if (action === 'setPayoutFrozen') {
+      const id = String(body.id || '')
+      const frozen = body.frozen === true
+      const reason = String(body.reason || '').trim().slice(0, 500)
+      if (!id) return json({ error: 'No partner id' }, 400)
+      if (frozen && !reason) {
+        return json({ error: 'Freezing a payout needs a reason, because somebody will ask' }, 400)
+      }
+      const { error } = await admin.rpc('set_partner_payout_frozen', {
+        p_partner: id, p_frozen: frozen, p_reason: frozen ? reason : null
+      })
+      if (error) return json({ error: error.message }, 500)
+      await log({ partner: id, frozen, reason })
+      return json({ ok: true })
+    }
+
+    /* An agreed ceiling, for a Bespoke contract or a promise made on a
+       call. null on either side puts that one back on the plan's own
+       limit, which is what an operator wants when a contract ends, and is
+       why both arguments are nullable rather than required.
+
+       A ceiling BELOW what a business already has is allowed on purpose.
+       It cannot strand anybody: the limit is only ever checked when
+       something is added, so the business keeps every studio and every
+       login it has and simply cannot add another. Refusing it would mean
+       an operator could not record a contract that had actually been
+       renegotiated downwards. */
+    if (action === 'setStudioLimits') {
+      const id = String(body.id || '')
+      if (!id) return json({ error: 'No studio id' }, 400)
+      const num = (v: unknown) => {
+        if (v === null || v === undefined || v === '') return null
+        const n = Number(v)
+        return isFinite(n) ? n : NaN
+      }
+      const studios = num(body.studios)
+      const seats = num(body.seats)
+      if (Number.isNaN(studios) || Number.isNaN(seats)) {
+        return json({ error: 'A ceiling has to be a number, or empty to use the plan default' }, 400)
+      }
+      if ((studios !== null && studios < 1) || (seats !== null && seats < 1)) {
+        return json({ error: 'A ceiling of zero would lock the business out of its own account' }, 400)
+      }
+      const { error } = await admin.rpc('set_studio_limits', {
+        p_business: id, p_max_studios: studios, p_max_seats: seats
+      })
+      if (error) return json({ error: error.message }, 500)
+      await log({ maxStudios: studios, maxSeats: seats }, id)
+      return json({ ok: true })
+    }
+
     /* ---- enquiries from the public website -----------------------------
        The five forms post to Netlify (unchanged, and still the fallback that
        works with no JavaScript) and to the database, so this is the console's
@@ -455,13 +524,31 @@ Deno.serve(async (req) => {
        claimed their account yet is invisible otherwise, and "did that invite
        ever go out" is the first question anybody asks. */
     if (action === 'partners') {
-      const { data, error } = await admin
-        .from('partners')
-        .select('id,code,name,business_name,email,phone,city,tier,status,joined_on,user_id,pending_email')
-        .order('joined_on', { ascending: false })
+      /* platform_partner_summary rather than a select on the table. The
+         console has to answer "what do we owe this partner" from the same
+         list that answers "who are they", and two calls would mean the two
+         halves could be a render apart. It carries user_id and
+         pending_email for the same reason the select did. */
+      const { data, error } = await admin.rpc('platform_partner_summary')
       if (error) return json({ error: error.message }, 500)
       await log({ count: (data || []).length })
       return json({ ok: true, partners: data || [] })
+    }
+
+    /* One partner's businesses, month by month.
+       This is the SAME function the portal reads through
+       my_commission_summary(); the only difference is that an operator is
+       looking at somebody else's, so the partner is passed in rather than
+       taken from the session. If the console summed this itself the two
+       would drift the first time either changed, and the partner would be
+       the one who noticed. */
+    if (action === 'partnerCommission') {
+      const id = String(body.id || '')
+      if (!id) return json({ error: 'No partner id' }, 400)
+      const { data, error } = await admin.rpc('partner_commission_summary', { p_partner: id })
+      if (error) return json({ error: error.message }, 500)
+      await log({ partner: id, count: (data || []).length })
+      return json({ ok: true, referrals: data || [] })
     }
 
     /* ---------------- invitations ----------------------------------------
@@ -574,21 +661,24 @@ Deno.serve(async (req) => {
       if (action === 'invitePartner') {
         const name = String(body.name || '').trim().slice(0, 160)
         const code = String(body.code || '').trim().toUpperCase().slice(0, 32)
-        const tier = String(body.tier || 'bronze')
         if (!name) return json({ error: 'The partner needs a name' }, 400)
         if (!/^[A-Z0-9][A-Z0-9-]{1,31}$/.test(code)) {
           return json({ error: 'A referral code is needed: letters, numbers and hyphens' }, 400)
         }
-        if (!['bronze', 'silver', 'gold', 'platinum'].includes(tier)) {
-          return json({ error: 'Unknown tier' }, 400)
-        }
+        /* body.tier is IGNORED rather than validated. The programme went
+           flat on 20 Sep: one rate for every partner and every business.
+           The column is not null with a check constraint, so a value still
+           has to go in, and 'bronze' is the one every row already has.
+           Accepting a tier from the caller would mean a stale console, or
+           anything else holding this key, could still set a field that
+           reads like it decides what somebody earns. */
         const { data: existing } = await admin
           .from('partners').select('id').eq('pending_email', email).maybeSingle()
         if (existing) {
           prepared = { table: 'partners', id: existing.id as string }
         } else {
           const { data: made, error } = await admin.from('partners')
-            .insert({ name, email, code, tier, status: 'active', pending_email: email })
+            .insert({ name, email, code, tier: 'bronze', status: 'active', pending_email: email })
             .select('id').maybeSingle()
           if (error) return json({ error: 'Could not create the partner: ' + error.message }, 500)
           prepared = { table: 'partners', id: made?.id as string }

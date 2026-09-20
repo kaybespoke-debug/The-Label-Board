@@ -121,7 +121,15 @@ const named = new Set();
 const rpcs  = new Set();
 [app, adminFn, teamFn, consoleJs, portalJs, webJs].forEach(src => {
   (src.match(/from\('([a-z_]+)'\)/g) || []).forEach(m => named.add(m.slice(6, -2)));
-  (src.match(/rpc\('([a-z_]+)'\)/g)  || []).forEach(m => rpcs.add(m.slice(5, -2)));
+  /* No closing paren in this pattern, and that is the fix rather than a
+     looseness. It used to be /rpc\('([a-z_]+)'\)/, which only ever matched a
+     call with NO ARGUMENTS, so every rpc that takes one went unchecked:
+     set_studio_plan, set_studio_storage_cap and all three of the partner and
+     limit reads added on 20 Sep. A gateway calling a function that does not
+     exist ships green and fails the first time an operator presses the
+     button. Same class as the mis-escaped regex that silently turned a block
+     of checks into no-ops twice on this project. */
+  (src.match(/rpc\('([a-z_]+)'/g)  || []).forEach(m => rpcs.add(m.slice(5, -1)));
   // the raw REST form: '/rest/v1/rpc/partner_me'
   (src.match(/\/rest\/v1\/rpc\/([a-z_]+)/g) || []).forEach(m => rpcs.add(m.slice('/rest/v1/rpc/'.length)));
 });
