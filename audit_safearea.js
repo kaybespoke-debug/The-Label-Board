@@ -190,6 +190,95 @@ ok('content moved out of a dropped column has somewhere to go',
      'who they are and how to reach them is the whole job of that list');
 }
 
+// =====================================================================
+section('The page header stays put while the page scrolls');
+// =====================================================================
+// Kayode, 20 September 2026: "lets keep the headers firm, so the header
+// doesnt scroll while you are scroliing other things on the profile".
+//
+// In all three apps the scroll container is .main, not the window, and the
+// page header lives inside it. So the header went up with the content and
+// the actions on a studio's record went with it.
+//
+// The first fix pulled the header up into .main's top padding with a
+// negative margin. Measured in a browser, that left it stuck 26px down with
+// a live strip above it that rows slid through: sticky positions against the
+// scrollport and does not care what margin it was given. So the top padding
+// moved ON TO the header instead, which is why both halves are checked here.
+// Either one alone is a header that looks right and leaks.
+{
+  const APPS = [
+    { name: 'console', css: 'admin/css/app.css',    header: '.top',    scroller: '.main' },
+    { name: 'portal',  css: 'partners/css/app.css', header: '.top',    scroller: '.main' },
+    { name: 'app',     css: 'site/layi_dashboard.html', header: '.topbar', scroller: '.main' },
+  ];
+
+  APPS.forEach(app => {
+    /* Comments out first. A comment in this very file explaining what the old
+       broken rule looked like was read as the rule itself, and the gate
+       reported a padding that exists nowhere but in prose. */
+    const src = fs.readFileSync(path.join(root, app.css), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+
+    /* every rule for the header selector, so a later one can be seen too */
+    const rules = [];
+    let at = src.indexOf(app.header + '{');
+    while (at !== -1) {
+      rules.push(src.slice(at, src.indexOf('}', at) + 1));
+      at = src.indexOf(app.header + '{', at + 1);
+    }
+    const all = rules.join('\n');
+
+    ok(app.name + ': the page header is declared somewhere', rules.length > 0);
+    ok(app.name + ': the page header is sticky', /position:\s*sticky/.test(all),
+       'it scrolls away with the content');
+    ok(app.name + ': and pinned to the top of its scroller', /top:\s*0/.test(all));
+    ok(app.name + ': with a background, or the content shows through it',
+       /background:\s*var\(--bg\)/.test(all));
+    ok(app.name + ': and something to separate it from what it covers',
+       /border-bottom:/.test(all));
+
+    /* the other half: the scroller must not keep a top padding, or there is a
+       strip above the sticky header for content to scroll into */
+    const scrollerRules = [];
+    let s = src.indexOf(app.scroller + '{');
+    while (s !== -1) {
+      scrollerRules.push(src.slice(s, src.indexOf('}', s) + 1));
+      s = src.indexOf(app.scroller + '{', s + 1);
+    }
+    /* EVERY rule, not just the last: the customer app has three that touch
+       .main, two of which only set padding-bottom, and checking the last one
+       reported a bug that was not there. What matters is that none of them
+       leaves a top padding behind. */
+    const offenders = scrollerRules.filter(r => {
+      const explicit = r.match(/padding-top:\s*([^;}]+)/);
+      if (explicit && !/^0\b/.test(explicit[1].trim())) return true;
+      const short = r.match(/[;{]\s*padding:\s*([^;}]+)/);
+      if (short && !/^0\b/.test(short[1].trim())) return true;
+      return false;
+    });
+    ok(app.name + ': the scroller has no top padding left for content to slide into',
+       offenders.length === 0,
+       offenders.length ? 'padding-top belongs on the header now: ' + offenders[0].slice(0, 90) : '');
+
+    /* the negative-margin version must not come back */
+    ok(app.name + ': the header is not pulled up by a negative margin',
+       !/margin-top:\s*(-|calc\(\s*-)/.test(all),
+       'that was tried, measured, and left a live strip above the header');
+  });
+
+  /* and the customer app keeps its safe-area inset on whichever element now
+     carries the top padding, because that inset is what keeps a phone's
+     status bar off the title */
+  {
+    const src = fs.readFileSync(path.join(root, 'site/layi_dashboard.html'), 'utf8');
+    const topbar = src.slice(src.indexOf('.topbar{'));
+    ok('app: the sticky header carries the top safe-area inset',
+       /padding-top:\s*max\([^)]*env\(safe-area-inset-top\)/.test(topbar.slice(0, 900)),
+       'the inset moved off .main with the padding and has to land here');
+  }
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass.length + ' passed, ' + failures.length + ' FAILED:');
