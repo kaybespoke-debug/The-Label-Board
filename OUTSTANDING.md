@@ -7,6 +7,39 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## Android, not just iPhone
+
+Kayode: "please think of android screens too not jus IOS". Fair: the sweep
+above was 375px, which is an iPhone. **The most common Android width is 360,
+which is NARROWER than anything that had been tested**, and the repo’s own
+documented floor is 320.
+
+| Width | Device | Pricing | Home | Sideways scroll |
+|---|---|---|---|---|
+| 320 | the floor | 5.77 screens | 2.39 | none |
+| 360 | most Android | 4.78 | 2.19 | none |
+| 375 | iPhone | 4.58 | 2.15 | none |
+| 412 | Pixel | 3.77 | 1.94 | none |
+
+Nothing overflows at any of the four, the comparison table scrolls 0px
+sideways at all of them, and the plan columns hold their measured 60px even
+at 320 where that leaves only 140px for the feature name.
+
+### What 320 turned up: forty rows and no column headings
+
+By row twenty the Basic / Pro / Bespoke heading has scrolled away, and
+three columns of ticks mean nothing without it. You can see that something
+is included without being able to say in WHICH plan. It is worse on Android
+because a 360 or 320 screen puts more rows between you and the heading.
+
+The heading is sticky now, parked at 66px so it sits under the page header
+rather than behind it. Phone only; the desktop table is unchanged and
+checked to still be `position:static`.
+
+**Sticky goes on the CELLS, not on the `thead`.** A `thead` is not a
+positionable box in most engines and the rule is silently ignored there,
+which looks exactly like it working until you scroll.
+
 ## The phone sweep, 20 September: all fifteen pages
 
 Every page measured at 375px on the live site. **Nothing scrolls sideways**
