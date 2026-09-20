@@ -179,7 +179,7 @@ function formStaffRole(staffId) {
     '</select></div><p class="hint">The role decides which pages they can open and what they are allowed to do. ' +
     'Edit the roles themselves in Settings → Team &amp; notifications.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doStaffRole(' + staffId + ')">Save</button>');
+    '<button class="btn gold" onclick="doStaffRole(\'' + staffId + '\')">Save</button>');
 }
 function doStaffRole(staffId) {
   const s = Q.staffM(staffId);
@@ -265,7 +265,7 @@ function formEditSubscriber(id) {
     '</select></div></div>' +
     '<div class="fg"><label>Seats in use</label><input id="esUsers" type="number" value="' + s.users + '"></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doEditSubscriber(' + id + ')">Save changes</button>');
+    '<button class="btn gold" onclick="doEditSubscriber(\'' + id + '\')">Save changes</button>');
 }
 function doEditSubscriber(id) {
   const s = Q.sub(id);
@@ -291,7 +291,7 @@ function formChangePlan(id) {
     '<div class="fg"><label>Reason (goes on the audit log)</label><input id="cpWhy" placeholder="e.g. Upgrade requested by owner"></div>' +
     '<p class="hint">Current MRR ' + (s.mrr ? money(s.mrr) : '—') + '. The change takes effect on the next renewal, ' + fmtD(s.renewsOn) + '.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doChangePlan(' + id + ')">Change plan</button>');
+    '<button class="btn gold" onclick="doChangePlan(\'' + id + '\')">Change plan</button>');
 }
 function doChangePlan(id) {
   const s = Q.sub(id);
@@ -317,7 +317,7 @@ function formConvert(id) {
     '</select></div><div class="fg"><label>Billing cycle</label><select id="cvCycle"><option value="monthly">Monthly</option><option value="annual">Annual (1 month free)</option></select></div>' +
     agreedPriceField('cvPlan', 'cvPriceWrap', 'cvPrice', '', false),
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doConvert(' + id + ')">Convert</button>');
+    '<button class="btn gold" onclick="doConvert(\'' + id + '\')">Convert</button>');
 }
 function doConvert(id) {
   const s = Q.sub(id);
@@ -345,7 +345,7 @@ function formRecordPayment(id) {
     '<div class="fg"><label>Note (goes on the audit log)</label><input id="rpNote" placeholder="e.g. September, paid late"></div>' +
     '<p class="hint">This records money that has already reached the account. Nothing is charged to anybody from here.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doRecordPayment(' + id + ')">Record it</button>');
+    '<button class="btn gold" onclick="doRecordPayment(\'' + id + '\')">Record it</button>');
 }
 async function doRecordPayment(id) {
   const s = Q.sub(id);
@@ -370,7 +370,7 @@ function formStorageCap(id) {
     '<div class="fg"><label>Why (goes on the audit log)</label><input id="scWhy" placeholder="e.g. agreed 300GB at ₦10,000 a month"></div>' +
     '<p class="hint">Extra space costs us about ₦28 per GB a month, so whatever is charged for it wants to be comfortably above that. Type a number to set the cap; leave it empty and save to clear any override and return them to their plan.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doStorageCap(' + id + ')">Save cap</button>');
+    '<button class="btn gold" onclick="doStorageCap(\'' + id + '\')">Save cap</button>');
 }
 async function doStorageCap(id) {
   const s = Q.sub(id);
@@ -404,7 +404,7 @@ function formStudioLimits(id) {
     'what ' + esc(p.name) + ' includes. Setting a ceiling below what they already have takes ' +
     'nothing away: the limit is only checked when they add one more.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doStudioLimits(' + id + ')">Save limits</button>');
+    '<button class="btn gold" onclick="doStudioLimits(\'' + id + '\')">Save limits</button>');
 }
 async function doStudioLimits(id) {
   const s = Q.sub(id);
@@ -527,7 +527,7 @@ function doPlan(id) {
 
 /* ---------------- payments ---------------- */
 function retryPayment(id) {
-  const p = DB.payments.find(x => x.id === +id);
+  const p = DB.payments.find(x => String(x.id) === String(id));
   p.status = 'successful'; p.method = 'Card •••6411 (retry)';
   const s = Q.sub(p.subId);
   if (s) { s.pastDue = false; if (s.health === 'at-risk') s.health = 'steady'; }
@@ -535,17 +535,17 @@ function retryPayment(id) {
   toast('Charge went through · ' + money(p.amount)); render();
 }
 function formRefund(id) {
-  const p = DB.payments.find(x => x.id === +id);
+  const p = DB.payments.find(x => String(x.id) === String(id));
   modal('Issue refund', p.subscriber + ' · ' + p.ref,
     '<div class="fg"><label>Amount to refund (₦)</label><input id="rfAmt" type="number" value="' + p.amount + '"></div>' +
     '<div class="fg"><label>Reason</label><select id="rfWhy"><option>Duplicate charge</option><option>Billed in error</option>' +
     '<option>Service issue</option><option>Cancelled within cooling-off</option><option>Goodwill</option></select></div>' +
     '<p class="hint">The refund goes back to ' + p.method + '. Flutterwave usually settles it in 5 to 10 working days.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn danger" onclick="doRefund(' + id + ')">Refund ' + money(p.amount) + '</button>');
+    '<button class="btn danger" onclick="doRefund(\'' + id + '\')">Refund ' + money(p.amount) + '</button>');
 }
 function doRefund(id) {
-  const p = DB.payments.find(x => x.id === +id);
+  const p = DB.payments.find(x => String(x.id) === String(id));
   const amt = +document.getElementById('rfAmt').value || p.amount;
   const why = document.getElementById('rfWhy').value;
   p.status = 'refunded';
@@ -553,7 +553,7 @@ function doRefund(id) {
   closeModal(); toast('Refunded ' + money(amt)); render();
 }
 function downloadInvoice(id) {
-  const p = DB.payments.find(x => x.id === +id);
+  const p = DB.payments.find(x => String(x.id) === String(id));
   const s = Q.sub(p.subId);
   const html = '<h1>Invoice ' + p.invoice + '</h1><p>The Label Board Ltd</p><hr>' +
     '<p><b>Billed to</b><br>' + s.name + '<br>' + s.owner + '<br>' + s.email + '</p>' +
@@ -609,7 +609,7 @@ function doPublishSlips(key) {
   closeModal(); toast(un.length + ' payslips published'); render();
 }
 function publishSlip(id) {
-  const s = DB.payslips.find(x => x.id === +id);
+  const s = DB.payslips.find(x => String(x.id) === String(id));
   s.uploaded = true; s.publishedOn = iso(DB.today);
   logAction('slip_publish', 'Payslip published', 'Kayode Ojomo published ' + s.staffName + '\'s ' + s.month + ' payslip');
   toast('Published to ' + s.staffName.split(' ')[0]); render();
@@ -622,7 +622,7 @@ function publishSlipsFor(staffId) {
   toast(un.length + ' payslip' + (un.length === 1 ? '' : 's') + ' published'); render();
 }
 function downloadSlip(id) {
-  const s = DB.payslips.find(x => x.id === +id);
+  const s = DB.payslips.find(x => String(x.id) === String(id));
   const st = Q.staffM(s.staffId);
   const rows = [
     ['THE LABEL BOARD — PAYSLIP'], [''],
@@ -662,7 +662,7 @@ function formAssignTicket(id) {
       '<option value="' + s.id + '"' + (t.assignedTo === s.id ? ' selected' : '') + '>' + s.name + ' · ' + s.title + '</option>').join('') +
     '</select></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doAssignTicket(' + id + ')">Assign</button>');
+    '<button class="btn gold" onclick="doAssignTicket(\'' + id + '\')">Assign</button>');
 }
 function doAssignTicket(id) {
   const t = Q.ticket(id);
@@ -706,7 +706,7 @@ function doNewTicket() {
 
 /* ---------------- tasks ---------------- */
 function formTask(id) {
-  const t = id ? DB.tasks.find(x => x.id === +id) : null;
+  const t = id ? DB.tasks.find(x => String(x.id) === String(id)) : null;
   modal(t ? 'Edit task' : 'Create task', t ? t.title : 'Something the team needs to do',
     '<div class="fg"><label>Title</label><input id="tkTitle" value="' + (t ? esc(t.title) : '') + '" placeholder="What needs doing"></div>' +
     '<div class="fg"><label>Detail</label><textarea id="tkBody">' + (t ? esc(t.body) : '') + '</textarea></div>' +
@@ -726,7 +726,7 @@ function doTask(id) {
   const dueIn = Math.round((new Date(due) - startOfDay(DB.today)) / DAY);
   const who = +document.getElementById('tkWho').value;
   if (id) {
-    const t = DB.tasks.find(x => x.id === +id);
+    const t = DB.tasks.find(x => String(x.id) === String(id));
     t.title = title; t.body = document.getElementById('tkBody').value;
     t.assignedTo = who; t.assignedName = Q.staffM(who).name;
     t.priority = document.getElementById('tkPri').value; t.due = due; t.dueIn = dueIn;
@@ -744,11 +744,11 @@ function doTask(id) {
   closeModal(); render();
 }
 function completeTask(id) {
-  const t = DB.tasks.find(x => x.id === +id);
+  const t = DB.tasks.find(x => String(x.id) === String(id));
   t.done = true; toast('"' + t.title + '" marked done'); render();
 }
 function reopenTask(id) {
-  const t = DB.tasks.find(x => x.id === +id);
+  const t = DB.tasks.find(x => String(x.id) === String(id));
   t.done = false; toast('Task reopened'); render();
 }
 
@@ -814,7 +814,7 @@ function formLeave(staffId) {
     '<div class="fg"><label>To</label><input type="date" id="lvTo" value="' + iso(DB.today) + '"></div></div>' +
     '<div class="fg"><label>Note</label><input id="lvNote" placeholder="Optional"></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doLeave(' + staffId + ')">Record leave</button>');
+    '<button class="btn gold" onclick="doLeave(\'' + staffId + '\')">Record leave</button>');
 }
 function doLeave(staffId) {
   const f = document.getElementById('lvFrom').value, t = document.getElementById('lvTo').value;
@@ -829,7 +829,7 @@ function doLeave(staffId) {
 
 /* ---------------- announcements ---------------- */
 function formAnnouncement(id) {
-  const a = id ? DB.announcements.find(x => x.id === +id) : null;
+  const a = id ? DB.announcements.find(x => String(x.id) === String(id)) : null;
   modal(a ? 'Edit announcement' : 'New announcement', a ? a.title : 'Tell subscribers something',
     '<div class="fg"><label>Title</label><input id="anTitle" value="' + (a ? esc(a.title) : '') + '"></div>' +
     '<div class="fg"><label>Message</label><textarea id="anBody">' + (a ? esc(a.body) : '') + '</textarea></div>' +
@@ -857,7 +857,7 @@ function doAnnouncement(id) {
     state, date: document.getElementById('anDate').value
   };
   if (id) {
-    Object.assign(DB.announcements.find(x => x.id === +id), fields);
+    Object.assign(DB.announcements.find(x => String(x.id) === String(id)), fields);
     toast('Announcement saved');
   } else {
     DB.announcements.unshift(Object.assign({
@@ -871,7 +871,7 @@ function doAnnouncement(id) {
   closeModal(); render();
 }
 function publishAnnouncement(id) {
-  const a = DB.announcements.find(x => x.id === +id);
+  const a = DB.announcements.find(x => String(x.id) === String(id));
   a.state = 'published'; a.date = iso(DB.today);
   a.reach = Q.subsAsOf().length; a.opened = 0;
   logAction('announce', 'Announcement sent', 'Kayode Ojomo sent "' + a.title + '" to ' + a.audience);
