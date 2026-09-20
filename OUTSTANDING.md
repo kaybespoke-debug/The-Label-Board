@@ -5,7 +5,87 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 20 September 2026 (sixteenth session, shipped)
+Last updated: 20 September 2026 (sixteenth session, shipped twice)
+
+## Two bugs that both looked like something else
+
+Both were reported on 20 September as "you did not do what I asked". Both
+times the work had been done and something older was hiding it. Worth
+keeping together, because the shape repeats: **a stale copy beat a correct
+one, and nothing on the page could say so.**
+
+### The screenshots that would not update
+
+Kayode saw the old LAYI captures on the live site, sidebar and all, and
+asked whether it was a regression, a bug or a bad upload. It was none of
+them. All six live files were byte-identical to the repo, checked by hash.
+
+They are served with `Cache-Control: public, max-age=604800` under filenames
+that never change, so any browser that had loaded the old capture kept
+drawing it from disk for a week. A hard refresh would have shown the new
+one. **Nothing in the deploy was wrong and nothing in the deploy could have
+fixed it.**
+
+Every screenshot src now carries `?v=2`, and `audit_web.js` REQUIRES one.
+A recapture that keeps the filename and forgets to bump the version is
+invisible to every visitor who has been here that week, so the gate fails
+the build rather than letting it ship to nobody. Bump the number on every
+recapture. The gate also strips the query before checking the file exists,
+because the query is a cache bust and not part of a filename.
+
+### The naira default that was done and could not work
+
+The picker opened in pounds on his machine. `setCcy(remembered() || 'NGN')`
+was correct and had been since the morning.
+
+**Before 20 September the page GUESSED a currency from the time zone and the
+language, and wrote that guess to localStorage exactly as if somebody had
+chosen it.** From then on the guess beat the default for ever. His browser
+was replaying a guess made in August.
+
+The first answer given was "that is your browser, not the page", which was
+true and useless: every returning visitor had the same stuck value, and no
+visitor can be told to clear their storage. The key is now `tlb_ccy2`, so
+every old value is ignored and only a currency picked from the picker is
+remembered. Proved on the live site by planting `tlb_ccy=GBP` and watching
+pricing still open on naira at 20,000 and 49,000.
+
+**The rule worth keeping:** never write a guess into the same place as a
+choice. Once it is there, nothing downstream can tell them apart, and the
+only way out is a new key.
+
+## Products and the FAQ, 20 September
+
+**Products is just the feature lists now.** "no explanations or long
+stories". Every pane is the title and one list of bullets; the narrative
+sub-heading and the paragraph under it are gone from all six. The Money
+pane was six cards of heading-plus-paragraph and is now six bullets in the
+same shape as the rest, carrying his sentences across rather than rewriting
+them. Screenshots stayed, because they are the proof and he did not ask for
+them to go. 1.5 screens to 1.4 on a phone.
+
+**The FAQ was repeating itself in the answers, not the questions.** Three
+promised the same export in different words, three explained the same 8%,
+two explained the same 31 day hold. Each fact is now stated once, where
+somebody would look for it. "Is it recurring, or only the first payment?"
+and "Is the rate the same for every partner?" were one question asked twice
+and are now "How much do I earn, and for how long?".
+
+| | Before | After |
+|---|---|---|
+| Questions | 25 | 24 |
+| Words in answers | 1,098 | 873 |
+| Average answer | 44 words | 36 |
+
+Four sections kept, which he asked for by name. Also reconciled: "How do I
+pay?" said bank transfer or card while the next answer said we never take a
+card. Both true, and together they read as a contradiction. It now says we
+do not keep the card, which is what was meant.
+
+**Still open:** the FAQ tone is a judgement call rather than a fact. He
+asked for it to sound like a person wrote it and approved the deploy without
+reading the new wording first, so it is worth him reading once on the live
+site.
 
 ## SHIPPED 20 September 2026, and applied
 
