@@ -315,8 +315,8 @@ PAGES.staff = function () {
           '<td class="num hide-sm">' + (a && a.hours ? a.hours : '—') + '</td>' +
           '<td class="hide-sm">' + (a ? statusPill(a.state) : '<span class="note">not recorded</span>') + '</td>' +
           '<td>' + (!a || !a.in
-            ? '<button class="btn sm" onclick="clockIn(' + s.id + ')">Clock in</button>'
-            : (!a.out ? '<button class="btn sm gold" onclick="clockOut(' + s.id + ')">Clock out</button>'
+            ? '<button class="btn sm" onclick="clockIn(\'' + s.id + '\')">Clock in</button>'
+            : (!a.out ? '<button class="btn sm gold" onclick="clockOut(\'' + s.id + '\')">Clock out</button>'
               : '<span class="note">done</span>')) + '</td></tr>';
       }).join('') + '</tbody></table></div></div>' +
 
@@ -542,7 +542,7 @@ PAGES.settings = function () {
         (st.roleId === 'owner' ? 'var(--gold)' : 'var(--green)') + ';padding-left:10px">' +
         '<div><b>' + esc(st.name) + ' <span class="pill grey">' + r.name + '</span></b>' +
         '<small>' + st.username + ' · ' + st.email + '</small></div>' +
-        '<button class="btn sm" onclick="event.stopPropagation();formStaffRole(' + st.id + ')">Change role</button></div>';
+        '<button class="btn sm" onclick="event.stopPropagation();formStaffRole(\'' + st.id + '\')">Change role</button></div>';
     }).join('') + '</div>' +
     '<button class="btn gold" style="margin-top:14px" onclick="formAddStaff()">+ Add staff account</button>';
 

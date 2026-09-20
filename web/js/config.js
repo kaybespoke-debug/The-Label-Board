@@ -159,6 +159,17 @@ const SITE = {
      be the website and the billing disagreeing in the one direction that
      matters to somebody deciding whether to trust us.                 */
   trial: {
+    /* OFF until the Flutterwave card step exists. Turned on by a PERSON in
+       the release that connects it, never by a date: 1 November is when we
+       open, not when the card form starts working, and a button that
+       appears on a date appears whether or not it can do anything.
+
+       audit_web.js reads this and follows it both ways. false and the
+       trial must be offered nowhere; true and it must be on the plan cards,
+       the hero, the header, the drawer and the footer. So the flag cannot
+       be flipped without the gate noticing, and the buttons cannot come
+       back without the flag. */
+    live: false,
     days: 14,
     plan: 'pro',
     cardRequired: true,

@@ -153,8 +153,26 @@ textarea.fld{resize:vertical;min-height:64px;letter-spacing:.3px;font-size:14px}
 .who .av{width:34px;height:34px;border-radius:50%;background:rgba(201,168,106,.14);color:var(--gold);display:grid;place-items:center;font-size:14px;font-weight:500;flex:none}
 .who .wn{font-size:13.5px;color:var(--text)}.who .wr{font-size:11px;color:var(--text-faint);letter-spacing:.5px}
 
-.main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:max(30px,env(safe-area-inset-top)) max(30px,env(safe-area-inset-right)) 60px max(30px,env(safe-area-inset-left));max-width:none}
-.topbar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:30px;gap:16px;flex-wrap:wrap}
+/* padding-top is 0 because .topbar carries it, sticky header, see above */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:0 max(30px,env(safe-area-inset-right)) 60px max(30px,env(safe-area-inset-left));max-width:none}
+/* The header stays put while the page scrolls under it. Kayode, 20 September
+   2026: "lets keep the headers firm, so the header doesnt scroll while you are
+   scroliing other things". .main is its own scroll container, so the page
+   title, the period picker and the branch switch all went up with the orders.
+
+   The top padding lives on the HEADER, not on .main. Pulling the header up
+   into .main's padding with a negative margin was tried first and measured:
+   sticky positions against the scrollport and ignores the margin, so the
+   header stuck 30px down with a live strip above it that rows slid through.
+   With the padding here instead, the header is the top of the page and there
+   is nothing above it to see.
+
+   The safe-area inset comes with it. On a phone with a notch that inset is
+   what keeps the title out from under the status bar, so it has to move too,
+   not be left behind on a .main that no longer has any. */
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:30px;gap:16px;flex-wrap:wrap;
+  position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line-soft);
+  padding-top:max(30px,env(safe-area-inset-top));padding-bottom:14px}
 .page-title{font-size:30px;letter-spacing:.5px}.page-sub{color:var(--text-faint);font-size:13px;margin-top:3px;letter-spacing:.6px}
 .top-actions{display:flex;align-items:center;gap:10px}
 .icon-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--text-dim);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.2s}
@@ -639,8 +657,10 @@ body.modal-open{overflow:hidden}
   .sidebar.open{transform:translateX(0)}
   #drawerOverlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:55;opacity:0;pointer-events:none;transition:opacity .25s}
   #drawerOverlay.show{opacity:1;pointer-events:auto}
-  .main{padding:max(18px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(82px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  .main{padding:0 max(16px,env(safe-area-inset-right)) calc(82px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
   body.has-install .main{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+  /* the header keeps carrying the top inset on a phone, where it matters most */
+  .topbar{padding-top:max(18px,env(safe-area-inset-top));padding-bottom:10px;margin-bottom:20px}
   .mob-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);border-top:1px solid var(--line);padding:6px 2px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px -12px rgba(0,0,0,.35)}
   .mob-bar .mb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text-faint);cursor:pointer;padding:4px 2px}
   .mob-bar .mb .mbi{line-height:0;display:block}

@@ -296,7 +296,7 @@ function setCalLens(v) { UI.calLens = v; render(); }
    and wiped. That bug cost the customer app a date and a freshly generated
    video link, and the cheapest fix is to never re-render at all. */
 function formCalEntry(id) {
-  const e = id ? (DB.calendar || []).find(x => x.id === +id) : null;
+  const e = id ? (DB.calendar || []).find(x => String(x.id) === String(id)) : null;
   const type = e ? e.type : 'meeting';
   const opts = (list, sel) => list.map(o =>
     '<option value="' + o[0] + '"' + (o[0] === sel ? ' selected' : '') + '>' + o[1] + '</option>').join('');
@@ -340,7 +340,7 @@ function formCalEntry(id) {
     '<div class="fg"><label>Notes</label><textarea id="calNotes">' + (e ? esc(e.notes || '') : '') +
     '</textarea></div>',
 
-    (e ? '<button class="btn" onclick="deleteCalEntry(' + e.id + ')">Delete</button>' : '') +
+    (e ? '<button class="btn" onclick="deleteCalEntry(\'' + e.id + '\')">Delete</button>' : '') +
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doCalEntry(' + (id || 'null') + ')">' +
     (e ? 'Save' : 'Add to calendar') + '</button>');
@@ -381,7 +381,7 @@ function doCalEntry(id) {
 
   DB.calendar = DB.calendar || [];
   if (id) {
-    const e = DB.calendar.find(x => x.id === +id);
+    const e = DB.calendar.find(x => String(x.id) === String(id));
     Object.assign(e, rec);
     logAction('calendar', 'Calendar entry updated', title);
     toast('Updated');
@@ -401,7 +401,7 @@ function doCalEntry(id) {
 }
 
 function deleteCalEntry(id) {
-  const e = (DB.calendar || []).find(x => x.id === +id);
+  const e = (DB.calendar || []).find(x => String(x.id) === String(id));
   if (!e) return;
   /* Only the person who made it, or someone who can manage staff, may
      remove it. Otherwise anyone could quietly delete the owner's meeting. */

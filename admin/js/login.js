@@ -239,7 +239,7 @@ function revokeAllSessions(staffId) {
       '<div class="row"><div><b>' + x.device + '</b><small>' + x.place + ' · ' + x.ip + ' · ' +
       sessionAge(x.lastSeenMins) + '</small></div></div>').join('') + '</div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn danger" onclick="doRevokeAll(' + staffId + ')">End ' + others.length + ' session' +
+    '<button class="btn danger" onclick="doRevokeAll(\'' + staffId + '\')">End ' + others.length + ' session' +
     (others.length === 1 ? '' : 's') + '</button>');
 }
 function doRevokeAll(staffId) {
@@ -273,7 +273,7 @@ function formSendReset(staffId) {
     '<div class="tog" id="rsForce" onclick="this.classList.toggle(\'on\')"><i></i></div></div>' +
     (authOf(s).resetSentOn ? '<p class="hint">A reset was last sent ' + ago(authOf(s).resetSentOn) + '.</p>' : ''),
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doSendReset(' + staffId + ')">Send the link</button>');
+    '<button class="btn gold" onclick="doSendReset(\'' + staffId + '\')">Send the link</button>');
 }
 function doSendReset(staffId) {
   const s = Q.staffM(staffId);
@@ -406,10 +406,10 @@ function loginSection() {
       (x.current ? ' <span class="pill green">This device</span>' : '') + '</b>' +
       '<small>' + x.place + ' · ' + x.ip + ' · ' + sessionAge(x.lastSeenMins) + '</small></div>' +
       (x.current ? '<span class="note">in use</span>'
-        : '<button class="btn sm" onclick="revokeSession(' + me.id + ',&#39;' + x.id + '&#39;)">Sign out</button>') +
+        : '<button class="btn sm" onclick="revokeSession(\'' + me.id + '\',&#39;' + x.id + '&#39;)">Sign out</button>') +
       '</div>').join('') + '</div>' +
     (a.sessions.filter(x => !x.current).length
-      ? '<button class="btn danger" style="margin-top:12px" onclick="revokeAllSessions(' + me.id + ')">' +
+      ? '<button class="btn danger" style="margin-top:12px" onclick="revokeAllSessions(\'' + me.id + '\')">' +
         'Sign out my other devices</button>' : '');
 
   /* --- everyone else, searchable and sortable --- */
@@ -491,7 +491,7 @@ function loginSection() {
               : au.mustReset ? '<span class="pill amber">Must change</span>'
                 : au.failedAttempts ? '<span class="pill amber">' + au.failedAttempts + ' failed</span>'
                   : '<span class="pill green">Normal</span>';
-          return '<tr><td class="klik" onclick="openDetail(&#39;staff&#39;,' + s.id + ')">' +
+          return '<tr><td class="klik" onclick="openDetail(&#39;staff&#39;,\'' + s.id + '\')">' +
             '<div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.username + '</div></td>' +
             '<td class="hide-sm">' + s.dept + '</td>' +
             '<td class="num hide-sm"' + (d > 365 ? ' style="color:var(--amber)"' : '') + '>' +
@@ -500,9 +500,9 @@ function loginSection() {
             '<td class="num hide-sm">' + au.sessions.length + '</td>' +
             '<td>' + state + '</td>' +
             '<td><div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">' +
-            '<button class="btn sm" onclick="formSendReset(' + s.id + ')">Reset link</button>' +
-            (au.locked ? '<button class="btn sm gold" onclick="unlockAccount(' + s.id + ')">Unlock</button>' : '') +
-            (au.sessions.length ? '<button class="btn sm" onclick="revokeAllSessions(' + s.id + ')">End sessions</button>' : '') +
+            '<button class="btn sm" onclick="formSendReset(\'' + s.id + '\')">Reset link</button>' +
+            (au.locked ? '<button class="btn sm gold" onclick="unlockAccount(\'' + s.id + '\')">Unlock</button>' : '') +
+            (au.sessions.length ? '<button class="btn sm" onclick="revokeAllSessions(\'' + s.id + '\')">End sessions</button>' : '') +
             '</div></td></tr>';
         }).join('') + '</tbody></table></div>'
         : '<div class="empty">Nobody matches that.</div>') +

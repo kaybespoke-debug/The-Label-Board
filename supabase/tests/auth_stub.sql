@@ -80,7 +80,16 @@ create table if not exists auth.users (
   id                  uuid primary key default gen_random_uuid(),
   email               text unique,
   raw_user_meta_data  jsonb not null default '{}'::jsonb,
-  created_at          timestamptz not null default now()
+  created_at          timestamptz not null default now(),
+  -- Added 21 September 2026 for account_directory, which reports whether an
+  -- account is confirmed, when it last signed in and whether it is banned.
+  -- The stub only has to carry the columns our own code reads, but it has to
+  -- carry ALL of them: a migration that names a column this table lacks does
+  -- not fail loudly here, it is skipped by the harness loop and every check
+  -- that depended on it then passes by not running.
+  email_confirmed_at  timestamptz,
+  last_sign_in_at     timestamptz,
+  banned_until        timestamptz
 );
 
 -- =====================================================================

@@ -77,7 +77,8 @@ body.light .badge{background:#17385c;color:#fff}
 .me-n{font-size:12.5px}.me-r{font-size:10px;color:var(--faint);margin-top:1px}
 
 /* ---------- main ---------- */
-.main{min-width:0;height:100vh;overflow-y:auto;padding:26px 30px 60px}
+/* no padding-top: the sticky .top carries it, see the header block below */
+.main{min-width:0;height:100vh;overflow-y:auto;padding:0 30px 60px}
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
 .top h1{font-size:29px}
 .top-sub{color:var(--faint);font-size:12.5px;margin-top:4px}
@@ -383,7 +384,7 @@ tbody tr:last-child td{border-bottom:0}
   .nav{justify-content:center;padding:12px 0;min-height:44px}
   .brand{justify-content:center;padding:4px 0 14px}
   .me{justify-content:center}
-  .main{padding:20px 16px 50px}
+  .main{padding:0 16px 50px}
   .srch{min-width:0;width:100%}
   .top-act{width:100%}
   .modal{max-width:none;margin:0 auto}
@@ -392,7 +393,7 @@ tbody tr:last-child td{border-bottom:0}
 /* ---- phone ---- */
 @media(max-width:680px){
 
-  .main{height:auto;min-height:100vh;padding:16px 14px 30px;overflow:visible}
+  .main{height:auto;min-height:100vh;padding:0 14px 30px;overflow:visible}
   html,body{height:auto}
   .top{margin-bottom:16px;gap:10px}
   .top h1{font-size:23px}
@@ -561,8 +562,13 @@ tbody tr:last-child td{border-bottom:0}
     padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;
     font-weight:700;display:grid;place-items:center;font-family:var(--sans)}
 
+  /* the window scrolls here, so .top sticks to the viewport and it is .top
+     that has to hold the status bar off the title. The inset moves with the
+     padding; leaving it on .main would put a live 16px strip above a header
+     that is stuck to the very top of the screen. */
   .main{height:auto;min-height:100vh;overflow:visible;
-    padding:max(16px,env(safe-area-inset-top)) 14px calc(74px + env(safe-area-inset-bottom))}
+    padding:0 14px calc(74px + env(safe-area-inset-bottom))}
+  .top{padding-top:max(16px,env(safe-area-inset-top))}
   html,body{height:auto}
 
   /* iOS zooms the page when a field under 16px gets focus */
@@ -728,3 +734,37 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
   .cal-dots i{width:4px;height:4px}
   .cal-key{gap:8px 10px}
 }
+
+/* ---------- the page header stays put ----------
+   Kayode, 20 September 2026: "lets keep the headers firm, so the header
+   doesnt scroll while you are scroliing other things on the profile".
+
+   .main is its own scroll container, so .top scrolled away with the rows and
+   the buttons on a studio's record went with it. Sticking it means the studio
+   name, the period and the actions are still there at the bottom of a long
+   list, which is the point of them.
+
+   The negative top margin and the matching padding exist because sticky sits
+   against the top of the scrollport, and .main has 26px of padding above it.
+   Without the pair, rows scroll through that gap and appear above the header.
+   Each breakpoint repeats it because each one has its own .main padding, and a
+   single value would leave a sliver of moving content on the other two.
+
+   Horizontal padding needs no such treatment: nothing renders in it. */
+/* The top padding moves OFF .main and ON to the header.
+
+   The first attempt kept .main{padding-top:26px} and pulled the header up
+   with a matching negative margin. Measured, that left the header stuck 26px
+   down from the top of the scrollport with a live 26px strip above it, so
+   rows slid through the gap. Sticky positions against the scrollport and does
+   not care what margin you gave it.
+
+   With the padding on the header instead, the header IS the top of the page:
+   nothing can appear above it because there is nothing above it. .top is
+   static markup in index.html and always the first child of .main, so this
+   holds on every screen. */
+.top{position:sticky;top:0;z-index:30;padding:26px 0 14px;margin-bottom:22px;
+  background:var(--bg);border-bottom:1px solid var(--line-soft)}
+
+@media(max-width:860px){ .top{padding:20px 0 12px;margin-bottom:16px} }
+@media(max-width:680px){ .top{padding:16px 0 10px;margin-bottom:14px} }

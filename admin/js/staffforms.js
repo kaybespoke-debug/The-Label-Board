@@ -232,7 +232,7 @@ function formEditStaff(id) {
     '</select></div>' +
     '<p class="hint">Pay, bank and pension are edited on the Pay setup tab so a change to them is logged separately.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doEditStaff(' + id + ')">Save changes</button>', true);
+    '<button class="btn gold" onclick="doEditStaff(\'' + id + '\')">Save changes</button>', true);
 }
 function doEditStaff(id) {
   const s = Q.staffM(id);
@@ -275,7 +275,7 @@ function formSalary(id) {
     '<div class="kv"><span class="k">Payslips already published</span><span class="v">Left untouched</span></div>' +
     '<div class="kv"><span class="k">Logged to the audit trail</span><span class="v">Yes, with the reason</span></div></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doSalary(' + id + ')">Save salary</button>');
+    '<button class="btn gold" onclick="doSalary(\'' + id + '\')">Save salary</button>');
 }
 function doSalary(id) {
   const s = Q.staffM(id);
@@ -310,7 +310,7 @@ function formBank(id) {
     '<p class="hint">A change of account should be backed by a fresh signed mandate. ' +
     'It is logged, and the mandate belongs under Documents.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doBank(' + id + ')">Save</button>');
+    '<button class="btn gold" onclick="doBank(\'' + id + '\')">Save</button>');
 }
 function doBank(id) {
   const s = Q.staffM(id);
@@ -345,7 +345,7 @@ function formPension(id) {
     money(Math.round(s.basic * s.pension.rate / 100)) + '</span></div>' +
     '<div class="kv"><span class="k">NHF if enrolled</span><span class="v">−' + money(Math.round(s.basic * 0.025)) + '</span></div></div>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn gold" onclick="doPension(' + id + ')">Save</button>');
+    '<button class="btn gold" onclick="doPension(\'' + id + '\')">Save</button>');
 }
 function doPension(id) {
   const s = Q.staffM(id);
@@ -378,7 +378,7 @@ function doPension(id) {
 
 /* ---------------- document viewer ---------------- */
 function viewDoc(docId) {
-  const d = DB.docs.find(x => x.id === +docId);
+  const d = DB.docs.find(x => String(x.id) === String(docId));
   if (!d) return;
   const s = Q.staffM(d.staffId);
   if (d.status !== 'on file') {
@@ -397,11 +397,11 @@ function viewDoc(docId) {
     '</div>' +
     '<div class="sec-t">Note</div><p class="note">' + d.note + '</p>',
     '<button class="btn" onclick="closeModal()">Close</button>' +
-    '<button class="btn" onclick="downloadDoc(' + d.id + ')">Download</button>', true);
+    '<button class="btn" onclick="downloadDoc(\'' + d.id + '\')">Download</button>', true);
   logAction('account_view', 'Document opened', 'Kayode Ojomo opened ' + s.name + '\'s ' + d.kind.toLowerCase());
 }
 function downloadDoc(docId) {
-  const d = DB.docs.find(x => x.id === +docId);
+  const d = DB.docs.find(x => String(x.id) === String(docId));
   const s = Q.staffM(d.staffId);
   const rows = [['THE LABEL BOARD — ' + d.kind.toUpperCase()], [''], ['Staff', s.name], ['Staff ID', s.staffId], ['']]
     .concat(d.body.map(r => [r[0], r[1]]))

@@ -13,7 +13,7 @@ const ROWS = {
     if (!list.length) return '<div class="empty">No accounts in this figure.</div>';
     return '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th><th>Status</th>' +
       '<th class="hide-sm">Joined</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
-      list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',' + s.id + ')">' +
+      list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
         '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') + '</td>' +
@@ -28,7 +28,7 @@ const ROWS = {
     if (!list.length) return '<div class="empty">No payments in this figure.</div>';
     return '<div class="tw"><table><thead><tr><th class="hide-sm">Date</th><th>Subscriber</th>' +
       '<th class="hide-sm">Reference</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>' +
-      list.slice(0, 150).map(p => '<tr class="klik" onclick="openDetail(\'pay\',' + p.id + ')">' +
+      list.slice(0, 150).map(p => '<tr class="klik" onclick="openDetail(\'pay\',\'' + p.id + '\')">' +
         '<td class="hide-sm">' + fmtD(p.date) + '</td>' +
         '<td><div class="t-main">' + esc(p.subscriber) + '</div><div class="t-sub">' + p.plan + ' · ' + p.cycle + '</div></td>' +
         '<td class="hide-sm">' + p.ref + '</td>' +
@@ -42,7 +42,7 @@ const ROWS = {
   },
   tickets(list) {
     if (!list.length) return '<div class="empty">No tickets in this figure.</div>';
-    return list.map(t => '<div class="row klik" onclick="openDetail(\'ticket\',' + t.id + ')">' +
+    return list.map(t => '<div class="row klik" onclick="openDetail(\'ticket\',\'' + t.id + '\')">' +
       '<div><b>' + esc(t.title) + '</b><small>#' + t.ref + ' · ' + esc(t.subscriber) + ' · ' +
       (t.assignedTo ? esc(t.assignedName) : 'unassigned') + ' · ' + ago(t.openedAt) + '</small></div>' +
       statusPill(t.state) + '</div>').join('');
@@ -53,7 +53,7 @@ const ROWS = {
       '<th class="num hide-sm">Monthly gross</th><th></th></tr></thead><tbody>' +
       list.map(s => {
         const a = Q.attToday(s.id);
-        return '<tr class="klik" onclick="openDetail(\'staff\',' + s.id + ')">' +
+        return '<tr class="klik" onclick="openDetail(\'staff\',\'' + s.id + '\')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + s.title + '</div></td>' +
           '<td class="hide-sm">' + s.dept + '</td>' +
           '<td>' + (a && a.in ? (a.out ? a.in + '–' + a.out : '<span class="pill green">In since ' + a.in + '</span>') : (a ? statusPill(a.state) : '<span class="note">—</span>')) + '</td>' +
@@ -65,7 +65,7 @@ const ROWS = {
     if (!list.length) return '<div class="empty">No payslips in this figure.</div>';
     return '<div class="tw"><table><thead><tr><th>Staff</th><th class="hide-sm">Department</th><th class="num hide-sm">Gross</th>' +
       '<th class="num hide-sm">Deductions</th><th class="num">Net</th><th>Status</th><th></th></tr></thead><tbody>' +
-      list.map(s => '<tr class="klik" onclick="openDetail(\'slip\',' + s.id + ')">' +
+      list.map(s => '<tr class="klik" onclick="openDetail(\'slip\',\'' + s.id + '\')">' +
         '<td class="t-main">' + esc(s.staffName) + '</td><td class="hide-sm">' + s.dept + '</td>' +
         '<td class="num hide-sm">' + money(s.gross) + '</td>' +
         '<td class="num hide-sm" style="color:var(--red)">−' + money(s.deductions) + '</td>' +
@@ -79,7 +79,7 @@ const ROWS = {
   },
   onb(list) {
     if (!list.length) return '<div class="empty">Nothing in this figure.</div>';
-    return list.map(o => '<div class="row klik" onclick="openDetail(\'onb\',' + o.id + ')">' +
+    return list.map(o => '<div class="row klik" onclick="openDetail(\'onb\',\'' + o.id + '\')">' +
       '<div><b>' + esc(o.name) + '</b><small>' + esc(o.owner) + ' · step ' + o.step + ' of 6 · trial ends ' +
       (o.trialEndsIn <= 0 ? 'today' : 'in ' + o.trialEndsIn + ' days') + '</small></div>' +
       statusPill(o.state) + '</div>').join('');
@@ -89,7 +89,7 @@ const ROWS = {
     return '<div class="tw"><table><thead><tr><th>Subscriber</th><th class="hide-sm">Plan</th>' +
       '<th class="num hide-sm">Referred</th>' +
       '<th class="num hide-sm">Converted</th><th></th></tr></thead><tbody>' +
-      list.map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',' + s.id + ')">' +
+      list.map(s => '<tr class="klik" onclick="UI.vtab[\'sub' + s.id + '\']=\'referrals\';openDetail(\'sub\',\'' + s.id + '\')">' +
         '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + '</div></td>' +
         '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
         '<td class="num hide-sm">' + s.referrals.length + '</td>' +
@@ -102,7 +102,7 @@ const ROWS = {
   },
   tasks(list) {
     if (!list.length) return '<div class="empty">Nothing in this figure.</div>';
-    return list.map(t => '<div class="row klik" onclick="openDetail(\'task\',' + t.id + ')">' +
+    return list.map(t => '<div class="row klik" onclick="openDetail(\'task\',\'' + t.id + '\')">' +
       '<div><b>' + esc(t.title) + '</b><small>' + esc(t.assignedName) + ' · due ' + fmtD(t.due) + '</small></div>' +
       '<span class="pill ' + (t.done ? 'green' : t.dueIn < 0 ? 'red' : 'amber') + '">' +
       (t.done ? 'Done' : t.dueIn < 0 ? Math.abs(t.dueIn) + 'd late' : t.dueIn === 0 ? 'Today' : 'In ' + t.dueIn + 'd') + '</span></div>').join('');

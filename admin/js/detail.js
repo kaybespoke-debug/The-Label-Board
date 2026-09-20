@@ -37,7 +37,7 @@ DETAIL.sub = function (id) {
     body = '<div class="actrow"><a href="tel:' + s.phone.replace(/\s/g, '') + '">Call</a>' +
       '<a href="https://wa.me/' + s.phone.replace(/[^0-9]/g, '') + '" target="_blank" rel="noopener">WhatsApp</a>' +
       '<a href="mailto:' + s.email + '">Email</a>' +
-      '<button class="lnk" onclick="formEditSubscriber(' + s.id + ')">Edit record</button></div>' +
+      '<button class="lnk" onclick="formEditSubscriber(\'' + s.id + '\')">Edit record</button></div>' +
       '<div class="sec-t">Business</div>' +
       kv('Trading name', esc(s.name)) + kv('Owner', esc(s.owner)) + kv('Email', esc(s.email)) +
       kv('Phone', s.phone) + kv('Base city', s.city) + kv('Found us via', s.channel) +
@@ -80,8 +80,8 @@ DETAIL.sub = function (id) {
         'and nothing will be: they keep everything they already had and simply cannot add ' +
         'more. Move them up a plan, or agree a ceiling on this business.</p>' : '') +
       '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">' +
-      '<button class="btn gold" onclick="formChangePlan(' + s.id + ')">Change plan</button>' +
-      '<button class="btn" onclick="formStudioLimits(' + s.id + ')">Agree a limit</button>' +
+      '<button class="btn gold" onclick="formChangePlan(\'' + s.id + '\')">Change plan</button>' +
+      '<button class="btn" onclick="formStudioLimits(\'' + s.id + '\')">Agree a limit</button>' +
       '<button class="btn" onclick="setVTab(\'' + key + '\',\'payments\')">See payments</button>' +
       '</div>';
   }
@@ -166,16 +166,16 @@ DETAIL.sub = function (id) {
     /* Recording a payment and granting extra storage both reach real rows through the
        gateway, so they are only offered on a real studio. On an example subscriber they
        would fail at the Edge Function, which is a worse way to learn it. */
-    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="formEditSubscriber(' + s.id + ')">Edit</button>' +
-    (s.live ? '<button class="btn" onclick="formRecordPayment(' + s.id + ')">Record a payment</button>' +
-              '<button class="btn" onclick="formStorageCap(' + s.id + ')">Storage</button>' : '') +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="formEditSubscriber(\'' + s.id + '\')">Edit</button>' +
+    (s.live ? '<button class="btn" onclick="formRecordPayment(\'' + s.id + '\')">Record a payment</button>' +
+              '<button class="btn" onclick="formStorageCap(\'' + s.id + '\')">Storage</button>' : '') +
     /* A studio that sends us another studio becomes a partner. Kayode, 19
        September 2026: "business referring other business becomes partner once
        they start referring". The invitation is the same one the Partners page
        sends, prefilled from this business, so there is one path into the
        programme and not two that can drift. */
-    '<button class="btn" onclick="makeSubscriberAPartner(' + s.id + ')">Make a partner</button>' +
-    '<button class="btn gold" onclick="formChangePlan(' + s.id + ')">Change plan</button></div></div>' +
+    '<button class="btn" onclick="makeSubscriberAPartner(\'' + s.id + '\')">Make a partner</button>' +
+    '<button class="btn gold" onclick="formChangePlan(\'' + s.id + '\')">Change plan</button></div></div>' +
     '<div class="dstats">' +
     dstat(s.mrr ? money(s.mrr) : '—', 'MRR', 'm') +
     dstat(money(lifetime), 'Lifetime revenue', 'g') +
@@ -211,7 +211,7 @@ DETAIL.staff = function (id) {
     body = '<div class="actrow"><a href="tel:' + s.phone.replace(/\s/g, '') + '">Call</a>' +
       '<a href="https://wa.me/' + s.phone.replace(/[^0-9]/g, '') + '" target="_blank" rel="noopener">WhatsApp</a>' +
       '<a href="mailto:' + s.email + '">Email</a>' +
-      (can('manage_staff') ? '<button class="lnk" onclick="formEditStaff(' + s.id + ')">Edit profile</button>' : '') + '</div>' +
+      (can('manage_staff') ? '<button class="lnk" onclick="formEditStaff(\'' + s.id + '\')">Edit profile</button>' : '') + '</div>' +
       (can('manage_staff') ? '' : '<p class="hint">Read-only. Editing a staff record needs the ' +
         '&ldquo;Manage staff accounts&rdquo; permission, which your role does not have.</p>') +
       '<div class="sec-t">Personal information</div>' +
@@ -250,11 +250,11 @@ DETAIL.staff = function (id) {
         : '<p class="hint">Nobody can set somebody else\'s password, including you. Send a reset link and ' +
           esc(s.name.split(' ')[0]) + ' chooses their own.</p>') +
       '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
-      '<button class="btn" onclick="formStaffRole(' + s.id + ')">Change role</button>' +
+      '<button class="btn" onclick="formStaffRole(\'' + s.id + '\')">Change role</button>' +
       (s.id === ME.staffId
         ? '<button class="btn gold" onclick="formChangePassword()">Change my password</button>'
-        : '<button class="btn" onclick="formSendReset(' + s.id + ')">Send a reset link</button>') +
-      (authOf(s).locked ? '<button class="btn gold" onclick="unlockAccount(' + s.id + ')">Unlock account</button>' : '') +
+        : '<button class="btn" onclick="formSendReset(\'' + s.id + '\')">Send a reset link</button>') +
+      (authOf(s).locked ? '<button class="btn gold" onclick="unlockAccount(\'' + s.id + '\')">Unlock account</button>' : '') +
       '<button class="btn" onclick="go(\'settings\')">Edit permissions</button></div>';
   }
 
@@ -283,9 +283,9 @@ DETAIL.staff = function (id) {
     const al = DB.settings.allowances;
     const lastSlip = slips[0];
     body = '<div class="actrow">' +
-      '<button class="lnk" onclick="formSalary(' + s.id + ')">Set salary</button>' +
-      '<button class="lnk" onclick="formBank(' + s.id + ')">Bank details</button>' +
-      '<button class="lnk" onclick="formPension(' + s.id + ')">Pension &amp; NHF</button></div>' +
+      '<button class="lnk" onclick="formSalary(\'' + s.id + '\')">Set salary</button>' +
+      '<button class="lnk" onclick="formBank(\'' + s.id + '\')">Bank details</button>' +
+      '<button class="lnk" onclick="formPension(\'' + s.id + '\')">Pension &amp; NHF</button></div>' +
 
       '<div class="sec-t">Earnings</div>' +
       kv('Salary type', s.salaryType) +
@@ -341,8 +341,8 @@ DETAIL.staff = function (id) {
         '<td class="hide-sm">' + (sl.uploaded ? '<span class="pill green">Published</span>' : '<span class="pill grey">Not yet</span>') + '</td>' +
         '<td class="chev">&rsaquo;</td></tr>').join('') + '</tbody></table></div>' +
       '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
-      '<button class="btn" onclick="downloadAllSlips(' + s.id + ')">Download all as CSV</button>' +
-      '<button class="btn gold" onclick="publishSlipsFor(' + s.id + ')">Publish unpublished slips</button></div>';
+      '<button class="btn" onclick="downloadAllSlips(\'' + s.id + '\')">Download all as CSV</button>' +
+      '<button class="btn gold" onclick="publishSlipsFor(\'' + s.id + '\')">Publish unpublished slips</button></div>';
   }
 
   else if (tab === 'attendance') {
@@ -356,8 +356,8 @@ DETAIL.staff = function (id) {
         : todayA.out ? 'Clocked out at ' + todayA.out + ' · ' + todayA.hours + ' hours'
           : 'On the floor since ' + todayA.in) + '</div></div>' +
       (!todayA || !todayA.in
-        ? '<button class="btn gold" onclick="clockIn(' + s.id + ')">Clock in</button>'
-        : !todayA.out ? '<button class="btn gold" onclick="clockOut(' + s.id + ')">Clock out</button>'
+        ? '<button class="btn gold" onclick="clockIn(\'' + s.id + '\')">Clock in</button>'
+        : !todayA.out ? '<button class="btn gold" onclick="clockOut(\'' + s.id + '\')">Clock out</button>'
           : statusPill(todayA.state)) + '</div></div>' +
       '<div class="stats" style="margin-bottom:10px">' +
       statCard({ label: 'Attendance rate', value: Q.attRate(s.id) + '%', tone: Q.attRate(s.id) >= 90 ? 'good' : 'warn', sub: 'Last 30 days' }) +
@@ -391,7 +391,7 @@ DETAIL.staff = function (id) {
           '<td class="num">' + l.days + '</td><td>' + statusPill(l.status === 'pending' ? 'open' : 'approved') + '</td>' +
           '<td class="note hide-sm">' + l.note + '</td></tr>').join('') + '</tbody></table></div>'
         : '<div class="empty">No leave taken or booked.</div>') +
-      '<button class="btn gold" style="margin-top:16px" onclick="formLeave(' + s.id + ')">Record leave</button>';
+      '<button class="btn gold" style="margin-top:16px" onclick="formLeave(\'' + s.id + '\')">Record leave</button>';
   }
 
   else if (tab === 'notes') {
@@ -413,7 +413,7 @@ DETAIL.staff = function (id) {
       '<p class="note">' + onFile + ' of ' + docs.length + ' on file. Tap any document to read it — ' +
       'only the Owner and this person\'s manager can open these.</p>' +
       '<div style="margin-top:12px">' +
-      docs.map(d => '<div class="row klik" onclick="viewDoc(' + d.id + ')">' +
+      docs.map(d => '<div class="row klik" onclick="viewDoc(\'' + d.id + '\')">' +
         '<div><b>' + d.kind + '</b><small>' +
         (d.status === 'on file' ? d.pages + ' page' + (d.pages === 1 ? '' : 's') + ' · added ' + fmtD(d.addedOn)
           : d.status === 'not enrolled' ? 'Nothing to show — not enrolled' : 'Not supplied yet') +
@@ -423,7 +423,7 @@ DETAIL.staff = function (id) {
             : '<span class="pill amber">Missing</span>') + '</div>').join('') + '</div>' +
       '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
       '<button class="btn" onclick="toast(\'File upload lands with the Supabase storage bucket\')">Upload a document</button>' +
-      '<button class="btn" onclick="downloadStaffDocs(' + s.id + ')">Export the index</button></div>';
+      '<button class="btn" onclick="downloadStaffDocs(\'' + s.id + '\')">Export the index</button></div>';
   }
 
   return backBtn() +
@@ -431,9 +431,9 @@ DETAIL.staff = function (id) {
     '<div style="flex:1;min-width:220px"><h2>' + esc(s.name) + ' ' + statusPill(s.status) + '</h2>' +
     '<div class="dmeta">' + s.staffId + ' · ' + s.title + ' · ' + s.dept + ' · <span class="pill grey">' + role.name + '</span></div></div>' +
     '<div style="display:flex;gap:8px">' +
-    (!todayA || !todayA.in ? '<button class="btn gold" onclick="clockIn(' + s.id + ')">Clock in</button>'
-      : !todayA.out ? '<button class="btn gold" onclick="clockOut(' + s.id + ')">Clock out</button>' : '') +
-    '<button class="btn" onclick="formStaffRole(' + s.id + ')">Change role</button></div></div>' +
+    (!todayA || !todayA.in ? '<button class="btn gold" onclick="clockIn(\'' + s.id + '\')">Clock in</button>'
+      : !todayA.out ? '<button class="btn gold" onclick="clockOut(\'' + s.id + '\')">Clock out</button>' : '') +
+    '<button class="btn" onclick="formStaffRole(\'' + s.id + '\')">Change role</button></div></div>' +
     '<div class="dstats">' +
     dstat(money(s.basic), 'Monthly basic', 'm') +
     dstat(money(gross), 'Monthly gross', 'm') +
@@ -451,7 +451,7 @@ DETAIL.staff = function (id) {
 
 /* =================== PAYSLIP =================== */
 DETAIL.slip = function (id) {
-  const sl = DB.payslips.find(x => x.id === +id);
+  const sl = DB.payslips.find(x => String(x.id) === String(id));
   if (!sl) return '<div class="empty">Payslip not found.</div>';
   const st = Q.staffM(sl.staffId);
   const allow = sl.housing + sl.transport + sl.bonus + sl.overtime;
@@ -467,8 +467,8 @@ DETAIL.slip = function (id) {
     /* the person's record belongs at the top, next to the other actions */
     '<button class="btn" onclick="openDetail(\'staff\',\'' + sl.staffId + '\')">Open ' +
     esc(sl.staffName.split(' ')[0]) + '&rsquo;s record &rarr;</button>' +
-    '<button class="btn" onclick="downloadSlip(' + sl.id + ')">Download</button>' +
-    (sl.uploaded ? '' : '<button class="btn gold" onclick="publishSlip(' + sl.id + ')">Publish to staff</button>') +
+    '<button class="btn" onclick="downloadSlip(\'' + sl.id + '\')">Download</button>' +
+    (sl.uploaded ? '' : '<button class="btn gold" onclick="publishSlip(\'' + sl.id + '\')">Publish to staff</button>') +
     '</div></div>' +
 
     '<div class="dstats">' +
@@ -543,8 +543,8 @@ DETAIL.ticket = function (id) {
     '<div class="dhead"><div style="flex:1;min-width:220px"><h2>' + esc(t.title) + ' ' + statusPill(t.state) + '</h2>' +
     '<div class="dmeta">#' + t.ref + ' · ' + t.kind + ' · opened ' + ago(t.openedAt) + ' · ' + (t.assignedTo ? 'assigned to ' + esc(t.assignedName) : 'unassigned') + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
-    '<button class="btn" onclick="formAssignTicket(' + t.id + ')">Assign</button>' +
-    (t.state === 'resolved' ? '' : '<button class="btn gold" onclick="resolveTicket(' + t.id + ')">Mark resolved</button>') +
+    '<button class="btn" onclick="formAssignTicket(\'' + t.id + '\')">Assign</button>' +
+    (t.state === 'resolved' ? '' : '<button class="btn gold" onclick="resolveTicket(\'' + t.id + '\')">Mark resolved</button>') +
     '</div></div>' +
     '<div class="dstats">' +
     dstat(t.firstReplyMins + 'm', 'First reply', t.firstReplyMins < DB.settings.slaHours * 60 ? 'g' : 'r') +
@@ -628,16 +628,16 @@ DETAIL.partner = function (id) {
 };
 
 DETAIL.pay = function (id) {
-  const p = DB.payments.find(x => x.id === +id);
+  const p = DB.payments.find(x => String(x.id) === String(id));
   if (!p) return '<div class="empty">Payment not found.</div>';
   const s = Q.sub(p.subId);
   return backBtn() +
     '<div class="dhead"><div style="flex:1;min-width:220px"><h2>' + money(p.amount) + ' ' + statusPill(p.status) + '</h2>' +
     '<div class="dmeta">' + p.ref + ' · ' + esc(p.subscriber) + ' · ' + fmtD(p.date) + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
-    (p.status === 'failed' || p.status === 'overdue' ? '<button class="btn gold" onclick="retryPayment(' + p.id + ')">Retry charge</button>' : '') +
-    (p.status === 'successful' ? '<button class="btn danger" onclick="formRefund(' + p.id + ')">Issue refund</button>' : '') +
-    '<button class="btn" onclick="downloadInvoice(' + p.id + ')">Invoice</button></div></div>' +
+    (p.status === 'failed' || p.status === 'overdue' ? '<button class="btn gold" onclick="retryPayment(\'' + p.id + '\')">Retry charge</button>' : '') +
+    (p.status === 'successful' ? '<button class="btn danger" onclick="formRefund(\'' + p.id + '\')">Issue refund</button>' : '') +
+    '<button class="btn" onclick="downloadInvoice(\'' + p.id + '\')">Invoice</button></div></div>' +
     '<div class="cols"><div class="pnl"><div class="ph"><h3>Transaction</h3></div>' +
     kv('Amount', '<b>' + money(p.amount) + '</b>') + kv('Status', statusPill(p.status)) +
     kv('Reference', p.ref) + kv('Invoice number', p.invoice) +
@@ -657,7 +657,7 @@ DETAIL.pay = function (id) {
 
 /* =================== ONBOARDING =================== */
 DETAIL.onb = function (id) {
-  const o = DB.onboarding.find(x => x.id === +id);
+  const o = DB.onboarding.find(x => String(x.id) === String(id));
   if (!o) return '<div class="empty">Not found.</div>';
   const s = Q.sub(o.subId);
   return backBtn() +
@@ -665,7 +665,7 @@ DETAIL.onb = function (id) {
     '<div style="flex:1;min-width:220px"><h2>' + esc(o.name) + ' ' + statusPill(o.state) + '</h2>' +
     '<div class="dmeta">' + esc(o.owner) + ' · ' + esc(o.city) + ' · found us via ' + esc(o.channel) + '</div></div>' +
     '<div style="display:flex;gap:8px"><button class="btn" onclick="openDetail(\'sub\',\'' + s.id + '\')">Full account</button>' +
-    '<button class="btn gold" onclick="formConvert(' + s.id + ')">Convert to paid</button></div></div>' +
+    '<button class="btn gold" onclick="formConvert(\'' + s.id + '\')">Convert to paid</button></div></div>' +
     '<div class="dstats">' +
     dstat(o.progress + '%', 'Setup complete', o.progress >= 80 ? 'g' : 'a') +
     dstat(o.step + '/6', 'Steps done') +
@@ -696,7 +696,7 @@ DETAIL.onb = function (id) {
 
 /* =================== SMALL DETAILS =================== */
 DETAIL.fb = function (id) {
-  const f = DB.feedback.find(x => x.id === +id);
+  const f = DB.feedback.find(x => String(x.id) === String(id));
   if (!f) return '<div class="empty">Not found.</div>';
   const s = Q.sub(f.subId);
   return backBtn() +
@@ -713,14 +713,14 @@ DETAIL.fb = function (id) {
 };
 
 DETAIL.ann = function (id) {
-  const a = DB.announcements.find(x => x.id === +id);
+  const a = DB.announcements.find(x => String(x.id) === String(id));
   if (!a) return '<div class="empty">Not found.</div>';
   return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + esc(a.title) + ' ' + statusPill(a.state) + '</h2>' +
     '<div class="dmeta">' + a.audience + ' · ' + a.channel + ' · ' + fmtD(a.date) + ' · by ' + a.author + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
-    (a.state === 'published' ? '' : '<button class="btn gold" onclick="publishAnnouncement(' + a.id + ')">' + (a.state === 'draft' ? 'Publish now' : 'Send now') + '</button>') +
-    '<button class="btn" onclick="formAnnouncement(' + a.id + ')">Edit</button></div></div>' +
+    (a.state === 'published' ? '' : '<button class="btn gold" onclick="publishAnnouncement(\'' + a.id + '\')">' + (a.state === 'draft' ? 'Publish now' : 'Send now') + '</button>') +
+    '<button class="btn" onclick="formAnnouncement(\'' + a.id + '\')">Edit</button></div></div>' +
     '<div class="dstats">' + dstat(a.reach || '—', 'Reached', 'm') +
     dstat(a.reach ? pct(a.opened, a.reach) + '%' : '—', 'Open rate', 'g') +
     dstat(a.audience, 'Audience') + dstat(a.channel, 'Channel') + '</div>' +
@@ -729,15 +729,15 @@ DETAIL.ann = function (id) {
 };
 
 DETAIL.task = function (id) {
-  const t = DB.tasks.find(x => x.id === +id);
+  const t = DB.tasks.find(x => String(x.id) === String(id));
   if (!t) return '<div class="empty">Not found.</div>';
   return backBtn() +
     '<div class="dhead"><div style="flex:1"><h2>' + esc(t.title) + '</h2>' +
     '<div class="dmeta">' + t.priority + ' priority · assigned to ' + esc(t.assignedName) + ' · due ' + fmtD(t.due) + '</div></div>' +
     '<div style="display:flex;gap:8px">' +
-    (t.done ? '<button class="btn" onclick="reopenTask(' + t.id + ')">Reopen</button>'
-      : '<button class="btn gold" onclick="completeTask(' + t.id + ')">Mark done</button>') +
-    '<button class="btn" onclick="formTask(' + t.id + ')">Edit</button></div></div>' +
+    (t.done ? '<button class="btn" onclick="reopenTask(\'' + t.id + '\')">Reopen</button>'
+      : '<button class="btn gold" onclick="completeTask(\'' + t.id + '\')">Mark done</button>') +
+    '<button class="btn" onclick="formTask(\'' + t.id + '\')">Edit</button></div></div>' +
     '<div class="dstats">' +
     dstat(t.done ? 'Done' : t.dueIn < 0 ? Math.abs(t.dueIn) + 'd late' : t.dueIn === 0 ? 'Due today' : 'In ' + t.dueIn + 'd', 'Status', t.done ? 'g' : t.dueIn < 0 ? 'r' : 'a') +
     dstat(t.priority, 'Priority') + dstat(esc(t.assignedName), 'Owner') + dstat(fmtD(t.createdAt), 'Created') + '</div>' +
@@ -748,7 +748,7 @@ DETAIL.task = function (id) {
 };
 
 DETAIL.audit = function (id) {
-  const a = DB.activity.find(x => x.id === +id);
+  const a = DB.activity.find(x => String(x.id) === String(id));
   if (!a) return '<div class="empty">Entry not found.</div>';
   const tgt = a.target ? a.target.split(':') : null;
   return backBtn() +
