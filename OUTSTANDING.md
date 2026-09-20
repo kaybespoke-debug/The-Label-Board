@@ -29,6 +29,30 @@ date went back and the clock came back at 41 days.
 It is the only link to `waitlist.html` on the site, so removing that row
 retires the offer rather than hiding one of several doors.
 
+### A near miss worth writing down: hrefs differ live
+
+**Netlify serves pretty URLs.** `waitlist.html` in the source is `/waitlist`
+in the live DOM. So a selector like `a[href$="waitlist.html"]` matches
+locally and matches NOTHING on the live site.
+
+The first version of the launch-day change used exactly that selector, to
+move the button rather than remove it. It passed every local test and would
+have silently done nothing in production, on the one morning it runs, with
+no error and nobody watching. Kayode changed his mind about the behaviour
+before it shipped, which is the only reason it did not go out; the selector
+was wrong either way and the local test could never have shown it.
+
+It was caught afterwards because a verification query used the same bad
+selector against the live page and reported the waiting list as already
+gone while the clock was still running at 41 days. The wrong answer came
+from the check rather than the site, which is its own lesson: a probe is
+code too.
+
+**The rule:** never key JavaScript off an href string. The remaining one in
+`site.js` is `a[href^="#"]`, which is an in-page anchor and is not rewritten.
+Everything else selects on a class or a data attribute, which is what the
+HTML controls and Netlify does not.
+
 ### The footer was floating on short pages
 
 `trial.html`, `thanks.html` and `404.html` are all shorter than a desktop
