@@ -1401,3 +1401,26 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .faq details[open] summary::after{top:18px}
   .faq .ans{padding:0 26px 10px 0;font-size:12.5px;line-height:1.5}
 }
+
+/* ---------- the FAQ category titles ----------
+   Scoped to the FAQ page rather than to h2 everywhere. These four are
+   category LABELS over a list of rows, not section headlines carrying an
+   argument, so they were running at the same clamp as "One fee for the shop,
+   not for each person" and reading louder than the questions under them.
+
+   Placed on the section that contains a .faq, so it cannot reach an h2 on
+   any other page. */
+.tight:has(.faq) .sec-head h2{font-size:clamp(18px,1.8vw,23px)}
+.tight:has(.faq) .sec-head{margin-bottom:clamp(10px,1.2vw,14px)}
+
+/* :has() is recent enough to be worth a fallback rather than a shrug. Every
+   .faq sits inside .tight on this page and nowhere else does, so naming the
+   page body would be the other way; this is the narrower one. */
+@supports not selector(:has(*)){
+  .faq-page .sec-head h2{font-size:clamp(18px,1.8vw,23px)}
+}
+
+@media (max-width:680px){
+  .tight:has(.faq) .sec-head h2{font-size:16px}
+  .tight:has(.faq) .sec-head{margin-bottom:9px}
+}
