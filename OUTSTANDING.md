@@ -62,6 +62,24 @@ That is a different shape from the trial and needs nothing from the trial
 machinery: `inviteStudio` already takes a `cohort`, so October’s intake is
 one tag and one count in the console.
 
+**The proposal is written** and lives as a Claude doc rather than in this
+repo, because it is a thing he sends to people rather than code:
+https://claude.ai/code/artifact/ee3bae71-802d-46ac-8a65-274f4927cf9c
+
+Five sections: what is being asked (run real work through it, say what
+breaks, one call at the end), what they get (everything, free, no card),
+what happens on 1 November (they choose, with the three prices), what we
+promise about their records, and how to start.
+
+**One decision is deliberately NOT in it: whether October testers get a
+price advantage at launch.** Kayode said "the chance of becoming first
+subscribers" and said nothing about a discount, so nothing was invented.
+A founding rate is the obvious lever and it is his to pull; the doc is one
+edit away from carrying it.
+
+**Also not in it:** how many studios. The doc says "a small number" rather
+than a figure, because a figure nobody has decided is a promise.
+
 ## Android, not just iPhone
 
 Kayode: "please think of android screens too not jus IOS". Fair: the sweep
