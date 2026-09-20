@@ -16,7 +16,15 @@
   --r:10px;--r-sm:7px;--r-btn:6px;--r-lg:14px;
   --max:1680px;
   --sans:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
-  --serif:Georgia,'Times New Roman',serif;
+  /* Fraunces, with Georgia behind it rather than a bare `serif`: if the
+     web font never arrives, the page should fall back to a face with
+     roughly the same width and x-height, or every heading reflows and the
+     layout moves under the reader. */
+  --serif:'Fraunces',Georgia,'Times New Roman',serif;
+  /* Fraunces is wider and warmer than Georgia at the same size, so the
+     tight tracking that suited Georgia now closes the counters up. These
+     two are the only places the swap needed a number changed. */
+  --serif-track:0;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -31,7 +39,7 @@ body{
   overflow-x:hidden;
 }
 img,svg{max-width:100%}
-h1,h2,h3,h4{font-family:var(--serif);font-weight:500;margin:0;line-height:1.08;letter-spacing:-.01em}
+h1,h2,h3,h4{font-family:var(--serif);font-weight:500;margin:0;line-height:1.1;letter-spacing:var(--serif-track)}
 p{margin:0}
 a{text-decoration:none;color:var(--gold)}
 a:hover{color:var(--gold-2)}
@@ -290,6 +298,69 @@ body.menu-open .drawer{display:flex}
    than the h2 it would have been on a page of its own */
 .trade-h{font-size:clamp(22px,2.6vw,30px);margin-bottom:12px}
 
+/* The founder's own page, so his face is in the hero rather than a stock
+   workroom. Beside the headline on a desktop, above it on a phone, and
+   capped there so a portrait does not take a whole screen before the first
+   word. The story underneath keeps its full reading measure: Kayode asked
+   once for this page to be a full length read rather than a narrow column
+   with something alongside it, and a portrait beside the text would be
+   exactly the thing he asked to take out. */
+/* The portrait sits to the LEFT of the story rather than above it, so the
+   reader meets the person and the first sentence at the same moment.
+
+   It is sticky, because the story is long and a portrait that scrolls away
+   in the first screen may as well not be there. Sticky rather than fixed:
+   it stops at the end of its own column instead of following you into the
+   footer.
+
+   The grid is capped at 300px + 820px because 820 is the reading measure
+   the story was already set at, and widening the text to make room for a
+   picture would be paying for the picture with the thing the page is for. */
+/* Two items only: the picture column and the text column. The signature
+   used to be a third, which in a two column grid means it wraps onto a new
+   row under the picture and the sticky picture then scrolls over it. It is
+   inside .story-pic now, so the name cannot be separated from the face it
+   belongs to and nothing can pass over it.
+
+   The text column takes what is left of 1240px rather than being capped at
+   820, because 820 inside a 1680px wrap left a band of empty ground down
+   both sides and the page read as pinched. The type goes up a point to pay
+   for the longer line. */
+/* .story.story-2col, not .story-2col: the plain .story rule is declared
+   LATER in this file and caps the block at 820px, so a single class name
+   loses on source order and the two column grid was being squeezed into
+   820 — 300 for the picture and 456 for the text, which is the narrow
+   centre strip with empty ground either side. */
+/* The block fills 1560 of the 1680 wrap. The extra width goes to the
+   PHOTOGRAPH, not to the line: past about 105 characters the eye starts
+   losing its place coming back to the left, so growing the text column to
+   fill a wide screen would trade readability for the appearance of using
+   the space. A 520px portrait uses it and stays readable. */
+.story.story-2col{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);
+  gap:clamp(28px,4vw,76px);align-items:start;max-width:1500px;margin:0 auto}
+/* Sticky, not fixed: it stops at the end of its own column instead of
+   following the reader into the footer. top clears the sticky header. */
+.story-pic{position:sticky;top:104px;align-self:start}
+.story-pic img{display:block;width:100%;height:auto;border-radius:var(--r);
+  border:1px solid var(--line);box-shadow:var(--shadow-soft)}
+/* As a caption it needs no rule above it: the picture is the divider. */
+.story-pic .sig{margin-top:16px;padding-top:0;border-top:0}
+.story-text p{font-size:15px;line-height:1.5}
+@media(max-width:900px){
+  .story.story-2col{grid-template-columns:minmax(0,1fr);max-width:820px}
+  .story-pic{position:static;max-width:260px}
+  .story-text{margin-top:6px}
+  .story-text p{font-size:13px;line-height:1.5}
+}
+
+/* One line held out of the paragraph above it, large, for rhythm in a long
+   read. It repeats text that is already there, which is what a pull quote
+   is, so it carries aria-hidden and a screen reader hears it once. */
+.pull{margin:34px 0;padding:0 0 0 22px;border-left:2px solid var(--gold);
+  font-family:var(--serif);font-size:clamp(21px,2.5vw,29px);line-height:1.28;
+  color:var(--text);letter-spacing:var(--serif-track)}
+@media(max-width:760px){.pull{margin:26px 0;padding-left:16px}}
+
 /* the long read on the story page: one column at a reading measure, centred,
    with its aside underneath rather than beside it */
 .story{max-width:820px;margin:0 auto}
@@ -414,6 +485,11 @@ tbody tr.grp td{background:var(--panel-2);font-size:10.5px;letter-spacing:.12em;
 .backlink:hover{color:var(--gold-2)}
 .backlink:hover::before{transform:rotate(45deg) translate(-2px,2px)}
 
+/* The product title sits under the list of areas now, not above it: it is
+   the name of what you just opened rather than a hero. It needs air off the
+   tabs, and less underneath, because the pane follows it. */
+[data-feat-title]{margin-top:30px;margin-bottom:6px}
+
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 .tab{font-size:13px;font-weight:600;padding:9px 15px;border-radius:var(--r-btn);
   border:1px solid var(--line);background:transparent;color:var(--faint);cursor:pointer;
@@ -455,7 +531,10 @@ html.js-on .pane.on{display:block;animation:rise .28s ease both}
 .cta{background:var(--bg-2)}
 .cta h2{margin-bottom:14px}
 .ftr{padding:clamp(38px,4.4vw,56px) 0 30px;background:#050b13;border-top:1px solid var(--line)}
-.ftr-top{display:grid;grid-template-columns:1.5fr repeat(4,minmax(0,1fr));gap:30px;
+/* Four children, not five: the Your trade column came out on 20 Sep. A
+   grid that still declares five leaves a dead column on the right and the
+   footer reads as though something failed to load. */
+.ftr-top{display:grid;grid-template-columns:1.5fr repeat(3,minmax(0,1fr));gap:30px;
   padding-bottom:30px;border-bottom:1px solid var(--line-soft)}
 /* the contact column: the same list, but the last line is an address rather
    than a link, so it needs a little air above it */
@@ -795,7 +874,9 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    read as a page that could not decide, which is the opposite of what a story
    about doing one thing properly should look like. What is left is the
    paragraphs, and a signature so you know who was talking. */
-.story-text p+p{margin-top:14px}
+/* A long read wants air between paragraphs. 14px was set when this
+   page was five short ones. */
+.story-text p+p{margin-top:15px}
 
 .sig{margin-top:32px;padding-top:20px;border-top:1px solid var(--line-soft);
   font-family:var(--serif);font-size:19px;color:var(--text)}
@@ -930,57 +1011,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .plan-more:hover{border-color:var(--gold);color:var(--gold)}
 }
 
-/* ---------- the Products dropdown ----------
-   Ten feature areas used to be a row of ten buttons on the page itself, which
-   made the page look like a control panel before anybody had read a word. They
-   are in the header now.
-
-   Opened by :hover and :focus-within, in CSS, with no script. That is only
-   safe because .hdr-nav is display:none below 1000px: on a touch screen a
-   :hover sticks after a tap and the menu would hang open. Below that width the
-   drawer has a plain Products link instead.
-
-   The trigger is still a real link to features.html in the markup, so a search
-   engine and a browser with no script both get somewhere useful. With the
-   script running it stops navigating and opens the menu instead, which is what
-   a menu title is for: Kayode asked for clicking Products to open the list
-   rather than jump to a page, and for each item in the list to be the thing
-   that goes somewhere.
-
-   .open is set by the script on click. Hover and focus-within stay, so a
-   cursor and a keyboard both still work without touching anything. */
-.nav-drop{position:relative;display:inline-flex}
-.nav-drop>a{display:inline-flex;align-items:center;gap:6px;position:relative;
-  font-size:14px;font-weight:500;color:var(--dim);padding:9px 13px;border-radius:6px;
-  transition:.16s}
-.nav-drop>a:hover,.nav-drop:focus-within>a{color:var(--text);background:var(--panel)}
-.nav-drop>a.on{color:var(--text)}
-.nav-drop>a.on::after{content:"";position:absolute;left:13px;right:13px;bottom:3px;
-  height:2px;border-radius:2px;background:var(--gold)}
-.nav-drop .caret{width:9px;height:6px;fill:none;stroke:currentColor;stroke-width:1.6;
-  stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:transform .16s ease}
-.nav-drop:hover .caret,.nav-drop:focus-within .caret,
-.nav-drop.open .caret{transform:rotate(180deg)}
-
-/* One column, not two. Two columns read as a panel of thumbnails rather than
-   a menu, and five items in two columns leaves an odd one hanging. */
-.nav-menu{position:absolute;top:100%;left:50%;transform:translateX(-50%) translateY(4px);
-  display:grid;grid-template-columns:minmax(0,1fr);gap:1px;
-  min-width:232px;padding:7px;border-radius:var(--r);
-  background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
-  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .14s ease,transform .14s ease}
-.nav-drop:hover .nav-menu,.nav-drop:focus-within .nav-menu,.nav-drop.open .nav-menu{
-  opacity:1;visibility:visible;pointer-events:auto;transform:translateX(-50%) translateY(0)}
-/* a menu held open by the script must not be closed again by the cursor
-   leaving, or a click that opened it would shut on the way to the list */
-.nav-drop.open{pointer-events:auto}
-.nav-menu a{display:block;padding:8px 11px;border-radius:7px;font-size:13.5px;
-  color:var(--dim);white-space:nowrap}
-.nav-menu a:hover{background:var(--panel-2);color:var(--text)}
-/* the gap between the trigger and the panel would drop the hover on the way
-   down, so the panel reaches up behind it */
-.nav-menu::before{content:"";position:absolute;left:0;right:0;top:-8px;height:8px}
-
 /* ---------- the hero: text higher, screenshot smaller ----------
    Two things were wrong with the balance.
 
@@ -1110,7 +1140,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
      were the only body text on the site still at 16 on a phone */
   .prose p,.prose li{font-size:14px;line-height:1.7}
   .prose h2{font-size:18px;margin-top:32px}
-  .story-text p{font-size:14.5px;line-height:1.66}
   .tier .rt{font-size:28px}
   /* the contact cards put the phone number and the address in a bare span,
      which was inheriting the page default and reading larger than the body */
@@ -1182,7 +1211,119 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .hero .device .shot{max-height:440px;width:auto;max-width:100%;margin-left:auto}
 }
 
-/* the five product areas inside the drawer, one step in from their parent */
-.drawer a.sub{padding-left:30px;font-size:14px;color:var(--dim);position:relative}
-.drawer a.sub::before{content:"";position:absolute;left:14px;top:50%;width:6px;height:1px;
-  background:var(--gold);opacity:.55}
+
+/* ---------- the phone: less of it, not bigger ----------
+   Kayode, 20 September: "you table looks like increase rather than a
+   decrease that i asked for." He is right and the pass before this one is
+   gone. He asked on 18 September to strip the phone down, especially the
+   type, and the right answer to "no long scrolling" is to take out the
+   SPACE between things, not to grow the things.
+
+   Nothing here changes a font size or removes a word. Every value is
+   vertical rhythm, and each one is paid once per section per page.
+
+   This block has to stay last in the file, for the same reason the type
+   block above it does: everything it touches is set unscoped further up at
+   equal specificity, so a phone rule placed earlier loses on source order
+   and silently does nothing. */
+@media (max-width:680px){
+  /* 32px top and bottom on every section was the clamp floor, so a page of
+     five sections spent 320px on gaps alone */
+  section{padding:22px 0}
+  .phero{padding:26px 0 17px}
+  .sec-head{margin-bottom:11px}
+  .cta{padding:26px 0}
+
+  .card{padding:13px}
+  .g-2up .card{padding:12px 11px}
+  .checks li{margin-top:6px}
+
+  /* three plan cards stacked is the longest thing on the longest page */
+  .plans{gap:12px}
+  .plan{padding:17px 15px}
+  .price{margin:12px 0 3px}
+  .plan-feats{padding-top:11px}
+  .plan-feats li{margin-top:7px}
+  .plan-feats li:not(.no)+li.no{margin-top:12px;padding-top:10px}
+
+  /* thirty six rows, so every pixel here is paid thirty six times */
+  th,td{padding:9px 11px}
+
+  .faq summary{padding:11px 36px 11px 0}
+  .faq summary::after{top:16px}
+  .faq details[open] summary::after{top:20px}
+
+  .ftr{padding:22px 0 16px}
+  .ftr-top{padding-bottom:12px}
+  .ftr-bot{padding-top:11px}
+
+  /* the footer declared three list columns and has had two since Your trade
+     came out, so the right third was an empty hole */
+  .ftr-top{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ---------- the phone, second reduction ----------
+   Kayode, 20 September: "we still need to reduce the sizes, make the table
+   work on screen without collapsing so theirs not scrolling to the side of
+   long scroll down the page."
+
+   Two things, and they pull against each other. A four column table that
+   fits 375 has to WRAP, and wrapping makes rows taller. The only way to get
+   both less sideways and less downwards is to take the type down, which is
+   what he has now asked for twice.
+
+   THE TABLE. table-layout:fixed with the three plan columns pinned narrow,
+   so the feature name takes whatever is left instead of every column
+   negotiating. The Yes and Not-included words become a tick and a dash,
+   which is what actually lets the plan columns be 52px: "Not included" is
+   twelve characters holding open a column that needs to show one bit of
+   information. The words are still in the HTML and still read out; only
+   their rendering changes. */
+@media (max-width:680px){
+  h1{font-size:26px;line-height:1.16}
+  h2{font-size:18px}
+  h3{font-size:15.5px}
+  h4{font-size:13.5px}
+  .phero h1{font-size:22px}
+  .phero .lede,.lede,.cta .lede,.hero .lede{font-size:13.5px;line-height:1.55}
+  .eyebrow{font-size:9.5px}
+
+  .row2-text p,.pane p{font-size:13px;line-height:1.58}
+  .checks li{font-size:12.5px;margin-top:5px}
+  .card h3{font-size:14.5px}
+  .card p,.card ul li{font-size:12.5px;line-height:1.55}
+  .story-text p{font-size:12px;line-height:1.5}
+  .prose p,.prose li{font-size:13px}
+  .sig{font-size:15px}
+
+  .plan h3{font-size:16.5px}
+  .plan-feats li{font-size:12.5px}
+  .faq summary{font-size:13.5px}
+  .faq .ans{font-size:12.5px;line-height:1.58}
+  .tab,.features-tabs .tab{font-size:11.5px;padding:6px 10px}
+  .btn{font-size:12px}
+
+  /* ---- the comparison table, on screen rather than off the side ---- */
+  .tw{overflow-x:visible}
+  .tw table{table-layout:fixed;min-width:0;width:100%}
+  th,td{padding:7px 8px;font-size:11px;line-height:1.35}
+  td:first-child,th:first-child{width:auto;word-break:normal;overflow-wrap:anywhere}
+  /* 56, not 52: "By agreement" is the widest thing a plan column has to
+     hold, and at 52 the word "agreement" overflowed its cell by six pixels
+     and pushed the table back into a sideways scroll. overflow-wrap is the
+     belt to that braces, so nothing added later can do it again. */
+  /* 10.5px in the plan columns, not 11. The only long value they hold is
+     "By agreement". Measured rather than guessed twice over: at 10.5px the
+     word "agreement" renders at 54px, so the column needs 60 to hold it
+     with its padding. At 56 it broke as "agreemen / t". break-word then
+     only ever breaks a word that genuinely cannot fit. */
+  th.c,td.c{width:60px;padding-left:2px;padding-right:2px;
+    font-size:10.5px;overflow-wrap:break-word}
+  thead th,tbody tr.grp td{font-size:9.5px;letter-spacing:.08em;padding-top:6px;padding-bottom:6px}
+  /* one bit of information should not need twelve characters of column */
+  .tw td .yes,.tw td .no{font-size:0;line-height:0}
+  .tw td .yes::before{content:"\2713";font-size:13px;line-height:1;font-weight:700}
+  .tw td .no::before{content:"\2013";font-size:13px;line-height:1}
+  /* nothing scrolls sideways any more, so the instruction to swipe is a lie */
+  .tw-hint{display:none}
+}

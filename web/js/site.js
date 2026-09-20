@@ -245,19 +245,6 @@
   function remember(code) {
     try { window.localStorage.setItem(CCY_KEY, code); } catch (e) { /* private mode, fine */ }
   }
-  function guessCcy() {
-    if (typeof SITE === 'undefined') return 'NGN';
-    var zone = '';
-    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
-    if (SITE.currencyByZone && SITE.currencyByZone[zone]) return SITE.currencyByZone[zone];
-    var lang = (navigator.language || '').toUpperCase();
-    var region = lang.split('-')[1] || '';
-    if (SITE.currencyByRegion && SITE.currencyByRegion[region]) return SITE.currencyByRegion[region];
-    /* a whole continent shares a handful of zones, so this is the last resort */
-    if (zone.indexOf('Europe/') === 0) return 'EUR';
-    if (zone.indexOf('America/') === 0) return 'USD';
-    return 'NGN';
-  }
   function group(n) {
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
@@ -321,7 +308,12 @@
     });
     sel.addEventListener('change', function () { setCcy(sel.value); });
     slot.appendChild(sel);
-    setCcy(remembered() || guessCcy());
+    /* Nigeria, unless this browser has already chosen otherwise. This used
+       to be a guess from the time zone and the language. Kayode, 20 Sep:
+       naira is the price this is really sold at, and everything else on the
+       page is worked out from it, so the page should open saying so. The
+       picker is one click away and the choice is still remembered. */
+    setCcy(remembered() || 'NGN');
   }
 
   /* ---------------- tabs ----------------
@@ -470,15 +462,15 @@
       var pane = $('.pane[data-pane="' + hash + '"]');
       if (pane) {
         selectTab(pane.getAttribute('data-group'), hash);
-        /* The pane was hidden when the browser decided where to scroll, so it
-           found nothing and stayed put. Put the strip on screen ourselves, and
-           only on a click: doing it on load would fight the browser's own
-           restore when somebody reopens a tab partway down the page. */
-        if (clicked) {
-          var strip = $('.tabs[aria-label]') || pane;
-          var y = strip.getBoundingClientRect().top + (window.pageYOffset || 0) - 96;
-          window.scrollTo(0, Math.max(0, y));
-        }
+        /* To the top, so the heading that names the area you just picked is
+           the thing you are looking at.
+
+           Arriving by link needs nothing from us: the five ids sit at the
+           top of the page rather than on the panes, so the browser's own
+           jump already lands there. This is for a hash change on the page
+           you are already on, where nothing navigates and so nothing
+           scrolls unless we say so. */
+        window.scrollTo(0, 0);
       }
       /* a folded section that is linked to has to be open when you land */
       var d = document.getElementById(hash);
@@ -497,48 +489,6 @@
        on click and on hover. There is no panel any more: each tile carries its
        own three lines. So the hover handler that lived here is gone with it. */
 
-    /* ---------------- the Products menu ----------------
-       In the markup the trigger is an ordinary link to features.html, so a
-       browser with no script, and a crawler, both get a real page out of it.
-       With the script running it becomes the title of a menu instead: clicking
-       Products opens the list and does nothing else, and the five items in the
-       list are the things that go somewhere. Kayode asked for exactly that,
-       and it is also how a menu is meant to behave.
-
-       Hover still opens it on a fine cursor, in CSS, untouched. The nav does
-       not exist below 1000px, so none of this is ever on a touch screen where
-       a stuck :hover would leave the panel hanging open after a tap. */
-    $$('.nav-drop > a[data-drop]').forEach(function (trigger) {
-      var drop = trigger.parentNode;
-      function setOpen(on) {
-        drop.classList.toggle('open', on);
-        trigger.setAttribute('aria-expanded', on ? 'true' : 'false');
-      }
-      trigger.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        setOpen(!drop.classList.contains('open'));
-      });
-      trigger.addEventListener('keydown', function (ev) {
-        if (ev.key !== 'ArrowDown') return;
-        ev.preventDefault();
-        setOpen(true);
-        var first = $('.nav-menu a', drop);
-        if (first) first.focus();
-      });
-      document.addEventListener('click', function (ev) {
-        if (!drop.contains(ev.target)) setOpen(false);
-      });
-      document.addEventListener('keydown', function (ev) {
-        if (ev.key !== 'Escape' || !drop.classList.contains('open')) return;
-        setOpen(false);
-        trigger.focus();
-      });
-      /* a chosen item closes the menu behind it, whether it navigated away or
-         only moved the hash on the page that was already open */
-      $$('.nav-menu a', drop).forEach(function (a) {
-        a.addEventListener('click', function () { setOpen(false); });
-      });
-    });
 
     document.addEventListener('click', function (ev) {
       var t = ev.target.closest ? ev.target.closest('[data-act],[data-cycle],[data-tab],[data-back],a[href^="#"]') : null;
@@ -573,6 +523,11 @@
         var name = t.getAttribute('data-tab');
         selectTab(t.getAttribute('data-group'), name);
         if (history.replaceState) history.replaceState(null, '', '#' + name);
+        /* Same as arriving by link: the heading names the area you just
+           picked, so it has to be the thing you are looking at. replaceState
+           fires no hashchange, so without this the two routes to the same
+           action ended up in different places. */
+        window.scrollTo(0, 0);
         return;
       }
 

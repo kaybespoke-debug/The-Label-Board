@@ -24,7 +24,7 @@ const ok = [];
 const check = (cond, msg) => (cond ? ok : fail).push(msg);
 
 const PAGES = ['index.html', 'features.html', 'pricing.html', 'book.html',
-  'partners.html', 'referrals.html', 'about.html', 'contact.html',
+  'partners.html', 'about.html', 'contact.html',
   'waitlist.html', 'reviews.html', 'privacy.html', 'terms.html',
   '404.html', 'thanks.html'];
 
@@ -112,6 +112,27 @@ built.filter(p => p !== 'index.html').forEach(p => {
     p + ' carries the same footer as every other page');
 });
 
+/* The font link is the third thing that exists once per page and has to be
+   identical, and nothing was checking it. sync_web_shell copies the header and
+   the footer; the <head> it does not touch, so the stylesheet link and the
+   font link are fourteen hand-kept copies.
+
+   It cost a pass on 20 Sep. The site moved from Georgia to Fraunces, index.html
+   got the new link, sync_web_shell reported "14 already in step" because the
+   header and footer had not changed, and every other page stayed on the old
+   one. That does not look like an error. It looks like one page in a slightly
+   different serif, which nobody notices until a customer does. */
+/* css2 in the pattern, not just the host: the preconnect hint points at the
+   same domain and comes first, so matching the host alone compares two
+   preconnects and passes whatever the stylesheets say. */
+const fontLink = t => (t.match(/<link[^>]*fonts\.googleapis\.com\/css2[^>]*>/) || [''])[0];
+const refFont = fontLink(html['index.html']);
+check(!!refFont, 'index.html loads the site fonts');
+check(/Fraunces/.test(refFont), 'and the serif is the one the brand uses');
+built.filter(p => p !== 'index.html').forEach(p => {
+  check(fontLink(html[p]) === refFont, p + ' loads the same fonts as every other page');
+});
+
 /* ================= 3. every link goes somewhere ================= */
 let internal = 0;
 built.forEach(p => {
@@ -133,7 +154,7 @@ built.forEach(p => {
 check(internal > 100, 'the pages are actually linked together (' + internal + ' internal links)');
 
 /* every page is reachable from the header or the footer of every other page */
-['features.html', 'pricing.html', 'book.html', 'partners.html', 'referrals.html', 'about.html',
+['features.html', 'pricing.html', 'book.html', 'partners.html', 'about.html',
   'contact.html', 'privacy.html', 'terms.html'].forEach(p => {
   check(refHeader.includes(p) || refFooter.includes(p), p + ' is reachable from the shared navigation');
 });
@@ -157,7 +178,10 @@ built.forEach(p => {
     check(html[p].includes('href="privacy.html"'), p + ' form "' + name + '" points at the privacy notice');
   });
 });
-check(forms.length === 5, 'there are five forms: booking, partners, referrals, contact and the waiting list');
+/* Four, not five. referrals.html was deleted on 20 Sep 2026 when the two
+   schemes became one: there is no separate customer referral to apply for,
+   because every customer already has a code. */
+check(forms.length === 4, 'there are four forms: booking, partners, contact and the waiting list');
 check(new Set(forms.map(f => f.name)).size === forms.length, 'no two forms share a name, which would merge their submissions');
 
 /* every field a person types into has a label tied to it */
@@ -211,9 +235,9 @@ const adminData = fs.readFileSync(path.join(__dirname, 'admin', 'js', 'data.js')
    Basic/Pro/Bespoke. This used to read them as if they were the same word,
    which quietly compared a naira price against `undefined` the moment a plan
    was renamed. */
-const planRe = /\{\s*id:\s*'(starter|pro|premium)',\s*name:\s*'([^']+)',\s*monthly:\s*(\d+),\s*annual:\s*(\d+),\s*seats:\s*(\d+),\s*live:\s*true(,\s*invoiceOnly:\s*true)?/g;
+const planRe = /\{\s*id:\s*'(starter|pro|premium)',\s*name:\s*'([^']+)',\s*monthly:\s*(\d+),\s*annual:\s*(\d+),\s*studios:\s*(\d+),\s*seats:\s*(\d+),\s*live:\s*true(,\s*invoiceOnly:\s*true)?/g;
 const plans = all(adminData, planRe).map(m => ({
-  id: m[1], name: m[2], monthly: +m[3], annual: +m[4], seats: +m[5], invoiceOnly: !!m[6]
+  id: m[1], name: m[2], monthly: +m[3], annual: +m[4], studios: +m[5], seats: +m[6], invoiceOnly: !!m[7]
 }));
 check(plans.length === 3, 'the three paid plans were read out of the admin console');
 
@@ -241,14 +265,27 @@ plans.forEach(pl => {
       pl.name + ' is not wired to the currency table, so it never changes currency');
   }
 
-  /* seats: 0 means unlimited. A comparison table printing "0" against Team
-     logins reads as a plan that includes nobody. */
-  if (pl.seats === 0) {
-    check(/<td>Team logins<\/td>[\s\S]{0,200}?Unlimited/.test(html['pricing.html']),
-      pl.name + ' has unlimited seats but the table does not say Unlimited');
-  } else {
-    check(html['pricing.html'].includes('>' + pl.seats + '<'),
-      'the comparison table shows the ' + pl.name + ' seat count (' + pl.seats + ')');
+  /* 0 means "whatever the contract says", which only Bespoke is. A table
+     printing 0 against Team logins would read as a plan that includes
+     nobody, so an unlimited plan has to say a word instead of a number. */
+  const row = (label) => new RegExp('<td>' + label + '</td>([\\s\\S]{0,400}?)</tr>').exec(html['pricing.html']);
+  [['Studios', pl.studios], ['Team logins', pl.seats]].forEach(([label, limit]) => {
+    const r = row(label);
+    check(!!r, 'the comparison table has a ' + label + ' row');
+    if (!r) return;
+    if (limit === 0) {
+      check(/By agreement|Unlimited/.test(r[1]),
+        pl.name + ' is not capped, so the ' + label + ' row must say so in a word');
+    } else {
+      check(new RegExp('>' + limit + '<').test(r[1]),
+        'the comparison table shows the ' + pl.name + ' ' + label + ' limit (' + limit + ')');
+    }
+  });
+  /* and the card a customer reads first has to agree with the table */
+  if (!pl.invoiceOnly) {
+    const card = new RegExp('<h3>' + pl.name + '</h3>[\\s\\S]*?</ul>').exec(html['pricing.html']);
+    check(!!card && new RegExp('\\b' + pl.seats + ' team logins').test(card[0]),
+      'the ' + pl.name + ' card says the same seat count as the table (' + pl.seats + ')');
   }
 });
 /* The comparison table must never print a bare 0 in a plan column: it is
@@ -271,62 +308,76 @@ built.forEach(p => {
 });
 
 /* ================= 7. the partner terms match the portal ================= */
+/* Rewritten 20 September 2026, and this is the second rewrite of this
+ * section in two days, which is the point worth recording rather than the
+ * checks themselves.
+ *
+ * It has held three different programmes now: a one off share of a first
+ * payment, then a four year recurring share on a tier ladder with milestone
+ * bonuses, and now a flat eight per cent for twelve months. Each time, the
+ * checks that had to go were the ones asserting the SHAPE of the old deal,
+ * and each time they would have gone on passing against a page nobody had
+ * updated. A gate can rot into enforcing the opposite of the truth, and it
+ * does it silently.
+ *
+ * So this reads the two numbers out of the portal rather than carrying its
+ * own copy, and checks the page for the FACTS a partner would be angry
+ * about if the page and their ledger disagreed, rather than for phrases. */
 const partnerData = fs.readFileSync(path.join(__dirname, 'partners', 'js', 'data.js'), 'utf8');
-const tiers = all(partnerData, /\{\s*id:\s*'(bronze|silver|gold|platinum)',\s*name:\s*'([^']+)',\s*min:\s*(\d+),\s*pct:\s*(\d+)/g)
-  .map(m => ({ id: m[1], name: m[2], min: +m[3], pct: +m[4] }));
-check(tiers.length === 4, 'the four partner tiers were read out of the portal');
+const ratePct = +(partnerData.match(/const RATE_PCT = (\d+);/) || [])[1];
+const termMonths = +(partnerData.match(/const TERM_MONTHS = (\d+);/) || [])[1];
+check(ratePct > 0, 'the partner rate was read out of the portal');
+check(termMonths > 0, 'and the term a referred business earns for');
 
 const pp = html['partners.html'] || '';
-tiers.forEach(t => {
-  check(pp.includes('<div class="nm">' + t.name + '</div>'), 'the partner page lists the ' + t.name + ' tier');
-  check(pp.includes('<div class="rt num">' + t.pct + '%</div>'),
-    'the partner page prints the ' + t.name + ' rate the portal pays (' + t.pct + '%)');
-  if (t.min > 0) {
-    /* the number has to be the portal's, the noun around it is free to change
-       as the positioning does, so this matches the figure rather than a phrase */
-    check(new RegExp('From ' + t.min + ' paying \\w+').test(pp),
-      'the partner page prints the ' + t.name + ' threshold the portal uses (' + t.min + ')');
-  }
+check(new RegExp('<h2>Eight per cent').test(pp) || pp.includes('>' + ratePct + '%<'),
+  'the partner page prints the rate the portal pays (' + ratePct + '%)');
+check(new RegExp('\\b' + ratePct + '%').test(pp), 'and prints it as a figure, not only as a word');
+
+/* the two halves of the deal, monthly and yearly */
+check(/twelve months|12 months/i.test(pp), 'the partner page states the ' + termMonths + ' month term');
+check(/paid monthly|If they pay monthly/i.test(pp), 'the partner page says what a monthly plan earns');
+check(/once|one credit/i.test(pp) && /yearly/i.test(pp),
+  'the partner page says a yearly plan earns once rather than month after month');
+
+/* THE CHECKS ARE WRITTEN AGAINST THE PAGE, NOT THE PAGE AGAINST THE CHECKS.
+
+   Kayode replaced this page with seven lines on 20 Sep: "Place what I give,
+   change nothing, expand nothing." Five checks here were asserting sentences
+   that existed only because they had been written to satisfy checks, and the
+   honest response is to delete the checks rather than put the sentences back
+   to keep a gate quiet. A gate that makes a page longer is a gate working
+   against the person the page is for.
+
+   The 31 day hold, the per-business clock and "the referred business gets
+   nothing" are all still true, still enforced in the database and still
+   proved by referral_fraud_harness. They are on the FAQ and in the Terms.
+   They are not on this page because he does not want them on this page. */
+check(/If they leave, it stops|stops that day/i.test(pp),
+  'the partner page says a business that leaves stops earning');
+check(/cannot refer yourself|cannot refer itself/i.test(pp),
+  'and that you cannot refer yourself');
+check(/Paid yearly|once a year/i.test(pp), 'the partner page states when payouts run');
+check(/naira/i.test(pp), 'and what it is paid in');
+
+/* ONE programme. There were two until 20 Sep 2026: this one, and a
+   customer referral that gave a free month to both sides. A second scheme
+   coming back would not look like a mistake, it would look like a feature,
+   which is exactly why it is worth a check rather than a memory. */
+check(/every business|Everybody has a code|already in it/i.test(pp),
+  'the referral page says every customer is already in the programme');
+check(/cannot refer yourself|cannot refer itself|refer yourself/i.test(pp),
+  'and that you cannot refer yourself');
+built.forEach(q => {
+  const v = visible(html[q]);
+  check(!/free month|month free each|month of credit/i.test(v),
+    q + ' does not offer a second referral scheme paying in free months');
 });
-const msMatch = partnerData.match(/const MILESTONES = \{([^}]+)\}/);
-check(!!msMatch, 'the milestone bonuses were read out of the portal');
-if (msMatch) {
-  const pairs = all(msMatch[1], /(\d+):\s*(\d+)/g).map(m => [+m[1], +m[2]]);
-  check(pairs.length === 4, 'there are four milestone bonuses');
-  pairs.forEach(([n, amt]) => {
-    check(new RegExp(n + ' paying \\w+, <span class="hl num">₦' + naira(amt) + '</span>').test(pp),
-      'the partner page prints the ' + n + ' account bonus the portal pays (₦' + naira(amt) + ')');
-  });
-}
-/* The money rules, rewritten on 19 September 2026 along with the programme.
- *
- * These checks used to insist the page said commission was "on the first
- * payment", "counted once per business", and paid "on the 5th". Every one of
- * those was true of the old programme and is now false, so a gate that kept
- * demanding them would have been holding the page to a promise we no longer
- * make. That is the failure mode worth naming: a check can rot into enforcing
- * the opposite of the truth, and it does it silently, because it keeps passing.
- *
- * What replaces them is the part a partner would be angry about if the page
- * and the ledger disagreed: that it recurs, how long for, what happens in the
- * taper years, that the rate follows their live count in BOTH directions, and
- * that nothing already credited is ever recalculated. The numbers themselves
- * are checked against the portal's ladder above, and the ladder is checked
- * against the database by partner_commission_harness.mjs. */
-check(/31 days/.test(pp) || /thirty one days/.test(pp), 'the partner page states the 31 day hold');
-check(/recurring|every month a business you brought pays/i.test(pp),
-  'the partner page is clear the commission recurs rather than paying once');
-check(/four years/i.test(pp), 'the partner page states the four year term');
-check(/3%/.test(pp), 'the partner page states the taper rate');
-check(/own clock/i.test(pp), 'the partner page says the clock is per business');
-check(/paid out once a year|paid yearly/i.test(pp), 'the partner page states when payouts run');
-check(/active and paying/i.test(pp), 'the partner page says the rate follows the live count');
-check(/can go down|back down if some leave/i.test(pp),
-  'the partner page admits the rate can fall, which is the half a partner would otherwise find out the hard way');
-check(/from that day forward/i.test(pp), 'the partner page says a change applies forward only');
-check(/never recalculated or taken back|ever recalculated or taken back/i.test(pp),
-  'the partner page promises nothing already credited is rewritten');
-check(/stops that day/i.test(pp), 'the partner page says a business that leaves stops earning that day');
+
+/* and the programme that is over must not survive on the page */
+check(!/milestone/i.test(pp), 'no milestone bonus is still offered on the partner page');
+check(!/Getting started|Unlocked|Established|Senior/.test(pp), 'no tier ladder survives on the partner page');
+check(!/four years|taper/i.test(pp), 'no four year term or taper survives on the partner page');
 /* the one number that has to match the schema rather than the copy */
 check(/in naira|Nigerian account/i.test(pp),
   'the partner page says partners are paid in naira, which is what partner_accounts holds');
@@ -378,7 +429,11 @@ built.forEach(p => {
 {
   const next = (html['pricing.html'].match(/href="book\.html"/g) || []).length;
   check(next >= 3, 'every plan on the pricing page still has a next step (' + next + ' found)');
-  check(/Talk to us/.test(html['pricing.html']),
+  /* The Bespoke card's own button, not the words "Talk to us": that phrase
+     was in the billing questions, which moved to the FAQ on 20 Sep, so the
+     check had started passing on a different part of the page from the one
+     it was written about. */
+  check(/<h3>Bespoke<\/h3>[\s\S]*?href="book\.html"/.test(html['pricing.html']),
     'the invoice-only plan does not offer a way to start the conversation');
 }
 
@@ -388,6 +443,9 @@ built.forEach(p => {
   check(!v.includes('—'), p + ' contains no em dashes in anything a customer reads');
   check(!/&mdash;|&#8212;/.test(v), p + ' contains no em dashes written as an entity');
   check(!/\bLAYI\b/i.test(v), p + ' never calls the product LAYI');
+  /* Copy is not the only place a real studio's name can reach this site.
+     The screenshots are the other one, and this gate cannot read a PNG. */
+  check(!/\bKay Ojomo\b/.test(v), p + " does not carry the founder's studio identity in copy");
   check(!/lorem ipsum/i.test(v), p + ' has no placeholder copy left in it');
   check(!/TODO|FIXME|XXX/.test(v), p + ' has no unfinished notes left in it');
 });
@@ -398,11 +456,109 @@ check(html['index.html'].includes('THE LABEL BOARD'), 'the brand mark is spelled
 /* Numbers on the home page strip are product facts, so they have to be true of
    the product. The nav of the studio app is the source for both. */
 const app = fs.readFileSync(path.join(__dirname, 'site', 'layi_dashboard.html'), 'utf8');
+
+/* ---------- and the pictures are product facts too ----------
+   Every screenshot on this site is a capture of the running app through
+   capture/shot.html, which calls demoLogin(), which calls loadExample(). So
+   the example studio's seed IS the marketing site's imagery, and no check
+   over the HTML can see it: the words are inside a PNG.
+
+   Until 20 Sep that seed was a studio called LAYI owned by "Kay Ojomo" at
+   hello@layiojomo.com, which is Kayode's own label. thelabelboard.com was
+   showing his brand name, his first name in the dashboard greeting and his
+   studio's books, and a visitor reading the dashboard had every reason to
+   think the product was called LAYI.
+
+   This reads the seed rather than the pictures. A seed that goes back to a
+   real studio's identity fails here, which is one recapture away from being
+   on the website again. */
+{
+  /* The seeded VALUES, read one at a time, not a blob scan over the function.
+     A blob is the obvious way to write this and it is wrong: layi_dash_* is
+     the storage key prefix on every real device and LAYI_BIZ is the demo
+     tenant's uuid, so a scan for "LAYI" inside loadExample matches things
+     that must never change and reports them as a leak. */
+  /* The whole line, because the company object contains nested bank objects
+     and a lazy [^}]* stops at the first one, three fields short of the end. */
+  /* Anchored on the seeded pay instruction, which only the example studio
+     has. Two other lines in the app assign SETTINGS.company from FORM FIELDS
+     and both matched looser patterns, so the check was reading a line with no
+     literal name in it and reporting that the studio had not said what it was
+     called, which sounds like a missing name rather than a missed line. */
+  const seedCompany = (app.match(/SETTINGS\.company=Object\.assign\(.*Balance due on collection.*/) || [''])[0];
+  const co = (seedCompany.match(/name:'([^']*)'/) || [])[1];
+  const email = (seedCompany.match(/email:'([^']*)'/) || [])[1];
+
+  check(!!co, 'the example studio says what it is called');
+  check(co !== 'LAYI', 'the example studio is not the founder’s own label (' + co + ')');
+  check(!/layiojomo/.test(seedCompany),
+    'the example studio is not on the founder’s own domain (' + email + ')');
+  check(!/LAYI/.test(seedCompany),
+    'nothing on the example studio’s letterhead is the founder’s label');
+
+  /* Every u-owner in the file, not the first one: there are two, the blank
+     one a fresh install gets and the one loadExample seeds, and they are
+     written almost identically. Asserting over all of them is also the
+     stronger question, because either of them reaching a screenshot is the
+     same problem. */
+  const owners = all(app, /\{id:'u-owner',name:'([^']*)'/g).map(m => m[1]);
+  check(owners.length >= 1, 'the example studio has somebody signed in to it');
+  owners.forEach(n => {
+    check(n !== 'Kay Ojomo',
+      'the dashboard greeting in every screenshot is not the founder (' + n + ')');
+  });
+  /* and nothing anywhere in the app still signs as him */
+  check(app.indexOf('Kay Ojomo') === -1,
+    'no record in the example studio is signed by the founder');
+}
 const views = new Set(all(app, /class="nav-item[^"]*"[^>]*data-view="([a-z]+)"/g).map(m => m[1]));
 check(views.size >= 20, 'the studio app really does have that many screens (' + views.size + ')');
-check(html['index.html'].includes('<div class="v num">' + views.size + '</div>'),
-  'the home page claims the number of screens the app actually has (' + views.size + ')');
-check(/six roles|Six roles|6<\/div>/.test(html['index.html']), 'the home page claims the six roles the app has');
+/* The home page used to print this in a four up strip. Kayode took the strip
+   out on 20 Sep, so there is no claim left to check against the app. The
+   check goes with the claim, rather than the claim being put back to keep a
+   check quiet. views.size is still read: the product page depends on it. */
+/* Read out of the app, not written down here. This check used to be the
+   regex /six roles|Six roles|6<\/div>/, which is a number asserting itself:
+   the site said six, the check looked for six, and the app had five. The
+   sixth is a custom role the demo account creates to prove custom roles
+   work, so the strip was quoting the demo rather than the product. */
+const roleBlock = app.slice(app.indexOf('function defaultRoles()'),
+                            app.indexOf('function canSeeProfit'));
+const roleCount = all(roleBlock, /\{id:'[a-z]+',name:'[^']+',builtin:true/g).length;
+check(roleCount >= 4, 'the app really does ship built in roles (' + roleCount + ')');
+/* Same: the strip that carried this is gone. The comparison table still
+   counts its roles row against the app, a few lines below. */
+/* The comparison table said "Six roles with permissions" while the app shipped
+   five and the home page strip said five. Two places on one site disagreeing
+   about a countable fact, with the app right there to be read. */
+{
+  const WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'];
+  const row = (/<td>(\w+) roles with permissions[^<]*<\/td>/.exec(html['pricing.html']) || [])[1];
+  check(!!row, 'the comparison table has a roles row');
+  check(row === WORDS[roleCount],
+    'and it counts the roles the app ships (' + WORDS[roleCount] + ', found ' + row + ')');
+}
+
+/* The table and the cards are two descriptions of one thing, and the way
+   they go wrong is one of them being edited. These are the rows where the
+   two contradicted each other on 20 Sep. */
+{
+  const pr = html['pricing.html'];
+  const proCard = (/<h3>Pro<\/h3>[\s\S]*?<\/ul>/.exec(pr) || [''])[0];
+  const row = label => (new RegExp('<td>' + label + '</td>([\\s\\S]{0,260}?)</tr>').exec(pr) || [, ''])[1];
+
+  const sellsPriority = /priority support/i.test(proCard);
+  const tablePriority = /Yes/.test((row('Priority support').match(/<td[\s\S]*?<\/td>/g) || [])[1] || '');
+  check(sellsPriority === tablePriority,
+    'the Pro card and the Priority support row agree (card ' + sellsPriority + ', table ' + tablePriority + ')');
+
+  check(!/measurement history|fitting records/i.test(proCard) ||
+        /Not included/.test(row('Customers and full measurements')),
+    'the Pro card does not sell measurements the table gives to Basic');
+
+  check(/<td>See who owes you<\/td>/.test(pr) && /<td>Chase list and payment reminders<\/td>/.test(pr),
+    'the table carries the receivables rows, which are the real Basic-versus-Pro line');
+}
 
 /* The app serves five kinds of business, not only tailors. The site has to say
    so, because a shoemaker or a fabric seller who reads it as tailoring software
@@ -431,13 +587,15 @@ const SELLS_TO = {
   'fabric':        ['fabrics',  'stock'],
   'accessor':      ['accessories', 'make']
 };
-const productCopy = visible(html['features.html']).toLowerCase();
+/* The product page used to repeat the trade list in a lede. Kayode took that
+   section out on 20 Sep, so what is left to check is that the app can really
+   be set up as each one, and that the SITE names it somewhere — which is the
+   check at the bottom of this file, over every page. Asking the product page
+   specifically would be asking for the copy back. */
 Object.keys(SELLS_TO).forEach(phrase => {
   const pair = SELLS_TO[phrase];
   check(crafts.indexOf(pair[0]) !== -1 && modes.indexOf(pair[1]) !== -1,
     'a studio can actually be set up as the "' + phrase + '" business the site names (' + pair.join(':') + ')');
-  check(productCopy.includes(phrase),
-    'the product page names the "' + phrase + '" business the app supports');
 });
 const homeCopy = visible(html['index.html']).toLowerCase();
 // haberdashery was dropped as a business type we sell to. Requiring the site to
@@ -617,7 +775,11 @@ check(!/tlb_site_theme/.test(read('js/site.js') + built.map(p => html[p]).join('
   'there is no theme switch left anywhere');
 check(!/html\.light|body\.light/.test(css), 'no switchable theme remains in the stylesheet');
 built.forEach(p => check(!html[p].includes('class="tgl"'), p + ' has no theme toggle button'));
-check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
+/* Was 12. Several light sections went with the removals on 20 Sep. The point
+   of the check is that the second ground is genuinely part of the design
+   rather than a leftover of the old theme switch, and ten sections across
+   twelve pages is still that. */
+check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 8,
   'the light ground is used across the site (' +
   all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length + ' sections)');
 check(css.includes('@media (prefers-reduced-motion:reduce)'), 'the stylesheet respects reduced motion');
@@ -637,56 +799,52 @@ const js = read('js/site.js');
 check(js.includes('window.__tlbReady = true'), 'the script tells the page it arrived');
 check(js.includes('window.scrollTo'), 'in page links use window.scrollTo, which is the one that works everywhere');
 check(!/\.scrollIntoView\s*\(/.test(js), 'nothing relies on scrollIntoView');
-check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 12,
+/* Was 12. Several light sections went with the removals on 20 Sep. The point
+   of the check is that the second ground is genuinely part of the design
+   rather than a leftover of the old theme switch, and ten sections across
+   twelve pages is still that. */
+check(all(built.map(p => html[p]).join(''), /class="[^"]*on-light/g).length >= 8,
   'the light ground is actually used across the site');
 check(!/layi_/.test(js), 'the website never touches the studio app storage keys');
 
-/* ---------- the product page has one way in, and it works on a phone ----
-   The tab strip came off on 19 September: "this is already in the dropdown, i
-   dont think we should still see it here". It was the same five names twice on
-   one screen and he is right.
+/* ---------- the product page lists its own areas ----------
+   The strip came off on 19 September, because the Products dropdown said the
+   same five things and having both was saying it twice. On 19 September it
+   went back, because Kayode asked for the menu to go instead: "no more
+   products dropdown just products then it opens up all the products list on
+   the page".
 
-   The strip was also the only way to change area on a PHONE, because the
-   header nav does not exist below 1000px. Taking it out without putting the
-   five somewhere else would have left the product page stranded on the area it
-   happens to ship open, on the device most of this site is read on. So the
-   drawer carries them, and these checks refuse the half of the change that
-   looks finished from a laptop. */
+   That makes the strip load bearing in a way it was not before. It is now
+   the only way to change area, at every width, so a page that ships without
+   it is a page stranded on whichever area happens to be open. These checks
+   refuse that. */
 {
   const feat = html['features.html'];
-  check(feat.indexOf('features-tabs') === -1, 'the product page no longer repeats the menu as a tab strip');
-  check(all(feat, /<button class="tab/g).length === 0, 'and no tab buttons are left behind');
+  const tabs = all(feat, /<button class="tab[^"]*"[^>]*data-tab="([a-z]+)"[^>]*>([^<]+)</g)
+    .map(m => ({ id: m[1], title: m[2] }));
+  const panes = all(feat, /data-pane="([a-z]+)" data-title="([^"]+)"/g)
+    .map(m => ({ id: m[1], title: m[2] }));
 
-  /* every area names itself, because the heading is built from it */
-  const panes = all(feat, /data-pane="([a-z]+)" data-title="([^"]+)"/g).map(m => ({ id: m[1], title: m[2] }));
-  check(panes.length >= 5, 'every area on the product page carries its own name (' + panes.length + ')');
+  check(tabs.length >= 5, 'the product page lists its areas on the page (' + tabs.length + ')');
+  check(panes.length === tabs.length,
+    'every area listed has a pane and every pane is listed (' + tabs.length + ' and ' + panes.length + ')');
+  tabs.forEach(t => {
+    const pane = panes.filter(x => x.id === t.id)[0];
+    check(!!pane, 'the list points at an area that exists: ' + t.id);
+    check(!!pane && pane.title === t.title,
+      'the area calls itself what the list calls it: ' + t.id +
+      ' (' + (pane || {}).title + ' vs ' + t.title + ')');
+  });
+
+  /* exactly one open, or the page reads as empty or as noise */
+  check(all(feat, /<button class="tab on"/g).length === 1, 'one area ships open');
+  check(all(feat, /class="pane on /g).length === 1, 'and one pane ships open with it');
+
+  /* the heading is written from the pane, and has to be right before any
+     script runs, or the page says the wrong product name to a crawler */
   check(/<h1 data-feat-title>/.test(feat), 'the page has a heading the areas can write into');
   check(feat.indexOf('>' + (panes[0] || {}).title + '<') !== -1,
     'the heading ships with the name of the area that ships open, so it is right with no script');
-
-  /* the menu, the drawer and the panes are the same five */
-  const menu = refHeader.slice(refHeader.indexOf('<span class="nav-menu">'));
-  const inMenu = all(menu.slice(0, menu.indexOf('</span>')), /features\.html#([a-z]+)">([^<]+)</g)
-    .map(m => ({ id: m[1], title: m[2] }));
-  const drawer = html['index.html'].slice(html['index.html'].indexOf('<div class="drawer"'));
-  const inDrawer = all(drawer.slice(0, drawer.indexOf('</div>')), /class="sub" href="features\.html#([a-z]+)">([^<]+)</g)
-    .map(m => ({ id: m[1], title: m[2] }));
-
-  check(inDrawer.length === inMenu.length,
-    'the drawer offers the same number of areas as the menu (' + inDrawer.length + ' and ' + inMenu.length + ')');
-  inMenu.forEach(item => {
-    const pane = panes.filter(p => p.id === item.id)[0];
-    check(!!pane, 'the menu points at an area that exists: ' + item.id);
-    check(!!pane && pane.title === item.title,
-      'the area calls itself what the menu calls it: ' + item.id + ' (' + (pane || {}).title + ' vs ' + item.title + ')');
-    const d = inDrawer.filter(x => x.id === item.id)[0];
-    check(!!d, 'a phone can reach ' + item.id + ', which the tab strip used to be for');
-    check(!!d && d.title === item.title, 'and the drawer calls it the same thing: ' + item.id);
-  });
-  /* the drawer link only does anything because site.js listens for a hash
-     change; without that it is a link to the page you are already on */
-  check(js.indexOf("addEventListener('hashchange'") !== -1,
-    'a drawer link on the product page itself still changes the area');
 }
 
 /* ---------- reviews are on or off, never half on ----------
@@ -798,32 +956,39 @@ built.forEach(p => {
    turns it into a toggle. That only happens if data-drop is on it, and the
    header is copied into twelve pages by sync_web_shell.js, so every page is
    checked rather than index alone. */
+/* ---------- Products is a link, not a menu ----------
+   Kayode, 19 September: the dropdown goes, the list lives on the page. What
+   has to stay true is that nothing anywhere still expects the menu, because
+   half a removal is what leaves a trigger that opens nothing.
+
+   The header is copied into thirteen pages by sync_web_shell.js, so every
+   page is checked rather than index alone. */
 check(js.indexOf("addEventListener('hashchange'") !== -1,
-  'the menu still works from the page it points at: a hash change reopens the area');
-check(js.indexOf("$$('.nav-drop > a[data-drop]')") !== -1,
-  'the Products trigger is wired up as a menu toggle');
-/* This has to look inside the click handler and nowhere else. Written as a
-   loose search for preventDefault next to setOpen it passed a mutant that took
-   preventDefault off the click entirely, because the ArrowDown handler a few
-   lines below has the same pair and satisfied it. */
-const clickAt = js.indexOf("trigger.addEventListener('click'");
-const clickBlock = clickAt < 0 ? '' : js.slice(clickAt, js.indexOf('});', clickAt));
-check(clickBlock.indexOf('preventDefault') !== -1,
-  'clicking Products opens the list rather than navigating away');
-check(js.indexOf("ev.key !== 'Escape'") !== -1, 'Escape closes the menu');
+  'picking an area from a link on the page itself still changes the area');
 built.forEach(p => {
-  const drop = (html[p].match(/<a href="features\.html" data-drop[^>]*>/) || [])[0];
-  check(!!drop, p + ' carries the Products trigger the script looks for');
-  check(!!drop && drop.indexOf('aria-expanded=') !== -1,
-    p + ' tells a screen reader whether the menu is open');
-  const menu = html[p].slice(html[p].indexOf('<span class="nav-menu">'));
-  const items = (menu.slice(0, menu.indexOf('</span>')).match(/<a href="features\.html#/g) || []).length;
-  check(items >= 4, p + ' has the areas in the menu (' + items + ')');
+  check(html[p].indexOf('<a href="features.html">Products</a>') !== -1,
+    p + ' offers Products as a plain link');
+  ['nav-drop', 'nav-menu', 'data-drop', 'class="sub"'].forEach(t => {
+    check(html[p].indexOf(t) === -1, p + ' has no dropdown left on it: ' + t);
+  });
 });
-/* one column. Two read as a panel of thumbnails rather than as a list, which
-   is the other half of what Kayode asked for. */
-check(/\.nav-menu\{[^}]*grid-template-columns:minmax\(0,1fr\)/.test(css),
-  'the menu is a single vertical list');
+
+/* picking an area goes to the top, so the heading that names the area you
+   just chose is the first thing on screen. It used to aim at the strip minus
+   96, and when the strip was removed that selector stopped matching and it
+   aimed at the pane, which landed below the heading with the sticky header
+   over the first line. */
+/* the hash handler goes to the top, and the five ids are at the top of the
+   page rather than on the panes, so a link from another page lands there
+   without the script having to race the browser for it */
+const hashFn = js.slice(js.indexOf('function openFromHash'), js.indexOf('openFromHash(false)'));
+check(hashFn.indexOf('window.scrollTo(0, 0)') !== -1,
+  'picking an area scrolls to the top of the page');
+const featTop = html['features.html'];
+check(all(featTop, /<span id="[a-z]+" class="anchor"><\/span>/g).length >= 5,
+  'the areas answer at the top of the page, so a link to one lands at the top');
+check(!/class="pane[^"]*"[^>]*\sid=/.test(featTop),
+  'and no pane carries an id of its own, which is what used to scroll into the middle');
 
 /* ---------- the product is shown, not drawn ----------
    Every screen on this site is a capture of the running app, taken through
@@ -1076,8 +1241,15 @@ const siteJs = read('js/site.js');
 ['XMLHttpRequest', 'ipapi', 'geoip', 'exchangerate', 'openexchange', 'ip-api', 'ipinfo'].forEach(t => {
   check(siteJs.indexOf(t) === -1, 'no price or location is fetched from anywhere: ' + t);
 });
-check(siteJs.indexOf('resolvedOptions().timeZone') !== -1,
-  'the currency guess comes from the browser rather than an IP lookup');
+/* There is no guess any more. The picker opens on naira for everybody,
+   which is the price this is really sold at and the one every other
+   currency on the page is worked out from. What still matters is that
+   nothing reaches for a third party to decide it, which the list of banned
+   names above covers, and that the visitor's own choice is remembered. */
+check(/setCcy\(remembered\(\) \|\| 'NGN'\)/.test(siteJs),
+  'the currency picker opens on naira rather than on a guess');
+check(siteJs.indexOf('guessCcy') === -1,
+  'and the guess is gone rather than left unreachable');
 check(siteJs.indexOf("'tlb_ccy'") !== -1, 'the chosen currency is remembered under our own key');
 check(!/layi_/.test(siteJs), 'the website still never touches the app storage keys');
 
@@ -1181,19 +1353,28 @@ prPlans.forEach((block, i) => {
   }
 });
 
-/* The band under the three columns. It has no price and no self serve sign up,
-   so in the grid it would look like the top of a ladder.
+/* Where somebody goes when neither priced plan fits.
 
-   It used to ask "None of these three fit?", which counted Bespoke among the
-   three and then offered Bespoke as the answer. Kayode's correction on 18 Sep:
-   it is the two priced plans that might not fit, and Bespoke is what you take
-   when neither does. Checked on the invitation rather than the wording, so a
-   rewrite does not fail this and a deletion still does. */
-check(/href="book\.html"[^>]*>Tell us what you need</.test(html['pricing.html']),
+   This used to be a band of its own under the three columns, asking
+   "Neither of the two fit?" and answering "that is what Bespoke is for" a
+   screen below the Bespoke card. Kayode, 20 Sep: put it in the card. So the
+   check moves with it, and it is aimed at the same thing either way, which
+   is that the invitation exists somewhere a reader will reach. */
+const bespokeCard = (/<h3>Bespoke<\/h3>[\s\S]*?<\/ul>/.exec(html['pricing.html']) || [''])[0];
+check(/Tell us what you need/.test(bespokeCard),
   'there is somewhere to go when neither priced plan fits');
-check(!/None of these three/.test(html['pricing.html']),
-  'the band does not count Bespoke among the plans it is the answer to');
-check(html['pricing.html'].indexOf('callout-row') !== -1, 'the fourth offer is a band rather than a priced column');
+check(/href="book\.html"/.test(bespokeCard), 'and it leads somewhere');
+check(!/None of these three|Neither of the two fit/.test(html['pricing.html']),
+  'the invitation is not also still sitting in a band of its own');
+
+/* The comparison table is not behind a disclosure. A page that has just
+   shown somebody three cards and then asks them to click to find out which
+   one they are is asking them to opt in to the answer they came for. */
+check(!/<details class="disclose">/.test(html['pricing.html']),
+  'the plan comparison is open rather than behind a disclosure');
+check(html['pricing.html'].indexOf('<div class="plans">') <
+      html['pricing.html'].indexOf('<td>Team logins</td>'),
+  'and it sits under the cards rather than further down the page');
 
 /* ---------- we only offer what a shop can actually choose ----------
    Haberdashery sat on this site as a trade for months and was never one of
@@ -1221,9 +1402,24 @@ check(everyWord.indexOf('made to measure') !== -1,
 
 // and the other way round: every craft the app can be set up as is spoken to somewhere,
 // or a studio the app serves reads the site and never sees itself in it.
-const CRAFT_SAYS = { garments: 'garment', footwear: 'shoe', leather: 'bag', fabrics: 'fabric', accessories: 'accessor' };
-crafts.forEach(c => check(everyWord.indexOf(CRAFT_SAYS[c] || c) !== -1,
-  'the site speaks to the "' + c + '" studios the app can be set up as'));
+/* Each craft, and ANY of the words the site uses for it. 'garments' had one
+   word against it, and the only place the site said "garment" was a lede on
+   the product page that has since been removed — while the home page has
+   spoken to those studios all along, as bespoke tailors and ready to wear.
+   A one-word map made this a check about vocabulary rather than about
+   whether a studio sees itself on the site. */
+const CRAFT_SAYS = {
+  garments: ['garment', 'bespoke tailor', 'ready to wear'],
+  footwear: ['shoe'],
+  leather: ['bag', 'leather'],
+  fabrics: ['fabric'],
+  accessories: ['accessor']
+};
+crafts.forEach(c => {
+  const words = CRAFT_SAYS[c] || [c];
+  check(words.some(w => everyWord.indexOf(w) !== -1),
+    'the site speaks to the "' + c + '" studios the app can be set up as');
+});
 
 /* ---------- report ---------- */
 function report() {

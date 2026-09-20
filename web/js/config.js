@@ -112,32 +112,20 @@ const SITE = {
      Bespoke is priced per business and quoting a number for it on a public
      page is the one thing it must never do. */
   currencies: [
-    { code: 'NGN', symbol: '\u20a6', label: 'Nigeria (naira)',        starter: 27000, pro: 65000 },
-    { code: 'USD', symbol: '$',       label: 'United States (dollar)', starter: 18,    pro: 42 },
-    { code: 'GBP', symbol: '\u00a3', label: 'United Kingdom (pound)', starter: 14,    pro: 33 },
-    { code: 'CAD', symbol: 'CA$',     label: 'Canada (dollar)',        starter: 24,    pro: 58 },
-    { code: 'EUR', symbol: '\u20ac', label: 'Europe (euro)',          starter: 17,    pro: 40 },
-    { code: 'GHS', symbol: 'GH\u20b5', label: 'Ghana (cedi)',         starter: 215,   pro: 520 }
+    { code: 'NGN', symbol: '\u20a6', label: 'Nigeria (naira)',        starter: 20000, pro: 49000 },
+    { code: 'USD', symbol: '$',       label: 'United States (dollar)', starter: 13,    pro: 32 },
+    { code: 'GBP', symbol: '\u00a3', label: 'United Kingdom (pound)', starter: 10,    pro: 25 },
+    { code: 'CAD', symbol: 'CA$',     label: 'Canada (dollar)',        starter: 18,    pro: 44 },
+    { code: 'EUR', symbol: '\u20ac', label: 'Europe (euro)',          starter: 13,    pro: 30 },
+    { code: 'GHS', symbol: 'GH\u20b5', label: 'Ghana (cedi)',         starter: 160,   pro: 390 }
   ],
 
-  /* Which one a visitor is shown first. Read from the browser's own time
-     zone and language, never from an IP lookup: that would mean calling a
-     third party on every page load, telling them who is reading our
-     pricing, and adding a dependency to a site that has none. A guess is
-     all this is, so the picker is always there to correct it, and the
-     choice is remembered. */
-  currencyByZone: {
-    'Africa/Lagos': 'NGN', 'Africa/Accra': 'GHS', 'Europe/London': 'GBP',
-    /* every Canadian zone is an America/ one, and the last resort in
-       guessCcy sends America/ to dollars, so Canada has to be named */
-    'America/Toronto': 'CAD', 'America/Vancouver': 'CAD', 'America/Edmonton': 'CAD',
-    'America/Winnipeg': 'CAD', 'America/Halifax': 'CAD', 'America/St_Johns': 'CAD',
-    'America/Regina': 'CAD', 'America/Montreal': 'CAD'
-  },
-  currencyByRegion: {
-    NG: 'NGN', GH: 'GHS', GB: 'GBP', US: 'USD', CA: 'CAD',
-    IE: 'EUR', FR: 'EUR', DE: 'EUR', IT: 'EUR', ES: 'EUR', NL: 'EUR', PT: 'EUR', BE: 'EUR'
-  },
+  /* There were two lookup tables here, currencyByZone and currencyByRegion,
+     which guessed a visitor's currency from the browser time zone and
+     language. The picker now opens on NGN for everybody and they had no
+     other reader, so they are gone rather than left looking live. To bring
+     the guess back: restore them, restore guessCcy in site.js, and change
+     one line to `remembered() || guessCcy()`.                           */
 
   /* ---- partner programme, mirrors PARTNERS.md and the portal ---- */
   partner: {
@@ -145,10 +133,16 @@ const SITE = {
     holdDays: 31, payoutDay: '5th of the month', minPayout: 10000
   },
 
-  /* ---- customer referral reward ----
-     PROPOSED, not yet built into billing. One month of credit each when a
-     studio you referred pays for their first month.                    */
-  referral: { monthsFree: 1, upgradeAfter: 3 }
+  /* There was a `referral: { monthsFree: 1 }` here: a second scheme that
+     gave a customer and the customer they sent a free month each. It was
+     marked PROPOSED and never built into billing, and on 20 Sep 2026 it
+     was folded into the one programme. Every business now has a referral
+     code that pays the same 8% as a partner's, and the referred business
+     gets the ordinary price rather than a reward of its own.
+
+     Nothing here replaces it, deliberately: the rate lives in the
+     database (partner_rate_bands) and the website reads it through the
+     portal rather than keeping a third copy. */
 };
 
 /* Values the pages ask for by name through data-cfg. */
