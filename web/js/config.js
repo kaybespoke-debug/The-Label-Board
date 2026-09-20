@@ -111,13 +111,25 @@ const SITE = {
      page are Basic and Pro. There is deliberately no `premium` here \u2014
      Bespoke is priced per business and quoting a number for it on a public
      page is the one thing it must never do. */
+  /* ONE currency. Kayode, 20 Sep 2026: "just naira so we dont cause
+     confusuion, we can always add those when the app is ready to go
+     international".
+
+     There were six. The other five were SEEDS: dollars, pounds, Canadian
+     dollars, euros and cedis, worked out from the naira price at a rate
+     nobody had agreed and nobody was going to honour. A seeded price is
+     fine in a spreadsheet and not fine on a pricing page, because the
+     person reading it cannot tell it from a real one.
+
+     Naira is what the console bills, what partner_payouts pays in and what
+     tlb_payments records. Now it is also the only thing the site says.
+
+     To go international: put the rows back here with real agreed prices,
+     restore buildCcyPicker() in site.js, put the <span id="ccy-slot"> back
+     on pricing.html, and turn the three checks in audit_web.js round. The
+     price table below and paint() in site.js already handle several. */
   currencies: [
-    { code: 'NGN', symbol: '\u20a6', label: 'Nigeria (naira)',        starter: 20000, pro: 49000 },
-    { code: 'USD', symbol: '$',       label: 'United States (dollar)', starter: 13,    pro: 32 },
-    { code: 'GBP', symbol: '\u00a3', label: 'United Kingdom (pound)', starter: 10,    pro: 25 },
-    { code: 'CAD', symbol: 'CA$',     label: 'Canada (dollar)',        starter: 18,    pro: 44 },
-    { code: 'EUR', symbol: '\u20ac', label: 'Europe (euro)',          starter: 13,    pro: 30 },
-    { code: 'GHS', symbol: 'GH\u20b5', label: 'Ghana (cedi)',         starter: 160,   pro: 390 }
+    { code: 'NGN', symbol: '\u20a6', label: 'Nigeria (naira)', starter: 20000, pro: 49000 }
   ],
 
   /* There were two lookup tables here, currencyByZone and currencyByRegion,

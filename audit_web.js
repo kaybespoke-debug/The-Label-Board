@@ -1255,7 +1255,19 @@ const ccyBlock = (cfgSrc.match(/currencies:\s*\[[\s\S]*?\n  \]/) || [''])[0];
    moment it was correctly removed. */
 const markets = all(ccyBlock, /\{\s*code:\s*'([A-Z]{3})'[^}]*?starter:\s*(\d+),\s*pro:\s*(\d+)/g)
   .map(m => ({ code: m[1], starter: +m[2], pro: +m[3] }));
-check(markets.length >= 2, 'the site quotes more than one currency (' + markets.length + ')');
+/* ONE currency, from 20 Sep 2026. There were six; the other five were
+   conversions at a rate nobody had agreed, and a visitor cannot tell a
+   seeded price from a real one. Kayode: "just naira so we dont cause
+   confusuion, we can always add those when the app is ready to go
+   international".
+
+   So this asks for exactly one, and names it, rather than asking for
+   "more than one" as it used to. A second row appearing here is either
+   a real agreed price or somebody re-seeding, and the difference is
+   worth a person looking rather than a build passing. */
+check(markets.length === 1, 'the site quotes one currency and only one (' + markets.length + ')');
+check(markets.length === 1 && markets[0].code === 'NGN',
+  'and that currency is naira, which is what the console bills and what partners are paid in');
 markets.forEach(m => {
   check(m.starter > 0 && m.pro > 0, 'every market has a price for every priced plan: ' + m.code);
   check(m.starter < m.pro, 'the plans go up in price in ' + m.code);
@@ -1288,7 +1300,9 @@ if (ngn) {
 /* the page still reads correctly with no JavaScript at all */
 const pr = html['pricing.html'];
 check(pr.indexOf('data-plan="starter"') !== -1, 'each plan tells the currency table which one it is');
-check(pr.indexOf('id="ccy-slot"') !== -1, 'there is somewhere for the currency picker to go');
+/* and no picker to put in it */
+check(pr.indexOf('id="ccy-slot"') === -1, 'there is no currency picker on the pricing page');
+check(!/\bccy\b/.test(visible(pr)), 'and no stray currency control left rendering');
 plans.filter(pl => !pl.invoiceOnly).forEach(pl => {
   check(pr.indexOf('data-monthly="' + pl.monthly.toLocaleString('en-US') + '"') !== -1,
     'the page still carries the naira price as plain text: ' + pl.name);
@@ -1307,23 +1321,29 @@ const siteJs = read('js/site.js');
 ['XMLHttpRequest', 'ipapi', 'geoip', 'exchangerate', 'openexchange', 'ip-api', 'ipinfo'].forEach(t => {
   check(siteJs.indexOf(t) === -1, 'no price or location is fetched from anywhere: ' + t);
 });
-/* There is no guess any more. The picker opens on naira for everybody,
-   which is the price this is really sold at and the one every other
-   currency on the page is worked out from. What still matters is that
-   nothing reaches for a third party to decide it, which the list of banned
-   names above covers, and that the visitor's own choice is remembered. */
-check(/setCcy\(remembered\(\) \|\| 'NGN'\)/.test(siteJs),
-  'the currency picker opens on naira rather than on a guess');
+/* There is no guess and there is no choice. The page is naira, full stop.
+
+   Both of the things this used to defend are now moot and both are worth
+   a line anyway, because each was a real bug within the last three days:
+
+     a GUESS from the time zone, written to storage as if it were a choice,
+     which then beat the naira default for ever on every returning browser
+
+     a REMEMBERED choice, which is meaningless with nothing to choose from
+     and would strand anybody who had picked pounds before today
+
+   Neither can come back without this failing first. */
+check(/setCcy\('NGN'\)/.test(siteJs),
+  'the page sets naira outright rather than reading a stored preference');
 check(siteJs.indexOf('guessCcy') === -1,
-  'and the guess is gone rather than left unreachable');
-/* The key carries a number because the OLD one holds guesses. Before 20 Sep
-   the page guessed a currency from the time zone and wrote that guess to
-   localStorage exactly as if somebody had chosen it, so every returning
-   browser overrode the naira default with something nobody picked. Reading
-   the old key again would bring all of that straight back. */
-check(/'tlb_ccy\d+'/.test(siteJs), 'the chosen currency is remembered under our own key');
-check(siteJs.indexOf("'tlb_ccy'") === -1,
-  'and never reads the pre-20-September key, whose values are guesses rather than choices');
+  'no guess from the time zone or the language survives');
+/* Named for the STORAGE rather than for the function. The first version of
+   this matched /remembered()/ and so failed on the COMMENT that explains
+   why the function was removed, on a file that was already correct. A check
+   that a name is absent will always be tripped by the note saying it is. */
+check(siteJs.indexOf('CCY_KEY') === -1, 'no currency key survives in the script');
+check(siteJs.indexOf('tlb_ccy') === -1,
+  'and nothing reads or writes a remembered currency, which would strand anyone who had picked pounds');
 check(!/layi_/.test(siteJs), 'the website still never touches the app storage keys');
 
 /* The one call the site makes, pinned to exactly what it may be.
