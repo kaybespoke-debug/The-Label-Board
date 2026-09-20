@@ -7,6 +7,78 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## THE 14 DAY TRIAL — built, proved, NOT applied and NOT deployed
+
+Kayode asked for it on 20 September, billing and website together, and for
+both halves to be proved in Flutterwave test mode.
+
+**The half that decides what is true is built and green.** 41 checks in
+`supabase/tests/trial_harness.mjs`, covering exactly the two scenarios he
+asked for: a trial that converts and a trial that is cancelled.
+
+**The half that talks to Flutterwave is not, and could not be.** There is
+no account, no key, and the standing rule is that the secret key is set by
+Kayode server-side and never reaches this repo. So there is nothing to run
+a test-mode charge against. What was done instead was to build everything
+the charge lands on, so that when the webhook exists it is a third caller
+of two functions that are already proved rather than a new set of rules.
+
+### The rule that mattered most
+
+A free trial plus a referral programme is a machine for paying commission
+on revenue that never arrived. Fourteen days is long enough to sign up,
+collect 8% of a subscription nobody paid for, and walk away.
+
+So it is enforced twice. `partner_accrue_month` skips a business still on
+trial, which is the engine doing the right thing. And a trigger on
+`partner_ledger` REFUSES any accrual for a referral whose business has
+never had a completed payment, which is the engine being unable to do the
+wrong thing: not by hand, not from the console, not from a future webhook
+written by somebody who has not read the file.
+
+**Mutation tested.** Breaking `app.has_paid()` so it always returns true
+turns six checks red. The suite is not passing by accident.
+
+It also caught a fixture: `referral_fraud_harness` was seeding referrals as
+"subscribed" by setting a date and nothing else, which is now a state the
+database says cannot exist. Those two fixtures book a real payment now.
+
+### Two decisions worth knowing about
+
+**A trial now gets Pro ceilings, 5 studios and 50 logins, not 1 and 3.**
+"Full Pro access" is a sentence with a consequence: a studio told that and
+then refused a second studio would be right to say we had lied. The card
+requirement is what makes it safe to hand out. `plan_limits_harness` used
+to assert 1 and 3 and now asserts it equals Pro.
+
+**`subscribed_on` finally has one writer.** No migration in this repo had
+ever set it; it was written by hand, and it is the field the whole twelve
+month commission clock counts from. `convert_trial_to_paid()` is now the
+only thing that sets it.
+
+### The website half is built and deliberately NOT live
+
+Trial primary on Basic and Pro with Book a demo demoted, a primary call to
+action in the hero, the trial in the nav, the drawer and the footer, and
+Kayode’s exact line beside every one of them. `audit_web.js` reads the 14
+out of the MIGRATION and fails if the pricing page disagrees with it, so
+the two cannot drift.
+
+**`web/trial.html` is `noindex` and out of the sitemap, and nothing is
+pushed.** "Start your 14-day free trial" with "Card required, nothing
+charged until day 15" is a promise nobody can currently keep: there is no
+card form, because there is no Flutterwave. Publishing it would be the
+exact mismatch the instruction forbade. Remove the noindex, add it to the
+sitemap and point the button at the hosted form in the SAME release that
+connects Flutterwave.
+
+### What is needed to finish it
+
+Everything in the "What I need from you" table in BILLING.md, unchanged:
+the dedicated Flutterwave account in test mode, the public key, the secret
+key set by Kayode as an Edge Function secret, the webhook secret hash, and
+the five decisions. Nothing here should be pasted into a chat message.
+
 ## Two bugs that both looked like something else
 
 Both were reported on 20 September as "you did not do what I asked". Both

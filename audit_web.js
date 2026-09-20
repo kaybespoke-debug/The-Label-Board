@@ -26,7 +26,7 @@ const check = (cond, msg) => (cond ? ok : fail).push(msg);
 const PAGES = ['index.html', 'features.html', 'pricing.html', 'book.html',
   'partners.html', 'about.html', 'contact.html',
   'waitlist.html', 'reviews.html', 'privacy.html', 'terms.html',
-  '404.html', 'thanks.html'];
+  '404.html', 'thanks.html', 'trial.html'];
 
 const read = f => fs.readFileSync(path.join(dir, f), 'utf8');
 const html = {};
@@ -382,46 +382,100 @@ check(!/four years|taper/i.test(pp), 'no four year term or taper survives on the
 check(/in naira|Nigerian account/i.test(pp),
   'the partner page says partners are paid in naira, which is what partner_accounts holds');
 
-/* ================= 8. nothing offers a free trial ================= */
-/* Kayode took the trial out on 18 Sep. It had been quoted in eleven places
-   across five pages, all fed by `trialDays` in the configuration.
+/* ============ 8. the trial, and it says what the database does ============ */
+/* There was no trial between 18 and 20 September. Kayode took it out, and
+   this section was the old checks INVERTED so it could not creep back one
+   page at a time. On 20 September he put it back, deliberately and with
+   terms: 14 days of Pro, a card required at signup, first charge on day 15.
 
-   His reason: the October cohort already gets a free month, so a trial on top
-   of that is the same business free for six weeks. And the trial was never
-   self-serve anyway — nobody gets an account until there has been a call, and
-   the call is where somebody sees it working on their own numbers, which is
-   the job the trial was supposed to do.
+   So the checks turn round again, and the risk turns round with them. It is
+   no longer a promise appearing on a page nobody meant to change. It is the
+   website and the billing system drifting apart, which is worse, because
+   one of them takes money from somebody.
 
-   These are the old checks inverted rather than deleted. A trial is the kind
-   of promise that creeps back one page at a time, and every page carrying it
-   is a promise we are held to, so the gate now fails on the offer itself
-   rather than on the offer being stated inconsistently. */
-check(S.trialDays === undefined, 'the configuration carries no trial length');
-check(S.trialDaysPremium === undefined, 'the configuration carries no second trial length either');
+   "The website trial terms must exactly match the billing system. Do not
+    invent different terms."
 
-/* The phrases a trial comes back as. "no card" on its own is deliberately NOT
-   here: the booking page still says "No card, and no account until we have
-   spoken", which is about the call rather than about a countdown. */
-const TRIAL_WORDS = [
-  [/\d+\s+days?\s+free/i, 'a number of days free'],
-  [/free\s+trial/i, 'a free trial'],
-  [/\d+\s+day\s+trial/i, 'a day trial'],
-  [/trials?\s+for\s+\d+/i, 'a trial of a number of days'],
-  [/start\s+free/i, 'a "start free" button'],
-  [/no card to start/i, 'a card-free start'],
+   That is why the numbers below are not read from the copy and compared to
+   each other. They are read from the MIGRATION, so a trial that becomes 30
+   days in the database and stays 14 on the pricing page fails here rather
+   than in somebody's bank statement. */
+const trialSql = fs.readFileSync(
+  path.join(__dirname, 'supabase/migrations/20260920150000_free_trial.sql'), 'utf8');
+const sqlDays = (trialSql.match(/start_free_trial\(\s*\n?\s*p_business uuid, p_days int default (\d+)\)/) || [])[1];
+
+check(S.trial && typeof S.trial === 'object', 'the configuration carries the trial terms');
+check(S.trial && Number(S.trial.days) === 14,
+  'the website says the trial is 14 days');
+check(sqlDays === String(S.trial && S.trial.days),
+  'and the database agrees, because that number is read out of the migration (sql ' + sqlDays + ')');
+check(S.trial && S.trial.plan === 'pro', 'the trial is of the Pro plan, which is what plan_features gives it');
+check(S.trial && S.trial.cardRequired === true,
+  'the configuration says a card is required, because one is');
+check(S.trial && Number(S.trial.chargesOnDay) === 15,
+  'and that the first charge is day 15, which is the day after 14');
+
+/* The exact sentence. Kayode gave it word for word and it is repeated
+   beside every trial button rather than paraphrased per page. */
+const REASSURANCE = 'Start free for 14 days. Card required, nothing charged until day 15. Cancel any time before then.';
+check(S.trial && S.trial.reassurance === REASSURANCE,
+  'the configuration holds the reassurance line exactly as it was given');
+
+/* NEVER "no card needed". A card IS required, and this is the one place the
+   copy could soften into a promise we do not keep. The booking page is
+   allowed to say there is no card to BOOK a call, which is a different
+   thing, so the patterns below are about starting rather than about booking. */
+const CARD_LIES = [
+  [/no card (needed|required)/i, '"no card needed"'],
+  [/without a card/i, '"without a card"'],
+  [/free.{0,20}no card/i, 'free with no card'],
+  [/card.{0,10}not required/i, 'a card not being required'],
 ];
 built.forEach(p => {
   const seen = visible(html[p]);
-  TRIAL_WORDS.forEach(pair => check(!pair[0].test(seen), p + ' does not offer ' + pair[1]));
-  /* an attribute rather than copy, so this one reads the raw page */
-  check(!html[p].includes('data-cfg="trialDays"'),
-    p + ' does not read a trial length from the configuration');
-  /* visible() strips <meta>, so a promise could survive in the search result
-     alone, which is the one place nobody looks */
-  const m = html[p].match(/<meta name="description" content="([^"]*)"/);
-  check(!m || !/trial|days free/i.test(m[1]),
-    p + ' does not advertise a trial in its search description');
+  CARD_LIES.forEach(pair => check(!pair[0].test(seen),
+    p + ' never claims ' + pair[1] + ', because a card is required to start a trial'));
 });
+
+/* Every page that offers the trial must carry the line with it. A button
+   with the terms on another page is a button with no terms. */
+built.forEach(p => {
+  const offersTrial = /href="trial\.html"/.test(html[p]);
+  const isCta = /Start your 14-day free trial|Set up my trial/.test(visible(html[p]));
+  if (!isCta) return;
+  check(visible(html[p]).includes(REASSURANCE),
+    p + ' puts the exact trial terms beside the button that starts one');
+  void offersTrial;
+});
+
+/* The two cards that can actually be started: trial primary, demo secondary.
+   Bespoke has neither, on purpose: it is priced per contract, so there is
+   nothing for a card to be charged for on day 15. */
+const pricingHtml = html['pricing.html'];
+check(/<a class="btn btn-gold btn-wide" href="trial\.html"><span>Start your 14-day free trial<\/span><\/a>[\s\S]{0,400}?The essentials/.test(pricingHtml),
+  'Basic leads with the trial');
+check(/<a class="btn btn-gold btn-wide" href="trial\.html"><span>Start your 14-day free trial<\/span><\/a>[\s\S]{0,400}?Everything in Basic/.test(pricingHtml),
+  'Pro leads with the trial');
+check((pricingHtml.match(/href="book\.html"><span>Book a demo<\/span>/g) || []).length === 2,
+  'and both of them keep Book a demo as the second choice');
+check(!/trial\.html[\s\S]{0,300}?Everything in Pro/.test(pricingHtml),
+  'Bespoke offers no trial, because it has no list price to charge on day 15');
+
+/* The hero, the nav, the drawer and the footer all reach it. */
+check(/<a class="btn btn-gold" href="trial\.html">Start your 14-day free trial<\/a>/.test(html['index.html']),
+  'the home page hero leads with the trial');
+check(html['index.html'].includes(REASSURANCE), 'and states the terms under it');
+built.forEach(p => {
+  check(/class="btn btn-gold btn-sm" href="trial\.html"/.test(html[p]),
+    p + ' offers the trial in the header');
+  check(/<a href="trial\.html">Start a free trial<\/a>/.test(html[p]),
+    p + ' offers the trial in the footer');
+});
+
+/* And the page it all points at exists and is honest about the card. */
+check(html['trial.html'].includes(REASSURANCE), 'the trial page states the terms');
+check(/Card is required|card is required|Card required/.test(visible(html['trial.html'])),
+  'and says plainly that a card is needed');
 
 /* Taking the trial out must not leave a plan with no way to act on it. Every
    priced column and the invoice-only band send the reader to the same place,

@@ -105,7 +105,7 @@ serving the old version.
 Every object the apps talk to is created by a migration in
 `supabase/migrations/`, applied in filename order. Nothing is created by hand
 any more: five objects once were, and were missing from the migrations
-entirely, so a fresh project would have run none of it. Eleven suites guard it:
+entirely, so a fresh project would have run none of it. Twelve suites guard it:
 
 ```bash
 node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
@@ -119,6 +119,7 @@ node supabase/tests/plan_limits_harness.mjs     # a plan is a ceiling, not a sug
 node supabase/tests/partner_commission_harness.mjs  # 8%, twelve months, and it stops when they do
 node supabase/tests/referral_fraud_harness.mjs  # nobody earns a commission off themselves
 node supabase/tests/plan_feature_harness.mjs   # Basic cannot write a Pro feature, by app or by hand
+node supabase/tests/trial_harness.mjs           # a free trial gives away the product, never the commission
 ```
 
 The first reads the shipped code for every table, function and column it
