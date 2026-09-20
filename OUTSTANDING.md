@@ -7,6 +7,58 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## The repeated trial line, the footer again, and the FAQ order
+
+### The trial terms are said once now, not five times
+
+They were under the home hero, on both plan cards, and twice on the trial
+page. All five are gone at Kayode’s request.
+
+**What did NOT go, and must not:** the trial page still states all four
+facts in its own bullet list. How long it runs, that a card is required,
+that day 15 is the first charge, and that it can be cancelled. Repeating
+the sentence beside four buttons was what he objected to; a "Start your
+14-day free trial" button with the card mentioned nowhere on the site
+would be the exact mismatch the trial build exists to avoid.
+
+So the gate moved rather than being deleted. It used to require the exact
+sentence beside every call to action. It now requires that the sentence is
+NOT repeated, that trial.html states each of the four facts separately, and
+the sweep for "no card needed" still runs on every page. Checking the four
+facts one at a time rather than as one string leaves the wording Kayode’s
+to change while the facts stay ours to keep.
+
+### The footer, desktop this time
+
+| | Before | Now |
+|---|---|---|
+| Desktop footer | 398px | **310px** |
+| Desktop tap target | 17px | **25px** |
+
+The same bug as the phone: the row kept the body line height and the
+anchor sat on it with no padding, so the space was dead AND not a target.
+
+**"Refer a business" is gone.** It pointed at `partners.html`, the same
+place as "Become a partner", in the same column.
+
+**It saved nothing on the phone, as predicted.** Product and Company sit
+side by side and the row is as tall as the longer one. Company went from
+six links to five; Product still has six; the phone footer is still 401px.
+Links have to come out in PAIRS to shorten it, and that is a navigation
+decision rather than a spacing one.
+
+### The FAQ
+
+Rows tightened on desktop and again on the phone: 2.42 screens to **2.25**.
+
+**The sections were reordered, and the order is a guess worth checking.**
+He asked for them rearranged without saying how. They now run in the order
+somebody meets them: **Paying for it** first, because most people arrive
+from the pricing page with a question about money; then **The software,
+your data, and us**, which is what they would be buying; then **Getting
+started**, which is after they have; and **The partner programme** last,
+because it is a different reader entirely.
+
 ## The footer on a phone, and a tap target that was not one
 
 461px under every page, which is more than half a screen. Now **401px**,

@@ -437,16 +437,20 @@ built.forEach(p => {
     p + ' never claims ' + pair[1] + ', because a card is required to start a trial'));
 });
 
-/* Every page that offers the trial must carry the line with it. A button
-   with the terms on another page is a button with no terms. */
-built.forEach(p => {
-  const offersTrial = /href="trial\.html"/.test(html[p]);
-  const isCta = /Start your 14-day free trial|Set up my trial/.test(visible(html[p]));
-  if (!isCta) return;
-  check(visible(html[p]).includes(REASSURANCE),
-    p + ' puts the exact trial terms beside the button that starts one');
-  void offersTrial;
-});
+/* The terms are stated ONCE, on the page a trial starts from.
+
+   They used to be repeated beside every trial button, which is what this
+   check enforced. Kayode took all four repetitions off on 20 Sep. That is a
+   layout decision and it is his, but the half of it that is NOT a layout
+   decision is that the terms have to survive somewhere a person reaching for
+   the button will pass, or the site is selling a free trial and mentioning
+   the card nowhere.
+
+   So the requirement moves rather than disappearing: trial.html has to say
+   it, in its own words, and the CARD_LIES sweep above still runs on every
+   page. Between them a button can never promise less than the truth. */
+check(!built.some(p => visible(html[p]).includes(REASSURANCE)),
+  'the reassurance line is not repeated beside every button any more');
 
 /* The two cards that can actually be started: trial primary, demo secondary.
    Bespoke has neither, on purpose: it is priced per contract, so there is
@@ -464,7 +468,7 @@ check(!/trial\.html[\s\S]{0,300}?Everything in Pro/.test(pricingHtml),
 /* The hero, the nav, the drawer and the footer all reach it. */
 check(/<a class="btn btn-gold" href="trial\.html">Start your 14-day free trial<\/a>/.test(html['index.html']),
   'the home page hero leads with the trial');
-check(html['index.html'].includes(REASSURANCE), 'and states the terms under it');
+/* and no longer repeats the terms under it; trial.html carries them */
 built.forEach(p => {
   check(/class="btn btn-gold btn-sm" href="trial\.html"/.test(html[p]),
     p + ' offers the trial in the header');
@@ -472,10 +476,16 @@ built.forEach(p => {
     p + ' offers the trial in the footer');
 });
 
-/* And the page it all points at exists and is honest about the card. */
-check(html['trial.html'].includes(REASSURANCE), 'the trial page states the terms');
-check(/Card is required|card is required|Card required/.test(visible(html['trial.html'])),
-  'and says plainly that a card is needed');
+/* And the page it all points at is where the terms live now. Each of the
+   four is checked separately rather than as one sentence, so the wording
+   stays Kayode's to change while the facts stay ours to keep. */
+const trialSeen = visible(html['trial.html']);
+[[/14 days|fourteen days/i, 'how long it runs'],
+ [/card is required|card required/i, 'that a card is needed'],
+ [/day 15/i, 'when the first charge is'],
+ [/cancel any time|cancel/i, 'that it can be cancelled']].forEach(pair => {
+  check(pair[0].test(trialSeen), 'the trial page states ' + pair[1]);
+});
 
 /* Taking the trial out must not leave a plan with no way to act on it. Every
    priced column and the invoice-only band send the reader to the same place,

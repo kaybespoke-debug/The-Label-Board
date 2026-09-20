@@ -468,15 +468,15 @@ tbody tr.grp td{background:var(--panel-2);font-size:10.5px;letter-spacing:.12em;
 /* ---------- FAQ ---------- */
 .faq{border-top:1px solid var(--line-soft)}
 .faq details{border-bottom:1px solid var(--line-soft)}
-.faq summary{list-style:none;cursor:pointer;padding:15px 44px 15px 0;position:relative;
+.faq summary{list-style:none;cursor:pointer;padding:10px 44px 10px 0;position:relative;
   font-family:var(--serif);font-size:18px}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"";position:absolute;right:8px;top:22px;width:9px;height:9px;
+.faq summary::after{content:"";position:absolute;right:8px;top:17px;width:9px;height:9px;
   border-right:1.7px solid var(--gold);border-bottom:1.7px solid var(--gold);
   transform:rotate(45deg);transition:transform .22s ease}
-.faq details[open] summary::after{transform:rotate(-135deg);top:26px}
-.faq .ans{padding:0 40px 17px 0;color:var(--faint);font-size:15px;line-height:1.7}
-.faq .ans p+p{margin-top:11px}
+.faq details[open] summary::after{transform:rotate(-135deg);top:21px}
+.faq .ans{padding:0 40px 13px 0;color:var(--faint);font-size:14.5px;line-height:1.55}
+.faq .ans p+p{margin-top:9px}
 
 /* ---------- tabs ---------- */
 /* the way back from a deep link, above the tabs it landed you in */
@@ -532,23 +532,27 @@ html.js-on .pane.on{display:block;animation:rise .28s ease both}
 /* ---------- CTA and footer ---------- */
 .cta{background:var(--bg-2)}
 .cta h2{margin-bottom:14px}
-.ftr{padding:clamp(38px,4.4vw,56px) 0 30px;background:#050b13;border-top:1px solid var(--line)}
+.ftr{padding:clamp(28px,3.2vw,40px) 0 22px;background:#050b13;border-top:1px solid var(--line)}
 /* Four children, not five: the Your trade column came out on 20 Sep. A
    grid that still declares five leaves a dead column on the right and the
    footer reads as though something failed to load. */
-.ftr-top{display:grid;grid-template-columns:1.5fr repeat(3,minmax(0,1fr));gap:30px;
-  padding-bottom:30px;border-bottom:1px solid var(--line-soft)}
+.ftr-top{display:grid;grid-template-columns:1.5fr repeat(3,minmax(0,1fr));gap:22px;
+  padding-bottom:22px;border-bottom:1px solid var(--line-soft)}
 /* the contact column: the same list, but the last line is an address rather
    than a link, so it needs a little air above it */
-.ftr-talk .small{margin-top:14px;color:var(--faint);font-size:12.5px;line-height:1.65}
-.ftr-about p{color:var(--faint);font-size:13.5px;margin-top:15px;max-width:34ch;line-height:1.7}
-.ftr h5{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text);
-  margin:0 0 13px;font-weight:700}
+.ftr-talk .small{margin-top:10px;color:var(--faint);font-size:12.5px;line-height:1.5}
+.ftr-about p{color:var(--faint);font-size:13px;margin-top:11px;max-width:34ch;line-height:1.55}
+.ftr h5{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text);
+  margin:0 0 10px;font-weight:700}
 .ftr ul{list-style:none;margin:0;padding:0}
-.ftr ul li{margin-bottom:9px}
-.ftr ul a{color:var(--faint);font-size:13.5px}
+/* The row was 26px of which 17 was clickable: the li kept the body line
+   height and the anchor sat on it with no padding of its own, so the extra
+   was dead space AND not a tap target. Same fix as the phone: leading off
+   the li, real padding on the anchor. Shorter row, bigger target. */
+.ftr ul li{margin-bottom:2px;line-height:1.3}
+.ftr ul a{color:var(--faint);font-size:13px;line-height:1.3;display:inline-block;padding:4px 0}
 .ftr ul a:hover{color:var(--gold-2)}
-.ftr-bot{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;align-items:center;padding-top:22px}
+.ftr-bot{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;padding-top:16px}
 .ftr-bot .small{margin:0}
 .ftr-bot nav{display:flex;gap:18px;flex-wrap:wrap}
 .ftr-bot nav a{font-size:12.5px;color:var(--faint)}
@@ -1385,4 +1389,15 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .ftr-talk ul{gap:4px 16px}
   .ftr-talk .small{margin-top:6px}
   .ftr-bot{padding-top:9px;gap:6px}
+}
+
+/* ---------- the FAQ on a phone ----------
+   Kayode: "the spacing between the questions need to strip down too". The
+   rows are a list of one-line questions, so the padding was doing all the
+   work and the caret has to follow it up the row or it floats. */
+@media (max-width:680px){
+  .faq summary{padding:9px 32px 9px 0;font-size:13px}
+  .faq summary::after{top:14px;right:6px}
+  .faq details[open] summary::after{top:18px}
+  .faq .ans{padding:0 26px 10px 0;font-size:12.5px;line-height:1.5}
 }
