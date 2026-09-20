@@ -7,6 +7,61 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## The free trial is SILENT until Flutterwave, 21 September
+
+Kayode asked whether the trial, demo and partner buttons should all be
+active while the app opens in November and tests in October. Checked
+rather than guessed, and they are not the same kind of thing.
+
+**Book a demo and Become a partner stay on.** Both are real forms that
+post to Netlify AND to `submit_enquiry`, and seven enquiries are sitting in
+the live console already: 4 demo, 1 partner, 1 contact, 1 early access.
+They are conversations rather than product, and they are how October’s
+cohort gets filled.
+
+**The trial came off every page.** Three reasons, worst first:
+
+1. The home page argued with itself. "Start your 14-day free trial" in
+   gold, and two inches below a clock counting down 41 days until we open.
+2. The dates did not work. A trial started that day ended **3 October**,
+   **29 days before** the 1 November launch and before the October test
+   had even finished.
+3. It did not do what it said. No card form, so it sent people to the
+   booking page. Zero of the 8 businesses had a trial running.
+
+### It is a flag, not a date, and that is the point
+
+`SITE.trial.live` is `false`. **1 November is when we OPEN, which is not
+the same as when the card form starts working.** A button wired to a date
+appears whether or not it can do anything, which is the exact fault being
+fixed. A person turns it on in the release that connects Flutterwave.
+
+`audit_web.js` follows the flag **both ways**, and that is mutation tested:
+
+- `false` and the trial must be offered NOWHERE, trial.html noindex and out
+  of the sitemap, and both priced plans must still lead with Book a demo,
+  because a plan card with no action is worse than one with the wrong one.
+- `true` and it must be on the cards, the hero, the header, the drawer and
+  the footer, and the page must be findable again.
+
+Flipping the flag to true with no buttons behind it turns 33 checks red.
+So the flag cannot be flipped without the gate noticing, and the buttons
+cannot come back without the flag.
+
+**Nothing else moved.** trial.html, its terms, `start_free_trial()`,
+`convert_trial_to_paid()`, `cancel_trial()` and the 41-check harness are
+all exactly as they were, waiting.
+
+### October is a test MONTH, not a 14-day trial
+
+Kayode’s plan, 21 September: hand-pick individuals, invite them manually as
+tenants, with a proposal sent to each. They get the chance to become the
+first subscribers at launch if they want to keep using it.
+
+That is a different shape from the trial and needs nothing from the trial
+machinery: `inviteStudio` already takes a `cohort`, so October’s intake is
+one tag and one count in the console.
+
 ## Android, not just iPhone
 
 Kayode: "please think of android screens too not jus IOS". Fair: the sweep

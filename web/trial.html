@@ -7,13 +7,14 @@
 <meta name="color-scheme" content="dark">
 <title>Start your free trial · The Label Board</title>
 <meta name="description" content="Fourteen days of the full Pro plan. A card is required at signup and nothing is charged until day 15. Cancel any time before then.">
-<!-- Indexed and live from 20 Sep 2026. Kayode: build the foundation now so
-     that connecting Flutterwave is a switch rather than a scramble.
-
-     Until the hosted card form exists, the button below goes to the booking
-     page and a person sets the trial up with you, which an operator can
-     actually do: start_free_trial() is a real function with a real proof
-     behind it. The terms stated here are the ones that function enforces. -->
+<!-- NOINDEX WHILE SITE.trial.live IS FALSE.
+     The trial is not offered anywhere on the site until the Flutterwave
+     card step exists, so a search engine sending somebody straight here is
+     the same broken promise by another door. The page stays because the
+     terms on it are the ones the database already enforces, and the release
+     that connects the card turns the flag on, removes this line and puts
+     the page back in the sitemap. -->
+<meta name="robots" content="noindex">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Label Board">
 <meta property="og:title" content="Start your free trial · The Label Board">
@@ -62,12 +63,11 @@
       <a href="partners.html">Partners</a>
       <a href="about.html">Our story</a>
       <a href="contact.html">Support</a>
-      <a href="book.html">Book a demo</a>
     </nav>
 
     <div class="hdr-act">
       <a class="login" data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a>
-      <a class="btn btn-gold btn-sm" href="trial.html">Start free trial</a>
+      <a class="btn btn-gold btn-sm" href="book.html">Book a demo</a>
       <button class="burger" type="button" data-act="menu" aria-label="Menu"><span></span><span></span><span></span></button>
     </div>
   </div>
@@ -80,8 +80,7 @@
   <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
   <a href="contact.html">Support and contact</a>
-  <a class="btn btn-gold" href="trial.html">Start free trial</a>
-  <a class="btn btn-line" href="book.html">Book a demo</a>
+  <a class="btn btn-gold" href="book.html">Book a demo</a>
   <a class="btn btn-line" data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a>
 </div>
 
@@ -152,7 +151,6 @@
           <li><a href="pricing.html">Pricing</a></li>
           <li><a href="features.html#offline">Offline and phone</a></li>
           <li><a href="features.html#money">Money and payroll</a></li>
-          <li><a href="trial.html">Start a free trial</a></li>
           <li><a href="book.html">Book a demo</a></li>
         </ul>
       </div>

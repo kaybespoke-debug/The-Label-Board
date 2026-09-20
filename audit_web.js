@@ -485,29 +485,66 @@ check(/@media (max-width:680px){[^}]*.field input,.field select,.field textarea{
       /.field input,.field select,.field textarea{font-size:16px}/.test(cssSrc),
   'form fields are 16px on a phone, or iOS zooms the page in on focus and never back out');
 
-/* The two cards that can actually be started: trial primary, demo secondary.
-   Bespoke has neither, on purpose: it is priced per contract, so there is
-   nothing for a card to be charged for on day 15. */
-const pricingHtml = html['pricing.html'];
-check(/<a class="btn btn-gold btn-wide" href="trial\.html"><span>Start your 14-day free trial<\/span><\/a>[\s\S]{0,400}?The essentials/.test(pricingHtml),
-  'Basic leads with the trial');
-check(/<a class="btn btn-gold btn-wide" href="trial\.html"><span>Start your 14-day free trial<\/span><\/a>[\s\S]{0,400}?Everything in Basic/.test(pricingHtml),
-  'Pro leads with the trial');
-check((pricingHtml.match(/href="book\.html"><span>Book a demo<\/span>/g) || []).length === 2,
-  'and both of them keep Book a demo as the second choice');
-check(!/trial\.html[\s\S]{0,300}?Everything in Pro/.test(pricingHtml),
-  'Bespoke offers no trial, because it has no list price to charge on day 15');
+/* ---- IS THE TRIAL BEING OFFERED AT ALL? ----
 
-/* The hero, the nav, the drawer and the footer all reach it. */
-check(/<a class="btn btn-gold" href="trial\.html">Start your 14-day free trial<\/a>/.test(html['index.html']),
-  'the home page hero leads with the trial');
-/* and no longer repeats the terms under it; trial.html carries them */
-built.forEach(p => {
-  check(/class="btn btn-gold btn-sm" href="trial\.html"/.test(html[p]),
-    p + ' offers the trial in the header');
-  check(/<a href="trial\.html">Start a free trial<\/a>/.test(html[p]),
-    p + ' offers the trial in the footer');
-});
+   SITE.trial.live decides, and this follows it BOTH ways. That is the whole
+   point: a one-directional check would let the buttons be removed and the
+   flag left true, or the flag flipped with nothing behind it.
+
+   Why a flag and not the launch date: 1 November is when we OPEN, which is
+   not the same as when the card form starts working. A button wired to a
+   date appears whether or not it can do anything, which is the exact fault
+   this is here to stop. A person turns it on in the release that connects
+   Flutterwave.
+
+   What it looked like with it on and the card step missing, for whoever
+   reads this wondering why it was switched off: the home page offered a
+   14-day free trial and, two inches below, counted down 41 days until we
+   open. A trial started that day would have ENDED 29 days before launch. */
+const pricingHtml = html['pricing.html'];
+const trialLive = !!(S.trial && S.trial.live);
+const anyTrialCta = p => /href="trial\.html"/.test(html[p]);
+
+if (trialLive) {
+  /* The two cards that can actually be started: trial primary, demo second.
+     Bespoke has neither, on purpose: it is priced per contract, so there is
+     nothing for a card to be charged for on day 15. */
+  check(/<a class="btn btn-gold btn-wide" href="trial\.html"><span>Start your 14-day free trial<\/span><\/a>[\s\S]{0,400}?The essentials/.test(pricingHtml),
+    'Basic leads with the trial');
+  check(/<a class="btn btn-gold btn-wide" href="trial\.html"><span>Start your 14-day free trial<\/span><\/a>[\s\S]{0,400}?Everything in Basic/.test(pricingHtml),
+    'Pro leads with the trial');
+  check(!/trial\.html[\s\S]{0,300}?Everything in Pro/.test(pricingHtml),
+    'Bespoke offers no trial, because it has no list price to charge on day 15');
+  check(/<a class="btn btn-gold" href="trial\.html">Start your 14-day free trial<\/a>/.test(html['index.html']),
+    'the home page hero leads with the trial');
+  built.forEach(p => {
+    check(/class="btn btn-gold btn-sm" href="trial\.html"/.test(html[p]),
+      p + ' offers the trial in the header');
+    check(/<a href="trial\.html">Start a free trial<\/a>/.test(html[p]),
+      p + ' offers the trial in the footer');
+  });
+  check(!/name="robots" content="noindex"/.test(html['trial.html']),
+    'and the trial page is findable, because it is being offered');
+  check(read('sitemap.xml').includes('trial.html'),
+    'and it is in the sitemap');
+} else {
+  /* Off. It must be offered NOWHERE, including the page itself, or a search
+     engine becomes the door the buttons no longer are. */
+  built.forEach(p => {
+    check(!anyTrialCta(p), p + ' does not offer a trial while the card step does not exist');
+  });
+  check(/name="robots" content="noindex"/.test(html['trial.html']),
+    'the trial page is noindex while nothing on the site links to it');
+  check(!read('sitemap.xml').includes('trial.html'),
+    'and it is out of the sitemap');
+  /* Every plan must still have SOMETHING to press. Removing the trial from
+     the cards left Book a demo behind, and that has to be true rather than
+     assumed: a plan card with no action is worse than one with the wrong one. */
+  check((pricingHtml.match(/href="book\.html"><span>Book a demo<\/span>/g) || []).length === 2,
+    'and both priced plans still lead with Book a demo instead');
+  check(/<a class="btn btn-gold" href="book\.html">Book a free demo<\/a>/.test(html['index.html']),
+    'the home hero leads with the demo instead');
+}
 
 /* And the page it all points at is where the terms live now. Each of the
    four is checked separately rather than as one sentence, so the wording
