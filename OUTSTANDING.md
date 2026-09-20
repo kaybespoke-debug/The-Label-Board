@@ -7,6 +7,64 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## The phone sweep, 20 September: all fifteen pages
+
+Every page measured at 375px on the live site. **Nothing scrolls sideways**
+anywhere, and the one real bug found is below.
+
+| Page | Screens |
+|---|---|
+| trial | 1.19 |
+| products | 1.35 |
+| 404 | 1.38 |
+| thanks | 1.46 |
+| book | 1.74 |
+| home | 2.15 |
+| terms | 2.17 |
+| waitlist | 2.18 |
+| faq | 2.23 |
+| privacy | 2.31 |
+| about | 2.52 |
+| contact | 2.69 |
+| partners | 2.83 |
+| pricing | 4.58 |
+
+### THE BUG: iOS was zooming the page on every form field
+
+Safari on iPhone treats an input whose font is under 16px as too small to
+read and **zooms the page in when it takes focus. It does not zoom back
+out.** So the rest of the form is filled in on a page that is now wider
+than the screen and scrolling sideways.
+
+Every field on the site was 15px: 8 on book, 12 on contact, 15 on waitlist,
+10 on partners. One pixel of design costing the whole form on the device
+most people use, and on the pages that are the entire point of the site.
+
+16px on the phone, 15 everywhere else. It is now a gate, and the gate is
+mutation tested: putting it back to 15px turns it red. **It had to be a
+check rather than something to remember, because it is invisible on a
+desktop browser, which is where all of this gets built.** Same reason the
+safe-area gate exists.
+
+### Three things that look wrong in a measurement and are not
+
+- **`minFont: 0` on pricing.** The comparison table renders Yes and Not
+  included as a tick and a dash by setting `font-size:0` and drawing the
+  glyph in `::before`. The words are still in the HTML and still read out.
+- **A `.wrap` on the home page reports 16px of horizontal overflow.** That
+  is the trade tiles: a deliberate full-bleed carousel, 1,656px of tiles in
+  a 375px scroller, bleeding past the wrap’s gutters on purpose. The
+  document itself does not scroll sideways, which is the thing that matters.
+- **`reviews.html` 302s to the home page.** Deliberate and documented in
+  `web/_redirects`: there are no reviews yet, the section is `hidden`, and
+  nothing visibly links to it.
+
+### Checked and fine
+
+The drawer opens over the whole screen, locks the body, lists nine links
+with a smallest tap target of 49px, and closes again. The footer sits at
+the bottom on every short page. No page anywhere scrolls sideways.
+
 ## Launch day, a floating footer, and a note that would not die
 
 ### The countdown takes the waiting list with it

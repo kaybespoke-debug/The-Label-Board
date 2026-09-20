@@ -1433,3 +1433,20 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .tight:has(.faq) .sec-head h2{font-size:16px}
   .tight:has(.faq) .sec-head{margin-bottom:9px}
 }
+
+/* ---------- iOS zooms a form field under 16px ----------
+   Safari on iPhone treats an input whose font is smaller than 16px as too
+   small to read, and ZOOMS THE PAGE IN when it gets focus. It does not zoom
+   back out afterwards, so the rest of the form is filled in on a page that
+   is now wider than the screen and scrolling sideways.
+
+   Every field on this site was 15px. That is one pixel of design costing
+   the whole form on the device most people will use, and it is invisible on
+   a desktop browser, which is where all of this gets built.
+
+   16px on the phone and 15 everywhere else: the desktop has no such rule
+   and the smaller size is the one that was wanted. audit_web.js checks this
+   because nobody will ever see it go wrong in the place it is written. */
+@media (max-width:680px){
+  .field input,.field select,.field textarea{font-size:16px}
+}

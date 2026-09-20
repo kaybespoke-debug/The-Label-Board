@@ -476,6 +476,15 @@ check(/body{[^}]*display:flex[^}]*flex-direction:column/.test(cssSrc),
 check(/main{flex:1 0 auto}/.test(cssSrc),
   'and main takes the slack, so the footer sits at the bottom rather than in mid air');
 
+/* Safari on iPhone zooms the page in when a field smaller than 16px takes
+   focus, and does not zoom out again, so the rest of the form is filled in
+   on a page wider than the screen. Every field here was 15px. It is
+   invisible on a desktop browser, which is where all of this gets built,
+   so it is a check rather than something to remember. */
+check(/@media (max-width:680px){[^}]*.field input,.field select,.field textarea{font-size:16px}/.test(cssSrc.replace(/s+/g,' ')) ||
+      /.field input,.field select,.field textarea{font-size:16px}/.test(cssSrc),
+  'form fields are 16px on a phone, or iOS zooms the page in on focus and never back out');
+
 /* The two cards that can actually be started: trial primary, demo secondary.
    Bespoke has neither, on purpose: it is priced per contract, so there is
    nothing for a card to be charged for on day 15. */
