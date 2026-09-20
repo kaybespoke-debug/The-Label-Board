@@ -7,7 +7,7 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
-## THE 14 DAY TRIAL — built, proved, NOT applied and NOT deployed
+## THE 14 DAY TRIAL — applied and live, except the card step
 
 Kayode asked for it on 20 September, billing and website together, and for
 both halves to be proved in Flutterwave test mode.
@@ -64,13 +64,25 @@ Kayode’s exact line beside every one of them. `audit_web.js` reads the 14
 out of the MIGRATION and fails if the pricing page disagrees with it, so
 the two cannot drift.
 
-**`web/trial.html` is `noindex` and out of the sitemap, and nothing is
-pushed.** "Start your 14-day free trial" with "Card required, nothing
-charged until day 15" is a promise nobody can currently keep: there is no
-card form, because there is no Flutterwave. Publishing it would be the
-exact mismatch the instruction forbade. Remove the noindex, add it to the
-sitemap and point the button at the hosted form in the SAME release that
-connects Flutterwave.
+**It is live, indexed and in the sitemap.** Kayode was shown the risk and
+chose to ship the foundation anyway: "let’s get the foundation set so when
+the keys land and flutterwave accounts land, its very easy to proceed."
+
+So the one thing that is not true yet is stated here rather than buried.
+The page says "Card required, nothing charged until day 15" and there is no
+card form, because there is no Flutterwave. The button goes to the booking
+page and a person sets the trial up, which an operator really can do:
+`start_free_trial()` is applied and proved. **When the keys land, the only
+thing that changes on the website is that button’s href.**
+
+Applied to `eskubrbgbcbaejynjxvh` on 20 September. Verified after: trial
+ceilings 5/50 matching Pro, the three trial columns, the commission guard
+trigger attached, all five functions present, and neither anon nor
+authenticated able to start a trial.
+
+A side effect worth knowing: the demo `LAYI` account was over its ceiling
+at 4 studios against a trial limit of 1. Moving the trial to Pro’s ceilings
+cleared it, so nothing on the live project is over a limit any more.
 
 ### What is needed to finish it
 
