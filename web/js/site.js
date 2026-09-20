@@ -115,6 +115,22 @@
       if (ms <= 0) {
         clock.remove();
         if (line) line.remove();
+        /* ADDED 20 Sep 2026. Taking the clock out used to leave "Join
+           waitlist" sitting on a row of its own under the three main
+           buttons, with a gap where the numbers had been.
+
+           THE WHOLE ROW GOES, waiting list included. Kayode: "there's no need
+           for a join waitlist when the timer goes off, they work today,
+           waitlist ends when the timer ends." A waiting list is for a thing
+           you cannot have yet. The morning it opens, the answer to "how do I
+           get in" stops being "wait" and starts being the trial button three
+           inches above it, and a list still offering to queue you is the site
+           contradicting itself on the one day it matters.
+
+           So the three buttons close up into the space and nothing is left
+           pointing backwards. */
+        var row = document.querySelector('.opens-row');
+        if (row) row.remove();
         return;
       }
       var p = opensParts(ms);

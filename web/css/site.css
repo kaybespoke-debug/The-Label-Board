@@ -48,6 +48,20 @@ button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:3px}
 
 .wrap{width:min(var(--max),calc(100% - 96px));margin:0 auto}
+/* ---------- a short page must not leave the footer in mid air ----------
+   trial.html, thanks.html and 404.html are shorter than a desktop window,
+   so the footer ended where the content did and the rest of the screen was
+   empty below it. It reads as though the page failed to finish loading.
+
+   The drawer is position:fixed and the skip link is absolute, so neither is
+   a flex child and making the body a column touches nothing else.
+
+   svh rather than vh: on a phone vh is the tallest the viewport ever gets,
+   so with the address bar showing, 100vh is already taller than the screen
+   and every page would gain a scrollbar it does not need. */
+body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column}
+main{flex:1 0 auto}
+
 .skip{position:absolute;left:-9999px;top:0;background:var(--gold);color:var(--on-gold);
   padding:10px 16px;border-radius:0 0 6px 0;z-index:200;font-weight:600}
 .skip:focus{left:0}
@@ -627,9 +641,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    held in SITE.trial.reassurance and repeated verbatim rather than
    paraphrased, because a card IS required and three wordings of that is
    three chances for one of them to soften into a promise we do not keep. */
-.trial-note{margin:9px 0 10px;font-size:12px;line-height:1.45;color:var(--muted);max-width:42ch}
-.center .trial-note,.plan .trial-note{margin-left:auto;margin-right:auto}
-.btn-row+.trial-note{margin-top:12px;max-width:52ch}
 
 @media (max-width:680px){
   .wrap{width:calc(100% - 32px)}
@@ -1343,7 +1354,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 }
 
 @media (max-width:680px){
-  .trial-note{font-size:11.5px;line-height:1.45}
 }
 
 /* The pricing cards on a phone. The cards are stacked here, so every pixel
@@ -1361,7 +1371,6 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   .plan-feats{margin-top:11px;padding-top:10px}
   .plan-feats li{margin-top:5px;font-size:12.5px;line-height:1.38;padding-left:19px}
   .plan-feats li.hd{margin-top:0;font-size:9.5px}
-  .trial-note{margin:7px 0 8px;font-size:11px;line-height:1.4}
 }
 
 /* ---------- the footer, on a phone ----------
