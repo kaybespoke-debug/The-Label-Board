@@ -223,11 +223,20 @@
      moved would quote a shop two different numbers on two days without
      anybody having decided anything.
 
-     The first guess comes from the browser's own time zone and language,
-     never from an IP lookup. An IP lookup means calling a third party on
-     every page load and telling them who is reading our pricing, for a
-     guess that a picker sitting right there can correct in one click. */
-  var CCY_KEY = 'tlb_ccy';
+     It opens in naira for everybody. It used to GUESS from the time zone
+     and the language, and that guess is why the key below has a 2 on the
+     end: the guess was written to localStorage exactly like a choice, so
+     every browser that had loaded the old page carried a currency nobody
+     had picked, and it beat the naira default for ever after.
+
+     Kayode saw the page open in pounds on 20 Sep and reported the default
+     as not done. It was done. His browser was replaying a guess made in
+     August. Nothing on the page could have told him apart from this.
+
+     So the key is new, every old value is ignored, and from here on a
+     remembered currency can only be one somebody chose from the picker.
+     If the default ever moves again, move this number again. */
+  var CCY_KEY = 'tlb_ccy2';
   var cycleNow = 'monthly';
   var ccyNow = null;
 
@@ -308,11 +317,10 @@
     });
     sel.addEventListener('change', function () { setCcy(sel.value); });
     slot.appendChild(sel);
-    /* Nigeria, unless this browser has already chosen otherwise. This used
-       to be a guess from the time zone and the language. Kayode, 20 Sep:
-       naira is the price this is really sold at, and everything else on the
-       page is worked out from it, so the page should open saying so. The
-       picker is one click away and the choice is still remembered. */
+    /* Nigeria, unless somebody picked something else FROM THIS PICKER. Naira
+       is the price this is really sold at and everything else on the page is
+       worked out from it, so the page opens saying so. See the note on
+       CCY_KEY above for why a remembered value can no longer be a guess. */
     setCcy(remembered() || 'NGN');
   }
 
