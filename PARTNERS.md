@@ -191,32 +191,145 @@ blanking the config again puts it back.
    What is left before a partner can actually sign in is **SMTP** (step 2), and
    nothing else.
 
+## One programme, and who is in it
+
+Since 20 September 2026 there is **one** referral programme. There used to
+be two: this one, and a customer referral that gave a free month each to a
+customer and the customer they sent. The second is gone, folded into this.
+
+**Every business gets a referral code on its first day.** `provision_studio()`
+creates a `partners` row alongside the studio, with `kind = 'customer'` and
+`business_id` pointing at it. Outside partners (fabric houses, associations,
+schools, consultants) are the same table with `kind = 'partner'` and no
+`business_id`.
+
+**`kind` decides nothing about the rate.** That is the point of the
+unification and it is a constraint rather than a comment: a partner with
+forty introductions and a studio who told one friend are paid the same on
+each business they bring.
+
+### The anti-fraud, which is the same change
+
+Opening the programme to every customer is what creates the fraud. Sign up,
+take your own code, sign up again, and collect 8% of your own subscription
+for a year. A programme open to everybody without a self-referral block is
+not a generous programme, it is a discount with extra steps and a worse
+audit trail. So both went in together, in
+`20260920130000_one_referral_programme.sql`.
+
+| Control | Where |
+|---|---|
+| No self-referral, on four axes | `app.self_referral_reason()` |
+| Attribution set once and never moved | `app.attach_referral()`, `businesses_referral_is_permanent` |
+| One payment method, one business | `payment_methods_one_business` trigger |
+| A late card still voids the referral | `payment_methods_recheck_referral` |
+| Churn inside the hold voids pending commission | `partner_referrals_void_on_churn` |
+| A refund does the same | `public.partner_void_on_refund()` |
+| An operator can freeze a payout | `public.set_partner_payout_frozen()` |
+| Patterns an operator should look at | `public.platform_referral_risk()` |
+
+**The four axes of "the same person"**, because they cost different amounts
+to get around: the same business (free to attempt), the same account (free),
+the same email address (a minute of work), and the same card. The last one
+is the control that does the real work. A fraudster can make twenty email
+addresses in a minute; they cannot make twenty cards.
+
+`payment_methods.fingerprint` is whatever the processor returns that
+identifies an instrument without being one, a token or a hash. **No card
+number can be stored in this schema.** The uniqueness is a trigger rather
+than an index so an operator can allow a genuinely shared card, which
+happens: one owner paying for two studios. Both sides have to be flagged,
+so one exempt business cannot drag another into sharing.
+
+**Every attempt is written down**, accepted or refused, in
+`referral_attempts`. A refusal that leaves no trace is a refusal nobody can
+count, and the console's risk list is built on it.
+
+**The risk list is patterns, not accusations.** Three of the four kinds have
+ordinary explanations: an association signs a dozen members up at an event,
+a husband and wife share an address, one owner pays for two studios. The
+fourth is something the database already refused, so no commission was ever
+created. The console says all of that on the panel, because an operator who
+is told these are proof will act on them as proof.
+
 ## How the money works
 
 Worth understanding before changing anything, because being believable about
-this is the portal's whole job.
+this is the portal’s whole job.
 
-- Commission is a share of a referred account's **first payment**, once per
-  business. An annual plan pays commission on the whole year, because the whole
-  year is what they paid.
-- The rate is the partner's **tier rate on the day that account started
-  paying**, stored on the ledger row rather than computed at read time. Moving
-  up a tier lifts what you earn from then on and never recalculates what has
-  already been credited. Base rate is 15%, matching the figure the admin console
-  publishes; Silver is 18%, Gold 22%, Platinum 25%.
-- Credit lands the day they first pay, and **clears 31 days later**. The hold
-  covers refunds and chargebacks.
-- Payouts run on the **5th of the month**. A run only happens when what is
-  waiting reaches the minimum in force that month (10,000 now, 25,000 before the
-  threshold dropped). Anything short of it rolls into the next run rather than
-  going out as a transfer worth less than the fee.
-- Milestone bonuses at 5, 10, 20 and 30 paying accounts sit on top, and follow
-  the same hold and payout rules.
+**One rate: 8% of what each referred business actually pays.** The same for
+every partner and every business. There is no tier to unlock and none to fall
+back down to.
 
-`settle()` in `partners/js/data.js` is the only place a row's status is decided,
-and the payout records fall out of the same pass. That is deliberate: build the
-statements separately and they start disagreeing with the ledger that produced
-them.
+- **Monthly plan.** 8% of every monthly payment, for **twelve months** from
+  the day that business first pays. After the twelfth month that business
+  stops earning.
+- **Yearly plan.** 8% of that year’s payment, **once**, because there is one
+  payment to take a share of. The basis is the year, not the monthly
+  equivalent: taking 8% of a twelfth would pay the partner a twelfth of what
+  they are owed and would look like a rounding problem rather than a missing
+  year.
+- **Only while they pay.** If a business leaves, commission stops that day and
+  nothing further is owed on it. The month it left in earns nothing at all,
+  rather than a pro rata: a partner cannot check a part month against a
+  payment that was never made.
+- **Only the partner earns.** The referred business is an ordinary customer at
+  the ordinary price, with no discount and no reward. What the partner is paid
+  comes out of our side.
+- **The clock is per business**, counted from its own first payment. It never
+  resets and never pauses, and the partner’s other businesses have no effect
+  on it.
+- Credit lands at the end of each month it is for, and **clears 31 days
+  later**. The hold covers refunds and chargebacks.
+- **Payouts run once a year**, at the end of January, for everything that
+  cleared in the year before. A run only happens when what is waiting reaches
+  the minimum in force that year (10,000 now, 25,000 before the threshold
+  dropped).
+
+### Three programmes in three days, and why
+
+This is the third shape in a month and the reasons are worth keeping, because
+the next person will otherwise assume nobody was thinking.
+
+The **first** was a one off share of a business’s FIRST payment, 15 to 25 per
+cent. It paid a partner the same for a business that lasted one month as for
+one that lasted five years, so it rewarded introductions rather than good
+introductions.
+
+The **second** fixed that and overcorrected: four years, a taper in years
+three and four, and a rate that moved with a live count of active businesses.
+Every rule in it was defensible, and the answer to "what will I earn on this
+one" was four numbers and two dates. For a programme whose entire promise is
+that a partner can check the working, that is a failure rather than a detail.
+
+The **third** is one number and two conditions. It is worth less to a partner
+with forty businesses than the ladder was, and worth more to every partner who
+has not got there yet, which today is all of them.
+
+### Where each rule actually lives
+
+The rate that decides money is `public.partner_referral_rate()` in
+`supabase/migrations/20260920110000_partner_flat_commission.sql`. The portal
+and the console both carry a DISPLAY copy and neither can be persuaded to pay
+from it: a partner’s browser works out nothing.
+
+`public.partner_commission_summary()` is the per-business working. The portal
+reads it through `my_commission_summary()` with the partner filled in from the
+session; the console reads it directly through the `partnerCommission` action
+on `admin-api`, passing the partner in. **Deliberately the same function.** If
+the console summed it separately the two would drift the first time either was
+changed, and the partner would be the one who noticed.
+
+`settle()` in `partners/js/data.js` is the only place a demo row’s status is
+decided, and the payout records fall out of the same pass. That is deliberate:
+build the statements separately and they start disagreeing with the ledger
+that produced them.
+
+`partners.tier` still exists as a column and live rows still carry `bronze`.
+It decides nothing. Nothing reads it, the console no longer offers it on an
+invitation, and `admin-api` ignores `body.tier` rather than validating it, so
+a stale client holding the key cannot set a field that looks like it decides
+what somebody earns.
 
 ## Data model
 
@@ -248,10 +361,31 @@ produced real bugs, twice.
 ```bash
 node audit_partners.js
 node supabase/tests/partner_rls_harness.mjs
+node supabase/tests/partner_commission_harness.mjs
+node supabase/tests/referral_fraud_harness.mjs
 node supabase/tests/rls_harness.mjs
 ```
 
-308, 75 and 71 checks. All three pass.
+408, 82, 81, 75 and 71 checks. All five pass.
+
+`referral_fraud_harness.mjs` shows the two things Kayode asked to be shown
+rather than described: a self-referral attempt blocked, and a business that
+churns inside the 31 day hold paying nothing. Both are shown the way every
+rule in this repo gets shown, refused and then the same operation succeeding
+once it is legitimate. It found a real bug on its first run: the late-card
+recheck marked a never-converted referral as lapsed, which
+`partner_referrals_lapsed_after_paid` correctly refuses, and the payment
+method insert failed silently because the test helper swallowed it.
+
+`partner_commission_harness.mjs` is the one that proves the programme rather
+than the plumbing. It shows a monthly referral paying for twelve months and
+then stopping, a churned business stopping the day it churns with the day
+before untouched, a yearly referral paying once on the year rather than on the
+month, a partner with one business earning exactly what a partner with forty
+earns on each, and the portal reading the console’s function rather than its
+own sum. It also checks the milestone table and its function are GONE rather
+than empty: an empty table and a function that awards nothing is a programme
+somebody could turn back on with four inserts.
 
 `audit_partners.js` drives the sign-in flow, then runs every page and detail
 view against a stub DOM **for all three partners**, reconciles the money for

@@ -4,30 +4,68 @@
     {
       "name": "Customer App",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["C:/Users/kaybe/Downloads/Claude Code/preview_server.js"],
+      "runtimeArgs": [
+        "C:/Users/kaybe/Downloads/Claude Code/preview_server.js"
+      ],
       "port": 8000,
       "url": "http://localhost:8000"
     },
     {
       "name": "Admin Dashboard",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "http-server", "admin", "-p", "3001", "-c-1"],
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "admin",
+        "-p",
+        "3001",
+        "-c-1"
+      ],
       "port": 3001,
       "url": "http://localhost:3001"
     },
     {
       "name": "Partner Portal",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "http-server", "partners", "-p", "3002", "-c-1"],
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "partners",
+        "-p",
+        "3002",
+        "-c-1"
+      ],
       "port": 3002,
       "url": "http://localhost:3002"
     },
     {
       "name": "Website",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "http-server", "web", "-p", "3003", "-c-1"],
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "web",
+        "-p",
+        "3003",
+        "-c-1"
+      ],
       "port": 3003,
       "url": "http://localhost:3003"
+    },
+    {
+      "name": "LAYI Site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "C:/Users/kaybe/Downloads/Website",
+        "-p",
+        "5599",
+        "-c-1",
+        "--silent"
+      ],
+      "port": 5599,
+      "url": "http://localhost:5599"
     }
   ],
   "autoVerify": false

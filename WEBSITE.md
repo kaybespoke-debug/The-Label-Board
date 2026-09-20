@@ -10,6 +10,312 @@ It is a separate Netlify deployment with its own `netlify.toml` and
 `_redirects`, exactly like `admin/` and `partners/`. Nothing is shared at
 runtime, so a bad release in one cannot take down the others.
 
+## The 20 September pass, part two: type, the story, and whose data is in the pictures
+
+### Fraunces everywhere, Inter for everything else
+
+Three front ends had three typographic systems. The website was on Georgia,
+a system serif that is on the machine rather than chosen. The console and
+the portal used Playfair Display for headings, **Source Serif 4 for body
+text** and Jost for small caps, which meant every table cell and every form
+label in the console was set in a serif on a screen somebody reads all day.
+
+All three are now Fraunces for anything set in a serif and Inter for
+everything else. Fraunces has an optical size axis, which is why it is
+worth a web font over a system one here: the same family stays soft at 13px
+on a card heading and tightens at 64px on a hero without anybody setting
+`opsz`.
+
+**The customer app is deliberately left alone.** It is one file with no
+build step and no network dependency, and it has to open on a phone with no
+signal. A web font is a request that can fail.
+
+Two things went wrong and both are now gated:
+
+- **The font link is in `<head>`, which `sync_web_shell` does not copy.**
+  index.html got Fraunces, sync reported "14 already in step" because the
+  header and footer had not changed, and every other page stayed on the old
+  link. That does not look like an error, it looks like one page in a
+  slightly different serif. `audit_web` section 2 now compares the font link
+  across pages the same way it compares the header.
+- **`--sans` and `--serif` landed in `body.light`.** The patch anchored on
+  `--shadow`, which is declared in both `:root` and `body.light`, so the
+  dark console rendered every word in Times New Roman. Glaring on screen,
+  invisible in a diff. Both console gates now check the tokens are in
+  `:root`.
+
+### The screenshots were of Kayode's own studio
+
+The product screenshots are captures of the running app through
+`capture/shot.html`, which calls `demoLogin()`, which calls `loadExample()`.
+**So the example studio IS the marketing imagery.** That seed was a studio
+called LAYI owned by "Kay Ojomo" at hello@layiojomo.com, which is his own
+label, so the site was showing his brand name, his first name in the
+dashboard greeting and his studio's books. A visitor reading the dashboard
+had fair reason to think the product was called LAYI.
+
+Fixed at the source rather than in the images: the seed is now Adé Atelier,
+owned by Adé Sowande, and the five screenshots were retaken from it.
+`audit_web` section 10 reads the seed and fails if it goes back.
+
+**The framing was measured, not chosen.** It had never been written down, so
+a recapture in September guessed at it and relaid the app out. `capture/
+measure.js` scans one row of pixels across the KPI band and reports where
+each card starts and ends as a fraction of the image width; two captures
+whose runs line up are the same layout. The settings that reproduce the
+originals to within two pixels are in `web/img/README.txt` and in
+`capture/recapture.js`, which takes all five in one command.
+
+The thing worth remembering: **the window width IS the framing.** At 1010 the
+six KPI cards on Orders wrap four and then two, which is what the originals
+show. At 1396 they fit six across and the whole picture changes shape.
+
+### Our story, in his words, with his face on it
+
+Replaced wholesale with the text Kayode sent. The only liberty taken is the
+byline: he wrote "Kayode Olayiwola Ojomo — FOUNDER" and also asked for no em
+dashes, so it is set the way every other signature on this site is, with the
+role on its own line.
+
+The photograph is in the **hero**, not beside the text. He asked once before
+for this page to be a full length read rather than a narrow column with
+something next to it, and a portrait alongside the story would walk that
+back. It is a real `<img>` with alt text rather than the `data-photo`
+background slot the rest of the site uses: those are decoration and degrade
+to a gradient, and a photograph of the person telling you the story is
+content.
+
+### One referral programme
+
+`referrals.html` is **deleted**. It described a second scheme giving a free
+month each to a customer and the customer they sent, and there is one
+programme now: every business gets a code on its first day and every code
+pays the same 8%. Deleted rather than left redirecting, because a page that
+says "this has moved" is a page somebody still finds in search two years
+later, and this site already has that rule.
+
+Fourteen footers were repointed, the sitemap entry removed, the Terms
+paragraph rewritten (it still described the ORIGINAL first-payment model,
+two programmes out of date), and `SITE.referral` taken out of config. The
+gate now fails if any page offers a second scheme paying in free months.
+
+## The 20 September pass: one FAQ, one rate, two new prices
+
+Seven sections came off, two numbers changed, and a page was added. Worth
+taking the changes in the order of how much they matter rather than the order
+they were asked for.
+
+### The FAQ was in three places, so it was in no place
+
+About, Support and Partners had each grown their own question list. A reader
+with a question had to guess which page had thought of it, and all three pages
+were long because of it. The three lists are now `faq.html`, in three groups:
+the software and your records, the first month, and the partner programme.
+
+**Seventeen questions, not eighteen.** About asked "Do you take a cut of what
+I sell?" and Pricing asks "Do you charge per order or take a percentage?",
+which is the same question twice. Pricing keeps it, because somebody reading
+prices should not have to leave the page to find out, and the FAQ does not
+repeat it. That was the only overlap, and the build script fails loudly rather
+than quietly deduplicating: a repeated question is a decision somebody should
+make, not something a script should silently resolve.
+
+Each page that lost its list gained a line pointing at the new one, and
+Support gained a closing band so the page does not end on a form.
+
+### The comparison table came out of its drawer
+
+It was inside a `<details>` that said "Open the full feature comparison, 30
+rows", and it sat three sections below the plan cards, under a stat strip and
+a four card argument. Both were the same mistake: a reader who has just looked
+at three cards wants the row that tells them which one they are, and was being
+asked to scroll past two arguments and then click to see it.
+
+It is now open, directly under the cards. The gate checks both halves — that
+no `<details class="disclose">` survives on that page, and that the table
+appears in the source before the VAT note does — because "move it up" and
+"open it" are two changes and only one of them is visible in a diff.
+
+### "Neither of the two fit?" is what the Bespoke card says now
+
+It was a band of its own a screen below the Bespoke card, describing Bespoke
+in different words. The check that used to look for `callout-row` now looks
+inside the Bespoke card for the same invitation, so the gate follows the
+content rather than the markup.
+
+### What was simply deleted
+
+- **"The loop that closes itself"** from the home page. Three cards restating
+  the trade tiles and the hero in different words.
+- **"Try it before you decide anything"** from Pricing. The third time that
+  page asked for the same call, and the last thing before the footer.
+- **The tier ladder and the milestone bonuses** from Partners, because the
+  programme no longer has either.
+
+### Two prices and four limits
+
+Basic 27,000 → **20,000**. Pro 65,000 → **49,000**. Yearly is still eleven
+months for twelve and is still worked out rather than typed, so 220,000 and
+539,000 follow from the monthly figures and cannot drift from them.
+
+The limits were agreed earlier and had never been applied anywhere: Basic is
+1 studio and **5** logins, Pro is **5** studios and **50** logins. Pro used to
+say unlimited team logins. That is the one change here that takes something
+away from a promise already made, so it is a number in every place a customer
+can read rather than a softer form of words.
+
+The other five currencies were re-seeded at the same ratio. They are still
+seeds and still Kayode’s to set properly: a price for a market is a decision
+about that market, not arithmetic on a rate.
+
+### The currency picker opens on Nigeria
+
+It used to guess from the browser’s time zone and language. Naira is what this
+is really sold at and what every other price on the page is worked out from,
+so the page opens saying so, and the picker is one click away. `guessCcy` and
+the two lookup tables it read are **deleted rather than left unreachable**. To
+put the guess back: restore `currencyByZone` and `currencyByRegion` in
+`config.js`, restore `guessCcy` in `site.js`, and change one line to
+`remembered() || guessCcy()`.
+
+### And a bug in sync_web_shell that only bit when it rewrote a header
+
+Every page failed section 2 at once with "carries the same header as every
+other page", which reads like the header changed. What changed was two bytes:
+the sync wrote `'\n\n'` between the header and `<main>` into files that are
+CRLF throughout, and the gate compares that whitespace because it is inside
+the slice. It now writes whatever newline the page it is editing already uses.
+
+It is invisible in an editor and invisible in a diff that normalises newlines,
+which is the whole reason it is worth a paragraph.
+
+## Two rules the Multi branches shot re-learned
+
+**Outcomes, not mechanisms.** The first two attempts at that screenshot were
+the branch report and then the Settings branches editor. Kayode rejected the
+second on sight: "its giving away our features to developers to copy". He is
+right, and it is already the rule. A configuration screen shows how the
+feature is built, which is the half worth keeping, and shows a customer
+nothing about what they get, which is the half worth publishing. If a
+screenshot is of a settings page, it is the wrong screenshot.
+
+**Keep the red.** Asked whether to hide an outlet that was losing money:
+"keep everything, they want to see loses too not just gains/profits." So the
+shot carries 2,920,000 outstanding and two overdue jobs, and nothing is
+cropped to flatter. A dashboard that is all green reads as a mock-up. Seeing
+which outlet is behind is the thing being sold.
+
+Worth separating the two, because they pull in opposite directions and both
+are right: **hide how it works, show what it finds.**
+
+The capture itself is the dashboard with `toggleSidebar` called and the
+remaining icon rail cropped off, over all time. Prototypes were built first
+and picked from, which is what saved the two wrong ones from shipping.
+
+## A sixth area, and two numbers that were not true
+
+The "Inside the product" section came off the home page on 19 September and
+its two cards became a sixth product area, **Multi branches**. Both cards
+were about the same thing, that the app changes shape with the business, by
+size and by trade. That is a product area rather than a home page aside. The
+two "more" links went with the move: on the home page they pointed at the
+product page, and inside the product page they would point at themselves.
+
+Removing the section broke the product page's Back link, which pointed at
+`index.html#product`. Its fallback is `index.html` now. The gate caught that
+one on the next run, which is what it is for.
+
+### The proof strip, checked rather than believed
+
+Kayode asked whether the numbers add up. Two of the four did not.
+
+| Claim | Verdict |
+| --- | --- |
+| 22 screens | **True.** 22 nav items in the app. |
+| 6 staff roles | **False.** The app ships five. |
+| 0 bars of signal | **True.** localStorage first, `sw.js` present. |
+| 100% exportable | **False.** The export writes 20 of the 21 keys the app syncs. |
+
+**The roles number was quoting the demo, not the product.** `defaultRoles()`
+returns owner, manager, client relations, tailor and accountant. The sixth is
+a custom role the example data creates, and the comment beside it in the app
+says exactly why: "a custom role this demo business created, proves the app
+adapts to roles beyond the built-in five." The strip now says five built in,
+and that you can add your own, which is the better claim anyway.
+
+**The gate could never have caught it.** The check was
+`/six roles|Six roles|6<\/div>/` against the home page: a number asserting
+itself. The site said six, the check looked for six, the app had five. It
+reads `defaultRoles()` out of the app now, the way the screen count already
+did. Any number on this site that is a fact about the product should be read
+from the product, and a check that hardcodes the same literal the page does
+is not a check.
+
+**The export claim is an app bug, not a copy problem.** `exportData()` writes
+20 keys; `STATE_KEYS` syncs 21. `orders_done`, `planner` and `shifts` are
+real data that reach the cloud and are missing from the downloaded file, so
+somebody who exports and reinstalls loses them. The copy has been softened to
+what the export actually does, and the app side is logged in `OUTSTANDING.md`.
+Once that is fixed the cell can go back to a percentage.
+
+## Products is a page, not a menu
+
+Kayode, 19 September: "no more products dropdown, just products, then it
+opens up all the products list on the page, then selecting each opens each
+product." The dropdown is gone, the list is back on the product page, and
+Products in the header is a plain link again.
+
+The list is load bearing in a way it was not before it was removed. It is now
+the only way to change area, at every width, so a page that ships without it
+is a page stranded on whichever area happens to be open. The gate refuses
+that: the list and the panes have to be the same five, with the same names,
+and exactly one of each has to ship open.
+
+**The order on the page changed with it.** Back, then the list, then the
+heading that names the area you picked, then the pane. The heading stopped
+being a hero above the controls and became the title of what the controls
+just opened, which is what it always was.
+
+### Landing at the top, and why the obvious fix does not work
+
+Picking an area used to drop you into the middle of the page with the heading
+already scrolled past and the sticky header over the first line. Three routes
+reach the same action and all three were different:
+
+- **A link from another page.** The browser scrolls to the fragment.
+- **A hash change on the page you are on.** Nothing navigates, so nothing
+  scrolls unless the script does it.
+- **A click on the list.** `selectTab` plus `replaceState`, which fires no
+  hashchange at all, so that route missed the fix written for the second one.
+
+**The first one cannot be fixed by scrolling.** Measured: arriving at
+`features.html#inventory` landed at 278 and stayed. The panes are
+`display:none` while the page is parsed, so Chrome finds no fragment target
+then. The script reveals the right pane on `DOMContentLoaded`, Chrome notices
+the target has appeared, and scrolls to it **after** everything the script has
+just done. Scrolling to the top on load, and again in the next frame, both
+lose that race. Anything that wins it wins it on one machine.
+
+So the target moved instead. The five ids came off the panes and onto empty
+markers at the top of the page. The browser still finds the fragment, and
+scrolling to it is scrolling to the top, because that is where it is now. No
+timing, nothing to lose a race to. The gate asserts both halves: the markers
+are there, and no pane carries an id of its own.
+
+### What went with the dropdown
+
+Fifty one lines of stylesheet, forty two of script, and the four drawer
+sub-item rules. Two attempts at removing them overshot, both the same way:
+the script block was cut at the first `document.addEventListener('click'`,
+which occurs **inside** the block being removed, and the stylesheet rule was
+cut by filtering lines that named it, which left the closing brace of a
+three line rule behind. Cut a block by its first and last line number, not by
+searching for a string that might also be inside it.
+
+`sync_web_shell.js` needed no change: it reads the header out of
+`index.html` rather than holding its own copy, so editing the original was
+enough to carry the new nav to all fourteen pages.
+
 ## Running it
 
 ```bash
@@ -22,14 +328,14 @@ Or use the **Website** entry in `.claude/launch.json`.
 
 | Page | What it is for |
 | --- | --- |
-| `index.html` | Hero, the eight kinds of business with their detail, the product, the loop and the closing call |
+| `index.html` | Hero, the eight kinds of business with their detail, the product and the closing call |
 | `features.html` | Six product areas behind tabs, deep linkable as `#money` and the rest |
 | `pricing.html` | Plans, the comparison table, and the billing questions |
 | `book.html` | The booking form, which is what "Book a demo" opens |
-| `partners.html` | The partner programme, its rates, and the application form |
-| `referrals.html` | A free month each, for customers who tell a friend |
+| `partners.html` | The one referral programme: 8%, who is in it, and the form for outside partners |
 | `about.html` | Why it exists and what we will not compromise on |
-| `contact.html` | Help and contact in one: channels, the form, getting started, common questions |
+| `contact.html` | Help and contact in one: channels and the form |
+| `faq.html` | Every question anybody asks, in one place, in three groups |
 | `privacy.html` · `terms.html` | Plain language, and both need a lawyer's eye |
 | `thanks.html` | Where every form lands |
 | `404.html` | Netlify serves this for anything that is not a page |
@@ -1143,7 +1449,7 @@ references listed above.
 node audit_web.js
 ```
 
-1759 checks. It reads every page and asserts the things a person stops noticing
+2349 checks. It reads every page and asserts the things a person stops noticing
 after the third read: that every internal link and anchor resolves, that the
 header and footer are identical everywhere, that every form will actually reach
 Netlify and every input has a label, that the prices match the console and the

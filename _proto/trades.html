@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trades strip-down, proposal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/web/css/site.css">
+<style>
+.pblock{border-top:2px dashed rgba(224,170,63,.45);padding-top:10px}
+.plabel{max-width:1124px;margin:0 auto 18px;font-size:12px;letter-spacing:.12em;
+  text-transform:uppercase;color:#e0aa3f}
+.plabel span{color:#9aa4b2;letter-spacing:0;text-transform:none;font-size:12.5px}
+
+/* ---------- the proposal ---------- */
+.trade-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;
+  max-width:1124px;margin-left:auto;margin-right:auto}
+.tt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);
+  overflow:hidden;display:flex;flex-direction:column;
+  transition:border-color .2s ease,transform .2s ease}
+.tt:hover{border-color:var(--gold);transform:translateY(-2px)}
+.tt-pic{height:118px;position:relative;display:grid;place-items:center;
+  background:linear-gradient(150deg,var(--panel-2),var(--bg-2));
+  background-size:cover;background-position:center;border-bottom:1px solid var(--line)}
+.tt-pic svg{width:30px;height:30px;fill:none;stroke:var(--gold);stroke-width:1.3;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.tt-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tt-body{padding:12px 13px 14px}
+.tt b{display:block;font-family:var(--serif);font-size:14.5px;font-weight:500;
+  margin-bottom:9px;color:var(--text)}
+.tt ul{list-style:none;margin:0;padding:0}
+.tt li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.5;
+  color:var(--faint);margin-top:5px}
+.tt li::before{content:"";position:absolute;left:0;top:7px;width:4px;height:4px;
+  border-radius:50%;background:var(--gold);opacity:.75}
+@media(max-width:980px){.trade-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Phone: the strip already swipes today, so it keeps swiping. Eight cards
+   stacked two up measured 1247px, longer than the thing it replaces. */
+@media(max-width:560px){
+  .trade-tiles{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;
+    margin:0 -16px;padding:0 16px 4px;scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .trade-tiles::-webkit-scrollbar{display:none}
+  .tt{flex:0 0 196px;scroll-snap-align:start}
+  .tt:hover{transform:none}
+  .tt-pic{height:92px}
+  .tt-body{padding:10px 11px 12px}
+  .tt b{font-size:13px;margin-bottom:7px}
+  .tt li{font-size:11.5px;margin-top:4px;padding-left:12px}
+  .tt li::before{top:6px;width:3.5px;height:3.5px}
+}
+</style>
+</head>
+<body>
+<main id="main">
+
+<!-- ====================== B: PROPOSED ====================== -->
+<section class="tight on-light pblock" id="proposed">
+  <div class="wrap">
+    <p class="plabel">Proposed &nbsp;<span>eight boxes, highlights inside them, nothing below</span></p>
+    <div class="sec-head center wide">
+      <h2 style="font-size:clamp(21px,2.4vw,26px)">Built for every kind of fashion business</h2>
+      <p class="lede lede-wide">Whether you make it, sell it, supply it or all three.</p>
+    </div>
+
+    <div class="trade-tiles" id="tiles">
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><path d="M12 3v7"/><path d="M8 5c0 3 1.5 5 4 5s4-2 4-5"/><path d="M6 21c0-4 2.7-7 6-7s6 3 6 7"/></svg><img src="/web/img/tailors.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Bespoke tailors</b>
+          <ul><li>Measurements per customer</li><li>Fittings on the calendar</li><li>Deposits and balances</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><path d="M3 16h11l4-2 3 2v3H3z"/><path d="M3 16V9h4l3 4"/></svg><img src="/web/img/shoes.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Shoe makers</b>
+          <ul><li>Your own bench stages</li><li>Leather and components</li><li>Cost per pair</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><img src="/web/img/bags.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Bag makers</b>
+          <ul><li>Styles you repeat</li><li>Hides and hardware</li><li>Runs and one offs</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><path d="M3 7h18"/><path d="M7 7v13"/><path d="M12 7v13"/><path d="M17 7v13"/><path d="M12 7V4"/></svg><img src="/web/img/readytowear.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Ready to wear</b>
+          <ul><li>Counter sales</li><li>Stock by size and colour</li><li>What is actually selling</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="5" height="13" rx="2"/><rect x="10" y="6" width="5" height="13" rx="2"/><rect x="17" y="6" width="4" height="13" rx="2"/></svg><img src="/web/img/fabrics.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Fabric shops</b>
+          <ul><li>Sold by the yard or metre</li><li>Cut against the roll</li><li>Suppliers and what you owe</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><path d="M12 4a5 5 0 0 1 5 5c0 3.5-5 11-5 11S7 12.5 7 9a5 5 0 0 1 5-5z"/><circle cx="12" cy="9" r="1.8"/></svg><img src="/web/img/accessories.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Accessories</b>
+          <ul><li>Head and wrist sizes</li><li>Short runs</li><li>Bench and shelf together</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><path d="M3 9h18v6H3z"/><path d="M7 9v3M11 9v3M15 9v3M19 9v3"/></svg><img src="/web/img/madetomeasure.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Made to measure</b>
+          <ul><li>Workroom and rail</li><li>One stock room</li><li>One set of books</li></ul>
+        </div>
+      </article>
+      <article class="tt">
+        <span class="tt-pic"><svg viewBox="0 0 24 24"><path d="M10 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z"/><circle cx="10" cy="11" r="2.2"/><path d="M17 8.5a4.2 4.2 0 0 1 3 4c0 3-3.5 6-3.5 6"/></svg><img src="/web/img/multilocation.jpg" alt="" loading="lazy"></span>
+        <div class="tt-body"><b>Multi location</b>
+          <ul><li>Every outlet its own type</li><li>Stock counted where it sits</li><li>Rolled up when you want it</li></ul>
+        </div>
+      </article>
+    </div>
+
+    <div class="btn-row center" style="margin-top:22px">
+      <a class="btn btn-gold btn-sm" href="#">See it set up for you</a>
+    </div>
+  </div>
+</section>
+
+</main>
+<script src="/web/js/config.js"></script>
+<script src="/web/js/site.js"></script>
+</body>
+</html>

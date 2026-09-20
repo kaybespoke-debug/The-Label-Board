@@ -72,7 +72,7 @@ they need the domain.
 
 ## 0. Prove the migrations still build a working database  ✅ done
 
-Run the five suites. They build a database from `supabase/migrations/`
+Run the eight suites. They build a database from `supabase/migrations/`
 **alone**, in filename order, and attack it.
 
 ```bash
@@ -95,17 +95,51 @@ node supabase/tests/partner_rls_harness.mjs
 node supabase/tests/tlb_policy_harness.mjs
 ```
 
-All five must be green. The first matters most here: it checks that every
+```bash
+node supabase/tests/plan_limits_harness.mjs
+```
+
+```bash
+node supabase/tests/partner_commission_harness.mjs
+```
+
+```bash
+node supabase/tests/referral_fraud_harness.mjs
+```
+
+All eight must be green. The first matters most here: it checks that every
 table, function and column the shipped code names is actually created by a
 migration — the two Edge Functions included. It exists because five objects
 the app uses every day (`app_state`, `profiles`, `suppliers`,
 `platform_audit` and `platform_tenant_summary()`) were once created by hand
 and were missing from the migrations entirely.
 
-The last one is newer and builds its database differently on purpose. See
-the note in `CLAUDE.md`: Supabase grants `anon` blanket access to new tables
-in `public` and a bare Postgres does not, so a suite that never had those
-grants cannot tell you whether your policies would hold on a real project.
+`tlb_policy_harness` builds its database differently on purpose. See the note
+in `CLAUDE.md`: Supabase grants `anon` blanket access to new tables in
+`public` and a bare Postgres does not, so a suite that never had those grants
+cannot tell you whether your policies would hold on a real project.
+
+**The last two are different in kind.** Every other suite proves that
+something is walled off. These two prove that something is REFUSED:
+
+`plan_limits_harness` shows a Basic account being refused a second studio and
+a sixth login, then shows the identical insert succeeding once the business is
+on Pro, with nothing about the insert itself having changed. A check that only
+ever sees the refusal cannot tell a working limit from a broken table. It also
+holds the three rules that make the limits liveable: a studio that drops from
+Pro to Basic keeps everything it had, an existing member can still be edited
+and suspended, and reinstating a suspended login at the ceiling is refused
+because otherwise a business could rotate people through it for ever.
+
+`partner_commission_harness` shows a monthly referral paying 8% for twelve
+months and then stopping, a churned business stopping the day it churns with
+the day before untouched, and a yearly referral paying 8% once on the year
+rather than on the month.
+
+`referral_fraud_harness` shows a self-referral refused on all four axes and
+then the same code accepted by an unrelated business, and a business that
+churns inside the 31 day hold paying nothing while the month that had
+already cleared stays theirs.
 
 ---
 

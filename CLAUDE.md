@@ -105,7 +105,7 @@ serving the old version.
 Every object the apps talk to is created by a migration in
 `supabase/migrations/`, applied in filename order. Nothing is created by hand
 any more: five objects once were, and were missing from the migrations
-entirely, so a fresh project would have run none of it. Seven suites guard it:
+entirely, so a fresh project would have run none of it. Eleven suites guard it:
 
 ```bash
 node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
@@ -115,6 +115,10 @@ node supabase/tests/partner_rls_harness.mjs    # no partner can reach another
 node supabase/tests/tlb_policy_harness.mjs     # our own books, as Supabase serves them
 node supabase/tests/onboarding_harness.mjs      # a new account becomes a studio it can sign into
 node supabase/tests/billing_harness.mjs         # every studio is on the books, and revenue is what arrived
+node supabase/tests/plan_limits_harness.mjs     # a plan is a ceiling, not a suggestion
+node supabase/tests/partner_commission_harness.mjs  # 8%, twelve months, and it stops when they do
+node supabase/tests/referral_fraud_harness.mjs  # nobody earns a commission off themselves
+node supabase/tests/plan_feature_harness.mjs   # Basic cannot write a Pro feature, by app or by hand
 ```
 
 The first reads the shipped code for every table, function and column it
@@ -131,6 +135,12 @@ Postgres has that absence for free while Supabase does not. Supabase ships
 authenticated` on every project, so a table in `public` is reachable with
 the public anon key from the moment it exists. `tlb_policy_harness` sets
 that default first, so the policies are actually reached and tested.
+
+Four of the eleven are different in kind. Every other suite proves something is
+walled off; `plan_limits_harness`, `partner_commission_harness` and
+`referral_fraud_harness` and `plan_feature_harness` prove something is REFUSED, and both show the refusal and then the same operation
+succeeding once it is allowed. A check that only ever sees the refusal cannot
+tell a working rule from a broken table.
 
 `SUPABASE_SETUP.md` is the go-live runbook.
 
