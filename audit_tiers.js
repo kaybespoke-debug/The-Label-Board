@@ -85,10 +85,20 @@ for(let i=1;i<asc.length;i++){
   });
   if(!keys.some(k=>(by.starter.features||[]).indexOf(k)<0))
     F('Basic includes every capability, so the plans differ only in size and the sell line is untrue');
-  // Unlimited seats mean storage is the only thing left protecting margin.
-  if(by.pro.seats!==UNL)F('Pro is sold with unlimited staff but still counts seats');
+  // Pro counted people again on 20 Sep 2026: 5 studios and 50 logins, where
+  // it had been three studios and unlimited staff. What has to hold is that
+  // every step up is a step up on BOTH axes, because a plan that gives you
+  // more of one thing and less of another is not a tier, it is a different
+  // product, and somebody upgrading would lose something.
+  if(by.pro.seats===UNL)F('Pro is sold with a seat limit but the app still treats it as unlimited');
+  if(!(by.pro.seats>by.starter.seats))F('Pro does not give a studio more people than Basic');
+  if(!(by.pro.studios>by.starter.studios))F('Pro does not give a studio more studios than Basic');
+  if(by.premium.seats!==UNL||by.premium.studios!==UNL)
+    F('Bespoke is agreed per contract, so neither of its limits may be a fixed number here');
+  // Storage is no longer the only limit, but it is the one that grows with
+  // use rather than with headcount, so it still needs a real ceiling.
   if(!(by.pro.storageGb>0)||by.pro.storageGb>=by.premium.storageGb)
-    F('Pro has no meaningful storage ceiling, and with seats unlimited it is the only limit left');
+    F('Pro has no meaningful storage ceiling below the top plan');
 }
 
 /* 2) The app and the console agree on what a plan costs. --------------------- */
@@ -183,10 +193,19 @@ if(!/if\(!id&&planStop\('seats'/.test(html))
 
 /* 7) A studio already running four outlets is not put on Starter. ------------ */
 {
+  // These moved with the limits on 20 Sep. Four studios and twelve people
+  // used to need Bespoke because Pro stopped at three studios; Pro now
+  // reaches five. One studio and five people used to need Pro because Basic
+  // stopped at three logins; Basic now reaches five. Both are the same
+  // question as before: does a real business land on the cheapest plan that
+  // actually holds it.
   const fit=run("smallestPlanFitting(4,12).id");
-  if(fit!=='premium')F('a four-studio, twelve-account business was inferred as '+fit);
+  if(fit!=='pro')F('a four-studio, twelve-account business was inferred as '+fit);
   if(run("smallestPlanFitting(1,1).id")!=='trial')F('a brand new one-person studio was not put on trial');
-  if(run("smallestPlanFitting(1,5).id")!=='pro')F('a one-studio business with five accounts was inferred as '+run("smallestPlanFitting(1,5).id"));
+  if(run("smallestPlanFitting(1,5).id")!=='starter')F('a one-studio business with five accounts was inferred as '+run("smallestPlanFitting(1,5).id"));
+  // and something still has to reach Bespoke, or the top plan is unreachable
+  if(run("smallestPlanFitting(6,12).id")!=='premium')F('a six-studio business was not put on Bespoke');
+  if(run("smallestPlanFitting(1,60).id")!=='premium')F('a sixty-person business was not put on Bespoke');
   // and the inference runs once, then leaves the plan alone
   run("SETTINGS.plan='starter';ensurePlan();");
   if(run("SETTINGS.plan")!=='starter')F('ensurePlan() overwrote a plan the studio is actually paying for');
@@ -276,5 +295,65 @@ if(!/if\(!id&&planStop\('seats'/.test(html))
 
 console.log('Plan / tier audit:');
 console.log('  plans: '+run("PLANS.map(p=>p.name+' '+(p.invoiceOnly?'(invoiced per business)':(p.monthly?('\\u20a6'+p.monthly):'free'))+' \\u00b7 '+(p.seats===PLAN_UNLIMITED?'unlimited seats':p.seats+' seats')+' \\u00b7 '+p.storageGb+'GB').join('\\n         ')"));
+
+/* 11) The plan gates: every Pro view refuses to draw for Basic. ------------- */
+{
+  const feats = run('Object.keys(PLAN_FEATURES)').sort();
+  const views = run('Object.keys(VIEW_FEATURE)').sort();
+  const WANT = ['chase','companylog','funds','inventory','marketing',
+               'payroll','reporting','reports','suppliers','team'];
+  if (JSON.stringify(feats) !== JSON.stringify(WANT))
+    F('the app does not declare the ten plan features: ' + JSON.stringify(feats));
+
+  /* every gated view names a feature that exists */
+  views.forEach(v => {
+    const f = run('VIEW_FEATURE[' + JSON.stringify(v) + ']');
+    if (feats.indexOf(f) < 0) F('view ' + v + ' is gated on a feature that does not exist: ' + f);
+  });
+
+  /* Basic has none of them, Pro has all of them. Read off the plans rather
+     than written down here, so moving a feature between plans moves this. */
+  run("SETTINGS.plan='starter';");
+  feats.forEach(f => {
+    if (run('planIncludes(' + JSON.stringify(f) + ')')) F('Basic includes ' + f + ', and it must not');
+  });
+  run("SETTINGS.plan='pro';");
+  feats.forEach(f => {
+    if (!run('planIncludes(' + JSON.stringify(f) + ')')) F('Pro does not include ' + f);
+  });
+
+  /* THE ONE THAT MATTERS. The view render function is replaced with a
+     counter, go() is called, and the count says whether the Pro screen
+     drew. Basic must be zero every time; Pro must not be. */
+  const RENDERS = {
+    supplies:'renderSupplies', suppliers:'renderSuppliers', pots:'renderPotsView',
+    payroll:'renderPayrollView', marketing:'renderMarketing',
+    rota:'renderRota', attendance:'renderAttendance', leave:'renderLeave',
+    companylog:'renderCompanyLog'
+  };
+  Object.keys(RENDERS).forEach(v => {
+    const fn = RENDERS[v];
+    /* a live owner with every permission, so the only thing that can stop
+       the screen is the plan */
+    run("currentUser=getUsers().find(u=>u.roleId==='owner');");
+    run("teamToolsOn=function(){return true};showsBespoke=function(){return true};");
+
+    run("SETTINGS.plan='starter';__drew=0;" + fn + "=function(){__drew++;};");
+    run("try{go(" + JSON.stringify(v) + ")}catch(e){__err=e.message}");
+    if (run('__drew') !== 0) F('Basic drew the Pro screen ' + v);
+
+    run("SETTINGS.plan='pro';__drew=0;");
+    run("try{go(" + JSON.stringify(v) + ")}catch(e){__err=e.message}");
+    if (run('__drew') === 0) F('Pro could not open ' + v + ' either, so the gate is not the plan');
+  });
+
+  /* and the nav item is NOT hidden: a plan is a price, not a secret, and
+     hiding it is the progressive disclosure rule 2 forbids */
+  const html2 = fs.readFileSync(appPath, 'utf8');
+  if (!/data-plan-gate/.test(html2)) F('there is no upgrade panel for a gated view');
+  if (!/This is a Pro feature/.test(html2)) F('the upgrade panel does not say it is a Pro feature');
+
+  run("SETTINGS.plan='starter';");
+}
 if(fails.length){console.log('\n✗ '+fails.length+' problem(s):');fails.forEach(x=>console.log('   - '+x));process.exit(1);}
 console.log('  ✓ scale only, nothing hidden when over, the console agrees on the price, and the limit says what more costs');

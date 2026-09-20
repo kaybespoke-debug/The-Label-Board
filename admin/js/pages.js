@@ -264,14 +264,15 @@ PAGES.subscribers = function () {
     section('subs-dir', 'Subscriber directory',
       list.length + ' of ' + all.length + ' shown' +
       (planSel !== 'any' ? ' · ' + planById(planSel).name + ' only' : '') +
-      ' · health, seats and referrals are on each profile',
+      ' · health, usage against the plan and referrals are on each profile',
       (list.length ? '<div class="tw"><table><thead><tr>' +
         '<th>Business</th><th class="hide-sm">Plan</th><th>Status</th><th class="hide-sm">Joined</th>' +
         '<th class="hide-sm">Renews</th><th class="num">MRR</th><th></th></tr></thead><tbody>' +
         list.map(s => '<tr class="klik" onclick="openDetail(\'sub\',\'' + s.id + '\')">' +
           '<td><div class="t-main">' + esc(s.name) + '</div><div class="t-sub">' + esc(s.owner) + ' · ' + esc(s.city) + '</div></td>' +
           '<td class="hide-sm"><span class="tier">' + s.planName + '</span></td>' +
-          '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') + '</td>' +
+          '<td>' + statusPill(s.status) + (s.pastDue ? ' <span class="pill red">Past due</span>' : '') +
+            (overPlan(s) ? ' <span class="pill amber">Over plan</span>' : '') + '</td>' +
           '<td class="hide-sm">' + fmtD(s.joined) + '</td>' +
           '<td class="hide-sm">' + (s.status === 'expired' ? '<span class="note">—</span>' :
             (s.renewIn <= 7 ? '<span class="pill amber">' + (s.renewIn <= 0 ? 'due' : s.renewIn + 'd') + '</span>' : fmtDShort(s.renewsOn))) + '</td>' +

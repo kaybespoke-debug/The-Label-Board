@@ -8,6 +8,9 @@
 
 const DETAIL = {};
 
+/* The term length, for a sentence that reads better as a word than as a
+   setting lookup halfway through one. */
+function last12(r) { return (DB.settings.termMonths || 12); }
 function backBtn() { return '<button class="back" onclick="goBack()">&larr; Back</button>'; }
 function dstat(v, l, tone) { return '<div class="dstat ' + (tone || '') + '"><div class="dv">' + v + '</div><div class="dl">' + l + '</div></div>'; }
 
@@ -17,7 +20,9 @@ DETAIL.ref = function (id) {
   if (!r) return backBtn() + '<div class="pnl"><div class="empty">That referral is not here.</div></div>';
   const link = Q.linkFor(r);
   const rows = Q.ledgerFor(r.id);
-  const sig = rows.find(x => x.type === 'signup');
+  /* Every row belongs to this business now, oldest first, because the
+     timeline below reads forwards while the ledger list reads backwards. */
+  const comms = rows.slice().sort((a, b) => a.date.localeCompare(b.date));
   const earned = Q.earnedFor(r.id);
 
   /* What happened, in order, and what it did to your money. */
@@ -27,15 +32,31 @@ DETAIL.ref = function (id) {
   if (r.subscribedOn) {
     events.push(['Started paying', fmtD(r.subscribedOn),
       r.planName + ', ' + (r.cycle === 'annual' ? 'annual' : 'monthly') + ' · ' + money(r.firstPayment) + ' when they started']);
-    if (sig) {
-      events.push(['You earned ' + money(sig.amount), fmtD(sig.date),
-        sig.rate + '% as a ' + sig.tier + ' partner']);
+    if (comms.length) {
+      const first = comms[0], last = comms[comms.length - 1];
+      events.push(['First commission, ' + money(first.amount), fmtD(first.date),
+        first.rate + '% of ' + money(first.basis) + ' ' + first.basisLabel]);
+      if (comms.length > 1) {
+        events.push(['Earned ' + money(earned) + ' so far', fmtD(last.date),
+          plural(comms.length, 'month') + ' credited of ' + last.months + ', latest at ' + last.rate + '%']);
+      }
       events.push([
-        sig.status === 'paid' ? 'Paid to you' : sig.status === 'cleared' ? 'Ready to pay out' : 'On hold',
-        fmtD(sig.status === 'paid' ? sig.paidOn : sig.clearsOn),
-        sig.status === 'paid' ? 'In payout ' + sig.payoutRef
-          : sig.status === 'cleared' ? 'Goes out ' + fmtD(Q.nextPayoutDate())
-            : 'Clears ' + fmtD(sig.clearsOn)]);
+        last.status === 'paid' ? 'Paid to you' : last.status === 'cleared' ? 'Ready to pay out' : 'On hold',
+        fmtD(last.status === 'paid' ? last.paidOn : last.clearsOn),
+        last.status === 'paid' ? 'In payout ' + last.payoutRef
+          : last.status === 'cleared' ? 'Goes out ' + fmtD(Q.nextPayoutDate())
+            : 'Clears ' + fmtD(last.clearsOn)]);
+    }
+    /* The one thing a flat rate leaves open: when this business stops
+       earning. A partner should never have to count months themselves. */
+    if (r.stage === 'lapsed') {
+      events.push(['Stopped paying', fmtD(r.lapsedOn), 'Commission stopped that day, nothing further is owed']);
+    } else if (r.cycle === 'annual') {
+      events.push(['Nothing further due', fmtD(Q.termEnd(r)), 'A yearly plan earns once, and it already has']);
+    } else {
+      const left = Q.monthsLeft(r);
+      events.push([left ? plural(left, 'month') + ' still to earn' : 'The ' + last12(r) + ' months are up',
+        fmtD(Q.termEnd(r)), left ? 'While they keep paying' : 'This business has finished earning']);
     }
   } else if (r.stage === 'trial') {
     events.push(['On trial now', fmtD(r.signedUpOn),
@@ -80,15 +101,15 @@ DETAIL.ref = function (id) {
     (r.subscribedOn ? kv('Outlets', r.outlets) + kv('People on the board', r.staff) : '') +
     kv('Came in through', esc(link.label) + ' <span class="mono note">' + esc(link.code) + '</span>') +
     kv('Last active', ago(r.lastSeen)) +
-    (rows.length > 1
-      ? '<div class="sec-t">Also earned</div>' +
-        rows.filter(x => x.type !== 'signup').map(x =>
-          '<div class="row"><div><b>Milestone bonus</b><small>' + esc(x.note) + '</small></div>' +
+    (comms.length > 1
+      ? '<div class="sec-t">Every month it has earned</div>' +
+        comms.slice().reverse().map(x =>
+          '<div class="row"><div><b>' + fmtD(x.date) + '</b><small>' + esc(x.note) + '</small></div>' +
           '<b>' + money(x.amount) + '</b></div>').join('')
       : '') +
-    '<p class="note" style="margin-top:12px">Commission is a share of every month this ' +
-    'account pays, for four years from the day they first paid. Years one and two at your ' +
-    'rate, years three and four at 3%. If they leave it stops that day.</p></div>';
+    '<p class="note" style="margin-top:12px">Commission is ' + Q.rate() + '% of what this business ' +
+    'actually pays: every month for ' + (DB.settings.termMonths || 12) + ' months from their first payment on a ' +
+    'monthly plan, or once on a yearly plan. If they stop paying it stops that day.</p></div>';
 };
 
 /* =================== A PAYOUT =================== */
@@ -114,7 +135,7 @@ DETAIL.payout = function (ref) {
     '<div class="tw"><table><thead><tr><th>What earned it</th><th class="hide-sm">Credited</th>' +
     '<th class="num">Amount</th><th></th></tr></thead><tbody>' +
     items.map(r => '<tr' + (r.refId ? ' class="klik" onclick="openDetail(\'ref\',' + r.refId + ')"' : '') + '>' +
-      '<td><div class="t-main">' + (r.type === 'bonus' ? 'Milestone bonus' : esc(r.business)) + '</div>' +
+      '<td><div class="t-main">' + esc(r.business) + '</div>' +
       '<div class="t-sub">' + esc(r.note) + '</div></td>' +
       '<td class="hide-sm">' + fmtD(r.date) + '</td>' +
       '<td class="num"><b>' + money(r.amount) + '</b></td>' +

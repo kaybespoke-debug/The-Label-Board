@@ -1355,7 +1355,7 @@ body.modal-open{overflow:hidden}
           <p class="page-sub" style="margin-bottom:14px">Used on invoices and receipts you send to customers.</p>
           <div class="field"><label>Logo</label><div style="display:flex;align-items:center;gap:14px"><div id="logoPreview" style="width:64px;height:64px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Upload logo</button><button class="btn ghost sm" onclick="clearLogo()">Remove</button><input type="file" id="logoFile" accept="image/*" style="display:none" onchange="uploadLogo(this)"></div></div>
           <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="LAYI"></div>
-          <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@layiojomo.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
+          <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@yourlabel.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
           <div class="field"><label>Address</label><textarea class="fld" id="co_address" placeholder="Studio address"></textarea></div>
           <div class="field"><label>Business registration (RC / TIN)</label><input class="fld" id="co_reg" placeholder="RC123456"></div>
           <div class="field"><label>Bank accounts (for invoices)</label>
@@ -3388,10 +3388,11 @@ function openStudioSetup(){
   const co=(SETTINGS.company&&SETTINGS.company.name)||'';
   const me=(currentUser&&currentUser.name)||'';
   setupDraft={
-    /* LAYI is the demo tenant's name and arrived via DEFAULTS on devices set up
-       before that default was blanked, so it is an unanswered question rather
-       than this studio's own answer. */
-    name:(co&&co!=='LAYI')?co:'',
+    /* Neither of these is an answer this studio gave. 'LAYI' arrived via
+       DEFAULTS on devices set up before that default was blanked, and the
+       example studio's name arrives from Load example. Both are somebody
+       else's label sitting in the box with the cursor after it. */
+    name:(co&&co!=='LAYI'&&co!=='Adé Atelier')?co:'',
     you:looksLikeAnAddress(me)?'':me,
     location:'', does:[], channels:['showroom'], team:'', outlets:'',
     studios:[]     // filled in once they say they run more than one
@@ -4321,6 +4322,11 @@ function go(view){
   document.querySelectorAll('.mob-bar .mb[data-view]').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
   const def=TITLES[view]||['',''];const[t,s]=def;document.getElementById('pgTitle').textContent=typeof t==='function'?t():t;document.getElementById('pgSub').textContent=typeof s==='function'?s():s;
   {const _ms=document.getElementById('moreSheet');if(_ms)_ms.classList.remove('show');}{const _mm=document.getElementById('mobMore');if(_mm)_mm.classList.remove('active');}closeDrawer();
+  /* The plan gate goes here, AFTER the view is on screen and the title is
+     set, so a Basic studio lands on a page that names the feature rather
+     than being bounced somewhere else with no explanation. */
+  {const _f=VIEW_FEATURE[view];
+   if(_f){ if(!planIncludes(_f)){showPlanGate(view);return;} hidePlanGate(view); }}
   if(view==='finance')renderFinance();if(view==='settings')fillSettings();if(view==='supplies')renderSupplies();if(view==='suppliers')renderSuppliers();if(view==='customers')renderCustomers();if(view==='marketing')renderMarketing();if(view==='payroll')renderPayrollView();if(view==='pots')renderPotsView();if(view==='logistics')renderLogistics();if(view==='products')renderProducts();if(view==='sales')renderSales();
   if(view==='orders')renderOrders();
   if(view==='team')renderTeam();if(view==='rota')renderRota();if(view==='calendar')renderCalendar();if(view==='attendance')renderAttendance();
@@ -6767,18 +6773,21 @@ function initSettingsCollapse(){groupSettings();}
    existing row, to change a word nobody sees. */
 const PLANS=[
   {id:'trial',   name:'Trial',   monthly:0,     studios:1, seats:3, storageGb:2,
-   blurb:'14 days, everything in Pro', features:['chase']},
-  {id:'starter', name:'Basic',   monthly:27000, studios:1, seats:3, storageGb:20,
-   blurb:'One studio, three people', features:[]},
-  /* Pro is the full product: no feature is held back and staff are unlimited.
-     That makes storage the only thing left protecting margin, which is why
-     its cap is a real number rather than a generous gesture. */
-  {id:'pro',     name:'Pro',     monthly:65000, studios:3, seats:0, storageGb:200,
-   blurb:'Everything, and as many people as you employ', features:['chase']},
+   blurb:'14 days, everything in Pro', features:['chase','funds','inventory','suppliers','team','payroll','companylog','marketing','reporting','reports']},
+  {id:'starter', name:'Basic',   monthly:20000, studios:1, seats:5, storageGb:20,
+   blurb:'One studio, up to five people', features:[]},
+  /* Pro is the full product: no feature is held back. It used to sell
+     unlimited staff, which left storage as the only thing protecting margin.
+     From 20 Sep 2026 it is 5 studios and 50 logins, which is a ceiling no
+     Pro studio is near and is still a narrowing of what was promised, so it
+     is a number here, on the website and in the database rather than a
+     quieter form of words. */
+  {id:'pro',     name:'Pro',     monthly:49000, studios:5, seats:50, storageGb:200,
+   blurb:'Everything, up to five studios and fifty people', features:['chase','funds','inventory','suppliers','team','payroll','companylog','marketing','reporting','reports']},
   /* Priced per business, so it carries no monthly figure to quote. An operator
      types the negotiated price when they move a studio onto it. */
   {id:'premium', name:'Bespoke', monthly:0, invoiceOnly:true, studios:0, seats:0, storageGb:1000,
-   blurb:'Shaped around how you already work', features:['chase']}
+   blurb:'Shaped around how you already work', features:['chase','funds','inventory','suppliers','team','payroll','companylog','marketing','reporting','reports']}
 ];
 /* ---- what a plan includes, as opposed to how much of it ------------------
    Everything above this line is scale: how many studios, how many people, how
@@ -6799,11 +6808,42 @@ const PLANS=[
    Kept deliberately short. Every key added here is a thing the product no
    longer simply does, and the reason to add one had better be that customers
    are buying the difference. */
+/* The ten things a plan decides, as opposed to how much of them. Every key
+   here is a thing the product no longer simply does on Basic, so the list
+   is not one to add to lightly.
+
+   It matches public.plan_feature_catalogue in the database exactly, and
+   plan_feature_harness fails if the two ever differ. This copy exists
+   because the app runs offline and cannot ask; the database is what
+   actually decides, and my_plan_features() is how a live session checks. */
 const PLAN_FEATURES={
-  chase:{
-    label:'Reminders & follow-ups',
-    why:'See who owes you on any plan. Sending the reminder is Pro.'
-  }
+  chase:{label:'Chase list and payment reminders',
+    why:'See who owes you on any plan. Chasing them is Pro.'},
+  funds:{label:'Funds, owner pay and retained profit',
+    why:'Set money aside, pay yourself, and see what the business kept.'},
+  inventory:{label:'Inventory and low stock warnings',
+    why:'Stock that comes off the shelf when a job uses it, and tells you when it is running out.'},
+  suppliers:{label:'Vendors and suppliers',
+    why:'Who you buy from, what you owe them, and what each job cost.'},
+  team:{label:'Rota, attendance and leave',
+    why:'Who is working when, who turned up, and who is off.'},
+  payroll:{label:'Payroll, piece rates and commission',
+    why:'What each person earned, by salary, by piece or by commission.'},
+  companylog:{label:'Company log',
+    why:'Notices and announcements everyone on the team can see.'},
+  marketing:{label:'Marketing lists and message templates',
+    why:'Segments built from what you already recorded, and the messages to send them.'},
+  reporting:{label:'Reporting lines',
+    why:'Managers see their own team rather than everybody.'},
+  reports:{label:'Full reports',
+    why:'The whole picture rather than the headline figures.'}
+};
+/* Which view belongs to which feature. A view that is not here is not
+   gated by any plan and never will be by accident. */
+const VIEW_FEATURE={
+  supplies:'inventory', suppliers:'suppliers', pots:'funds', payroll:'payroll',
+  rota:'team', attendance:'team', leave:'team',
+  companylog:'companylog', marketing:'marketing'
 };
 function planIncludes(feature){
   const f=(currentPlan().features)||[];
@@ -6818,6 +6858,42 @@ function planRank(p){return p.invoiceOnly?Infinity:(p.monthly||0);}
 function firstPlanWith(feature){
   return PLANS.filter(p=>p.id!=='trial'&&(p.features||[]).indexOf(feature)>=0)
               .sort((a,b)=>planRank(a)-planRank(b))[0]||null;
+}
+/* The panel a Basic studio sees instead of a Pro screen.
+
+   Not an empty page and not a hidden nav item: they can see the feature
+   exists, what it does and what it costs, and nothing they already have
+   is touched. The view's own markup is hidden rather than replaced, so
+   the moment the plan changes the screen comes back without a reload.
+
+   Inline styles rather than a class, because this app is one file with
+   forty style blocks in it and a new rule in the wrong one is a rule that
+   silently loses. */
+function planGateHost(view){return document.getElementById('view-'+view);}
+function showPlanGate(view){
+  const host=planGateHost(view);if(!host)return;
+  const f=VIEW_FEATURE[view];const meta=PLAN_FEATURES[f]||{label:view,why:''};
+  const next=firstPlanWith(f);
+  let g=host.querySelector?host.querySelector('[data-plan-gate]'):null;
+  if(!g){g=document.createElement('div');g.setAttribute('data-plan-gate','1');host.appendChild(g);}
+  Array.prototype.forEach.call(host.children||[],function(c){if(c!==g)c.style.display='none';});
+  g.style.display='';
+  g.innerHTML='<div style="max-width:560px;margin:38px auto;padding:26px 24px;border:1px solid var(--line);'
+    +'border-radius:14px;background:var(--panel);text-align:center">'
+    +'<div style="font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gold)">Pro feature</div>'
+    +'<h3 style="margin:10px 0 6px;font-size:21px">'+esc(meta.label)+'</h3>'
+    +'<div style="color:var(--text-dim);line-height:1.6">'+esc(meta.why)+'</div>'
+    +'<div style="margin-top:16px;font-weight:600">This is a Pro feature \u2014 upgrade to unlock.</div>'
+    +(next?'<div style="margin-top:6px;color:var(--text-dim)">'+esc(next.name)
+      +(next.invoiceOnly?' includes it.':' includes it, for '+cur2(next.monthly)+' a month.')+'</div>':'')
+    +'<div style="margin-top:8px;color:var(--text-faint);font-size:13px">Nothing you already have is affected.</div>'
+    +'<button class="btn primary" style="margin-top:18px" onclick="go(\'settings\')">See your plan</button>'
+    +'</div>';
+}
+function hidePlanGate(view){
+  const host=planGateHost(view);if(!host)return;
+  const g=host.querySelector?host.querySelector('[data-plan-gate]'):null;
+  Array.prototype.forEach.call(host.children||[],function(c){c.style.display=(c===g)?'none':'';});
 }
 /* Returns true when the caller must stop, matching planStop's shape. */
 function featureStop(feature){
@@ -8114,11 +8190,11 @@ function loadExample(force){
     inspo:_svg('#3a3a3a','#5a5a5a','\u263A','Inspiration')
   };
   setStaff([
-    {id:'st-demo1',staffId:'LAYI-S001',name:'Franklin',role:'Master Tailor',department:'Production',specialty:'Tailor',skills:'Agbada, kaftan, suits',gender:'Male',dob:'1990-04-12',nationality:'Nigerian',phone:'+234 803 111 2222',email:'franklin@example.com',address:'Surulere, Lagos',emergencyName:'Grace F.',emergencyPhone:'+234 803 000 1111',emergencyRel:'Sister',employmentType:'Full Time',startDate:'2023-02-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Commission',active:true,maxLoad:4,basic:0,rate:45000,rates:[{type:'Kaftan',amount:40000},{type:'Agbada',amount:65000}],bankName:'GTBank',accountNo:'0011223344',accountName:'Franklin',docs:[],timeline:[{id:'tl1',at:iso(11000),type:'Joined',text:'Joined as Master Tailor (2023-02-01)',by:'Kay Ojomo'}]},
-    {id:'st-demo2',staffId:'LAYI-S002',name:'Idara Umah',role:'Customer Relationship Executive',department:'Sales / Client Relations',specialty:'Customer Relations',skills:'Client care, follow-up, styling advice',gender:'Female',dob:'1994-09-03',nationality:'Nigerian',phone:'+234 805 333 4444',email:'idara@example.com',address:'Lekki, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Full Time',startDate:'2024-05-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Monthly Salary',active:true,maxLoad:10,basic:150000,rate:0,rates:[],bankName:'Access Bank',accountNo:'0099887766',accountName:'Idara Umah',docs:[],timeline:[{id:'tl2',at:iso(2500),type:'Joined',text:'Joined as Customer Relationship Executive (2024-05-01)',by:'Kay Ojomo'}]},
-    {id:'st-demo3',staffId:'LAYI-S003',name:'Tunde',role:'Shoemaker',department:'Production',specialty:'Cutter / Finisher',skills:'Leather shoes & slippers',gender:'Male',dob:'1988-12-20',nationality:'Nigerian',phone:'+234 807 555 6666',email:'',address:'Mushin, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Contract',startDate:'2023-08-15',status:'Active',manager:'st-demo1',location:'Lagos studio',notes:'',salaryType:'Commission',active:true,maxLoad:6,basic:0,rate:6000,rates:[{type:'Shoes',amount:6000},{type:'Leather slippers',amount:6000}],bankName:'',accountNo:'',accountName:'',docs:[],timeline:[{id:'tl3',at:iso(8000),type:'Joined',text:'Joined as Shoemaker (2023-08-15)',by:'Kay Ojomo'}]},
-    {id:'st-demo4',staffId:'LAYI-S004',name:'Hassan',role:'Tailor',department:'Production',specialty:'Tailor',skills:'Kaftans, casual sets, trousers',gender:'Male',dob:'1992-06-18',nationality:'Nigerian',phone:'+234 806 222 3333',email:'hassan@example.com',address:'Yaba, Lagos',emergencyName:'Aisha H.',emergencyPhone:'+234 806 222 0000',emergencyRel:'Wife',employmentType:'Full Time',startDate:'2024-01-10',status:'Active',manager:'st-demo1',location:'Lagos studio',notes:'Fast turnaround on everyday pieces',salaryType:'Commission',active:true,maxLoad:8,basic:0,rate:35000,rates:[{type:'Kaftan',amount:35000},{type:'Casual set',amount:30000},{type:'Ankara trousers',amount:18000}],bankName:'UBA',accountNo:'2011334455',accountName:'Hassan',docs:[],timeline:[{id:'tl4',at:iso(3600),type:'Joined',text:'Joined as Tailor (2024-01-10)',by:'Kay Ojomo'}]},
-    {id:'st-demo5',staffId:'LAYI-S005',name:'Musa',role:'Embroiderer',department:'Production',specialty:'Embroiderer / Beading',skills:'Hand embroidery, beadwork, monograms',gender:'Male',dob:'1991-02-25',nationality:'Nigerian',phone:'+234 809 444 5555',email:'',address:'Aba (remote)',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Freelance',startDate:'2024-09-01',status:'On Leave',manager:'st-demo1',location:'Aba',notes:'Freelance, on leave this week',salaryType:'Commission',active:true,maxLoad:5,basic:0,rate:25000,rates:[{type:'Bespoke outfit',amount:30000},{type:'Agbada',amount:35000}],bankName:'Zenith',accountNo:'1099887700',accountName:'Musa',docs:[],timeline:[{id:'tl5',at:iso(1500),type:'Joined',text:'Joined as freelance Embroiderer (2024-09-01)',by:'Kay Ojomo'}]},
+    {id:'st-demo1',staffId:'AA-S001',name:'Franklin',role:'Master Tailor',department:'Production',specialty:'Tailor',skills:'Agbada, kaftan, suits',gender:'Male',dob:'1990-04-12',nationality:'Nigerian',phone:'+234 803 111 2222',email:'franklin@example.com',address:'Surulere, Lagos',emergencyName:'Grace F.',emergencyPhone:'+234 803 000 1111',emergencyRel:'Sister',employmentType:'Full Time',startDate:'2023-02-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Commission',active:true,maxLoad:4,basic:0,rate:45000,rates:[{type:'Kaftan',amount:40000},{type:'Agbada',amount:65000}],bankName:'GTBank',accountNo:'0011223344',accountName:'Franklin',docs:[],timeline:[{id:'tl1',at:iso(11000),type:'Joined',text:'Joined as Master Tailor (2023-02-01)',by:'Adé Sowande'}]},
+    {id:'st-demo2',staffId:'AA-S002',name:'Idara Umah',role:'Customer Relationship Executive',department:'Sales / Client Relations',specialty:'Customer Relations',skills:'Client care, follow-up, styling advice',gender:'Female',dob:'1994-09-03',nationality:'Nigerian',phone:'+234 805 333 4444',email:'idara@example.com',address:'Lekki, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Full Time',startDate:'2024-05-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Monthly Salary',active:true,maxLoad:10,basic:150000,rate:0,rates:[],bankName:'Access Bank',accountNo:'0099887766',accountName:'Idara Umah',docs:[],timeline:[{id:'tl2',at:iso(2500),type:'Joined',text:'Joined as Customer Relationship Executive (2024-05-01)',by:'Adé Sowande'}]},
+    {id:'st-demo3',staffId:'AA-S003',name:'Tunde',role:'Shoemaker',department:'Production',specialty:'Cutter / Finisher',skills:'Leather shoes & slippers',gender:'Male',dob:'1988-12-20',nationality:'Nigerian',phone:'+234 807 555 6666',email:'',address:'Mushin, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Contract',startDate:'2023-08-15',status:'Active',manager:'st-demo1',location:'Lagos studio',notes:'',salaryType:'Commission',active:true,maxLoad:6,basic:0,rate:6000,rates:[{type:'Shoes',amount:6000},{type:'Leather slippers',amount:6000}],bankName:'',accountNo:'',accountName:'',docs:[],timeline:[{id:'tl3',at:iso(8000),type:'Joined',text:'Joined as Shoemaker (2023-08-15)',by:'Adé Sowande'}]},
+    {id:'st-demo4',staffId:'AA-S004',name:'Hassan',role:'Tailor',department:'Production',specialty:'Tailor',skills:'Kaftans, casual sets, trousers',gender:'Male',dob:'1992-06-18',nationality:'Nigerian',phone:'+234 806 222 3333',email:'hassan@example.com',address:'Yaba, Lagos',emergencyName:'Aisha H.',emergencyPhone:'+234 806 222 0000',emergencyRel:'Wife',employmentType:'Full Time',startDate:'2024-01-10',status:'Active',manager:'st-demo1',location:'Lagos studio',notes:'Fast turnaround on everyday pieces',salaryType:'Commission',active:true,maxLoad:8,basic:0,rate:35000,rates:[{type:'Kaftan',amount:35000},{type:'Casual set',amount:30000},{type:'Ankara trousers',amount:18000}],bankName:'UBA',accountNo:'2011334455',accountName:'Hassan',docs:[],timeline:[{id:'tl4',at:iso(3600),type:'Joined',text:'Joined as Tailor (2024-01-10)',by:'Adé Sowande'}]},
+    {id:'st-demo5',staffId:'AA-S005',name:'Musa',role:'Embroiderer',department:'Production',specialty:'Embroiderer / Beading',skills:'Hand embroidery, beadwork, monograms',gender:'Male',dob:'1991-02-25',nationality:'Nigerian',phone:'+234 809 444 5555',email:'',address:'Aba (remote)',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Freelance',startDate:'2024-09-01',status:'On Leave',manager:'st-demo1',location:'Aba',notes:'Freelance, on leave this week',salaryType:'Commission',active:true,maxLoad:5,basic:0,rate:25000,rates:[{type:'Bespoke outfit',amount:30000},{type:'Agbada',amount:35000}],bankName:'Zenith',accountNo:'1099887700',accountName:'Musa',docs:[],timeline:[{id:'tl5',at:iso(1500),type:'Joined',text:'Joined as freelance Embroiderer (2024-09-01)',by:'Adé Sowande'}]},
   ]);
   // A custom role this demo business created — proves the app adapts to roles beyond the built-in five.
   // Production + orders + team, with every finance/sales key explicitly denied so no PERM_FALLBACK can leak money in.
@@ -8126,7 +8202,7 @@ function loadExample(force){
     {id:'headprod',name:'Head of Production',builtin:false,perms:{orders:1,allOrders:1,del:1,update:1,canQC:1,canDispatch:1,products:1,supplies:1,customers:1,seeContact:1,team:1,editStaff:1,tasks:1,attendance:1,branchSwitch:1,appts:0,marketing:0,logistics:0,sales:0,receivables:0,money:0,finance:0,expenses:0,funds:0,payroll:0,seeProfit:0,seeCost:0,audit:0,settings:0,users:0}},
   ]));
   setUsers([
-    {id:'u-owner',name:'Kay Ojomo',username:'owner',pin:(SETTINGS.ownerPassword||'layi2025'),roleId:'owner',staffId:'',active:true,createdAt:new Date().toISOString()},
+    {id:'u-owner',name:'Adé Sowande',username:'owner',pin:(SETTINGS.ownerPassword||'layi2025'),roleId:'owner',staffId:'',active:true,createdAt:new Date().toISOString()},
     {id:'u-idara',name:'Idara Umah',username:'idara',pin:'idara123',roleId:'cre',staffId:'st-demo2',active:true,createdAt:new Date().toISOString()},
     {id:'u-franklin',name:'Franklin',username:'franklin',pin:'franklin123',roleId:'tailor',staffId:'st-demo1',active:true,createdAt:new Date().toISOString()},
     {id:'u-bisi',name:'Bisi Adeyemi',username:'manager',pin:'manager123',roleId:'manager',staffId:'',active:true,createdAt:new Date().toISOString()},
@@ -8134,18 +8210,18 @@ function loadExample(force){
     {id:'u-seyi',name:'Seyi Balogun',username:'production',pin:'production123',roleId:'headprod',staffId:'',active:true,createdAt:new Date().toISOString()},
   ]);
   setTasks([
-    {id:'tk-1',title:'Cut emerald lace for Mrs Oladuja (L-0003)',note:'Beaded neckline, coordinate with Musa',who:'st-demo1',due:dd(2),done:false,by:'Kay Ojomo',at:iso(120)},
-    {id:'tk-2',title:'Call A. Bakare to book final fitting',note:'',who:'st-demo2',due:dd(1),done:false,by:'Kay Ojomo',at:iso(60)},
-    {id:'tk-3',title:'Finish beadwork on Ngozi Eze gown (L-0006)',note:'QC waiting on this',who:'st-demo5',due:dd(-1),done:false,by:'Kay Ojomo',at:iso(200)},
-    {id:'tk-4',title:'Chase Yusuf Bello balance (L-0007)',note:'₦240k outstanding',who:'st-demo2',due:dd(-2),done:false,by:'Kay Ojomo',at:iso(300)},
-    {id:'tk-5',title:'Reorder branded boxes, running low',note:'Below reorder level',who:'st-demo2',due:dd(3),done:false,by:'Kay Ojomo',at:iso(90)},
-    {id:'tk-6',title:'Press & package Tola Smart casual set',note:'',who:'st-demo4',due:dd(-3),done:true,doneAt:iso(180),doneBy:'Hassan',by:'Kay Ojomo',at:iso(1400)},
+    {id:'tk-1',title:'Cut emerald lace for Mrs Oladuja (L-0003)',note:'Beaded neckline, coordinate with Musa',who:'st-demo1',due:dd(2),done:false,by:'Adé Sowande',at:iso(120)},
+    {id:'tk-2',title:'Call A. Bakare to book final fitting',note:'',who:'st-demo2',due:dd(1),done:false,by:'Adé Sowande',at:iso(60)},
+    {id:'tk-3',title:'Finish beadwork on Ngozi Eze gown (L-0006)',note:'QC waiting on this',who:'st-demo5',due:dd(-1),done:false,by:'Adé Sowande',at:iso(200)},
+    {id:'tk-4',title:'Chase Yusuf Bello balance (L-0007)',note:'₦240k outstanding',who:'st-demo2',due:dd(-2),done:false,by:'Adé Sowande',at:iso(300)},
+    {id:'tk-5',title:'Reorder branded boxes, running low',note:'Below reorder level',who:'st-demo2',due:dd(3),done:false,by:'Adé Sowande',at:iso(90)},
+    {id:'tk-6',title:'Press & package Tola Smart casual set',note:'',who:'st-demo4',due:dd(-3),done:true,doneAt:iso(180),doneBy:'Hassan',by:'Adé Sowande',at:iso(1400)},
   ]);
-  setAnns([{id:'an-1',text:'Great work this week, team. Three orders ready ahead of schedule. Studio closed Friday for a public holiday.',by:'Kay Ojomo',at:iso(30)}]);
+  setAnns([{id:'an-1',text:'Great work this week, team. Three orders ready ahead of schedule. Studio closed Friday for a public holiday.',by:'Adé Sowande',at:iso(30)}]);
   setAttendance([]);
   const dago=d=>iso(d*1440);
   const exOrders=[
-    {id:'L-0001',client:'A. Bakare',clientPhotos:[],outfits:[{type:'Agbada',name:'Wedding agbada set',price:380000,photos:[],style:'Royal blue, hand-embroidered',finish:'Monogram on cap'},{type:'Shoes',name:'Matching leather slippers',price:60000,photos:[],style:'',finish:''}],value:440000,paid:220000,discount:0,costs:[{label:'Aso-oke fabric',amount:45000,supplier:'Aso-oke House, Lagos'},{label:'Leather',amount:12000,supplier:'Mushin Leather'}],commissions:[{staffId:'st-demo1',kind:'maker',work:'Tailoring',amount:65000,paid:false},{staffId:'st-demo3',kind:'maker',work:'Shoemaking',amount:6000,paid:false},{staffId:'st-demo2',kind:'referral',amount:8000,paid:false}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[{potId:'p-demo1',amount:34200},{potId:'p-demo2',amount:11400}],garment:'Wedding agbada + slippers',due:dd(2),stageIndex:7,stockUsed:[{supplyId:'s-3',qty:1}],qc:{status:'passed',items:[{label:'Measurements match the spec',ok:true},{label:'Stitching & seams clean',ok:true},{label:'Fit confirmed / tried on',ok:true},{label:'Finishing & detailing correct',ok:true},{label:'Embellishment / monogram correct',ok:true},{label:'Pressed & packaged neatly',ok:true}],note:'Monogram clean, pressed and bagged.',by:'Kay Ojomo',at:dago(2)},satisfaction:5,createdAt:dago(20),updates:[{at:dago(16),stage:'Cutting',note:'Aso-oke cut',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]},{at:dago(6),stage:'Fitting',note:'First fitting done, take in sleeves',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]},{at:dago(2),stage:'Ready for Delivery',note:'Passed QC, ready',by:'Kay Ojomo',workerId:'st-demo1',worker:'Franklin',photos:[]}]},
+    {id:'L-0001',client:'A. Bakare',clientPhotos:[],outfits:[{type:'Agbada',name:'Wedding agbada set',price:380000,photos:[],style:'Royal blue, hand-embroidered',finish:'Monogram on cap'},{type:'Shoes',name:'Matching leather slippers',price:60000,photos:[],style:'',finish:''}],value:440000,paid:220000,discount:0,costs:[{label:'Aso-oke fabric',amount:45000,supplier:'Aso-oke House, Lagos'},{label:'Leather',amount:12000,supplier:'Mushin Leather'}],commissions:[{staffId:'st-demo1',kind:'maker',work:'Tailoring',amount:65000,paid:false},{staffId:'st-demo3',kind:'maker',work:'Shoemaking',amount:6000,paid:false},{staffId:'st-demo2',kind:'referral',amount:8000,paid:false}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[{potId:'p-demo1',amount:34200},{potId:'p-demo2',amount:11400}],garment:'Wedding agbada + slippers',due:dd(2),stageIndex:7,stockUsed:[{supplyId:'s-3',qty:1}],qc:{status:'passed',items:[{label:'Measurements match the spec',ok:true},{label:'Stitching & seams clean',ok:true},{label:'Fit confirmed / tried on',ok:true},{label:'Finishing & detailing correct',ok:true},{label:'Embellishment / monogram correct',ok:true},{label:'Pressed & packaged neatly',ok:true}],note:'Monogram clean, pressed and bagged.',by:'Adé Sowande',at:dago(2)},satisfaction:5,createdAt:dago(20),updates:[{at:dago(16),stage:'Cutting',note:'Aso-oke cut',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]},{at:dago(6),stage:'Fitting',note:'First fitting done, take in sleeves',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]},{at:dago(2),stage:'Ready for Delivery',note:'Passed QC, ready',by:'Adé Sowande',workerId:'st-demo1',worker:'Franklin',photos:[]}]},
     {id:'L-0002',client:'M. Bello',clientPhotos:[],outfits:[{type:'Kaftan',name:'Linen kaftan',price:120000,photos:[],style:'Sand linen',finish:''}],value:120000,paid:120000,discount:0,costs:[{label:'Linen',amount:15000}],commissions:[{staffId:'st-demo4',kind:'maker',work:'Tailoring',amount:35000,paid:true}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[{potId:'p-demo1',amount:9000},{potId:'p-demo2',amount:3000}],delivery:{enabled:true,fee:3500,location:'Ikoyi, Lagos',company:'GIG Logistics',tracking:'GIG48820',status:'Delivered'},garment:'Linen kaftan',due:dd(-4),stageIndex:8,satisfaction:4,createdAt:dago(30),updates:[{at:dago(26),stage:'Cutting',note:'Fabric cut',by:'Hassan',workerId:'st-demo4',worker:'Hassan',photos:[]},{at:dago(22),stage:'Ready for Delivery',note:'Pressed & bagged',by:'Hassan',workerId:'st-demo4',worker:'Hassan',photos:[]},{at:dago(21),stage:'Dispatched',note:'Handed to GIG',by:'Idara Umah',workerId:'st-demo4',worker:'Hassan',photos:[]}]},
     {id:'L-0003',client:'Mrs Oladuja',clientPhotos:[],outfits:[{type:'Bespoke outfit',name:'Aso-ebi gown',price:220000,photos:[],style:'Emerald lace',finish:'Beaded neckline'},{type:'Accessory',name:'Gele & ipele',price:40000,photos:[],style:'',finish:''}],value:260000,paid:130000,discount:20000,costs:[{label:'Lace',amount:35000,supplier:'Idumota Textiles'}],commissions:[{staffId:'st-demo1',kind:'maker',work:'Tailoring',amount:60000,paid:false},{staffId:'st-demo5',kind:'maker',work:'Beading',amount:30000,paid:false}],directorPct:25,directorAmount:null,directorOn:false,potContribs:[{potId:'p-demo1',amount:18000},{potId:'p-demo2',amount:6000}],garment:'Aso-ebi gown + gele',due:dd(2),stageIndex:2,createdAt:dago(4),updates:[{at:dago(2),stage:'Cutting',note:'Lace cut, beadwork briefed to Musa',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]}]},
     {id:'L-0004',client:'Chief Adeyemi',clientPhotos:[],outfits:[{type:'Agbada',name:'3-piece ceremonial agbada',price:650000,photos:[],style:'Wine guinea brocade',finish:'Full chest embroidery'}],value:650000,paid:300000,discount:0,costs:[{label:'Guinea brocade',amount:90000,supplier:'Aso-oke House, Lagos'}],commissions:[{staffId:'st-demo1',kind:'maker',work:'Tailoring',amount:65000,paid:false},{staffId:'st-demo5',kind:'maker',work:'Embroidery',amount:35000,paid:false}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[{potId:'p-demo1',amount:45000},{potId:'p-demo2',amount:15000}],garment:'3-piece agbada',due:dd(-1),stageIndex:4,createdAt:dago(10),updates:[{at:dago(7),stage:'Cutting',note:'Cut',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]},{at:dago(3),stage:'Stitching',note:'Assembly underway',by:'Franklin',workerId:'st-demo1',worker:'Franklin',photos:[]}]},
@@ -8230,8 +8306,8 @@ function loadExample(force){
   SETTINGS.budgets={Production:600000,Marketing:150000,Operations:400000,Sales:120000};
   SETTINGS.branches=[{id:'br-lag',name:'Lagos studio',location:'Surulere, Lagos',active:true,type:'bespoke',channels:['showroom']},{id:'br-abj',name:'Abuja outlet',location:'Wuse, Abuja',active:true,type:'rtw',channels:['showroom','online']},{id:'br-ib',name:'Ibadan branch',location:'Bodija, Ibadan',active:true,type:'rtw',does:['garments:stock','leather:make','leather:stock'],channels:['showroom']},{id:'br-kan',name:'Kano store',location:'Nassarawa, Kano',active:true,type:'fabrics',channels:['showroom','online']}];
   setCampaigns([
-    {id:uid('cmp'),at:dd(-4)+'T10:00:00.000Z',by:'Kay Ojomo',subject:'Festive agbada collection is here',message:'Our new festive pieces just dropped.',type:'Launch',channel:'whatsapp',segment:'all',segmentName:'All reachable',recipients:6},
-    {id:uid('cmp'),at:dd(-18)+'T10:00:00.000Z',by:'Kay Ojomo',subject:'10% off for our VIP clients',message:'A thank-you to our top clients.',type:'Promotion',channel:'email',segment:'vip',segmentName:'VIP, top tier',recipients:2}
+    {id:uid('cmp'),at:dd(-4)+'T10:00:00.000Z',by:'Adé Sowande',subject:'Festive agbada collection is here',message:'Our new festive pieces just dropped.',type:'Launch',channel:'whatsapp',segment:'all',segmentName:'All reachable',recipients:6},
+    {id:uid('cmp'),at:dd(-18)+'T10:00:00.000Z',by:'Adé Sowande',subject:'10% off for our VIP clients',message:'A thank-you to our top clients.',type:'Promotion',channel:'email',segment:'vip',segmentName:'VIP, top tier',recipients:2}
   ]);
   // attendance for the last few days
   const exAtt=[];[['u-franklin','Franklin'],['u-idara','Idara Umah']].forEach(([uId,nm])=>{[0,1,2,3].forEach(k=>{const inT=new Date(Date.now()-k*86400000);inT.setHours(8,30,0,0);const outT=new Date(Date.now()-k*86400000);outT.setHours(17,0,0,0);exAtt.push({id:uid('at'),userId:uId,name:nm,date:dd(-k),inAt:inT.toISOString(),outAt:k===0?'':outT.toISOString()});});});
@@ -8253,14 +8329,19 @@ function loadExample(force){
     {id:'lg-7',date:dd(-2),category:'Incident',title:'Fabric delivery arrived short by 3 yards',note:'Supplier (Aso-oke House) credited the difference. Logged for follow-up.',by:'Idara Umah',at:dago(2)}
   ]);
   setAudit([
-    {id:'au-1',at:dago(6),by:'Kay Ojomo',role:'Owner',action:'Order created',detail:'L-0008 · Chidinma Okafor'},
+    {id:'au-1',at:dago(6),by:'Adé Sowande',role:'Owner',action:'Order created',detail:'L-0008 · Chidinma Okafor'},
     {id:'au-2',at:dago(5),by:'Idara Umah',role:'Client Relations',action:'Payment recorded',detail:'Tunde Bello · ₦120,000'},
     {id:'au-3',at:dago(4),by:'Franklin',role:'Tailor / Workroom',action:'QC passed',detail:'Emeka Nwosu · 3-piece agbada'},
-    {id:'au-4',at:dago(3),by:'Kay Ojomo',role:'Owner',action:'Role saved',detail:'Tailor / Workroom'},
-    {id:'au-5',at:dago(2),by:'Kay Ojomo',role:'Owner',action:'Account created',detail:'hassan'},
+    {id:'au-4',at:dago(3),by:'Adé Sowande',role:'Owner',action:'Role saved',detail:'Tailor / Workroom'},
+    {id:'au-5',at:dago(2),by:'Adé Sowande',role:'Owner',action:'Account created',detail:'hassan'},
     {id:'au-6',at:dago(1),by:'Idara Umah',role:'Client Relations',action:'Expense added',detail:'Courier (Lagos) · ₦8,500'}
   ]);
-  SETTINGS.company=Object.assign({},SETTINGS.company,{name:'LAYI',address:'LAYI Studio, Lagos, Nigeria',email:'hello@layiojomo.com',phone:'+234 800 000 0000',reg:'RC 1234567',payInstructions:'Balance due on collection.',showPhotos:true,banks:[{currency:'NGN',bank:'GTBank',name:'LAYI',no:'0123456789'},{currency:'GBP',bank:'Wise',name:'Kay Ojomo',no:'GB00 ABCD 0000'},{currency:'USD',bank:'Wise',name:'Kay Ojomo',no:'US00 1234 5678'}]});
+  /* The example studio is a made up one. It used to be LAYI, which is
+     Kayode's own label, and the public website's screenshots are captures
+     of this seed, so his brand and his books were on the marketing site.
+     The email is on the .example TLD, which IANA reserves and which can
+     therefore never belong to anybody. */
+  SETTINGS.company=Object.assign({},SETTINGS.company,{name:'Adé Atelier',address:'Adé Atelier, Lagos, Nigeria',email:'hello@adeatelier.example',phone:'+234 800 000 0000',reg:'RC 1234567',payInstructions:'Balance due on collection.',showPhotos:true,banks:[{currency:'NGN',bank:'GTBank',name:'Adé Atelier',no:'0123456789'},{currency:'GBP',bank:'Wise',name:'Adé Sowande',no:'GB00 ABCD 0000'},{currency:'USD',bank:'Wise',name:'Adé Sowande',no:'US00 1234 5678'}]});
   delete SETTINGS.suppliers;SETTINGS.stagesV2=true;SETTINGS.currency='NGN';
   SETTINGS.productCatalog=[
     {id:'pc-agbada',name:'Agbada',category:'Garment',materials:[{name:'Aso-oke',variants:['Royal blue','Wine','Silver']},{name:'Guinea brocade',variants:[]},{name:'Velvet',variants:[]},{name:'Atiku',variants:[]}]},
@@ -8301,7 +8382,7 @@ function loadExample(force){
     {id:'s-9',branch:'Lagos studio',name:'Glass beads (gold)',cat:'Raw Materials',subcat:'Embellishments',qty:5,unit:'packs',reorder:6,cost:4500,supplierId:'sp-9',note:'Beaded gele & clutches',updatedAt:new Date().toISOString(),moves:[{at:dago(30),type:'in',qty:8,note:'Opening stock',ref:''},{at:dago(5),type:'out',qty:3,note:'Used',ref:'L-0011'}]},
     {id:'s-10',branch:'Lagos studio',name:'Horn buttons',cat:'Components',subcat:'Buttons & Fasteners',qty:140,unit:'pcs',reorder:50,cost:180,supplierId:'sp-8',note:'Agbada & kaftans',updatedAt:new Date().toISOString(),moves:[{at:dago(40),type:'in',qty:160,note:'Opening stock',ref:''},{at:dago(7),type:'out',qty:20,note:'Used',ref:''}]},
     {id:'s-11',branch:'Lagos studio',name:'YKK zips (assorted)',cat:'Components',subcat:'Zips',qty:45,unit:'pcs',reorder:20,cost:250,supplierId:'sp-8',note:'',updatedAt:new Date().toISOString(),moves:[{at:dago(30),type:'in',qty:50,note:'Opening stock',ref:''},{at:dago(5),type:'out',qty:5,note:'Used',ref:''}]},
-    {id:'s-12',branch:'Lagos studio',name:'Woven brand labels',cat:'Components',subcat:'Woven Tags',qty:8,unit:'packs',reorder:10,cost:3000,supplierId:'sp-7',note:'LAYI sewn-in labels',updatedAt:new Date().toISOString(),moves:[{at:dago(28),type:'in',qty:12,note:'Opening stock',ref:''},{at:dago(4),type:'out',qty:4,note:'Used',ref:''}]},
+    {id:'s-12',branch:'Lagos studio',name:'Woven brand labels',cat:'Components',subcat:'Woven Tags',qty:8,unit:'packs',reorder:10,cost:3000,supplierId:'sp-7',note:'Sewn-in brand labels',updatedAt:new Date().toISOString(),moves:[{at:dago(28),type:'in',qty:12,note:'Opening stock',ref:''},{at:dago(4),type:'out',qty:4,note:'Used',ref:''}]},
     {id:'s-13',branch:'Lagos studio',name:'Hang tags',cat:'Components',subcat:'Hang Tags',qty:60,unit:'pcs',reorder:30,cost:90,supplierId:'sp-7',note:'Printed card tags',updatedAt:new Date().toISOString(),moves:[{at:dago(25),type:'in',qty:80,note:'Opening stock',ref:''},{at:dago(3),type:'out',qty:20,note:'Used',ref:''}]},
     {id:'s-14',name:'Thank-you cards',cat:'Packaging',subcat:'Thank You Cards',qty:36,unit:'pcs',reorder:20,cost:150,supplierId:'sp-7',note:'',updatedAt:new Date().toISOString(),moves:[{at:dago(26),type:'in',qty:50,note:'Opening stock',ref:''},{at:dago(8),type:'out',qty:14,note:'Used',ref:''}]},
     {id:'s-15',branch:'Lagos studio',name:'Hand-sewing needles',cat:'Tools & Equipment',subcat:'Needles & Notions',qty:8,unit:'packs',reorder:10,cost:600,supplierId:'',note:'Assorted sizes',updatedAt:new Date().toISOString(),moves:[{at:dago(35),type:'in',qty:12,note:'Opening stock',ref:''},{at:dago(7),type:'out',qty:4,note:'Workroom use',ref:''}]},

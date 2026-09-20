@@ -314,7 +314,12 @@ section('A plan with no seat limit reads as one');
        looking for. Set the tab the way the console does. */
     const subTab = run('(function(){try{UI.vtab["sub"+' + JSON.stringify(sub.id) + ']="subscription";return DETAIL.sub(' + JSON.stringify(sub.id) + ');}catch(e){return "ERR:"+e.message;}})()');
     ok('the subscription tab renders for an unlimited plan', String(subTab).indexOf('ERR:') !== 0, String(subTab).slice(0, 120));
-    ok('and reaches the seats line at all', /Seats included/.test(String(subTab)), 'the tab rendered but has no seats row to check');
+    /* It used to be one row saying "Seats included". Since 20 Sep the
+       database enforces BOTH ceilings, so the tab has to show both or an
+       operator cannot answer "why were they refused another outlet". */
+    ok('and reaches the usage lines at all',
+       /Team logins/.test(String(subTab)) && /Studios/.test(String(subTab)),
+       'the tab rendered but has no usage rows to check');
     ok('and does not quote 0 seats included', String(subTab).indexOf('>0 (using') < 0);
     run('(function(){UI.vtab["sub"+' + JSON.stringify(sub.id) + ']="profile";})()');
   }
@@ -628,9 +633,11 @@ section('Only partners earn, and the console says so');
   ok('and that opens the ordinary partner invitation rather than a second one',
      /function makeSubscriberAPartner[\s\S]{0,400}formInvitePartner\(/.test(everyScript));
 
-  /* the partner ladder reached the console */
-  ['Getting started, 0%', 'Unlocked, 6%', 'Established, 7%', 'Senior, 8%'].forEach(label => {
-    ok('the console knows the tier "' + label + '"', everyScript.indexOf(label) !== -1);
+  /* The ladder is gone, and what matters now is that no trace of it is
+     left anywhere an operator could act on. A stale label is a wrong
+     answer to somebody on the phone; a stale CONTROL is a promise. */
+  ['Getting started', 'Unlocked, 6%', 'Established, 7%', 'Senior, 8%', 'ipTier'].forEach(label => {
+    ok('no tier called "' + label + '" survives in the console', everyScript.indexOf(label) === -1);
   });
   ok('and none of the old rates are still printed anywhere',
      !/Bronze'|15%|18%|22%|25%/.test(everyScript.split('Housing is 15%').join('')));
@@ -644,4 +651,17 @@ if (failures.length) {
 }
 console.log(pass + ' passed, 0 failed');
 console.log('\nA studio that exists in the database reaches the screen, which is');
+
+/* The type tokens have to be in :root, not in a theme block. --shadow is
+   declared in BOTH :root and body.light, so a patch anchored on it lands in
+   whichever one it matched first. That happened on 20 Sep: --sans and --serif
+   went into body.light, and the dark console rendered every word in Times New
+   Roman. It is glaring on screen and invisible in a diff. */
+try {
+  const css = fs.readFileSync(path.join(__dirname, 'admin', 'css', 'app.css'), 'utf8');
+  const root = css.slice(css.indexOf(':root{'), css.indexOf('}', css.indexOf(':root{')));
+  ok('the sans token is in :root, where no theme can take it away', /--sans:/.test(root));
+  ok('and so is the serif token', /--serif:/.test(root));
+  ok('the serif is the one the brand uses', /Fraunces/.test(root));
+} catch (e) { ok('the stylesheet was readable', false, e.message); }
 console.log('the only part of the gateway anybody actually sees.');

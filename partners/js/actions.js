@@ -364,16 +364,17 @@ function downloadStatement(ref) {
     '-'.repeat(70)
   ];
   items.forEach(r => {
-    lines.push(pad(r.date, 14) + pad(r.type === 'bonus' ? 'Milestone bonus' : r.business, 34) +
+    lines.push(pad(r.date, 14) + pad(r.business, 34) +
       pad(r.rate ? r.rate + '%' : '-', 7) + money(r.amount));
   });
   lines.push('-'.repeat(70));
   lines.push(pad('', 55) + 'TOTAL  ' + money(p.amount));
   lines.push('');
-  lines.push('Commission is ' + DB.settings.baseRatePct + '% of what each referred account pays,');
-  lines.push('every month, for four years from the day they first paid. Years three and four');
-  lines.push('are at 3%. Your rate follows how many accounts are active and paying now and');
-  lines.push('applies from that day forward. Nothing already credited is ever recalculated.');
+  lines.push('Commission is ' + DB.settings.baseRatePct + '% of what each referred business pays:');
+  lines.push('every month for ' + DB.settings.termMonths + ' months from their first payment on a monthly');
+  lines.push('plan, or once on a yearly plan. It stops the day a business stops paying, and');
+  lines.push('nothing already credited is ever recalculated. The same rate applies to every');
+  lines.push('partner and every business.');
   lines.push('Each month clears ' + DB.settings.holdDays + ' days after it is credited.');
   lines.push('Questions: ' + DB.me.manager.email);
 

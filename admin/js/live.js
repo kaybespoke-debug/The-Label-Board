@@ -586,6 +586,66 @@ async function liveSetStorageCap(subId, gb, note) {
   await liveLoadTenants();
 }
 
+/* An agreed ceiling on ONE studio, which is how a Bespoke contract gets
+   recorded and how a promise made on a call stops being only a promise.
+   null on either side puts that one back on the plan's own limit.
+
+   A ceiling below what they already have is allowed, and is not a way to
+   take anything away: the limit is only read when something is ADDED, so
+   the studio keeps every outlet and every login it has. */
+/* The patterns worth a second look. Cached on DB rather than fetched per
+   render, for the same reason the commission summary is: a detail view
+   re-renders on every keystroke in the search box above it. */
+async function liveLoadReferralRisk() {
+  const out = await liveCall('referralRisk');
+  DB.referralRisk = (out.risk || []).map(function (r) {
+    return {
+      partnerId: r.partner_id, partner: r.partner_name || '', code: r.partner_code || '',
+      businessId: r.business_id, business: r.business_name || '',
+      kind: r.kind, detail: r.detail || '', at: r.at || ''
+    };
+  });
+  return DB.referralRisk;
+}
+
+/* Freezing needs a reason in the database as well as here, so a freeze can
+   never be a thing somebody did that nobody can explain later. */
+async function liveSetPayoutFrozen(partnerId, frozen, reason) {
+  await liveCall('setPayoutFrozen', { id: partnerId, frozen: !!frozen, reason: reason || '' });
+  await liveLoadPartners();
+}
+
+async function liveSetStudioLimits(subId, studios, seats) {
+  const s = Q.sub(subId);
+  if (!s || !s.live) throw new Error('That is an example subscriber, not a real studio.');
+  const num = v => (v === null || v === undefined || v === '') ? null : Number(v);
+  await liveCall('setStudioLimits', { id: s.liveId, studios: num(studios), seats: num(seats) });
+  await liveLoadTenants();
+}
+
+/* One partner's businesses, month by month. The SAME function the portal
+   reads through my_commission_summary, so an operator and a partner
+   looking at the same account see the same figures. Cached on DB rather
+   than fetched on every render, because a detail view re-renders on every
+   keystroke in a search box above it. */
+async function liveLoadPartnerCommission(partnerId) {
+  const out = await liveCall('partnerCommission', { id: partnerId });
+  DB.partnerCommission = DB.partnerCommission || {};
+  DB.partnerCommission[partnerId] = (out.referrals || []).map(function (r) {
+    return {
+      id: r.referral_id, business: r.business_name || '', plan: r.plan || '',
+      cycle: r.cycle || '', subscribedOn: r.subscribed_on || '', lapsedOn: r.lapsed_on || '',
+      active: !!r.is_active, ratePct: Number(r.rate_pct) || 0,
+      monthsCredited: Number(r.months_credited) || 0,
+      termEndsOn: r.term_ends_on || '',
+      earned: Number(r.earned_total) || 0,
+      cleared: Number(r.earned_cleared) || 0,
+      paid: Number(r.earned_paid) || 0
+    };
+  });
+  return DB.partnerCommission[partnerId];
+}
+
 async function liveRecordPayment(subId, amount, method, reference, note) {
   const s = Q.sub(subId);
   if (!s || !s.live) throw new Error('That is an example subscriber, not a real studio.');
@@ -717,9 +777,13 @@ async function inviteIntoCohort() {
   }
 }
 
-async function liveInvitePartner(email, name, code, tier, enquiryId) {
+/* No tier. Every partner earns the same 8% of what each business they
+   bring actually pays, so there was nothing for the argument to carry
+   and a caller passing one would have been passing a preference the
+   programme does not have. */
+async function liveInvitePartner(email, name, code, enquiryId) {
   return await liveCall('invitePartner', {
-    email: email, name: name, code: code, tier: tier || 'bronze',
+    email: email, name: name, code: code,
     enquiryId: enquiryId || ''
   });
 }
@@ -764,7 +828,7 @@ async function approveEnquiry(id) {
     + '\n\nThey set their own password. Nothing is sent to you.')) return;
 
   try {
-    if (isPartner) await liveInvitePartner(e.email, named, code, 'bronze', e.id);
+    if (isPartner) await liveInvitePartner(e.email, named, code, e.id);
     else await liveInviteStudio(e.email, named, e.id, intoCohort ? COHORT.key : '');
     await liveLoadEnquiries();
     /* The places-left figure is counted from the studios, so it does not move
@@ -792,16 +856,34 @@ async function approveEnquiry(id) {
    them cannot answer it. */
 async function liveLoadPartners() {
   try {
+    /* platform_partner_summary now, not a select on the table, so the
+       money arrives with the name rather than in a second call that could
+       be a render behind it. The figures are the ledger's, not worked out
+       here: the same function the portal reads through
+       my_commission_summary is what the console opens for one partner. */
     const out = await liveCall('partners');
     DB.partners = (out.partners || []).map(function (p) {
       return {
         id: p.id, code: p.code || '', name: p.name || '',
         business: p.business_name || '', email: p.email || p.pending_email || '',
         phone: p.phone || '', city: p.city || '',
-        tier: p.tier || 'bronze', status: p.status || 'active',
+        status: p.status || 'active',
         joined: p.joined_on || '',
         claimed: !!p.user_id,
-        pending: !p.user_id && !!p.pending_email
+        pending: !p.user_id && !!p.pending_email,
+        ratePct: Number(p.rate_pct) || 0,
+        referrals: Number(p.referrals) || 0,
+        referralsPaying: Number(p.referrals_paying) || 0,
+        referralsLapsed: Number(p.referrals_lapsed) || 0,
+        earned: Number(p.earned_total) || 0,
+        pendingAmount: Number(p.pending_amount) || 0,
+        owed: Number(p.owed_amount) || 0,
+        paid: Number(p.paid_amount) || 0,
+        lastPayoutOn: p.last_payout_on || '',
+        lastPayoutRef: p.last_payout_ref || '',
+        kind: p.kind || 'partner',
+        frozen: !!p.payout_frozen,
+        frozenReason: p.frozen_reason || ''
       };
     });
     return true;

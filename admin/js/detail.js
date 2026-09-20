@@ -61,7 +61,12 @@ DETAIL.sub = function (id) {
       kv('Billing cycle', s.cycle === 'annual' ? 'Annual, paid up front' : s.cycle === 'trial' ? 'Free trial' : 'Monthly') +
       kv('List price', p.invoiceOnly ? 'Invoiced per business' : s.cycle === 'annual' ? money(p.annual) + ' / year' : p.monthly ? money(p.monthly) + ' / month' : 'Free') +
       kv('Recognised MRR', s.mrr ? money(s.mrr) : '—') +
-      kv('Seats included', p.seats ? p.seats + ' (using ' + s.users + ')' : 'Unlimited (using ' + s.users + ')') +
+      /* Both ceilings, both counts, and a word when they are over one.
+         This used to be one line about seats, from before the database
+         held anybody to either number. An operator asked "why can they
+         not add another outlet" had nowhere to look. */
+      kv('Studios', planUse(s.outlets, p.studios)) +
+      kv('Team logins', planUse(s.users, p.seats)) +
       kv('Renews on', s.status === 'expired' ? '<span class="note">Not renewing</span>' : fmtD(s.renewsOn) + (s.renewIn <= 7 && s.renewIn >= 0 ? ' <span class="pill amber">in ' + s.renewIn + 'd</span>' : '')) +
       '<div class="sec-t">Value</div>' +
       kv('Lifetime revenue', money(lifetime)) +
@@ -70,8 +75,13 @@ DETAIL.sub = function (id) {
       kv('Refunds', pays.filter(x => x.status === 'refunded').length) +
       '<div class="sec-t">Plan includes</div>' +
       '<div class="chips">' + p.features.map(f => '<span class="chip on">' + f + '</span>').join('') + '</div>' +
+      (overPlan(s) ? '<p class="note" style="margin-top:10px;color:var(--amber)">' +
+        'This account is over a limit on its plan. Nothing has been taken away from them ' +
+        'and nothing will be: they keep everything they already had and simply cannot add ' +
+        'more. Move them up a plan, or agree a ceiling on this business.</p>' : '') +
       '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">' +
       '<button class="btn gold" onclick="formChangePlan(' + s.id + ')">Change plan</button>' +
+      '<button class="btn" onclick="formStudioLimits(' + s.id + ')">Agree a limit</button>' +
       '<button class="btn" onclick="setVTab(\'' + key + '\',\'payments\')">See payments</button>' +
       '</div>';
   }
@@ -563,6 +573,60 @@ DETAIL.ticket = function (id) {
 };
 
 /* =================== PAYMENT =================== */
+/* =================== A PARTNER ===================
+   What they brought, what it earned, and when each business runs out.
+
+   Every figure here comes from partner_commission_summary, which is the
+   same function the portal reads. That is the point of the view rather
+   than a detail of it: an operator on the phone to a partner who is
+   querying a figure has to be looking at the partner's own numbers, not
+   at a second calculation that agrees with them most of the time. */
+DETAIL.partner = function (id) {
+  const p = (DB.partners || []).find(x => String(x.id) === String(id));
+  if (!p) return backBtn() + '<div class="pnl"><div class="empty">That partner is not here.</div></div>';
+  const rows = ((DB.partnerCommission || {})[id]) || [];
+
+  const head = '<div class="pnl"><div class="ph"><div><h3>' + esc(p.name || '(no name)') + '</h3>' +
+    '<div class="ph-sub">' + esc(p.business || '') + (p.code ? ' \u00b7 <code>' + esc(p.code) + '</code>' : '') + '</div></div>' +
+    (p.email ? '<a class="btn" href="mailto:' + esc(p.email) + '">Email</a>' : '') +
+    '<button class="btn' + (p.frozen ? ' gold' : ' danger') + '" onclick="formFreezePayout(\'' + p.id + '\')">' +
+    (p.frozen ? 'Release payouts' : 'Freeze payouts') + '</button></div>' +
+    (p.frozen ? '<p class="note" style="color:var(--red)">Payouts frozen: ' +
+      esc(p.frozenReason || 'no reason recorded') + '</p>' : '') +
+    kv('How they came in', p.kind === 'customer'
+      ? 'A customer of ours, on the same programme as everybody else'
+      : 'A partner rather than a customer, on the same programme as everybody else') +
+    kv('Rate', (p.ratePct || 0) + '% of what each business pays') +
+    kv('Businesses brought', (p.referrals || 0) + ' \u00b7 ' + (p.referralsPaying || 0) + ' still paying') +
+    kv('Earned all time', money(p.earned || 0)) +
+    kv('On hold', (p.pendingAmount ? money(p.pendingAmount) + ' inside the 31 day hold' : 'Nothing on hold')) +
+    kv('Owed now', (p.owed ? money(p.owed) : 'Nothing cleared and unpaid')) +
+    kv('Paid out', money(p.paid || 0) + (p.lastPayoutOn ? ' \u00b7 last ' + fmtD(p.lastPayoutOn) : ' \u00b7 never')) +
+    '</div>';
+
+  const table = rows.length
+    ? '<div class="pnl"><div class="sec-t">Every business they brought</div>' +
+      '<div class="tw"><table><thead><tr><th>Business</th><th class="hide-sm">Plan</th>' +
+      '<th>Months</th><th class="hide-sm">Earning until</th><th class="num">Earned</th></tr></thead><tbody>' +
+      rows.map(r => '<tr>' +
+        '<td><div class="t-main">' + esc(r.business) + '</div>' +
+        '<div class="t-sub">' + (r.active ? 'Paying since ' + fmtD(r.subscribedOn)
+          : r.lapsedOn ? 'Left ' + fmtD(r.lapsedOn) : 'Not paying yet') + '</div></td>' +
+        '<td class="hide-sm">' + esc(r.plan) + '<div class="note">' + esc(r.cycle) + '</div></td>' +
+        '<td>' + r.monthsCredited + (r.cycle === 'annual' ? '<div class="note">paid once</div>' : '') + '</td>' +
+        '<td class="hide-sm">' + (r.termEndsOn ? fmtD(r.termEndsOn) : '\u2014') + '</td>' +
+        '<td class="num">' + money(r.earned) + '</td></tr>').join('') +
+      '</tbody></table></div>' +
+      '<p class="note" style="margin-top:10px">These are the figures the partner sees in their own ' +
+      'portal, read from the same place. A business earns for twelve months from the day it first ' +
+      'paid, or once if it pays yearly, and stops the day it stops paying.</p></div>'
+    : '<div class="pnl"><div class="empty">Nothing to show yet.<br>' +
+      '<span class="note">Either they have not brought a paying business, or the console is in ' +
+      'example mode and there is no live ledger to read.</span></div></div>';
+
+  return backBtn() + head + table;
+};
+
 DETAIL.pay = function (id) {
   const p = DB.payments.find(x => x.id === +id);
   if (!p) return '<div class="empty">Payment not found.</div>';

@@ -6,6 +6,22 @@
   --gold:#c9a24b;--gold-2:#ddb968;--on-gold:#1a1305;
   --green:#3f9d78;--red:#d6706f;--amber:#d3a34a;--blue:#5a9fd4;--purple:#9b7fd4;
   --shadow:0 24px 60px -28px rgba(0,0,0,.9);--r:14px;
+  /* IN :root, NOT in body.light. The first attempt anchored on --shadow,
+     which is declared in both blocks, and landed these in the light theme
+     only — so the dark console fell back to the browser default and set the
+     whole thing in Times New Roman. A type token belongs where the theme
+     cannot take it away. */
+  /* One pairing across the website, this console and the partner portal, so
+     the three read as one product. Fraunces is a variable font with an
+     optical size axis: the same family stays soft at 13px on a card heading
+     and tightens at 32px on a page title without anybody setting opsz,
+     which is why it replaced a two-serif system.
+
+     Body text is Inter now. Source Serif 4 used to set every table cell and
+     every form label in here, which is a great deal of small serif on a
+     screen somebody reads all day. */
+  --sans:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  --serif:'Fraunces',Georgia,'Times New Roman',serif;
 }
 body.light{
   --bg:#ffffff;--bg-2:#eef0f5;--panel:#ffffff;--panel-2:#f5f6f9;
@@ -14,12 +30,13 @@ body.light{
   --gold:#17385c;--gold-2:#0f2743;--on-gold:#ffffff;
   --green:#166534;--red:#b3261e;--amber:#8a5a12;--blue:#155e75;--purple:#5b3fa8;
   --shadow:0 18px 42px -24px rgba(15,23,42,.20);
+
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%}
-body{background:var(--bg);color:var(--text);font-family:'Source Serif 4',Georgia,serif;
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
   transition:background .35s ease,color .25s ease;-webkit-font-smoothing:antialiased}
-h1,h2,h3,h4{font-family:'Playfair Display',Georgia,serif;font-weight:600;letter-spacing:.3px;margin:0}
+h1,h2,h3,h4{font-family:var(--serif);font-weight:600;letter-spacing:.3px;margin:0}
 button,input,select,textarea{font:inherit;color:inherit}
 a{color:var(--gold);text-decoration:none}
 
@@ -31,7 +48,7 @@ a{color:var(--gold);text-decoration:none}
 
 .brand{display:flex;align-items:center;gap:11px;padding:4px 6px 18px}
 .brand svg{width:38px;height:38px;flex:none;border-radius:10px}
-.brand-name{font-family:'Playfair Display',serif;font-size:13.5px;font-weight:600;letter-spacing:1.4px;line-height:1.15}
+.brand-name{font-family:var(--serif);font-size:13.5px;font-weight:600;letter-spacing:1.4px;line-height:1.15}
 .brand-sub{font-size:9.5px;color:var(--faint);letter-spacing:1.6px;text-transform:uppercase;margin-top:3px}
 
 .grp{margin:14px 0 4px}
@@ -47,7 +64,7 @@ a{color:var(--gold);text-decoration:none}
 .nav .tx{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* circular count bubble, matching the customer app rather than a gold pill */
 .badge{min-width:21px;height:21px;padding:0 5px;border-radius:50%;background:#1e3a5f;color:#fff;
-  font-size:10.5px;font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif;
+  font-size:10.5px;font-weight:700;display:grid;place-items:center;font-family:var(--sans);
   box-shadow:0 0 0 1px rgba(255,255,255,.06)}
 body.light .badge{background:#17385c;color:#fff}
 
@@ -56,7 +73,7 @@ body.light .badge{background:#17385c;color:#fff}
 .me:hover{background:var(--panel)}
 .av{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
   background:color-mix(in srgb,var(--gold) 18%,var(--panel));color:var(--gold);font-size:12px;font-weight:700;
-  font-family:'Jost',sans-serif}
+  font-family:var(--sans)}
 .me-n{font-size:12.5px}.me-r{font-size:10px;color:var(--faint);margin-top:1px}
 
 /* ---------- main ---------- */
@@ -74,7 +91,7 @@ body.light .badge{background:#17385c;color:#fff}
 .iconbtn:hover{border-color:var(--gold);color:var(--gold)}
 .iconbtn svg{width:17px;height:17px}
 .iconbtn .dot{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;
-  background:var(--red);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
+  background:var(--red);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;font-family:var(--sans)}
 
 .page{display:none}.page.on{display:block;animation:rise .3s ease both}
 @keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
@@ -109,7 +126,7 @@ body.light .badge{background:#17385c;color:#fff}
 .st.klik:hover{transform:translateY(-2px);border-color:var(--gold)}
 .st .sl{color:var(--faint);font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;font-weight:600;
   padding-right:22px}
-.st .sv{font-family:'Playfair Display',serif;font-size:31px;margin-top:9px;line-height:1;font-weight:600}
+.st .sv{font-family:var(--serif);font-size:31px;margin-top:9px;line-height:1;font-weight:600}
 .st .sd{font-size:11.5px;margin-top:7px;color:var(--faint)}
 .st .arrow{position:absolute;top:14px;right:15px;color:var(--gold);opacity:.55;font-size:15px;line-height:1}
 .sd .up{color:var(--green)}.sd .down{color:var(--red)}.sd .wn{color:var(--amber)}
@@ -154,7 +171,7 @@ body.light .badge{background:#17385c;color:#fff}
 table{width:100%;border-collapse:collapse;min-width:640px}
 th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line-soft);font-size:12.5px;white-space:nowrap}
 th{font-size:9.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.9px;font-weight:600;
-  font-family:'Jost',sans-serif;border-bottom:1px solid var(--line)}
+  font-family:var(--sans);border-bottom:1px solid var(--line)}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tbody tr.klik{cursor:pointer}
 tbody tr.klik:hover{background:var(--panel-2)}
@@ -167,14 +184,14 @@ tbody tr:last-child td{border-bottom:0}
 
 /* ---------- pills / chips ---------- */
 .pill{padding:3px 9px;border-radius:20px;font-size:10px;display:inline-block;font-weight:700;
-  letter-spacing:.4px;font-family:'Jost',sans-serif;white-space:nowrap}
+  letter-spacing:.4px;font-family:var(--sans);white-space:nowrap}
 .pill.green{background:color-mix(in srgb,var(--green) 20%,var(--panel));color:var(--green)}
 .pill.amber{background:color-mix(in srgb,var(--amber) 20%,var(--panel));color:var(--amber)}
 .pill.red{background:color-mix(in srgb,var(--red) 20%,var(--panel));color:var(--red)}
 .pill.blue{background:color-mix(in srgb,var(--blue) 20%,var(--panel));color:var(--blue)}
 .pill.purple{background:color-mix(in srgb,var(--purple) 20%,var(--panel));color:var(--purple)}
 .pill.grey{background:var(--panel-2);color:var(--faint)}
-.tier{font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;font-weight:700;font-family:'Jost',sans-serif;
+.tier{font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;font-weight:700;font-family:var(--sans);
   border:1px solid var(--line);border-radius:20px;padding:2px 8px;color:var(--gold)}
 
 /* ---------- toolbar / tabs ---------- */
@@ -226,13 +243,13 @@ tbody tr:last-child td{border-bottom:0}
 .kv .k{color:var(--faint)}
 .kv .v{text-align:right;font-weight:600}
 .sec-t{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);font-weight:700;
-  margin:20px 0 4px;font-family:'Jost',sans-serif}
+  margin:20px 0 4px;font-family:var(--sans)}
 .sec-t:first-child{margin-top:0}
 
 /* ---------- charts ---------- */
 .chartbox{position:relative}
 .chartbox svg{display:block;width:100%;overflow:visible}
-.cx-lbl{font-size:9.5px;fill:var(--faint);font-family:'Jost',sans-serif}
+.cx-lbl{font-size:9.5px;fill:var(--faint);font-family:var(--sans)}
 .cgrid{stroke:var(--line-soft);stroke-width:1}
 .legend{display:flex;flex-direction:column;gap:9px;margin-top:4px}
 .lg{display:flex;align-items:center;gap:9px;font-size:12.5px;cursor:pointer;padding:3px 0}
@@ -254,13 +271,13 @@ tbody tr:last-child td{border-bottom:0}
 .dhead{display:flex;align-items:flex-start;gap:15px;margin-bottom:6px;flex-wrap:wrap}
 .dav{width:56px;height:56px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:19px;font-weight:700;
   background:color-mix(in srgb,var(--gold) 16%,var(--panel));color:var(--gold);border:1px solid var(--line);
-  font-family:'Jost',sans-serif}
+  font-family:var(--sans)}
 .dhead h2{font-size:25px}
 .dhead .dmeta{font-size:12.5px;color:var(--faint);margin-top:4px}
 .dstats{display:flex;gap:26px;flex-wrap:wrap;margin:16px 0 20px;padding-bottom:16px;border-bottom:1px solid var(--line)}
-.dstat .dv{font-family:'Playfair Display',serif;font-size:21px;font-weight:600}
+.dstat .dv{font-family:var(--serif);font-size:21px;font-weight:600}
 .dstat .dl{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint);margin-top:3px;font-weight:600;
-  font-family:'Jost',sans-serif}
+  font-family:var(--sans)}
 .dstat.g .dv{color:var(--green)}.dstat.r .dv{color:var(--red)}.dstat.a .dv{color:var(--amber)}.dstat.m .dv{color:var(--gold)}
 .dsplit{display:grid;grid-template-columns:180px minmax(0,1fr);gap:22px;align-items:start}
 .vtabs{display:flex;flex-direction:column;gap:3px}
@@ -288,7 +305,7 @@ tbody tr:last-child td{border-bottom:0}
 /* ---------- forms ---------- */
 .fg{margin-bottom:14px}
 .fg label{display:block;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--faint);
-  font-weight:700;margin-bottom:6px;font-family:'Jost',sans-serif}
+  font-weight:700;margin-bottom:6px;font-family:var(--sans)}
 .fg input,.fg select,.fg textarea{width:100%;background:var(--panel);border:1px solid var(--line);
   border-radius:9px;padding:10px 12px;font-size:13px;outline:none}
 .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--gold)}
@@ -300,11 +317,11 @@ tbody tr:last-child td{border-bottom:0}
 .rolecard{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-bottom:12px;background:var(--panel-2)}
 .rolehead{display:flex;align-items:center;gap:11px;margin-bottom:6px}
 .roleav{width:31px;height:31px;border-radius:50%;background:var(--line);color:var(--dim);display:grid;place-items:center;
-  font-size:12px;font-weight:700;flex:none;font-family:'Jost',sans-serif}
+  font-size:12px;font-weight:700;flex:none;font-family:var(--sans)}
 .rolename{font-size:14px;font-weight:600}
 .roledesc{font-size:11px;color:var(--faint);margin-top:2px}
 .roletag{font-size:9px;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:1px 6px;
-  font-family:'Jost',sans-serif;text-transform:uppercase;letter-spacing:.5px}
+  font-family:var(--sans);text-transform:uppercase;letter-spacing:.5px}
 .roleacts{margin-left:auto;display:flex;gap:6px}
 .band{font-size:10.5px;color:var(--faint);margin:13px 0 7px;letter-spacing:.4px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -321,7 +338,7 @@ tbody tr:last-child td{border-bottom:0}
 .sgrp-h::-webkit-details-marker{display:none}
 .sgrp-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none}
 .sgrp-ic svg{width:17px;height:17px}
-.sgrp-t{font-size:14.5px;font-weight:600;font-family:'Playfair Display',serif}
+.sgrp-t{font-size:14.5px;font-weight:600;font-family:var(--serif)}
 .sgrp-d{font-size:11.5px;color:var(--faint);margin-top:2px}
 .sgrp-cv{margin-left:auto;color:var(--faint);transition:.15s}
 .sgrp[open] .sgrp-cv{transform:rotate(90deg)}
@@ -448,7 +465,7 @@ tbody tr:last-child td{border-bottom:0}
 /* ---------- demo-data marker ----------
    Every figure in this build is invented. While that is true it says so on
    screen, so nobody reads ₦6.25M MRR as a real number. DB.demoData turns it off. */
-.demo{display:inline-block;vertical-align:middle;margin-left:9px;font-family:'Jost',sans-serif;
+.demo{display:inline-block;vertical-align:middle;margin-left:9px;font-family:var(--sans);
   font-size:9.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
   padding:4px 9px;border-radius:20px;white-space:nowrap;
   background:color-mix(in srgb,var(--amber) 20%,var(--panel));
@@ -542,7 +559,7 @@ tbody tr:last-child td{border-bottom:0}
   .mobbar .mb.on{opacity:1;color:var(--text);font-weight:600}
   .mobbar .mb .mbd{position:absolute;top:3px;right:calc(50% - 20px);min-width:15px;height:15px;
     padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;
-    font-weight:700;display:grid;place-items:center;font-family:'Jost',sans-serif}
+    font-weight:700;display:grid;place-items:center;font-family:var(--sans)}
 
   .main{height:auto;min-height:100vh;overflow:visible;
     padding:max(16px,env(safe-area-inset-top)) 14px calc(74px + env(safe-area-inset-bottom))}
@@ -572,11 +589,11 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
 .login-theme:hover{border-color:var(--gold);color:var(--gold)}
 .login-theme svg{width:17px;height:17px}
 .login-logo{width:60px;height:60px;margin:0 auto 18px;display:block;border-radius:15px}
-.login-the{font-size:9px;letter-spacing:4.5px;color:var(--faint);margin-bottom:5px;font-family:'Jost',sans-serif}
-.login-brand{font-family:'Playfair Display',serif;font-size:23px;letter-spacing:4.5px;font-weight:600;line-height:1.2}
+.login-the{font-size:9px;letter-spacing:4.5px;color:var(--faint);margin-bottom:5px;font-family:var(--sans)}
+.login-brand{font-family:var(--serif);font-size:23px;letter-spacing:4.5px;font-weight:600;line-height:1.2}
 .login-brand .dot{color:var(--gold)}
 .login-sub{margin-top:8px;color:var(--faint);font-size:9.5px;letter-spacing:2.6px;text-transform:uppercase;
-  font-family:'Jost',sans-serif}
+  font-family:var(--sans)}
 .pw-wrap{margin-top:26px;display:none;text-align:left}
 .pw-wrap.on{display:block;animation:rise .3s ease both}
 .fld{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
@@ -584,7 +601,7 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
 .fld:focus{border-color:var(--gold)}
 .pw-row{position:relative}
 .pw-show{position:absolute;right:13px;top:50%;transform:translateY(-50%);cursor:pointer;
-  color:var(--dim);font-size:12.5px;user-select:none;font-family:'Jost',sans-serif}
+  color:var(--dim);font-size:12.5px;user-select:none;font-family:var(--sans)}
 #loginEmail{margin-bottom:10px}
 .login-err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:17px}
 .login-foot{margin-top:22px;color:var(--faint);font-size:11px;line-height:1.7}
@@ -620,12 +637,12 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
   animation:spDot .32s cubic-bezier(.2,.9,.25,1.2) 1.2s forwards}
 #splash .sp-copy{opacity:0;transform:translateY(12px);animation:spUp .55s ease 1.38s forwards;color:#f4f0e8}
 #splash .sp-the{font-size:clamp(13px,1.1vw,15px);letter-spacing:.42em;margin-bottom:14px;font-weight:500;
-  font-family:'Jost',sans-serif}
-#splash .sp-name{font-family:'Playfair Display',serif;font-size:clamp(30px,3.4vw,44px);line-height:1;
+  font-family:var(--sans)}
+#splash .sp-name{font-family:var(--serif);font-size:clamp(30px,3.4vw,44px);line-height:1;
   font-weight:500;letter-spacing:.18em;white-space:nowrap}
 #splash .sp-tag{margin-top:clamp(26px,3.2vh,34px);font-size:clamp(10.5px,.85vw,13px);letter-spacing:.24em;
   color:#e2ad4f;opacity:0;transform:translateY(10px);animation:spUp .5s ease 1.9s forwards;white-space:nowrap;
-  font-family:'Jost',sans-serif}
+  font-family:var(--sans)}
 @keyframes spDraw{to{stroke-dashoffset:0}}
 @keyframes spDot{to{opacity:1;transform:scale(1)}}
 @keyframes spUp{to{opacity:1;transform:translateY(0)}}
@@ -670,7 +687,7 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
    ============================================================ */
 .cal-head{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:6px}
 .cal-head span{text-align:center;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--faint);font-weight:600;font-family:'Jost',sans-serif}
+  color:var(--faint);font-weight:600;font-family:var(--sans)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-cell{min-width:0;aspect-ratio:1/1;background:var(--panel-2);border:1px solid var(--line-soft);
   border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
@@ -681,7 +698,7 @@ body.signed-out .shell,body.signed-out .mobbar{display:none}
 .cal-cell.today .cal-n{color:var(--gold);font-weight:700}
 .cal-cell.on{background:var(--gold);border-color:var(--gold)}
 .cal-cell.on .cal-n{color:var(--on-gold);font-weight:700}
-.cal-n{font-size:13px;line-height:1;font-family:'Jost',sans-serif}
+.cal-n{font-size:13px;line-height:1;font-family:var(--sans)}
 .cal-dots{display:flex;gap:2px;align-items:center;min-height:5px}
 .cal-dots i{width:5px;height:5px;border-radius:50%;display:block}
 .cal-dots i.blue{background:var(--blue)}.cal-dots i.amber{background:var(--amber)}

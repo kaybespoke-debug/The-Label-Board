@@ -110,12 +110,17 @@ if(!/used/.test(meter)||!/width:/.test(meter)) F('the storage meter does not ren
       F(p.name+' sells '+p.storageGb+'GB but actually enforces '+gb+'GB, because no storage tier matches its allowance');
   });
   run("SETTINGS.plan='pro';");
-  // Pro's cap must be a real ceiling, because it is the only one left
+  // Pro's cap must be a real ceiling. It used to be the ONLY thing limiting
+  // Pro, because staff were unlimited; since 20 Sep 2026 Pro is 5 studios
+  // and 50 logins as well. Storage still needs a ceiling for a different
+  // reason: it is the one cost that grows with how much a studio USES the
+  // product rather than with how big the studio is, so a studio can run up
+  // the bill without crossing any other limit.
   const pro=run("PLANS.find(p=>p.id==='pro')"),top=run("PLANS.find(p=>p.id==='premium')");
   if(!(pro.storageGb>0&&pro.storageGb<top.storageGb))
-    F('Pro has no storage ceiling below the top plan, and with seats unlimited nothing else limits it');
-  if(run("PLANS.find(p=>p.id==='pro').seats")!==run("PLAN_UNLIMITED"))
-    F('this check assumes Pro sells unlimited seats and it no longer does — re-derive the storage sizing');
+    F('Pro has no storage ceiling below the top plan');
+  if(!(pro.seats>0))
+    F('Pro no longer counts seats, so storage is the only limit again — re-derive the sizing above');
 }
 
 console.log('Storage groundwork audit:');
