@@ -223,20 +223,29 @@
      moved would quote a shop two different numbers on two days without
      anybody having decided anything.
 
-     It opens in naira for everybody. It used to GUESS from the time zone
-     and the language, and that guess is why the key below has a 2 on the
-     end: the guess was written to localStorage exactly like a choice, so
-     every browser that had loaded the old page carried a currency nobody
-     had picked, and it beat the naira default for ever after.
+     IT IS NAIRA. Not by default, not unless something else is chosen:
+     there is nothing else to choose. Kayode, 20 Sep 2026, "just naira so
+     we dont cause confusuion, we can always add those when the app is
+     ready to go international".
 
-     Kayode saw the page open in pounds on 20 Sep and reported the default
-     as not done. It was done. His browser was replaying a guess made in
-     August. Nothing on the page could have told him apart from this.
+     Two things used to live here and both were removed in the same week,
+     for the same underlying reason, which is worth one paragraph so it is
+     not rebuilt a third time.
 
-     So the key is new, every old value is ignored, and from here on a
-     remembered currency can only be one somebody chose from the picker.
-     If the default ever moves again, move this number again. */
-  var CCY_KEY = 'tlb_ccy2';
+     A GUESS from the time zone and the language, written to localStorage
+     exactly like a choice. It then beat the naira default for ever on
+     every returning browser. Kayode saw the page open in pounds and
+     reported the default as broken; it was not, his browser was replaying
+     a guess made in August, and nothing on the page could have told him.
+
+     A REMEMBERED choice, under a key with a 2 on the end to escape those
+     guesses. Meaningless once there is nothing to choose from, and it
+     would have stranded anybody who picked pounds yesterday.
+
+     So nothing is stored and nothing is read. Whatever is still sitting
+     in a visitor’s browser from either scheme is ignored, which is why
+     everybody sees naira from the first paint. To go international, see
+     the note on currencies in config.js.                              */
   var cycleNow = 'monthly';
   var ccyNow = null;
 
@@ -248,12 +257,8 @@
     for (var i = 0; i < list.length; i++) if (list[i].code === code) return list[i];
     return list[0] || null;
   }
-  function remembered() {
-    try { return window.localStorage.getItem(CCY_KEY); } catch (e) { return null; }
-  }
-  function remember(code) {
-    try { window.localStorage.setItem(CCY_KEY, code); } catch (e) { /* private mode, fine */ }
-  }
+  /* remembered() and remember() were here. Nothing reads or writes a
+     currency now. If the picker comes back they come back with it. */
   function group(n) {
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
@@ -282,7 +287,6 @@
 
   function setCcy(code) {
     ccyNow = findCcy(code) ? code : 'NGN';
-    remember(ccyNow);
     var sel = $('#ccy');
     if (sel && sel.value !== ccyNow) sel.value = ccyNow;
     paint();
@@ -298,30 +302,19 @@
     paint();
   }
 
-  /* Builds the picker from the configuration, so adding a market is one line
-     in config.js and nothing else. It is built rather than written into the
-     page because with no JavaScript there is nothing it could do, and a dead
-     control is worse than no control. */
+  /* THERE IS NO PICKER. The site quotes naira and only naira, from 20 Sep
+     2026, because the other five prices were conversions at a rate nobody
+     had agreed and a visitor cannot tell a seeded price from a real one.
+
+     This still runs, because paint() is what puts the figures and the
+     "per month" wording on the page and it has to be called once. It just
+     has nothing to choose between any more.
+
+     To bring the picker back: restore the select built from currencies(),
+     put <span id="ccy-slot"> back on pricing.html, and restore remember()
+     so a choice survives a reload. The full note is in config.js. */
   function buildCcyPicker() {
-    var slot = $('#ccy-slot');
-    if (!slot || !currencies().length) return;
-    var sel = document.createElement('select');
-    sel.id = 'ccy';
-    sel.className = 'ccy';
-    sel.setAttribute('aria-label', 'Currency');
-    currencies().forEach(function (c) {
-      var o = document.createElement('option');
-      o.value = c.code;
-      o.textContent = c.code + ' \u00b7 ' + c.label;
-      sel.appendChild(o);
-    });
-    sel.addEventListener('change', function () { setCcy(sel.value); });
-    slot.appendChild(sel);
-    /* Nigeria, unless somebody picked something else FROM THIS PICKER. Naira
-       is the price this is really sold at and everything else on the page is
-       worked out from it, so the page opens saying so. See the note on
-       CCY_KEY above for why a remembered value can no longer be a guess. */
-    setCcy(remembered() || 'NGN');
+    setCcy('NGN');
   }
 
   /* ---------------- tabs ----------------

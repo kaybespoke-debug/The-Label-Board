@@ -7,6 +7,45 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## Naira only, and the end of a three-day currency saga
+
+Kayode, 20 September: "lets revert back to naira, no currency change for
+now, just naira so we dont cause confusuion, we can always add those when
+the app is ready to go international".
+
+The picker is gone and five of the six currencies with it. Those five were
+SEEDS: dollars, pounds, Canadian dollars, euros and cedis, worked out from
+the naira price at a rate nobody had agreed and nobody was going to honour.
+Fine in a spreadsheet, not fine on a pricing page, because the person
+reading it cannot tell a seeded price from a real one.
+
+**Three versions of the same mistake in three days, which is the part worth
+keeping.** Each one was a way of letting something that was not a decision
+behave like one:
+
+| | What it was | How it went wrong |
+|---|---|---|
+| 18 Sep | a guess from the time zone and language | written to storage exactly like a choice, so it beat the naira default for ever on every returning browser |
+| 20 Sep, morning | a remembered choice under a new key | correct, and still meant Kayode saw pounds and reported the default as broken |
+| 20 Sep, evening | six currencies, five of them seeded | a price on the page that nobody had agreed to honour |
+
+Nothing is stored and nothing is read now. Whatever is still in a visitor’s
+browser from either scheme is ignored, so everybody sees naira from the
+first paint. Proved by planting both `tlb_ccy` and `tlb_ccy2` and loading
+the page.
+
+**To go international**, the note is written at the site of each removal:
+`currencies` in `web/js/config.js`, `buildCcyPicker()` in `web/js/site.js`,
+the `ccy-slot` span on pricing.html, and three checks in `audit_web.js`.
+The price table and `paint()` already handle several currencies, so it is
+putting rows back with real agreed prices rather than rebuilding anything.
+
+**A gate check bit me while doing it**, worth one line: the first version
+asserted the source did not contain `remembered()`, which failed on the
+COMMENT explaining why the function had been removed. A check that a name
+is absent is always tripped by the note saying it is absent. Name the
+storage, not the function.
+
 ## THE 14 DAY TRIAL — applied and live, except the card step
 
 Kayode asked for it on 20 September, billing and website together, and for
