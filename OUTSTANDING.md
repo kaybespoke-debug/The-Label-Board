@@ -7,6 +7,50 @@ with the reason, so it does not get re-raised in six months.
 
 Last updated: 20 September 2026 (sixteenth session, shipped twice)
 
+## The pricing cards, tightened
+
+Kayode: "cut off the excess spaces on each of the tier card / tighten the
+line spaces too / i am trying to strip down the scrolling on phone version".
+
+| | Before | After |
+|---|---|---|
+| Pricing on a phone | 5.37 screens | **4.76** |
+| The three cards | 1,855px | 1,525px |
+| The comparison table | 1,497px | 1,335px |
+
+**Two of the three crossed-out lines on Basic were already on the Pro card
+in other words.** Reminders and the chase list, and a second studio, were
+both there. So Basic was paying for them in vertical space and telling
+nobody anything new. They are gone from Basic and payroll, which was on
+neither card, joins Pro. The list now reads forwards: what Pro adds IS
+what Basic does not have.
+
+The gate check moved with it. It used to count `class="no"` on the entry
+card and require at least two; it now requires NO card to cross anything
+off, and separately asserts that Pro names all three capabilities. Counting
+crosses would have passed a Basic card that said nothing at all.
+
+**Bespoke’s empty bottom was `align-items:stretch`**, making every card as
+tall as the tallest. Fine when the lists are a similar length; Bespoke has
+five bullets against Pro’s eight, so it was carrying three bullets of
+nothing. `start` lets each card be its own height, and the desktop spread
+is now 149px rather than a hole.
+
+**`min-height` on `.who` and `.price-note` is a three-column problem.** It
+keeps the prices level across the row. On a phone the cards are stacked and
+there is nothing to line up with, so on the phone it is pure scrolling and
+both are dropped there rather than everywhere.
+
+**The card collapse button lost its count.** It said "See all 8 features"
+and "See all 5 features", which made three buttons look like three
+different controls and invited a comparison of list LENGTHS. It is "See
+more" on all three now.
+
+**One thing the currency change had left behind:** the pricing hero still
+said "Shown and invoiced in your own currency" with one currency on the
+page. It says naira, and a check now fails if a choice is offered in words
+while none is offered in the interface.
+
 ## Naira only, and the end of a three-day currency saga
 
 Kayode, 20 September: "lets revert back to naira, no currency change for

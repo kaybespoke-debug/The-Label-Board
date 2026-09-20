@@ -389,8 +389,10 @@ body.menu-open .drawer{display:flex}
   padding:9px 18px;border-radius:4px;cursor:pointer;transition:.2s;font-family:inherit}
 .plan-switch button.on{background:var(--gold);color:var(--on-gold)}
 .save-note{font-size:12.5px;color:var(--green);margin-left:12px;font-weight:600}
-.plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
-.plan{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px 20px;
+/* start, not stretch. Equal heights meant Bespoke, with five bullets to
+   Pro's eight, carrying three bullets of empty card. */
+.plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.plan{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 17px;
   display:flex;flex-direction:column;position:relative}
 .plan.feat{border-color:color-mix(in srgb,var(--gold) 50%,transparent);
   box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 14%,transparent)}
@@ -398,15 +400,15 @@ body.menu-open .drawer{display:flex}
   font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 11px;
   border-radius:20px}
 .plan h3{font-size:22px}
-.plan .who{color:var(--faint);font-size:13px;margin-top:6px;min-height:38px;line-height:1.5}
-.price{display:flex;align-items:baseline;gap:4px;margin:16px 0 4px}
+.plan .who{color:var(--faint);font-size:13px;margin-top:5px;min-height:38px;line-height:1.45}
+.price{display:flex;align-items:baseline;gap:4px;margin:12px 0 3px}
 .price .cur{font-size:19px;color:var(--dim)}
 .price .amt{font-family:var(--serif);font-size:38px;font-variant-numeric:tabular-nums}
 .price .per{font-size:13px;color:var(--faint)}
 .price-note{font-size:12.5px;color:var(--faint);min-height:19px}
-.plan .btn{margin:16px 0 18px}
-.plan-feats{list-style:none;margin:0;padding:15px 0 0;border-top:1px solid var(--line);flex:1}
-.plan-feats li{position:relative;padding-left:23px;margin-top:9px;font-size:14px;color:var(--dim)}
+.plan .btn{margin:12px 0 0}
+.plan-feats{list-style:none;margin:14px 0 0;padding:13px 0 0;border-top:1px solid var(--line)}
+.plan-feats li{position:relative;padding-left:21px;margin-top:7px;font-size:13.5px;line-height:1.4;color:var(--dim)}
 .plan-feats li::before{content:"";position:absolute;left:2px;top:8px;width:7px;height:4px;
   border-left:1.7px solid var(--gold);border-bottom:1.7px solid var(--gold);transform:rotate(-45deg)}
 .plan-feats li.hd{padding-left:0;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
@@ -621,7 +623,7 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
    held in SITE.trial.reassurance and repeated verbatim rather than
    paraphrased, because a card IS required and three wordings of that is
    three chances for one of them to soften into a promise we do not keep. */
-.trial-note{margin:8px 0 14px;font-size:12.5px;line-height:1.5;color:var(--muted);max-width:42ch}
+.trial-note{margin:9px 0 10px;font-size:12px;line-height:1.45;color:var(--muted);max-width:42ch}
 .center .trial-note,.plan .trial-note{margin-left:auto;margin-right:auto}
 .btn-row+.trial-note{margin-top:12px;max-width:52ch}
 
@@ -1314,7 +1316,7 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
   /* ---- the comparison table, on screen rather than off the side ---- */
   .tw{overflow-x:visible}
   .tw table{table-layout:fixed;min-width:0;width:100%}
-  th,td{padding:7px 8px;font-size:11px;line-height:1.35}
+  th,td{padding:5px 8px;font-size:11px;line-height:1.3}
   td:first-child,th:first-child{width:auto;word-break:normal;overflow-wrap:anywhere}
   /* 56, not 52: "By agreement" is the widest thing a plan column has to
      hold, and at 52 the word "agreement" overflowed its cell by six pixels
@@ -1338,4 +1340,22 @@ html.js-on .reveal.in{opacity:1;transform:none;transition:opacity .4s ease,trans
 
 @media (max-width:680px){
   .trial-note{font-size:11.5px;line-height:1.45}
+}
+
+/* The pricing cards on a phone. The cards are stacked here, so every pixel
+   reserved to keep three columns level is a pixel of scrolling and nothing
+   else. Kayode: "i am trying to strip down the scrolling on phone version". */
+@media (max-width:680px){
+  .plans{gap:11px}
+  .plan{padding:15px 14px}
+  .plan h3{font-size:16.5px}
+  /* nothing to line up with once they are stacked */
+  .plan .who{min-height:0;font-size:12px;line-height:1.4;margin-top:4px}
+  .price-note{min-height:0;font-size:11.5px}
+  .price{margin:9px 0 2px}
+  .plan .btn{margin:10px 0 0}
+  .plan-feats{margin-top:11px;padding-top:10px}
+  .plan-feats li{margin-top:5px;font-size:12.5px;line-height:1.38;padding-left:19px}
+  .plan-feats li.hd{margin-top:0;font-size:9.5px}
+  .trial-note{margin:7px 0 8px;font-size:11px;line-height:1.4}
 }

@@ -1266,6 +1266,11 @@ const markets = all(ccyBlock, /\{\s*code:\s*'([A-Z]{3})'[^}]*?starter:\s*(\d+),\
    a real agreed price or somebody re-seeding, and the difference is
    worth a person looking rather than a build passing. */
 check(markets.length === 1, 'the site quotes one currency and only one (' + markets.length + ')');
+/* And the page must not still be offering a choice in words. This line
+   said "Shown and invoiced in your own currency" for a few hours after the
+   picker was removed, which is the copy outliving the control it described. */
+check(!/your own currency|choose your currency|in your currency/i.test(visible(html['pricing.html'])),
+  'the pricing page does not offer a currency choice in words either');
 check(markets.length === 1 && markets[0].code === 'NGN',
   'and that currency is naira, which is what the console bills and what partners are paid in');
 markets.forEach(m => {
@@ -1433,17 +1438,33 @@ check(prPlans.length === 3, 'there are three self serve plans (' + prPlans.lengt
 prPlans.forEach((block, i) => {
   const name = (block.match(/<h3>([^<]+)<\/h3>/) || [])[1] || ('plan ' + i);
   const gaps = (block.match(/class="no"/g) || []).length;
-  /* The ENTRY plan has to be honest about its ceiling, or nobody understands
-     what they are moving up for. Pro no longer crosses anything off, and that
-     is the point of the retier rather than an omission: it is sold as the
-     full product with no feature held back, so a list of things it lacks
-     would be a list we would have to invent. */
-  if (i === 0) {
-    check(gaps >= 2, 'the ' + name + ' plan says what you would gain by moving up (' + gaps + ')');
-    check(gaps <= 4, 'the ' + name + ' plan does not read as a list of complaints (' + gaps + ')');
-  } else {
-    check(gaps === 0, 'the ' + name + ' plan crosses things off, but it is sold as complete');
-  }
+  /* NO card crosses anything off any more, Basic included. It used to, and
+     the property that mattered is unchanged: a reader has to be able to see
+     what moving up gets them. Kayode, 20 Sep: "infuse this the already
+     essentials under pro so they can see what they dont have access to the
+     starter".
+
+     Two of Basic's three crossed-out lines were already on the Pro card in
+     other words, so Basic was paying for them in vertical space and telling
+     nobody anything new. So the job moved to Pro's list, which reads
+     forwards: what Pro adds IS what Basic does not have.
+
+     The check moves with it. Counting crosses would now pass on a Basic card
+     that said nothing at all, which is why the real assertion is below this
+     loop, against Pro. */
+  check(gaps === 0, 'the ' + name + ' plan crosses nothing off; Pro says what it adds instead');
+});
+
+/* And Pro's list has to actually name the three, or the sentence above is
+   a claim about a page rather than a description of it. Each one is matched
+   loosely, because the wording is Kayode's to change and the point is that
+   the capability is named somewhere in that card. */
+const proBlock = prPlans[1] || '';
+[[/chase list|reminders/i, 'the chase list and reminders'],
+ [/up to 5 studios|five studios/i, 'more than one studio'],
+ [/payroll/i, 'payroll, rota and leave']].forEach(pair => {
+  check(pair[0].test(proBlock),
+    'the Pro card names ' + pair[1] + ', which is one of the things Basic does not get');
 });
 
 /* Where somebody goes when neither priced plan fits.

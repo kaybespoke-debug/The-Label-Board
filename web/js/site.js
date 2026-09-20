@@ -182,7 +182,12 @@
 
       function paint() {
         var shut = ul.classList.contains('is-collapsed');
-        btn.textContent = shut ? 'See all ' + feats.length + ' features' : 'Show fewer';
+        /* No count. Kayode, 20 Sep: "instead of see all 8 fetaures, see all 5
+           festures, just use 'see more'". The number differed per card, which
+           made three buttons that looked like three different controls and
+           invited a comparison of list LENGTHS rather than of what is in
+           them. Basic having fewer bullets is not the thing being sold. */
+        btn.textContent = shut ? 'See more' : 'Show fewer';
         btn.setAttribute('aria-expanded', shut ? 'false' : 'true');
       }
       btn.addEventListener('click', function () {
