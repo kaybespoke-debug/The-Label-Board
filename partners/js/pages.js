@@ -100,7 +100,7 @@ PAGES.earnings = function () {
       ? '<div class="tw"><table><thead><tr><th>What earned it</th><th class="hide-sm">Credited</th>' +
         '<th>Status</th><th class="num">Amount</th></tr></thead><tbody>' +
         list.map(r => '<tr' + (r.refId ? ' class="klik" onclick="openDetail(\'ref\',' + r.refId + ')"' : '') + '>' +
-          '<td><div class="t-main">' + (r.type === 'bonus' ? 'Milestone bonus' : esc(r.business)) + '</div>' +
+          '<td><div class="t-main">' + esc(r.business) + '</div>' +
           '<div class="t-sub">' + esc(r.note) + '</div></td>' +
           '<td class="hide-sm">' + fmtD(r.date) + '</td>' +
           '<td>' + statusPill(r.status) +
@@ -153,8 +153,8 @@ function payoutsTab() {
         '<tr><td colspan="2" style="text-align:right;font-weight:600">Paid to you</td>' +
         '<td class="num"><b>' + money(Q.paid()) + '</b></td><td></td></tr>' +
         '</tbody></table></div>'
-      : '<div class="empty">No payouts yet.<br><span class="note">The first runs on the ' +
-        DB.settings.payoutDay + 'th after a commission clears.</span></div>') +
+      : '<div class="empty">No payouts yet.<br><span class="note">Payouts run ' +
+        esc(DB.settings.payoutRuns) + '.</span></div>') +
     '</div>';
 }
 

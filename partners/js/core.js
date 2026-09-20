@@ -44,13 +44,16 @@ const Q = {
   signups() { return DB.referrals.length; },
   clicks() { return DB.links.reduce((t, l) => t + l.clicks, 0); },
 
-  /* ---- tier ---- */
-  tier() { return tierFor(Q.converted().length); },
-  next() { return nextTier(Q.converted().length); },
-  tierProgress() {
-    const cur = Q.tier(), nxt = Q.next(), n = Q.converted().length;
-    if (!nxt) return 100;
-    return Math.max(4, Math.round((n - cur.min) / (nxt.min - cur.min) * 100));
+  /* ---- the rate ----
+     One number for every partner and every business, so there is no ladder
+     to report a position on. What a partner wants to know instead is when
+     each business runs out, which is the pair below. */
+  rate() { return DB.settings.baseRatePct; },
+  termEnd(r) { return termEndFor(r); },
+  monthsLeft(r) {
+    if (!r || !r.subscribedOn || r.cycle === 'annual') return 0;
+    const done = Q.ledgerFor(r.id).length;
+    return r.stage === 'lapsed' ? 0 : Math.max(0, (DB.settings.termMonths || 12) - done);
   },
 
   /* ---- money ---- */
@@ -59,14 +62,14 @@ const Q = {
   paid() { return DB.ledger.filter(r => r.status === 'paid').reduce((t, r) => t + r.amount, 0); },
   available() { return DB.ledger.filter(r => r.status === 'cleared').reduce((t, r) => t + r.amount, 0); },
   pending() { return DB.ledger.filter(r => r.status === 'pending').reduce((t, r) => t + r.amount, 0); },
-  bonuses() { return DB.ledger.filter(r => r.type === 'bonus').reduce((t, r) => t + r.amount, 0); },
   earnedIn(offset) { return DB.ledger.filter(r => inMonth(r.date, offset)).reduce((t, r) => t + r.amount, 0); },
 
-  /* what one referred business has earned you. Commission only: a milestone
-     bonus happens to land on a referral's date but it was not earned by that
-     business, and crediting it there would double-count it in every total. */
+  /* what one referred business has earned you. Every row in the ledger now
+     belongs to a business, because milestone bonuses are gone and there is
+     nothing left that was earned by a partner's total rather than by one
+     account. So this is simply everything against that referral. */
   earnedFor(refId) {
-    return DB.ledger.filter(r => r.type === 'signup' && r.refId === +refId).reduce((t, r) => t + r.amount, 0);
+    return DB.ledger.filter(r => r.refId === +refId).reduce((t, r) => t + r.amount, 0);
   },
   ledgerFor(refId) { return DB.ledger.filter(r => r.refId === +refId); },
 
@@ -74,10 +77,11 @@ const Q = {
   payout(ref) { return DB.payouts.find(p => p.ref === ref); },
   payoutItems(ref) { return DB.ledger.filter(r => r.payoutRef === ref); },
   lastPayout() { return DB.payouts[0] || null; },
+  /* Once a year, at the end of January, for everything cleared before it. */
   nextPayoutDate() {
     const t = DB.today;
-    let d = new Date(t.getFullYear(), t.getMonth(), DB.settings.payoutDay);
-    if (d <= t) d = new Date(t.getFullYear(), t.getMonth() + 1, DB.settings.payoutDay);
+    let d = new Date(t.getFullYear(), PAYOUT_MONTH, PAYOUT_DAY);
+    if (d <= t) d = new Date(t.getFullYear() + 1, PAYOUT_MONTH, PAYOUT_DAY);
     return d;
   },
   daysToPayout() { return Math.max(0, Math.round((Q.nextPayoutDate() - DB.today) / DAY)); },

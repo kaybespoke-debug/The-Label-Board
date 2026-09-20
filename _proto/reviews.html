@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where a review lands</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/web/css/site.css">
+<style>
+.plabel{max-width:1124px;margin:0 auto 18px;font-size:12px;letter-spacing:.12em;
+  text-transform:uppercase;color:#e0aa3f}
+.plabel span{color:#9aa4b2;letter-spacing:0;text-transform:none;font-size:12.5px}
+.pblock{border-top:2px dashed rgba(224,170,63,.45)}
+
+/* ---------- the block itself ---------- */
+.reviews{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;
+  max-width:1124px;margin-left:auto;margin-right:auto}
+.rev{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px;display:flex;flex-direction:column}
+.rev .stars{display:flex;gap:3px;margin-bottom:12px}
+.rev .stars svg{width:14px;height:14px;fill:var(--gold);stroke:none}
+.rev .stars svg.off{fill:none;stroke:var(--gold);stroke-width:1.4;opacity:.45}
+.rev blockquote{margin:0;font-family:var(--serif);font-size:16px;line-height:1.6;
+  color:var(--text)}
+.rev .who{display:flex;align-items:center;gap:11px;margin-top:auto;padding-top:16px}
+.rev .ini{width:34px;height:34px;border-radius:50%;flex:0 0 34px;display:grid;
+  place-items:center;font-size:12px;font-weight:700;letter-spacing:.04em;
+  background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold-2)}
+.rev .who b{display:block;font-size:13.5px;font-weight:600;color:var(--text)}
+.rev .who span{display:block;font-size:12px;color:var(--faint);margin-top:2px}
+
+/* the empty state, option A */
+.rev-none{max-width:640px;margin:0 auto;text-align:center}
+.rev-none p{color:var(--dim);font-size:15px;line-height:1.65}
+
+@media(max-width:900px){
+  .reviews{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:10px;margin:0 -16px;
+    padding:0 16px 4px;scroll-snap-type:x mandatory;scrollbar-width:none}
+  .reviews::-webkit-scrollbar{display:none}
+  .rev{flex:0 0 268px;scroll-snap-align:start;padding:16px}
+  .rev blockquote{font-size:14.5px}
+}
+</style>
+</head>
+<body>
+<main id="main">
+
+<!-- ============================ OPTION A ============================ -->
+<section class="tight on-light pblock">
+  <div class="wrap">
+    <p class="plabel">Option A &nbsp;<span>the slot is there now and says what it is waiting for</span></p>
+    <div class="sec-head center wide">
+      <span class="eyebrow">From the bench</span>
+      <h2 style="font-size:clamp(21px,2.4vw,26px)">What studios say</h2>
+    </div>
+    <div class="rev-none">
+      <p>The first studios open their accounts in October. Their words go here, with their names and their labels, once they have run a month of real work through it and told us we may quote them.</p>
+      <div class="btn-row center" style="margin-top:18px">
+        <a class="btn btn-line btn-sm" href="/web/waitlist.html">Join the October list</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ OPTION B ============================ -->
+<section class="tight pblock">
+  <div class="wrap">
+    <p class="plabel">Option B &nbsp;<span>the same block, built and in the page, rendering nothing until the first review exists</span></p>
+    <div class="rev-none">
+      <p style="color:#9aa4b2;font-size:13px">Nothing here. The section, the card, the stars and the phone behaviour all exist and are covered by the gate. On the day a review is approved it becomes markup and the section appears. A visitor sees no empty box and no promise.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FULL ============================ -->
+<section class="tight on-light pblock">
+  <div class="wrap">
+    <p class="plabel">Either one, once October is in &nbsp;<span>three real reviews, sample words</span></p>
+    <div class="sec-head center wide">
+      <span class="eyebrow">From the bench</span>
+      <h2 style="font-size:clamp(21px,2.4vw,26px)">What studios say</h2>
+    </div>
+    <div class="reviews">
+
+      <article class="rev">
+        <div class="stars" aria-label="Five out of five">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+        </div>
+        <blockquote>The measurement book used to go home in somebody's bag. Now I open the order and it is all there, and the balance is already worked out.</blockquote>
+        <div class="who">
+          <span class="ini" aria-hidden="true">AO</span>
+          <div><b>A real name here</b><span>Bespoke tailor, Lagos</span></div>
+        </div>
+      </article>
+
+      <article class="rev">
+        <div class="stars" aria-label="Five out of five">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+        </div>
+        <blockquote>I found out at month end that two styles were selling at a loss. Nobody was hiding it from me. I just could not see it before.</blockquote>
+        <div class="who">
+          <span class="ini" aria-hidden="true">CE</span>
+          <div><b>A real name here</b><span>Shoe maker, Aba</span></div>
+        </div>
+      </article>
+
+      <article class="rev">
+        <div class="stars" aria-label="Four out of five">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+          <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6.6 7 .9-5.1 4.8 1.3 7L12 18l-6.2 3.3 1.3-7L2 9.5l7-.9z"/></svg>
+        </div>
+        <blockquote>Light went at four and I still took the order. That is the part I did not believe until it happened.</blockquote>
+        <div class="who">
+          <span class="ini" aria-hidden="true">NU</span>
+          <div><b>A real name here</b><span>Ready to wear, Abuja</span></div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+</main>
+<script src="/web/js/config.js"></script>
+<script src="/web/js/site.js"></script>
+</body>
+</html>

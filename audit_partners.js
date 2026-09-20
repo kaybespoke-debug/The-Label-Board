@@ -426,31 +426,52 @@ for (const profile of PROFILES) {
 
   check(DB.ledger.filter(r => !Q.ref(r.refId)).length === 0,
     who + 'no ledger row points at a referral that does not exist');
-  check(DB.ledger.filter(r => r.type === 'signup' && !(Q.ref(r.refId) || {}).subscribedOn).length === 0,
+  /* A ledger row is a share of one payment. Monthly plans make twelve of
+     them per business and yearly plans make one, and both kinds are
+     commission. There is nothing else in the ledger any more. */
+  const isComm = r => r.type === 'recurring' || r.type === 'yearly';
+  check(DB.ledger.filter(r => isComm(r) && !(Q.ref(r.refId) || {}).subscribedOn).length === 0,
     who + 'no commission on an account that never paid');
+  check(DB.ledger.every(isComm), who + 'every ledger row is commission, earned by a named business');
 
+  /* This used to read "no business earns commission twice", which is now
+     the opposite of correct: a business on a monthly plan earns twelve
+     times. The bug it was guarding against is a double credit for the SAME
+     month, which is also what the unique index in the database refuses. */
   const seen = {};
-  check(DB.ledger.filter(r => r.type === 'signup' &&
-    (seen[r.refId] ? true : (seen[r.refId] = 1, false))).length === 0,
-    who + 'no business earns commission twice');
+  check(DB.ledger.filter(r => {
+    const k = r.refId + '/' + r.month;
+    return seen[k] ? true : (seen[k] = 1, false);
+  }).length === 0, who + 'no business is credited twice for the same month');
 
-  const commissionTotal = DB.ledger.filter(r => r.type === 'signup').reduce((t, r) => t + r.amount, 0);
+  const commissionTotal = DB.ledger.reduce((t, r) => t + r.amount, 0);
   check(DB.referrals.reduce((t, r) => t + Q.earnedFor(r.id), 0) === commissionTotal,
     who + 'per-business figures sum to the commission total');
-  check(commissionTotal + Q.bonuses() === lifetime, who + 'commission plus bonuses is everything earned');
-  check(DB.ledger.filter(r => r.type === 'signup')
-    .every(r => r.amount === Math.round(r.basis * r.rate / 100)),
+  check(commissionTotal === lifetime, who + 'the commission is everything earned');
+  check(DB.ledger.every(r => r.amount === Math.round(r.basis * r.rate / 100)),
     who + 'every commission is its rate applied to the payment it was based on');
 
-  const validRates = new Set(DB.tiers.map(t => t.pct));
-  check(DB.ledger.filter(r => r.type === 'signup').every(r => validRates.has(r.rate)),
-    who + 'every commission used a real tier rate');
+  check(DB.ledger.every(r => r.rate === G('RATE_PCT')),
+    who + 'every commission used the one rate the programme pays');
 
-  /* payout runs respect the minimum in force that month */
+  /* the twelve month clock, per business, from its own first payment */
+  const term = G('TERM_MONTHS');
+  check(DB.referrals.filter(r => r.cycle === 'annual')
+    .every(r => Q.ledgerFor(r.id).length <= 1),
+    who + 'a yearly plan earns once, not month after month');
+  check(DB.referrals.filter(r => r.cycle === 'monthly')
+    .every(r => Q.ledgerFor(r.id).length <= term),
+    who + 'no business earns past its ' + term + ' months');
+  check(DB.lapsed ? true : Q.lapsed().every(r => Q.ledgerFor(r.id)
+    .every(x => x.date < r.lapsedOn)),
+    who + 'a business that left earned nothing from the day it left');
+
+  /* payout runs respect the minimum in force that year. The reference is
+     PO-YYYY now rather than PO-YYYY-MM, because runs happen once a year. */
   const changedOn = G('THRESHOLD_CHANGED_ON');
-  const minOn = ref => (ref.slice(3) >= changedOn.slice(0, 7) ? 10000 : 25000);
+  const minOn = ref => (ref.slice(3) >= changedOn.slice(0, 4) ? 10000 : 25000);
   check(DB.payouts.filter(p => p.amount < minOn(p.ref)).length === 0,
-    who + 'no payout went out below the minimum in force that month');
+    who + 'no payout went out below the minimum in force that year');
   const lastRunOn = DB.payouts.length ? DB.payouts[0].paidOn : null;
   check(DB.ledger.filter(r => r.status === 'cleared' && lastRunOn && r.clearsOn <= lastRunOn).length === 0,
     who + 'nothing already cleared was left behind by a run that happened');
@@ -483,9 +504,17 @@ for (const profile of PROFILES) {
     who + 'every referral is attributed to exactly one link');
   check(DB.links.filter(l => l.isDefault).length === 1, who + 'exactly one default link');
 
-  const n = Q.converted().length;
-  check(Q.tier() === G('tierFor')(n), who + 'the tier shown is the one the count earns');
-  check(Q.tierProgress() >= 0 && Q.tierProgress() <= 100, who + 'tier progress stays inside 0 to 100');
+  /* There is no ladder to report a position on. What replaced it is the
+     per business clock, and the thing worth checking is that a partner is
+     never told a business has months left after it has stopped paying. */
+  check(Q.rate() === G('RATE_PCT'), who + 'the rate shown is the rate the programme pays');
+  check(Q.lapsed().every(r => Q.monthsLeft(r) === 0),
+    who + 'a business that stopped paying has no months left to earn');
+  check(Q.paying().filter(r => r.cycle === 'monthly')
+    .every(r => Q.monthsLeft(r) >= 0 && Q.monthsLeft(r) <= G('TERM_MONTHS')),
+    who + 'every clock sits inside the term');
+  check(Q.converted().every(r => !!Q.termEnd(r)),
+    who + 'every paying business can say when it stops earning');
 }
 
 /* ---------- 4. every page renders, for every partner ---------- */
@@ -762,12 +791,12 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
         lapsed_on: null, outlets: 1, staff_count: 2, added_by: 'partner', last_seen: '2026-09-11' }
     ],
     'partner_ledger': [
-      { id: 'X1', referral_id: 'R1', payout_id: 'PO1', kind: 'signup', amount: '9750.00',
-        rate_pct: '15.00', tier: 'bronze', basis: '65000.00', note: 'Pro · 15% of 65,000',
+      { id: 'X1', referral_id: 'R1', payout_id: 'PO1', kind: 'yearly', amount: '5200.00',
+        rate_pct: '8.00', basis: '65000.00', note: 'Pro · 8% of 65,000, paid once',
         credited_on: '2026-02-15', clears_on: '2026-03-17', status: 'paid' },
-      { id: 'X2', referral_id: null, payout_id: null, kind: 'bonus', amount: '5000.00',
-        rate_pct: '0', tier: 'bronze', basis: '0', note: 'milestone bonus',
-        credited_on: '2026-02-15', clears_on: '2026-03-17', status: 'cleared' }
+      { id: 'X2', referral_id: 'R1', payout_id: null, kind: 'recurring', amount: '1600.00',
+        rate_pct: '8.00', basis: '20000.00', note: 'Basic · month 1 of 12',
+        credited_on: '2026-03-15', clears_on: '2026-04-15', status: 'cleared' }
     ],
     'partner_accounts': [
       { id: 'A1', account_name: 'Amaka O', bank_name: 'GTBank', account_number: '0123456789',
@@ -799,10 +828,10 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
   check(!!db, 'the live hydrate returns a database rather than nothing');
   if (db) {
     /* the money, which is the half that matters */
-    check(db.ledger[0].amount === 9750, 'a ledger amount arrives as a number, not the string PostgREST sends');
+    check(db.ledger[0].amount === 5200, 'a ledger amount arrives as a number, not the string PostgREST sends');
     check(db.referrals[0].firstPayment === 65000, 'first payment is mapped from first_payment');
     check(db.referrals[0].mrr > 5416 && db.referrals[0].mrr < 5417, 'mrr survives as a number');
-    check(db.ledger[0].type === 'signup', 'ledger kind is mapped to the type the pages read');
+    check(db.ledger[0].type === 'yearly', 'ledger kind is mapped to the type the pages read');
     check(db.ledger[0].status === 'paid', 'the database decides what is paid, not the device');
     check(db.ledger[0].payoutRef === '2026-03', 'a paid ledger row carries its payout reference');
     check(db.ledger[0].paidOn === '2026-03-25', 'and the date it was paid');
@@ -820,7 +849,7 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
     check(!!def, 'the default link is marked');
     check(def.signups === 1 && def.converted === 1,
       'per-link counts are counted from referrals rather than trusted from a column');
-    check(def.earned === 9750, 'and what a link earned is summed from the ledger');
+    check(def.earned === 6800, 'and what a link earned is summed from the ledger');
     check(db.links[1].signups === 1 && db.links[1].converted === 0,
       'a link with a signup that never converted counts the signup and not the conversion');
 
@@ -828,17 +857,14 @@ for (const dead of ['.chartbox', '.donutwrap', '.hbar', '.funnel', '.fstage', '.
     check(db.referrals[1].trialEndsIn !== null, 'a referral on trial shows how long is left');
     check(db.referrals[0].trialEndsIn === null, 'one that has already subscribed does not');
 
-    /* the tier drives the rate a partner is told about */
-    /* The ladder moved on 19 September 2026: a one off 15 to 25 per cent of
-       the first payment became a recurring 0 to 8 per cent, so silver is 6
-       rather than 18. The check is the same check, aimed at the same bug: a
-       partner being shown the bottom of the ladder because the tier was not
-       read. It reads the ladder rather than a literal now, so the next time
-       Kayode moves a rate this asks the right question on its own. */
-    const silverPct = G("(TIERS.find(function(t){return t.id==='silver'})||{}).pct");
-    check(silverPct !== undefined, 'the silver rate was read out of the ladder');
-    check(db.settings.baseRatePct === silverPct,
-      'a silver partner is shown the silver rate (' + silverPct + '%), not the bottom of the ladder');
+    /* There is one rate, so the bug this used to guard against — a partner
+       shown the bottom of a ladder because their tier was not read — can no
+       longer happen. What replaces it is the check that the hydrate still
+       hands the pages a rate at all, rather than a quiet zero. */
+    check(db.settings.baseRatePct === G('RATE_PCT'),
+      'a live partner is shown the programme rate, not a zero left over from a failed lookup');
+    check(db.settings.termMonths === G('TERM_MONTHS'),
+      'and the term their businesses earn for');
 
     /* the thing that must never happen: a failed request drawn as a confident zero */
     sandbox.supaFetch = async (path) =>
@@ -897,26 +923,53 @@ function report() {
   /* and the new one has to be visible somewhere a partner reads */
   const src = fs.readFileSync(path.join(dir, 'js/data.js'), 'utf8') + fs.readFileSync(path.join(dir, 'js/detail.js'), 'utf8') +
               fs.readFileSync(path.join(dir, 'js/actions.js'), 'utf8') + fs.readFileSync(path.join(dir, 'js/pages.js'), 'utf8');
-  check(/four years/i.test(src), 'the portal tells a partner the term is four years');
-  check(/years three and four/i.test(src), 'and what happens in the taper years');
-  check(/active and paying/i.test(src) || /accounts are active and paying/i.test(src),
-    'and that the rate follows the live count');
+  check(/12 months|twelve months|termMonths/i.test(src),
+    'the portal tells a partner how long a business earns for');
+  check(/paid once|once on a yearly|yearly plan/i.test(src),
+    'and that a yearly plan earns once rather than month after month');
+  check(/stops paying|stopped paying|stops that day|nothing further is owed/i.test(src),
+    'and that commission stops the day a business does');
   check(/never recalculated|ever recalculated/i.test(src),
     'and that nothing already credited is recalculated');
 
-  /* the ladder the portal shows is the ladder the database pays */
-  const tiers = G('JSON.stringify(TIERS)');
-  check(/"pct":0/.test(tiers) && /"pct":6/.test(tiers) && /"pct":7/.test(tiers) && /"pct":8/.test(tiers),
-    'the portal carries the 0, 6, 7 and 8 per cent ladder');
-  check(G('TAPER_PCT') === 3, 'and the 3 per cent taper');
-  check(G('TERM_YEARS') === 4, 'and the four year term');
-  check(G('TAPER_AFTER_YEARS') === 2, 'and that the taper starts after two years');
+  /* The old programme must not survive as MACHINERY. Not as a word: the
+     announcement that the tiers and milestones are gone has to name them,
+     and so does the comment explaining why this changed shape twice in a
+     month. Banning the words would mean deleting the explanation. */
+  check(!/'bonus'|"bonus"/.test(src), 'no page still has a branch for a milestone bonus row');
+  check(!/tierbar|tierProgress|class="rung|DB\.tiers/.test(src + all),
+    'no ladder is drawn anywhere, and nothing reads one');
+  check(!/type === 'signup'/.test(src), 'nothing still looks for the old single commission row');
 
-  /* an unrecognised tier must not fall back to somebody else's rate */
-  check(/LIVE_TIER_PCT\[me\.tier\] != null/.test(fs.readFileSync(path.join(dir, 'js/live.js'), 'utf8')),
-    'a partner whose tier we could not read is shown 0, not a number borrowed from another band');
+  /* one rate, in the one place that holds it */
+  check(G('RATE_PCT') === 8, 'the portal carries the 8 per cent rate');
+  check(G('TERM_MONTHS') === 12, 'and the twelve month term');
+  check(G('typeof TIERS') === 'undefined', 'and no ladder is left behind for something to read');
+
+  /* the rate a live partner is shown is the programme rate, not a lookup
+     that can miss. There is nothing per-partner left to get wrong. */
+  const liveSrc = fs.readFileSync(path.join(dir, 'js/live.js'), 'utf8');
+  check(!/LIVE_TIER_PCT/.test(liveSrc), 'the live hydrate no longer looks a rate up by tier');
+  check(/baseRatePct: \(typeof RATE_PCT/.test(liveSrc),
+    'it reads the one rate rather than keeping a second copy of it');
 }
 
+
+/* The type tokens have to be in :root, not in a theme block. --shadow is
+   declared in BOTH :root and body.light, so a patch anchored on it lands in
+   whichever one it matched first. That happened on 20 Sep: --sans and --serif
+   went into body.light, and the dark console rendered every word in Times New
+   Roman. It is glaring on screen and invisible in a diff. */
+/* check(cond, msg) here, not ok(msg, cond): in this file `ok` is the ARRAY
+   of passes and `check` is the helper, and the two gates use opposite
+   argument orders. */
+try {
+  const css = fs.readFileSync(path.join(dir, 'css', 'app.css'), 'utf8');
+  const root = css.slice(css.indexOf(':root{'), css.indexOf('}', css.indexOf(':root{')));
+  check(/--sans:/.test(root), 'the sans token is in :root, where no theme can take it away');
+  check(/--serif:/.test(root), 'and so is the serif token');
+  check(/Fraunces/.test(root), 'the serif is the one the brand uses');
+} catch (e) { check(false, 'the stylesheet was readable: ' + e.message); }
   ok.forEach(m => console.log('  pass  ' + m));
   if (fail.length) {
     console.log('\n' + '-'.repeat(60));

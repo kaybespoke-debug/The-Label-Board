@@ -88,26 +88,59 @@ function initials(s) {
 /* ---------------- plan catalogue ---------------- */
 /* This is what actually bills, so when it and the app disagree about a price
    this one is right and audit_tiers says so. The ids are the ones stored on
-   businesses.plan; the names are what the customer is sold. seats: 0 means
-   unlimited — Pro no longer counts people. */
+   businesses.plan; the names are what the customer is sold.
+
+   studios and seats are the LIMITS the database enforces, and they are here
+   rather than only in the app because this is what bills and because the
+   console has to show a studio its usage against them. 0 means unlimited,
+   which now only Bespoke is: its real ceiling is whatever its contract says,
+   and businesses.max_branches / max_seats carry that per account.
+
+   Pro counted people again on 20 Sep 2026. It had been sold as unlimited
+   seats, and 50 is a ceiling nobody on Pro is realistically near, but it is
+   still a promise being narrowed, so it is a number on the page, in the
+   console and in the database rather than a quiet change of wording. */
 const PLANS = [
-  { id: 'starter', name: 'Basic', monthly: 27000, annual: 297000, seats: 3, live: true,
-    features: ['1 studio', '3 team seats', 'Orders, production & client records',
+  { id: 'starter', name: 'Basic', monthly: 20000, annual: 220000, studios: 1, seats: 5, live: true,
+    features: ['1 studio', '5 team logins', 'Orders, production & client records',
                'Invoices, and who owes what', 'Basic finance (money in, money out)'] },
-  { id: 'pro', name: 'Pro', monthly: 65000, annual: 715000, seats: 0, live: true,
-    features: ['3 studios, each scoped & reported separately', 'Unlimited team seats & roles',
+  { id: 'pro', name: 'Pro', monthly: 49000, annual: 539000, studios: 5, seats: 50, live: true,
+    features: ['5 studios, each scoped & reported separately', 'Up to 50 team logins, with roles',
                'Receivables & the chase list, with one-tap reminders', 'Full finance & reporting lines',
                'Fitting & measurement history', 'Onboarding, migration & priority support'] },
   /* Priced per business, so there is no figure to quote. An operator types the
      negotiated price when moving a studio onto it — set_studio_plan takes it. */
-  { id: 'premium', name: 'Bespoke', monthly: 0, annual: 0, seats: 0, live: true, invoiceOnly: true,
-    features: ['Everything in Pro', 'Unlimited studios', 'Custom features & workflow tailoring',
+  { id: 'premium', name: 'Bespoke', monthly: 0, annual: 0, studios: 0, seats: 0, live: true, invoiceOnly: true,
+    features: ['Everything in Pro', 'Studios and logins by agreement', 'Custom features & workflow tailoring',
                'Dedicated onboarding, migration & training at scale', 'Priority/dedicated support',
                'Invoiced per business, not charged at a checkout'] },
-  { id: 'trial', name: 'Trial', monthly: 0, annual: 0, seats: 3, live: true,
+  { id: 'trial', name: 'Trial', monthly: 0, annual: 0, studios: 1, seats: 3, live: true,
     features: ['14 days', 'Full Pro features', 'No card required'] }
 ];
 const planById = id => PLANS.find(p => p.id === id);
+
+/* Usage against a ceiling, as one readable phrase. 0 means the plan does
+   not cap it, which only Bespoke is: a bare "0" against Team logins would
+   read as a plan that includes nobody, which is the mistake the pricing
+   table has a gate about.
+
+   The limits here are the ones public.plan_limits enforces. If these two
+   ever disagree, the database is right and plan_limits_harness says so:
+   it reads this file and compares. */
+function planUse(used, limit) {
+  const n = Number(used) || 0;
+  if (!limit) return n + ' of as many as agreed';
+  const over = n > limit;
+  return '<span' + (over ? ' style="color:var(--red)"' : '') + '>' + n + ' of ' + limit +
+    (over ? ' \u00b7 over' : n === limit ? ' \u00b7 full' : '') + '</span>';
+}
+/* Over on either axis. Being over is not a fault and never costs them
+   anything they already have; it is a conversation about the next one. */
+function overPlan(s) {
+  const p = planById(s.plan); if (!p) return false;
+  return (!!p.studios && Number(s.outlets) > p.studios) ||
+         (!!p.seats && Number(s.users) > p.seats);
+}
 
 /* What a subscriber on this plan is worth a month.
 

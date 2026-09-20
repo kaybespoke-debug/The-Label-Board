@@ -20,7 +20,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/site.css">
 </head>
 <body>
@@ -50,16 +50,7 @@
          touch screen where a hover would stick open after a tap. -->
     <nav class="hdr-nav" aria-label="Main">
       <a href="index.html">Home</a>
-      <span class="nav-drop">
-        <a href="features.html" data-drop aria-haspopup="true" aria-expanded="false">Products<svg class="caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></a>
-        <span class="nav-menu">
-          <a href="features.html#orders">Orders and customers</a>
-          <a href="features.html#production">Production and delivery</a>
-          <a href="features.html#inventory">Stock and suppliers</a>
-          <a href="features.html#money">Money and people</a>
-          <a href="features.html#offline">Phone and offline</a>
-        </span>
-      </span>
+      <a href="features.html">Products</a>
       <a href="pricing.html">Pricing</a>
       <a href="partners.html">Partners</a>
       <a href="about.html">Our story</a>
@@ -77,13 +68,6 @@
 <div class="drawer" id="drawer">
   <a href="index.html">Home</a>
   <a href="features.html">Products</a>
-  <!-- The header dropdown does not exist below 1000px, and the product page
-       no longer has a tab strip, so these five are how a phone changes area. -->
-  <a class="sub" href="features.html#orders">Orders and customers</a>
-  <a class="sub" href="features.html#production">Production and delivery</a>
-  <a class="sub" href="features.html#inventory">Stock and suppliers</a>
-  <a class="sub" href="features.html#money">Money and people</a>
-  <a class="sub" href="features.html#offline">Phone and offline</a>
   <a href="pricing.html">Pricing</a>
   <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
@@ -119,7 +103,7 @@
       <a class="card" href="book.html">
         <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/></svg></div>
         <h3>Book a walkthrough</h3>
-        <p>Twenty minutes, your own figures on screen.</p>
+        <p>Your own figures on screen.</p>
         <span class="more">Pick a time</span>
       </a>
     </div>
@@ -210,34 +194,9 @@
 
 <hr class="rule">
 
-<section>
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Common questions</span>
-      <h2>Things people ask in the first month</h2>
-    </div>
-    <div class="faq">
-      <details>
-        <summary>How do I get my old records in?</summary>
-        <div class="ans"><p>There is an import for customers, orders, stock, suppliers, staff and past payments, and it reads an ordinary spreadsheet. Running it twice does not create everything twice, so you can fix a messy file and import again. Send us the file and we will do the first one with you.</p></div>
-      </details>
-      <details>
-        <summary>My staff can see things I do not want them to see.</summary>
-        <div class="ans"><p>Roles control that, and you can change them yourself in Settings. Finance, payroll, expenses and funds sit behind a lock. If somebody is seeing something they should not, it is a role setting rather than a limitation, and we will walk you through it.</p></div>
-      </details>
-      <details>
-        <summary>It is not syncing between my phone and the shop laptop.</summary>
-        <div class="ans"><p>Sync happens when you are signed in with an email address and online. A username sign in stays on that one device by design, which is what makes the offline mode work. If you are signed in properly and still not seeing changes, message us and we will look at the account rather than guess.</p></div>
-      </details>
-      <details>
-        <summary>I think I have lost something.</summary>
-        <div class="ans"><p>Tell us straight away rather than trying to fix it. There is an audit trail of who changed what and when, and the sooner we look the more likely it is that we can put it back exactly as it was.</p></div>
-      </details>
-      <details>
-        <summary>Can you build something we need?</summary>
-        <div class="ans"><p>Ask. A good part of what is in the app came from somebody saying this would be easier if it did that. We will tell you honestly whether it is coming, whether it is a maybe, or whether it is not something we will build.</p></div>
-      </details>
-    </div>
+<section class="tight">
+  <div class="wrap center">
+    <p class="lede">Most of it has been asked before. <a href="faq.html">Read the questions and answers</a>, or write to us anyway and a person will reply.</p>
   </div>
 </section>
 
@@ -273,23 +232,13 @@
         </ul>
       </div>
       <div>
-        <h5>Your trade</h5>
-        <ul>
-          <li><a href="index.html#tailors">Bespoke tailors</a></li>
-          <li><a href="index.html#readytowear">Ready to wear</a></li>
-          <li><a href="index.html#shoes">Shoes and bags</a></li>
-          <li><a href="index.html#fabrics">Fabric shops</a></li>
-          <li><a href="index.html#accessories">Accessories makers</a></li>
-          <li><a href="index.html#trades">Every kind of business</a></li>
-        </ul>
-      </div>
-      <div>
         <h5>Company</h5>
         <ul>
           <li><a href="about.html">Our story</a></li>
           <li><a href="partners.html">Become a partner</a></li>
-          <li><a href="referrals.html">Refer a business</a></li>
+          <li><a href="partners.html">Refer a business</a></li>
           <li><a href="contact.html">Support and contact</a></li>
+          <li><a href="faq.html">Frequently asked questions</a></li>
           <li><a data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a></li>
         </ul>
       </div>
@@ -304,7 +253,7 @@
       </div>
     </div>
     <div class="ftr-bot">
-      <p class="small">&copy; <span data-year>2026</span> The Label Board. Made in Lagos.</p>
+      <p class="small">&copy; <span data-year>2026</span> The Label Board.</p>
       <nav aria-label="Legal">
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>

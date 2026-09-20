@@ -12,6 +12,13 @@
 var q = new URLSearchParams(location.search);
 var theme = q.get('theme') || 'black';
 var view = (location.hash || '').slice(1);  /* empty means: leave it where it boots */
+/* an optional function to call once the view has settled, for the things that
+   are modals rather than views. A bare name off window, nothing else. */
+var call = (q.get('call') || '').replace(/[^A-Za-z0-9_:,]/g, '');
+/* how far down the view to sit, for the things that are not at the top */
+var scrollTo = parseInt(q.get('scroll') || '0', 10) || 0;
+/* a collapsed section to expand first, by element id */
+var openId = (q.get('open') || '').replace(/[^A-Za-z0-9_-]/g, '');
 var f = document.getElementById('f');
 f.onload = function () {
   var w = f.contentWindow;
@@ -31,7 +38,20 @@ f.onload = function () {
       try {
         var m = w.document.querySelector('main.main');
         if (m) { var y = m.getBoundingClientRect().top + w.pageYOffset; w.scrollTo(0, Math.max(0, y)); }
+        if (scrollTo) w.scrollTo(0, scrollTo);
       } catch (e) {}
+      if (openId) {
+        var sec = w.document.getElementById(openId);
+        if (sec) sec.classList.remove('collapsed');
+      }
+      /* one entry per comma, an optional single argument after a colon */
+      call.split(',').forEach(function (entry) {
+        if (!entry) return;
+        var bits = entry.split(':');
+        var fn = w[bits[0]];
+        if (typeof fn !== 'function') return;
+        try { bits.length > 1 ? fn(bits[1]) : fn(); } catch (e) {}
+      });
       document.title = 'ready:' + view + ':' + theme;
     }, 900);
   } catch (e) { document.title = 'ERR ' + e.message; }

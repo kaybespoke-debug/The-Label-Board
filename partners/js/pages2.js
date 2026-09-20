@@ -77,7 +77,7 @@ PAGES.updates = function () {
 
 /* =================== ACCOUNT =================== */
 PAGES.account = function () {
-  const me = DB.me, tier = Q.tier(), nxt = Q.next(), n = Q.converted().length;
+  const me = DB.me, rate = Q.rate(), n = Q.converted().length;
 
   const ic = (bg, path) => '<div class="sgrp-ic" style="background:' + bg + '"><svg viewBox="0 0 24 24" fill="none" ' +
     'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg></div>';
@@ -103,32 +103,38 @@ PAGES.account = function () {
     '</div>' +
     '<button class="btn gold" style="margin-top:6px" onclick="formAddAccount()">+ Add account</button>';
 
-  /* The ladder and the rules that govern it, in one place. They are the same
-     subject, and a partner reading one wants the other. */
+  /* One rate, and then the only thing that varies: how long each business
+     has left on its own twelve months. The ladder that used to be here
+     answered "what am I worth"; this answers "what is still coming", which
+     is the question a flat rate leaves open. */
+  const earning = Q.converted().filter(r => r.stage !== 'lapsed' && r.cycle !== 'annual');
+  const clocks = earning.length
+    ? '<div class="clocks">' + earning.slice().sort((a, b) =>
+        String(Q.termEnd(a)).localeCompare(String(Q.termEnd(b)))).map(r => {
+        const left = Q.monthsLeft(r);
+        return '<div class="clock' + (left <= 2 ? ' soon' : '') + '">' +
+          '<div class="clock-n">' + esc(r.business) + '</div>' +
+          '<div class="clock-m">' + (left ? plural(left, 'month') + ' left' : 'Finished') + '</div>' +
+          '<div class="clock-d">ends ' + fmtD(Q.termEnd(r)) + '</div></div>';
+      }).join('') + '</div>'
+    : '<p class="note">No business is earning on a monthly clock yet.</p>';
+
   const paidHow =
-    '<div class="tierline"><b>' + tier.name + '</b><span>' + tier.pct + '% of every month they pay</span></div>' +
-    '<div class="tierbar"><i style="width:' + Q.tierProgress() + '%"></i></div>' +
-    '<p class="note">' + (nxt
-      ? plural(n, 'paying account') + ' referred. ' + plural(nxt.min - n, 'more') + ' and you move to ' +
-        nxt.name + ' at ' + nxt.pct + '%.'
-      : plural(n, 'paying account') + ' referred. You are at the top of the ladder.') + '</p>' +
-    '<div class="ladder">' + DB.tiers.map(t => {
-      const done = n >= t.min && t.id !== tier.id, now = t.id === tier.id;
-      return '<div class="rung' + (now ? ' on' : done ? ' done' : '') + '">' +
-        '<div class="rung-n">' + t.name + '</div>' +
-        '<div class="rung-p">' + t.pct + '%</div>' +
-        '<div class="rung-d">' + (t.min === 0 ? 'from your first' : t.min + ' accounts') + '</div></div>';
-    }).join('') + '</div>' +
+    '<div class="tierline"><b>' + rate + '%</b><span>of what every referred business pays</span></div>' +
+    '<p class="note">The same rate for every partner and every business. There is no ladder to ' +
+    'climb, so there is nothing to unlock and nothing to lose if a business leaves.</p>' +
     '<div class="sec-t">The rules</div>' +
-    kv('What you earn', tier.pct + '% of every month a referred account pays') +
-    kv('For how long', TERM_YEARS + ' years from the day that account first paid') +
-    kv('Years ' + (TAPER_AFTER_YEARS + 1) + ' and ' + TERM_YEARS, TAPER_PCT + '%, then it ends') +
+    kv('What you earn', rate + '% of what a referred business actually pays') +
+    kv('On a monthly plan', 'Every month, for ' + DB.settings.termMonths + ' months from their first payment') +
+    kv('On a yearly plan', rate + '% of that year\u2019s payment, once') +
+    kv('If they leave', 'It stops that day, and nothing further is owed') +
     kv('When it clears', DB.settings.holdDays + ' days after it is credited') +
-    kv('When it reaches you', 'Once a year, in naira') +
-    '<p class="note" style="margin-top:12px">Your rate follows how many of your accounts are active and paying ' +
-    'right now. It lifts when you grow and eases back if some leave, and either way it applies from that day ' +
-    'forward: nothing already credited to you is ever recalculated or taken back. Each account carries its own ' +
-    'clock, and an account that leaves stops earning that day.</p>';
+    kv('When it reaches you', 'Once a year, in naira \u00b7 ' + esc(DB.settings.payoutRuns)) +
+    '<div class="sec-t">Where each business is on its clock</div>' + clocks +
+    '<p class="note" style="margin-top:12px">Each business carries its own ' + DB.settings.termMonths + ' months, ' +
+    'counted from the day it first paid rather than from the day you joined. It never resets and never ' +
+    'pauses. The business itself gets no discount and no reward: what you earn comes out of our side, ' +
+    'not theirs.</p>';
 
   const notify =
     '<div>' +
@@ -160,7 +166,7 @@ PAGES.account = function () {
     '<div class="dav">' + initials(me.name) + '</div>' +
     '<div style="flex:1;min-width:150px"><h3 style="font-size:16px">' + esc(me.name) + '</h3>' +
     '<div class="ph-sub">' + esc(AUTH.session ? AUTH.session.email : me.email) + '</div>' +
-    '<div class="ph-sub">' + esc(me.business) + ' · ' + tier.name + ' partner</div></div>' +
+    '<div class="ph-sub">' + esc(me.business) + ' · ' + plural(n, 'paying business') + '</div></div>' +
     '<button class="btn sm" onclick="signOut()">Sign out</button></div>' +
 
     grp(ic('color-mix(in srgb,var(--gold) 22%,var(--panel))', '<circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>'),
@@ -168,7 +174,7 @@ PAGES.account = function () {
     grp(ic('color-mix(in srgb,var(--green) 22%,var(--panel))', '<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/>'),
       'Payout accounts', DB.accounts.length ? esc((Q.primaryAccount() || {}).bankName) : 'None yet', accounts) +
     grp(ic('color-mix(in srgb,var(--amber) 22%,var(--panel))', '<path d="M12 3.5l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 17.2 6.7 20l1.1-6L3.4 9.8l6-.8z"/>'),
-      'How you get paid', tier.name + ' \u00b7 ' + tier.pct + '% of every month', paidHow) +
+      'How you get paid', rate + '% of what they pay, for ' + DB.settings.termMonths + ' months', paidHow) +
     grp(ic('color-mix(in srgb,var(--blue) 22%,var(--panel))', '<path d="M18 15V10a6 6 0 1 0-12 0v5l-1.5 2.5h15z"/><path d="M9.5 20.5a2.6 2.6 0 0 0 5 0"/>'),
       'Notifications', 'What we tell you about', notify) +
     grp(ic('color-mix(in srgb,var(--purple) 22%,var(--panel))', '<path d="M21 12a8 8 0 0 1-8 8H8l-4 3v-4.5A8 8 0 0 1 13 4a8 8 0 0 1 8 8z"/>'),
@@ -208,14 +214,15 @@ function notifyRow(key, title) {
    somebody sent them and may not know what The Label Board is, so this says what
    the portal is for before they start poking at numbers.
 
-   Deliberately no commission figure. The tiers are set in the console, and a rate
-   hard-coded into a welcome screen is a rate that goes stale and then gets quoted
-   back at us. */
+   The rate appears here in words rather than read from DB, because the welcome
+   screen renders before a partner's data has been fetched. It is the one place
+   in the portal that repeats the number, so it is the one place to change if the
+   programme ever moves off eight per cent. */
 PAGES.welcome = function () {
   const name = (AUTH.session && AUTH.session.name) ? String(AUTH.session.name).split(' ')[0] : '';
   const points = [
     ['Every referral, tracked', 'Who you brought in, where they got to, and who is still on trial.'],
-    ['Recurring commission', 'You earn for as long as they stay, not once when they sign. Your rate rises with your tier.'],
+    ['One rate, every time', 'Eight per cent of what each business you brought actually pays, every month for a year, and nothing to unlock first.'],
     ['Paid out to your account', 'What you have earned, what has been sent, and what is still owed.'],
     ['Something to send', 'Your code and your links, ready to share.']
   ];

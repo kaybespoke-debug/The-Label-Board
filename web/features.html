@@ -20,7 +20,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/site.css">
 </head>
 <body>
@@ -50,16 +50,7 @@
          touch screen where a hover would stick open after a tap. -->
     <nav class="hdr-nav" aria-label="Main">
       <a href="index.html">Home</a>
-      <span class="nav-drop">
-        <a href="features.html" data-drop aria-haspopup="true" aria-expanded="false">Products<svg class="caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></a>
-        <span class="nav-menu">
-          <a href="features.html#orders">Orders and customers</a>
-          <a href="features.html#production">Production and delivery</a>
-          <a href="features.html#inventory">Stock and suppliers</a>
-          <a href="features.html#money">Money and people</a>
-          <a href="features.html#offline">Phone and offline</a>
-        </span>
-      </span>
+      <a href="features.html">Products</a>
       <a href="pricing.html">Pricing</a>
       <a href="partners.html">Partners</a>
       <a href="about.html">Our story</a>
@@ -77,13 +68,6 @@
 <div class="drawer" id="drawer">
   <a href="index.html">Home</a>
   <a href="features.html">Products</a>
-  <!-- The header dropdown does not exist below 1000px, and the product page
-       no longer has a tab strip, so these five are how a phone changes area. -->
-  <a class="sub" href="features.html#orders">Orders and customers</a>
-  <a class="sub" href="features.html#production">Production and delivery</a>
-  <a class="sub" href="features.html#inventory">Stock and suppliers</a>
-  <a class="sub" href="features.html#money">Money and people</a>
-  <a class="sub" href="features.html#offline">Phone and offline</a>
   <a href="pricing.html">Pricing</a>
   <a href="partners.html">Partners</a>
   <a href="about.html">Our story</a>
@@ -103,11 +87,6 @@
      page is called. With no script it stays on the first area, which is the
      one the markup ships open, so it is never wrong. site.js keeps it in
      step from the tab strip, the Products menu and the back button. -->
-<section class="phero">
-  <div class="wrap">
-    <h1 data-feat-title>Orders and customers</h1>
-  </div>
-</section>
 
 <!-- ============ five areas, one at a time ============
      This was ten areas with ten panels, eight screenshots and 1,272 words that
@@ -117,7 +96,27 @@
 <section class="tight">
   <div class="wrap">
 
-    <a class="backlink" href="index.html#product" data-back>Back</a>
+    <!-- The five areas answer here rather than at their panes, so a link to
+         one of them scrolls to the top of the page instead of into the
+         middle of it. The script reads the hash to pick the pane. -->
+    <span id="orders" class="anchor"></span>
+    <span id="production" class="anchor"></span>
+    <span id="inventory" class="anchor"></span>
+    <span id="money" class="anchor"></span>
+    <span id="offline" class="anchor"></span>
+    <span id="branches" class="anchor"></span>
+    <a class="backlink" href="index.html" data-back>Back</a>
+
+    <div class="tabs" role="tablist" aria-label="Areas of the product">
+      <button class="tab on" type="button" data-group="feat" data-tab="orders" role="tab" aria-selected="true">Orders and customers</button>
+      <button class="tab" type="button" data-group="feat" data-tab="production" role="tab" aria-selected="false">Production and delivery</button>
+      <button class="tab" type="button" data-group="feat" data-tab="inventory" role="tab" aria-selected="false">Stock and suppliers</button>
+      <button class="tab" type="button" data-group="feat" data-tab="money" role="tab" aria-selected="false">Money and people</button>
+      <button class="tab" type="button" data-group="feat" data-tab="offline" role="tab" aria-selected="false">Phone and offline</button>
+      <button class="tab" type="button" data-group="feat" data-tab="branches" role="tab" aria-selected="false">Multi branches</button>
+    </div>
+
+    <h1 data-feat-title>Orders and customers</h1>
 
     <!-- The tab strip that used to sit here is gone. Kayode: "this is already
          in the dropdown, i dont think we should still see it here". It was the
@@ -129,7 +128,7 @@
          area on a phone and removing it would have stranded the page. -->
 
     <!-- ---- orders ---- -->
-    <div class="pane on anchor" data-group="feat" data-pane="orders" data-title="Orders and customers" id="orders">
+    <div class="pane on anchor" data-group="feat" data-pane="orders" data-title="Orders and customers">
       <div class="row2">
         <div class="row2-text">
           <h3>An order that carries everything about itself</h3>
@@ -141,12 +140,12 @@
             <li><strong>Invoices, receipts and job sheets</strong> on your own letterhead.</li>
           </ul>
         </div>
-        <img class="shot" src="img/screens/orders.png" width="1328" height="1063" loading="lazy" decoding="async" alt="The orders list: every order with its client, items, value, profit and status">
+        <img class="shot" src="img/screens/orders.png" width="1328" height="867" loading="lazy" decoding="async" alt="The orders list: every order with its client, items, value, profit and status">
       </div>
     </div>
 
     <!-- ---- production ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="production" data-title="Production and delivery" id="production">
+    <div class="pane anchor" data-group="feat" data-pane="production" data-title="Production and delivery">
       <div class="row2">
         <div class="row2-text">
           <h3>A board that answers the only question that matters today</h3>
@@ -158,12 +157,12 @@
             <li><strong>Dispatch and delivery on the same record</strong>, so what has left the workroom is still accounted for.</li>
           </ul>
         </div>
-        <img class="shot" src="img/screens/production.png" width="1328" height="1063" loading="lazy" decoding="async" alt="The production pipeline: every piece, the stage it is at, and who is responsible">
+        <img class="shot" src="img/screens/production.png" width="1328" height="867" loading="lazy" decoding="async" alt="The production pipeline: every piece, the stage it is at, and who is responsible">
       </div>
     </div>
 
     <!-- ---- inventory ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="inventory" data-title="Stock and suppliers" id="inventory">
+    <div class="pane anchor" data-group="feat" data-pane="inventory" data-title="Stock and suppliers">
       <div class="row2">
         <div class="row2-text">
           <h3>The shelf and the screen agree</h3>
@@ -175,12 +174,12 @@
             <li><strong>Vendors and suppliers</strong> with what you paid and what you still owe.</li>
           </ul>
         </div>
-        <img class="shot" src="img/screens/stock.png" width="1328" height="1063" loading="lazy" decoding="async" alt="Inventory: what is on hand, in what units, and what is running low">
+        <img class="shot" src="img/screens/stock.png" width="1328" height="867" loading="lazy" decoding="async" alt="Inventory: what is on hand, in what units, and what is running low">
       </div>
     </div>
 
     <!-- ---- money and people ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="money" data-title="Money and people" id="money">
+    <div class="pane anchor" data-group="feat" data-pane="money" data-title="Money and people">
       <div class="sec-head">
         <h3>Real books, and pay that follows the work</h3>
         <p class="lede">Every order, wage, roll of fabric and expense lands in the same ledger, so the profit figure is arrived at rather than guessed.</p>
@@ -196,7 +195,7 @@
     </div>
 
     <!-- ---- phone, offline, and who is allowed to do what ---- -->
-    <div class="pane anchor" data-group="feat" data-pane="offline" data-title="Phone and offline" id="offline">
+    <div class="pane anchor" data-group="feat" data-pane="offline" data-title="Phone and offline">
       <div class="sec-head">
         <h3>It does not stop when the network does</h3>
         <p class="lede">Install it from the browser and it sits on your home screen like any other app. With no signal it still opens, still saves and still prints. When you are back it catches up on its own.</p>
@@ -210,53 +209,22 @@
       </ul>
     </div>
 
-  </div>
-</section>
 
-<hr class="rule">
-
-<!-- ============ what kind of business ============
-     Six cards naming each way a studio can be set up became one line. The home
-     page already shows the trades with pictures, and this was that list twice. -->
-<section id="kinds" class="anchor tight on-light">
-  <div class="wrap">
-    <div class="sec-head center wide">
-      <span class="eyebrow">Not only for tailors</span>
-      <h3>Tell it what kind of business you are, and it changes</h3>
-      <p class="lede lede-wide">A bespoke tailor, a shoe maker, a bag maker, a fabric shop, an accessories bench, ready to wear garments off the rail, or more than one of those at once. You pick when you set up, and again for each outlet. What you never use stops taking up room.</p>
-    </div>
-  </div>
-</section>
-
-<hr class="rule">
-
-<!-- ============ moving in ============ -->
-<section id="import" class="anchor tight on-light">
-  <div class="wrap">
-    <div class="row2">
-      <div class="row2-text">
-        <span class="eyebrow">Moving in</span>
-        <h3>Bring what you already have</h3>
-        <p>Your customers, orders, stock, suppliers, staff and past payments come across from an ordinary spreadsheet, and everything exports again whenever you want it.</p>
+    <!-- ---- multi branches ---- -->
+    <div class="pane anchor" data-group="feat" data-pane="branches" data-title="Multi branches">
+      <div class="row2">
+        <div class="row2-text">
+          <h3>Every outlet on one screen, and the whole label underneath</h3>
+          <p>A workroom in Lagos, a rail in Abuja, a fabric counter in Kano. Each one keeps its own takings, staff and stock, and you see all of them at once without ringing round.</p>
+          <ul class="checks">
+            <li><strong>Each outlet its own line</strong>, with what it took, what is active and what is running late.</li>
+            <li><strong>The red as well as the green.</strong> What is owed and what is overdue sit next to the takings, because that is the half you act on.</li>
+            <li><strong>One set of books</strong>, split by outlet the moment you want it and rolled up when you do not.</li>
+            <li><strong>Hidden until you need it.</strong> On your own, none of this is there. It appears when you open the second one.</li>
+          </ul>
+        </div>
+        <img class="shot" src="img/screens/branches.png" width="1328" height="867" loading="lazy" decoding="async" alt="The dashboard across all four outlets: revenue, what is owed, profit and expenses, then Lagos, Abuja, Ibadan and Kano each with their own takings and what is overdue">
       </div>
-      <div class="callout">
-        <p><strong>We will do the first import with you.</strong></p>
-        <p>Bring whatever your records are in, a spreadsheet, a notebook photo or a WhatsApp export, and we will get your live orders in during the call.</p>
-        <p><a class="more" href="book.html">Book a walkthrough</a></p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<hr class="rule">
-
-<section class="cta">
-  <div class="wrap center">
-    <h2>The fastest way to judge it is to open it</h2>
-    <p class="lede">A full business with orders, staff, stock and books already in it, and nothing you can break.</p>
-    <div class="btn-row center">
-      <a class="btn btn-gold" href="book.html">Book a demo</a>
-      <a class="btn btn-line" href="pricing.html">See pricing</a>
     </div>
   </div>
 </section>
@@ -293,23 +261,13 @@
         </ul>
       </div>
       <div>
-        <h5>Your trade</h5>
-        <ul>
-          <li><a href="index.html#tailors">Bespoke tailors</a></li>
-          <li><a href="index.html#readytowear">Ready to wear</a></li>
-          <li><a href="index.html#shoes">Shoes and bags</a></li>
-          <li><a href="index.html#fabrics">Fabric shops</a></li>
-          <li><a href="index.html#accessories">Accessories makers</a></li>
-          <li><a href="index.html#trades">Every kind of business</a></li>
-        </ul>
-      </div>
-      <div>
         <h5>Company</h5>
         <ul>
           <li><a href="about.html">Our story</a></li>
           <li><a href="partners.html">Become a partner</a></li>
-          <li><a href="referrals.html">Refer a business</a></li>
+          <li><a href="partners.html">Refer a business</a></li>
           <li><a href="contact.html">Support and contact</a></li>
+          <li><a href="faq.html">Frequently asked questions</a></li>
           <li><a data-cfg-link="app" href="https://app.thelabelboard.com">Log in</a></li>
         </ul>
       </div>
@@ -324,7 +282,7 @@
       </div>
     </div>
     <div class="ftr-bot">
-      <p class="small">&copy; <span data-year>2026</span> The Label Board. Made in Lagos.</p>
+      <p class="small">&copy; <span data-year>2026</span> The Label Board.</p>
       <nav aria-label="Legal">
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>

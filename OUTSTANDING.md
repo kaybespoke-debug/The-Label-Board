@@ -5,7 +5,580 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 19 September 2026 (thirteenth session)
+Last updated: 20 September 2026 (fifteenth session)
+
+## Where the deploy stands — read this before pushing anything
+
+Kayode asked for a deploy on 20 September. It did not happen, and the
+reason is worth stating plainly rather than leaving in a table further
+down.
+
+The live database was moved onto the TIERED partner programme on 19
+September. Every page, portal and console in this tree now says a flat 8%
+for twelve months. **Pushing either branch without applying the five
+migrations puts the website and the database into open disagreement about
+how much money a partner earns.** The same release also has to redeploy
+`admin-api`, or the console calls four actions that do not exist.
+
+So a deploy is one instruction away, and the instruction is not a git
+command. In order:
+
+1. Apply the five migrations to `eskubrbgbcbaejynjxvh`, in filename order.
+2. Redeploy the `admin-api` Edge Function.
+3. Run the pre-flight queries below, which only work after step 1.
+4. `git push origin admin-deploy` — publishes the console and the portal.
+5. Bump `CACHE` in `site/sw.js`, then merge into `main` with the
+   `netlify.toml` recipe, and push. That publishes the customer app and
+   the website.
+
+Steps 1 and 2 need Supabase access that this session does not have: the
+token reaches one project and it is not this one. They are Kayode’s to
+run, or to hand over.
+
+## The story type scale, and a rule that came out of it
+
+Our story reads 15px on a wide screen, 13 on a tablet, 12 on a phone. It
+took four passes, because the size was asked for without a device and I
+applied it to all three: "font size 12 is a good enough size" meant the
+laptop, and 12 on a laptop is not 12 on a phone.
+
+**One of the three was dead.** The tablet rule was sitting inside a
+`max-width:680px` block, and a later `680px` block further down the file
+set 12px over the top of it, so a tablet silently got the desktop size and
+the middle step never existed. It is in the story’s own `max-width:900px`
+block now. The lesson is the same one this stylesheet keeps teaching: this
+file has several phone blocks appended at different times, and a rule’s
+position decides whether it renders at all. Measure the rendered size in a
+browser rather than reading the declaration.
+
+**Still open, and Kayode’s call.** At 15px the story line is 143
+characters on an 1848px screen, against a comfortable 60 to 90. He asked
+for the column not to be narrowed, so the fix, if he ever wants one, is
+two columns on wide screens rather than a narrower single one.
+
+## The phone pass, 20 September
+
+Two attempts. The first one was wrong and is worth recording.
+
+**What went wrong.** Kayode asked to check the phone sizes, with "no long
+scrolling, not too much details". I read the small numbers as faults and
+raised eight of them: footer links 12.5 to 14, trade tile lists 11.5 to 13,
+tabs 12 to 13, buttons 12.5 to 13.5, and so on. He caught it: "you table
+looks like increase rather than a decrease that i asked for."
+
+He had already asked for the opposite on 18 September, in a comment sitting
+in this very stylesheet: "strip down all pages and tabs sizes for mobile
+view especially font sizes." Raising them also made most pages LONGER,
+which is the thing he was asking to fix. Two instructions pointing the same
+way, and I went against both.
+
+**The lesson.** Small type and a small tap target are different faults with
+different fixes. A 15px tall footer link is hard to hit; the answer is
+padding, not a bigger word. And when a measurement looks like a fault, check
+whether it was a decision first. This one was, and it was written down eight
+lines above where I was working.
+
+**What the second attempt did.** Reverted every size. Then took out SPACE
+rather than growing anything: section padding from the 32px clamp floor to
+22, plan card padding, feature list rhythm, table row padding, FAQ summary
+padding, footer padding. Not one font size changed, not one word removed.
+
+| Page | Before | After |
+|---|---|---|
+| pricing | 6.5 | 5.9 |
+| faq | 3.8 | 3.6 |
+| about | 3.3 | 3.2 |
+| partners | 3.2 | 3.0 |
+| contact | 2.9 | 2.8 |
+| waitlist | 2.4 | 2.3 |
+| home | 2.3 | 2.2 |
+| book | 1.9 | 1.8 |
+| products | 1.7 | 1.6 |
+
+No page scrolls sideways at 375. The footer also still declared three list
+columns on the phone after Your trade came out, so the right third was an
+empty hole; that is fixed and was a real bug rather than a preference.
+
+**The third pass took the type down**, which is what he asked for twice and
+what the first pass had gone against. Body text 14 to 13, ledes 14.5 to
+13.5, h1 29 to 26, h2 20 to 18, card text 13 to 12.5, FAQ answers 13.5 to
+12.5, tabs 12 to 11.5, buttons 12.5 to 12, table cells 13.5 to 11.
+
+### The comparison table now fits the screen
+
+It used to be `min-width:540px` inside a horizontal scroller, so a phone
+swiped sideways through it. Three changes and it fits 375 with none:
+
+- `table-layout:fixed` with the three plan columns pinned, so the feature
+  name takes what is left instead of four columns negotiating.
+- **Yes and Not included render as a tick and a dash.** This is what makes
+  it possible: "Not included" is twelve characters holding open a column
+  that carries one bit of information. The words are still in the HTML and
+  still read out; only their rendering changes.
+- The plan columns are **60px**, which is measured rather than guessed. At
+  10.5px the word "agreement" renders at 54px and needs 60 with its
+  padding. 52 broke it as "agreeme / nt" and 56 as "agreemen / t"; both
+  were guesses, and the third attempt measured the text with a canvas
+  instead. Worth remembering: when a box is one word too narrow, measure
+  the word.
+
+The table went from 2.6 screens to 1.7 and from a sideways scroll to none.
+The "swipe the table sideways" hint hides itself, because it would now be
+a lie.
+
+| Page | Start of day | Now |
+|---|---|---|
+| pricing | 6.5 | **5.1** |
+| faq | 3.8 | 3.4 |
+| about | 3.3 | 3.0 |
+| partners | 3.2 | 2.9 |
+| contact | 2.9 | 2.8 |
+| privacy | 2.6 | 2.4 |
+| terms | 2.4 | 2.2 |
+| waitlist | 2.4 | 2.3 |
+| home | 2.3 | 2.2 |
+| book | 1.9 | 1.8 |
+| thanks | 1.7 | 1.5 |
+| 404 | 1.6 | 1.5 |
+| features | 1.7 | 1.5 |
+| reviews | 1.5 | 1.3 |
+
+Nothing scrolls sideways on any of the fourteen. Pricing is still the
+longest at 5.1, and what is left of it is three stacked plan cards (1.9)
+and the table (1.7). Neither can shrink further without taking something
+out of the cards, which is a content decision.
+
+## Flutterwave billing: planned, not built
+
+`BILLING.md` holds the plan. Seven phases, each ending in something
+demonstrable. It is waiting on five decisions and a test-mode account.
+The recommendation is tokenised charges over Flutterwave Payment Plans,
+because the plan gates, the suspension rules and the commission engine all
+already read from our database and Payment Plans would put the schedule
+somewhere else.
+
+## A fourth pass on the website, 20 September
+
+| Change | Where |
+|---|---|
+| The seven billing questions moved to the FAQ | off `pricing.html`, onto `faq.html` as a fourth group |
+| The footer link is now "Frequently asked questions" | was "Questions and answers" |
+| Three sections deleted | `features.html`: "Not only for tailors", "Bring what you already have", "The fastest way to judge it is to open it" |
+| The Your trade column is gone from the footer | every item was an anchor into the home page, not a page of its own |
+| "Made in Lagos" is gone from the footer | |
+
+`faq.html` is now four groups and 25 questions with none repeated. It is the
+only place on the site that holds questions.
+
+Five gate checks were re-aimed rather than the copy being put back:
+
+- The product page no longer lists the trades, so only the site-wide check
+  remains. Asking the product page specifically would be asking for the
+  copy back.
+- `CRAFT_SAYS` mapped each craft to ONE word, and the only place the site
+  said "garment" was the lede that was removed. The home page has spoken to
+  those studios all along, as bespoke tailors and ready to wear, so the map
+  takes a list now. One word made it a check about vocabulary rather than
+  about whether a studio sees itself on the site.
+- The `on-light` floor came down from 12 to 8, which the site still clears.
+- The invoice-only route is checked on the Bespoke CARD, not on the words
+  "Talk to us", which had moved to the FAQ with the billing questions. The
+  check had started passing on a different part of the page from the one it
+  was written about, which is the quiet way a gate stops meaning anything.
+- `.ftr-top` declared five columns and now has four children, which left a
+  dead column on the right.
+
+## The sections Kayode asked to be removed, finished
+
+He screenshotted seven regions of the site and asked for all of them out.
+The first pass removed some, moved some and left the rest, which he had to
+raise twice: "if i want them, i wont ask that they been taken out".
+
+Now out in full:
+
+| Page | Gone |
+|---|---|
+| Home | the 22/5/0/1 strip, "The loop that closes itself", "See it with your own orders in it" |
+| Pricing | the November waiting list band, the 0%/Unlimited/1/100% strip, "What the fee is standing next to", "Try it before you decide anything", "Neither of the two fit?" (folded into the Bespoke card as asked) |
+| Partners | the whole page, replaced with the seven lines he sent |
+| About | "Why it is called The Label Board", the questions list, "Come and see whether it fits your shop" |
+| Support | "Things people ask in the first month" |
+
+The three question lists are on `faq.html`, seventeen questions with none
+repeated. Two gate checks went with the home strip: they asserted the
+screen count and the role count that the strip printed. The check goes
+with the claim rather than the claim being restored to keep a gate quiet.
+
+**`waitlist.html` is still reachable** from the home hero, so removing the
+pricing band did not orphan it.
+
+## The plans are enforced now, 20 September
+
+Was open on this list for one day. Kayode: "Build the gates properly, now
+— this needs to be set up correctly before launch, not left open."
+
+`PLAN_FEATURES` held one key, `chase`, and the comparison table marked
+eight rows "Not included" for Basic that nothing enforced. There are ten
+features now and the database holds every one of them.
+
+| Feature | Enforced on | How |
+|---|---|---|
+| inventory | `app_state` `layi_dash_supplies` | trigger |
+| suppliers | `app_state` `layi_dash_bills`, and the `suppliers` table | trigger |
+| funds | `app_state` `layi_dash_pots` | trigger |
+| team | `app_state` `_attendance` `_leave` `_shifts`, and the `attendance` table | trigger |
+| marketing | `app_state` `layi_dash_campaigns` | trigger |
+| companylog | `app_state` `layi_dash_log` `layi_dash_anns` | trigger |
+| payroll | `staff.basic`, the rate every payroll figure is computed from | trigger |
+| chase, reporting, reports | nothing | see below |
+
+**Writes are blocked, reads are not.** A studio that drops from Pro to
+Basic keeps everything it had and cannot add more, which is the rule
+`audit_tiers` has had since the beginning. A new Basic account has nothing
+in those keys, so reads return nothing anyway.
+
+**Three features have no server surface and it is better to say so.**
+Sending a reminder is a `wa.me` link opened on the device, with no server
+in the path until we send messages ourselves. Reporting lines and full
+reports are read-side arithmetic over rows Basic legitimately holds. All
+three are gated in the app and listed in `my_plan_features()`, so a client
+cannot grant itself one, but somebody determined with the anon key could
+still compute them. What they cannot do is STORE anything.
+
+Proved twice. `plan_feature_harness.mjs` (85) refuses each write on Basic
+and accepts the identical write on Pro, including from a signed-in Basic
+owner going straight at the table with no app in the way.
+`audit_tiers.js` section 11 replaces each view’s render function with a
+counter and shows it never runs on Basic and does run on Pro. Both were
+mutation tested: giving Basic `funds` fails on the feature list AND on the
+screen drawing.
+
+**Still open:** `chase` cannot be enforced until reminders are sent by us
+rather than handed to WhatsApp on the device. That is the one gate in the
+ten that is still only a nudge.
+
+## The comparison table, reconciled 20 September
+
+Six discrepancies between the table, the pricing cards and the app. Five
+fixed, one left for the decision above.
+
+| # | What was wrong | Fixed to |
+|---|---|---|
+| 1 | The receivables rows were missing entirely, and they are the one real Basic-versus-Pro capability in the software | Added "See who owes you" (Basic: Yes, view only) and "Chase list and payment reminders" (Basic: Not included) |
+| 2 | Table said "Six roles with permissions"; `defaultRoles()` returns five and the home page strip says five | "Five roles with permissions, and you can add your own" |
+| 3 | Pro card sold "Client fitting records and measurement history" while the table gave "Customers and full measurements" to Basic. The app gates neither | The card line removed. Basic gets measurements and fitting history |
+| 4 | Table said Pro had no priority support; the Pro card and the operator console both say it does | Table: Pro Yes |
+| 5 | "Reporting lines, so managers see their own team" was on the Pro card and had no row | Row added, Pro and Bespoke |
+| 6 | Onboarding: table Basic "Self serve", Pro Yes | Checked, already agreed with the cards. No change |
+
+Three gate checks were added so the table and the cards cannot contradict
+each other again: the roles row is counted against the app, the Priority
+support row is compared with the Pro card, and the receivables rows have
+to exist.
+
+## COMMITTED, NOT PUSHED, NOT APPLIED — 20 September, part three
+
+Everything from parts one and two below, PLUS a fifth migration. The work
+is now **committed on `admin-deploy`** in four commits. Nothing is pushed,
+nothing is applied, and the Edge Function is not redeployed.
+
+| To apply, in this order | What it does |
+|---|---|
+| `20260920100000_plan_limits.sql` | Studio and login ceilings, enforced by triggers |
+| `20260920110000_partner_flat_commission.sql` | One 8% band, the twelve month clock |
+| `20260920120000_console_plan_and_partner_usage.sql` | What the console reads |
+| `20260920130000_one_referral_programme.sql` | Every customer is a referrer, and the anti-fraud |
+| `20260920140000_plan_feature_gates.sql` | **New.** Basic cannot write a Pro feature, by app or by hand |
+
+`admin-api` now also serves `partnerCommission`, `setStudioLimits`,
+`referralRisk` and `setPayoutFrozen`, and its `partners` action reads a
+summary rather than the table. It has to be redeployed in the same release.
+
+### The fourth migration is the one to read before applying
+
+It is the only one that changes what happens on every future SIGNUP:
+`app.provision_studio()` now also creates a `partners` row for the new
+studio and, if the account carried a `referral_code` in its metadata,
+attaches the referral. It also backfills a code for every business that
+already exists.
+
+Two things to know before it runs:
+
+1. **The backfill skips a business with no active owner**, because a code
+   belongs to a person. Those get one the day somebody signs in. Expect the
+   count of new `partners` rows to be lower than the count of businesses.
+2. **An existing partner who is also a customer is converted rather than
+   duplicated**: their row gets `business_id` and `kind = 'customer'`.
+
+### Pre-flight, after applying
+
+```sql
+-- who is over a plan limit (they will ring)
+select b.name, b.plan, u.studios, u.max_studios, u.seats, u.max_seats
+from public.businesses b cross join lateral app.usage_for(b.id) u
+where (u.max_studios is not null and u.studios > u.max_studios)
+   or (u.max_seats   is not null and u.seats   > u.max_seats);
+
+-- every business should now have a code, or have no owner yet
+select count(*) filter (where p.id is not null) as with_code,
+       count(*) filter (where p.id is null)     as without_code
+from public.businesses b
+left join public.partners p on p.business_id = b.id;
+
+-- and nothing should be flagged on day one
+select kind, count(*) from public.platform_referral_risk() group by 1;
+```
+
+### What changed in part two
+
+**One referral programme.** Every business gets a code on its first day.
+Outside partners and customers are the same table and the same 8%.
+`referrals.html` and its free-month scheme are deleted.
+
+**Anti-fraud, built in rather than bolted on.** Self-referral refused on
+four axes, one payment method per business, attribution permanent, churn or
+refund inside the 31 day hold voiding pending commission, a per-referrer
+payout freeze, and a risk list for the console. `referral_fraud_harness`
+proves the two Kayode asked for and 73 other things.
+
+**Typography.** Fraunces plus Inter across the website, the console and the
+portal. The customer app is deliberately untouched: it must open with no
+network.
+
+**The screenshots no longer show Kayode’s studio.** The example studio is
+Adé Atelier now, and all six images were retaken from it at framings
+measured back off the originals.
+
+**Our story** is his text, with his photograph in the hero.
+
+### Found on the way
+
+- **`app_schema_harness` was reading the wrong `provision_studio`.** My
+  fourth migration copied the 20260904180000 version, which is one
+  generation behind: the billing migration had since added
+  `perform app.ensure_billing_record(v_biz)` to it. Copying the wrong
+  generation is the same failure as retyping from memory and looks
+  identical in a diff. `billing_harness` caught it in one run. **When
+  replacing a function, grep every migration for its name and copy the
+  LAST one.**
+- **A late self-referral is not a churn.** The recheck marked a
+  never-converted referral as lapsed, which
+  `partner_referrals_lapsed_after_paid` correctly refuses, so the payment
+  method insert failed. The test helper swallowed the error and the failure
+  surfaced three assertions later pointing at the wrong function. Both are
+  fixed; the harness now asserts every insert it performs.
+
+### Still open
+
+- **`ownerPassword: 'layi2025'`** is still the fallback password for any
+  studio that never set one. It was left alone with the demo rename because
+  changing it locks those studios out. It wants a migration that forces a
+  reset, not a rename.
+- **`apple-mobile-web-app-title` is still "LAYI"** in the customer app, so
+  an installed phone shows that on the home screen. Changing it renames the
+  app on devices that already have it, which is a decision rather than a fix.
+- **The website has no signup form that carries a referral code yet.** The
+  database reads `raw_user_meta_data ->> 'referral_code'`, and the only
+  thing that writes it today is the console invitation. A public "you were
+  sent by" field is the next piece.
+- **Nothing writes `payment_methods` yet.** The table, the uniqueness and
+  the self-referral recheck are all live and proved, but no payment
+  processor is connected, so nothing inserts a fingerprint. The control is
+  in place ahead of the thing it controls, which is the right way round.
+- `mutation_check.mjs` still reports three SKIPs, unchanged and
+  pre-existing. See part one.
+
+## NOT APPLIED AND NOT DEPLOYED — 20 September, the repricing and the flat programme
+
+Everything below is written, green on every gate, and **sitting in the working
+tree**. Nothing is committed, nothing is pushed, and the three new migrations
+have **not** been applied to `eskubrbgbcbaejynjxvh`.
+
+That last one matters more than usual. The live database was moved onto the
+TIERED programme yesterday (`20260919171055`, `171119`, `171236`), so until
+these are applied the live project pays 0/6/7/8 on a four year clock while
+every page, portal and console in this tree says a flat 8% for twelve months.
+The two must not be released separately.
+
+| To apply, in this order | What it does |
+|---|---|
+| `20260920100000_plan_limits.sql` | The studio and login ceilings, enforced by triggers |
+| `20260920110000_partner_flat_commission.sql` | One 8% band, the twelve month clock, drops the milestones |
+| `20260920120000_console_plan_and_partner_usage.sql` | What the console reads to show usage and commission owed |
+
+`admin-api` also has three changes in it (`partners` now reads the summary,
+plus `partnerCommission` and `setStudioLimits`), so the Edge Function has to
+be redeployed in the same release or the console calls two actions that are
+not there.
+
+### A pre-flight worth running before the limits migration
+
+The triggers only ever refuse an INSERT, so applying them cannot break an
+existing studio. But it is worth knowing who is over, because they are the
+ones who will ring:
+
+```sql
+select b.name, b.plan, u.studios, u.max_studios, u.seats, u.max_seats
+from public.businesses b cross join lateral app.usage_for(b.id) u
+where (u.max_studios is not null and u.studios > u.max_studios)
+   or (u.max_seats   is not null and u.seats   > u.max_seats);
+```
+
+(Run it after applying, since `app.usage_for` is created by the migration.)
+The demo `layi-multi-studio` account is known to be one of them: it is on
+trial with four branches, which is deliberate and is what the console’s new
+"Over plan" pill is there to show.
+
+### What changed, in one list
+
+**Prices.** Basic 27,000 → 20,000, Pro 65,000 → 49,000, in the website config,
+the pricing page, the console, the app and the portal. Yearly is still worked
+out as eleven months for twelve. The five non-naira currencies were re-seeded
+at the same ratio and are still seeds.
+
+**Limits, agreed earlier and never applied anywhere until now.** Basic 1
+studio / 5 logins, Pro 5 studios / 50 logins, Bespoke by contract. Enforced by
+BEFORE INSERT triggers on `branches` and `memberships`, with per-business
+overrides on `businesses.max_branches` and `max_seats` that a tenant cannot
+write. Pro used to sell unlimited logins; that is the one change that narrows
+a promise already made, and it is a number everywhere rather than a softer
+form of words.
+
+**The partner programme, flattened.** 8% of what each referred business
+actually pays: every month for twelve months on a monthly plan, once on a
+yearly plan, only while they pay, and only the partner earns. Tiers and
+milestone bonuses are gone from the website, the portal, the console and the
+database — the milestone table and its function are DROPPED rather than
+emptied, so nobody can turn the programme back on with four inserts.
+
+**The website.** Seven sections removed, `faq.html` added carrying the
+seventeen questions that were spread across three pages, the comparison table
+taken out of its `<details>` and moved under the cards, "Neither of the two
+fit?" folded into the Bespoke card, the currency picker opening on Nigeria,
+and "Founder, England" became "Founder".
+
+### Three things found on the way that were nobody’s ask
+
+1. **`sync_web_shell.js` wrote LF into CRLF pages.** Only bit when it rewrote
+   a header, and then every page failed the gate at once with "carries the
+   same header as every other page", which reads like the header changed.
+   Two bytes of whitespace. Fixed.
+
+2. **`plan_limits` was writable by `authenticated`.** First draft revoked from
+   `anon` only, and Supabase’s default privileges had already granted all to
+   both. RLS meant the write touched no rows and reported no error, so it
+   looked harmless. The harness asks for the PRIVILEGE rather than trying the
+   write, which is the only way that shows up. Third time this project has
+   been caught by the same default.
+
+3. **`app_schema_harness` never checked an RPC that takes arguments.** The
+   pattern was `rpc\('([a-z_]+)'\)`, with a closing paren, so it only ever
+   matched a call with no arguments: `set_studio_plan`, `set_studio_storage_cap`
+   and every new one went unverified. A gateway calling a function that does
+   not exist ships green and fails the first time an operator presses the
+   button. Fixed, and it now covers fourteen RPCs instead of nine.
+
+### Still open from this session
+
+- **`mutation_check.mjs` reports three SKIPs**, which it counts as a failure.
+  They are pre-existing: all three patterns target
+  `20260827090000_tenant_isolation.sql`, which this session did not touch, and
+  the patterns have drifted from that file’s current text. The suite it
+  mutates (`rls_harness`) is green at 71 checks. Worth an hour to re-aim the
+  three patterns, because a meta-check that always reports a failure is a
+  meta-check nobody reads.
+
+- **The customer referral programme still gives a free month to both sides**
+  (`referrals.html`, `SITE.referral`), while the partner programme now says in
+  as many words that a referred business gets nothing. They are two different
+  programmes so it is not a contradiction, but a business referred by a partner
+  and a business referred by a customer are treated differently and nothing on
+  the site explains why. The referral reward is still marked PROPOSED and never
+  built into billing. Kayode’s call.
+
+- **The pricing table still says "Six roles with permissions"** and the app
+  ships five (the sixth is demo-only). Known before this session, untouched in
+  it, and it is a claim on a public page.
+
+- **`partners.tier` is a column nothing reads.** Left in place rather than
+  dropped: it is not null with a check constraint and live rows carry it, so
+  dropping it is a migration with nothing to gain. `admin-api` ignores
+  `body.tier` rather than validating it, so a stale client cannot set it.
+
+- **Kayode is sending a photograph for Our story**, and will edit that page’s
+  text and send it back. Nothing has been changed there beyond the signature.
+
+## Shipped 19 September 2026, third batch
+
+`main` -> `f108ce9`, `admin-deploy` -> `c4bddf4`. Verified live rather than
+assumed: the partner ladder reads 0, 6, 7 and 8 per cent under the new names,
+the product page opens with the area you picked and has no tab strip, the
+drawer carries the five areas, the screenshots are the cropped ones at
+1328x1063, and all twelve pages render at 390 with no broken image and no
+sideways scroll. `app.thelabelboard.com` still serves the customer app.
+
+## The commission engine is live in the database, 19 September
+
+Both migrations applied to `eskubrbgbcbaejynjxvh`, plus a third the Supabase
+linter asked for. The pre-flight check came back clean: **0 referrals marked
+lapsed without a date**, and none lapsed at all.
+
+| Applied | |
+|---|---|
+| `20260919171055` | `partner_commission` |
+| `20260919171119` | `partner_milestones_and_payouts` |
+| `20260919171236` | `partner_tier_rate_invoker` |
+
+Verified against the live database rather than assumed: the ladder reads
+0/5/15/30 to 0/6/7/8 under the new labels, the four milestones are 25k, 50k,
+100k and 150k, all four new constraints exist, and the two historic ledger
+rows at 30% are untouched, one paid and one pending. Forward only held.
+
+Grants, checked with `has_function_privilege` rather than by calling:
+all seven functions executable by `service_role`, **none by `anon`**, and only
+`partner_tier_rate` by `authenticated`, which is the ladder the portal shows.
+
+**The linter found one of mine.** `partner_tier_rate` was SECURITY DEFINER out
+of habit and sat on `/rest/v1/rpc` callable by any signed-in user. It reads
+nothing they cannot already read, so it is INVOKER now and the warning is
+gone. The four remaining security findings are older and deliberate:
+`submit_enquiry` is anon-callable because the website forms use it,
+`my_storage_usage` is a studio reading its own, and four service-role-only
+tables have RLS on with no policy on purpose.
+
+**Nothing is scheduled yet.** No job calls `partner_accrue_month`,
+`partner_award_milestones`, `partner_clear_ledger` or `partner_payout_run`.
+Until one does, no commission accrues. Today that costs nothing: one partner
+has a single paying referral, which is under the five needed to unlock
+earning, and the other three have none.
+
+**Next, and it is the last piece:** a monthly job and a yearly one. A Supabase
+scheduled function is the obvious home, and it needs the service role key,
+which is Kayode's to put in.
+
+The whole partner commission engine is in the repo and proven by a 137 check
+harness, and **none of it is in the live database**. Nothing deployed calls
+it, so the site is consistent either way, but no commission is being accrued
+and no milestone awarded.
+
+| Migration | What it adds |
+|---|---|
+| `20260919120000_partner_commission.sql` | the rate ladder, the four year clock, the monthly accrual |
+| `20260919160000_partner_milestones_and_payouts.sql` | the milestones, clearing, the yearly payout run |
+
+**Check this before applying.** The first migration adds
+`check (stage <> 'lapsed' or lapsed_on is not null)` to `partner_referrals`.
+If any live row is marked lapsed with no date, the migration fails and stops.
+Run this first and expect zero:
+
+```sql
+select count(*) from public.partner_referrals
+ where stage = 'lapsed' and lapsed_on is null;
+```
+
+**Also still to build:** nothing calls `partner_accrue_month`,
+`partner_award_milestones`, `partner_clear_ledger` or `partner_payout_run` on
+a schedule. They are functions waiting for a monthly job and a yearly one.
 
 ## Reviews: the landing place is built, the permission is not
 
@@ -363,6 +936,8 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 | 6b | ~~Turn on Netlify form notifications~~ | **Done 18 Sep.** One rule, `hello@thelabelboard.com` on a new submission from **any form**, which covers all five and does not need updating when a sixth appears. A waitlist-specific rule was added first and removed, because "any form" already included it and two copies of one enquiry in a shared inbox get worked twice. **Still to do: send a real submission through and confirm the email lands** |
 | 6c | **Have a Nigerian lawyer read `privacy.html` and `terms.html`** | Both are honest plain-language drafts that match how the site, the app and the partner programme actually behave, but neither has been reviewed. This was only ever recorded as an HTML comment inside the two pages, which means it was being served to the public until 18 Sep. Re-read them the day analytics, a payment provider or an email list is added, because each one changes what the privacy notice has to say |
 | 7 | Netlify: **over 75% of the monthly credit allowance used** on 11 Sep | Check Usage & billing for whether it is builds or bandwidth. Four pushes in one hour on 11 Sep each rebuilt the admin site, which did not help. Batch pushes |
+| 8 | **The backup file leaves out three keys the app syncs.** `exportData()` writes 20 keys; `STATE_KEYS` syncs 21. `orders_done`, `planner` and `shifts` are real data that reach the cloud and are missing from the downloaded file, so a customer who exports and reinstalls loses them. Found on 2026-09-19 while checking whether the website could honestly claim 100% exportable. It cannot, and the website copy has been softened; the app is the actual fix. | small |
+| 9 | **The branch report clips its Outstanding figure.** The four combined-total cards at the top of `openBranchReport()` are wider than the modal body, so the last digit of Outstanding is cut off. Reproduced at 1180, 1400 and 1700 wide, so it is the modal max-width rather than a narrow viewport. Found on 2026-09-19 while capturing that screen for the website; the website crop avoids it. | small |
 
 ---
 

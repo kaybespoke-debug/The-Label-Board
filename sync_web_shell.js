@@ -38,8 +38,16 @@ fs.readdirSync(dir).filter(f => f.endsWith('.html') && f !== 'index.html').forEa
   if (s.includes('<!--HEADER-->')) s = s.replace('<!--HEADER-->', header);
   else if (s.includes('<header class="hdr">')) {
     /* the blank line before main is part of the shape every page shares, and
-       the slice above drops it, so it goes back in deliberately */
-    s = s.slice(0, s.indexOf('<header class="hdr">')) + header + '\n\n' +
+       the slice above drops it, so it goes back in deliberately.
+
+       It has to be the newline the PAGE uses, not a bare \n. The pages are
+       CRLF, and writing two LFs here is invisible in an editor, invisible in
+       a diff that normalises newlines, and it makes every page fail section 2
+       of audit_web at once with "carries the same header as every other page",
+       which reads like the header changed when what changed was two bytes of
+       whitespace after it. */
+    const nl = s.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+    s = s.slice(0, s.indexOf('<header class="hdr">')) + header + nl + nl +
         s.slice(s.indexOf('<main id="main">'));
   }
 

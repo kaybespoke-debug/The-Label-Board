@@ -138,12 +138,19 @@ const U = {
 
 const ids = {};
 async function seed() {
-  const mk = async (slug, name) =>
-    (await asAdmin('insert into businesses(name, slug) values ($1,$2) returning id', [name, slug]))[0].id;
+  /* The plan matters now. 20260920100000 enforces the studio and login
+     ceilings in the database, and Studio C has two branches, which a trial
+     account is not entitled to. Putting it on pro is the fixture telling the
+     truth rather than working around the check: a two-outlet studio IS a Pro
+     studio. A and B stay on the default trial, which is what a new account
+     is, so the suite still exercises both. */
+  const mk = async (slug, name, plan = 'trial') =>
+    (await asAdmin('insert into businesses(name, slug, plan) values ($1,$2,$3) returning id',
+      [name, slug, plan]))[0].id;
 
   ids.bizA = await mk('studio-a', 'Studio A');
   ids.bizB = await mk('studio-b', 'Studio B');
-  ids.bizC = await mk('studio-c', 'Studio C');
+  ids.bizC = await mk('studio-c', 'Studio C', 'pro');
 
   const mkBranch = async (biz, name) =>
     (await asAdmin('insert into branches(business_id, name) values ($1,$2) returning id', [biz, name]))[0].id;

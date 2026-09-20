@@ -384,6 +384,100 @@ async function doStorageCap(id) {
   } catch (e) { toast(e.message || 'Could not set that cap'); }
 }
 
+/* An agreed ceiling, for a Bespoke contract or a promise made on a call.
+   Same shape as the storage override and for the same reason: no prefill,
+   because the tenant list does not carry the current override and a blank
+   box shown as though it were the current value reads as "no override"
+   when there may well be one. Typing sets it, empty clears it, and both
+   are said out loud under the fields. */
+function formStudioLimits(id) {
+  const s = Q.sub(id), p = planById(s.plan);
+  modal('Limits for ' + s.name,
+    'Give this studio a different ceiling from the one its plan includes',
+    '<div class="f2">' +
+    '<div class="fg"><label>Studios</label><input id="slStudios" type="number" min="1" placeholder="plan: ' +
+      (p.studios || 'by agreement') + '"></div>' +
+    '<div class="fg"><label>Team logins</label><input id="slSeats" type="number" min="1" placeholder="plan: ' +
+      (p.seats || 'by agreement') + '"></div></div>' +
+    '<p class="hint">They are using ' + (s.outlets || 0) + ' studio(s) and ' + (s.users || 0) +
+    ' login(s) today. Leave a box empty and save to clear that override and put them back on ' +
+    'what ' + esc(p.name) + ' includes. Setting a ceiling below what they already have takes ' +
+    'nothing away: the limit is only checked when they add one more.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn gold" onclick="doStudioLimits(' + id + ')">Save limits</button>');
+}
+async function doStudioLimits(id) {
+  const s = Q.sub(id);
+  const st = document.getElementById('slStudios').value.trim();
+  const se = document.getElementById('slSeats').value.trim();
+  try {
+    await liveSetStudioLimits(id, st === '' ? null : +st, se === '' ? null : +se);
+    logAction('plan_change', 'Limits agreed',
+      'Kayode Ojomo set ' + s.name + ' to ' + (st === '' ? 'the plan\u2019s studios' : st + ' studios') +
+      ' and ' + (se === '' ? 'the plan\u2019s logins' : se + ' logins'), 'subscriber:' + s.id);
+    closeModal(); toast(s.name + '\u2019s limits saved'); render();
+  } catch (e) { toast(e.message || 'Could not set those limits'); }
+}
+
+/* Open one partner's working: which businesses they brought, which are
+   still paying, the share applied and when each twelve months runs out.
+   Fetched before the view opens rather than inside it, so the panel never
+   renders empty and then fills in. */
+async function openPartner(id) {
+  if (typeof LIVE === 'object' && LIVE.on && LIVE.on()) {
+    try { await liveLoadPartnerCommission(id); }
+    catch (e) { toast(e.message || 'Could not read that partner\u2019s commission'); }
+  }
+  openDetail('partner', id);
+}
+
+/* Stop paying one referrer while a pattern is looked at. Not a ban and
+   not a deletion: what they have earned stays earned and keeps accruing.
+   What stops is the transfer, which is the only part that cannot be
+   undone once it has happened. */
+function formFreezePayout(id) {
+  const p = (DB.partners || []).find(x => String(x.id) === String(id));
+  if (!p) { toast('That referrer is not on this screen any more.'); return; }
+  if (p.frozen) {
+    modal('Release ' + esc(p.name) + '?',
+      'Frozen because: ' + esc(p.frozenReason || 'no reason recorded'),
+      '<p class="hint">Releasing puts them back in the next yearly run. Everything they ' +
+      'earned while frozen is still there; it was only the transfer that was held.</p>',
+      '<button class="btn" onclick="closeModal()">Cancel</button>' +
+      '<button class="btn gold" onclick="doFreezePayout(\'' + id + '\', false)">Release the payout</button>');
+    return;
+  }
+  modal('Freeze payouts to ' + esc(p.name),
+    'They keep earning. Nothing leaves our account until this is released.',
+    '<div class="fg"><label>Why (required, and it goes on the audit log)</label>' +
+    '<input id="fzWhy" placeholder="e.g. four signups from one address in an hour"></div>' +
+    '<p class="hint">A reason is required by the database, not just by this box. ' +
+    'Somebody will ask about this in six months and it has to answer for itself.</p>',
+    '<button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn danger" onclick="doFreezePayout(\'' + id + '\', true)">Freeze payouts</button>');
+}
+async function doFreezePayout(id, frozen) {
+  const why = frozen ? (document.getElementById('fzWhy').value || '').trim() : '';
+  if (frozen && !why) { toast('What is the reason?'); return; }
+  try {
+    await liveSetPayoutFrozen(id, frozen, why);
+    logAction('plan_change', frozen ? 'Payout frozen' : 'Payout released',
+      'Kayode Ojomo ' + (frozen ? 'froze payouts: ' + why : 'released payouts'), 'partner:' + id);
+    closeModal(); toast(frozen ? 'Payouts frozen' : 'Payouts released'); render();
+  } catch (e) { toast(e.message || 'Could not change that'); }
+}
+
+/* The risk list is fetched before the page renders rather than inside it,
+   so the panel never draws empty and then fills in. */
+async function openReferralRisk() {
+  if (typeof LIVE === 'object' && LIVE.on && LIVE.on()) {
+    try { await liveLoadReferralRisk(); }
+    catch (e) { toast(e.message || 'Could not read the referral checks'); }
+  }
+  UI.showRisk = !UI.showRisk;
+  render();
+}
+
 /* ---------------- plans ---------------- */
 function formPlan(id) {
   const p = id ? planById(id) : null;
@@ -928,12 +1022,12 @@ async function doInviteStudio() {
 
    It opens the ordinary partner invitation prefilled from the business, so a
    studio joining the programme goes through exactly the same door as anybody
-   else: same code rules, same tier ladder, same email. Two doors into one
-   programme is how the two end up disagreeing about what somebody earns.
+   else: same code rules, same rate, same email. Two doors into one programme
+   is how the two end up disagreeing about what somebody earns.
 
-   The tier is not chosen here. A new partner starts at the bottom of the
-   ladder, which is 0% until five of their referrals are paying, and the
-   database works the rest out from their live count. */
+   There is nothing to choose. Every partner earns the same 8% of what each
+   business they bring actually pays, so there is no starting position and
+   nothing an operator could get wrong here. */
 function makeSubscriberAPartner(id) {
   const s = (DB.subscribers || []).find(x => String(x.id) === String(id));
   if (!s) { toast("That subscriber is not on this screen any more."); return; }
@@ -948,16 +1042,11 @@ function formInvitePartner(prefillEmail, prefillName) {
     '<input id="ipName" placeholder="e.g. Tunde Sanni" value="' + esc(prefillName || '') + '"></div>' +
     '<div class="fg"><label>Email</label>' +
     '<input id="ipEmail" type="email" placeholder="them@wherever.com" value="' + esc(prefillEmail || '') + '"></div>' +
-    '<div class="f2"><div class="fg"><label>Referral code</label>' +
+    '<div class="fg"><label>Referral code</label>' +
     '<input id="ipCode" placeholder="TUNDE" value="' + esc(suggested) + '"></div>' +
-    '<div class="fg"><label>Tier</label><select id="ipTier">' +
-    [['bronze', 'Getting started, 0%'], ['silver', 'Unlocked, 6%'],
-     ['gold', 'Established, 7%'], ['platinum', 'Senior, 8%']]
-      .map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('') +
-    '</select></div></div>' +
     '<p class="hint">The code is what they share, so it has to be unique and it is worth it being ' +
-    'something they would say out loud. Letters, numbers and hyphens. Their tier sets what ' +
-    'they earn and can be changed later.</p>',
+    'something they would say out loud. Letters, numbers and hyphens. There is no tier to pick: ' +
+    'every partner earns the same share of what the businesses they bring actually pay.</p>',
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doInvitePartner()">Send the invitation</button>');
 }
@@ -966,7 +1055,6 @@ async function doInvitePartner() {
   const name = (document.getElementById('ipName').value || '').trim();
   const email = (document.getElementById('ipEmail').value || '').trim();
   const code = (document.getElementById('ipCode').value || '').trim().toUpperCase();
-  const tier = document.getElementById('ipTier').value;
   if (!name) { toast('What is their name?'); return; }
   if (!email || email.indexOf('@') < 0) { toast('An email address is needed to invite them.'); return; }
   if (!/^[A-Z0-9][A-Z0-9-]{1,31}$/.test(code)) {
@@ -975,7 +1063,7 @@ async function doInvitePartner() {
   const btn = document.querySelector('.modal .btn.gold');
   if (btn) { btn.textContent = 'Sending\u2026'; btn.disabled = true; }
   try {
-    await liveInvitePartner(email, name, code, tier);
+    await liveInvitePartner(email, name, code);
     logAction('sub_edit', 'Partner invited', 'Invitation sent to ' + email + ' for ' + name + ' (' + code + ')');
     closeModal(); toast('Invitation sent to ' + email); render();
   } catch (e) {

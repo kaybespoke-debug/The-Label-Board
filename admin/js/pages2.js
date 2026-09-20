@@ -807,18 +807,18 @@ PAGES.partners = function () {
   };
   const list = buckets[f] || all;
 
-  /* The ladder was renamed and repriced on 19 September 2026: a one off 15
-     to 25 per cent of a referred business's first payment became a recurring
-     0 to 8 per cent of what they keep paying, on a four year clock. The ids
-     did not change, because partners.tier holds them.
+  /* There is no tier any more: every partner earns the same 8% of what
+     each business they brought actually pays, for twelve months on a
+     monthly plan or once on a yearly one. So the column that used to hold
+     a ladder position now holds the thing an operator opens this page to
+     find out, which is what we owe them.
 
-     The rate is shown next to the name because an operator looking at this
-     table is usually about to answer "what does this partner earn", and the
-     answer used to be a word they had to go and look up. What a partner is
-     actually PAID comes off partner_ledger, which stores the rate each month
-     was worked out at; this is a label, not a calculation. */
-  const TIER = { bronze: 'Getting started, 0%', silver: 'Unlocked, 6%',
-                 gold: 'Established, 7%', platinum: 'Senior, 8%' };
+     owed is cleared and not yet paid: the figure that would leave our
+     account if a payout ran today. pending is credited but still inside
+     the 31 day hold, and it is shown separately because paying it out is
+     how a programme ends up refunding money it has already given away. */
+  const owedTotal = all.reduce(function (t, p) { return t + (Number(p.owed) || 0); }, 0);
+  const pendingTotal = all.reduce(function (t, p) { return t + (Number(p.pending) || 0); }, 0);
 
   const head = '<div class="stats">' +
     statCard({ label: 'Partners', value: all.length, tone: 'info',
@@ -828,9 +828,14 @@ PAGES.partners = function () {
       sub: buckets.pending.length ? 'Invited, not claimed yet' : 'Nobody left hanging' }) +
     statCard({ label: 'Active', value: buckets.active.length, tone: 'good',
       sub: 'Signed in and able to refer' }) +
-    statCard({ label: 'Suspended', value: buckets.suspended.length,
-      tone: buckets.suspended.length ? 'warn' : 'good', sub: 'Cannot refer while suspended' }) +
-    '</div>';
+    statCard({ label: 'Owed to partners', value: moneyShort(owedTotal),
+      tone: owedTotal ? 'money' : 'good',
+      sub: owedTotal ? 'Cleared, waiting on the yearly run' : 'Nothing cleared and unpaid' }) +
+    '</div>' +
+    (pendingTotal
+      ? '<p class="note">' + moneyShort(pendingTotal) + ' more is credited but still inside the ' +
+        '31 day hold, and is not owed yet.</p>'
+      : '');
 
   const bar = '<div class="bar">' + tabBar('partners', [
     { k: 'all', t: 'All', n: all.length },
@@ -838,7 +843,44 @@ PAGES.partners = function () {
     { k: 'active', t: 'Active', n: buckets.active.length },
     { k: 'suspended', t: 'Suspended', n: buckets.suspended.length }
   ]) + '<span class="spacer"></span>' +
+    '<button class="btn" onclick="openReferralRisk()">' +
+      (UI.showRisk ? 'Hide' : 'Referral checks') + '</button>' +
     '<button class="btn gold" onclick="formInvitePartner()">Invite a partner</button></div>';
+
+  /* Every row here is a PATTERN, not an accusation, and the panel says so
+     out loud. An association signing twelve members up at an event looks
+     exactly like a fraud ring until you know it is an association, and an
+     operator who is told these are proof will act on them as proof. */
+  const RISK = {
+    'shared-payment':  ['red',   'Same payment method as the referrer'],
+    'similar-email':   ['amber', 'Address looks like the referrer\u2019s'],
+    'rapid-signups':   ['amber', 'A lot of referrals in one day'],
+    'refused-attempt': ['grey',  'Already refused, no commission was created']
+  };
+  const risk = UI.showRisk ? (DB.referralRisk || []) : null;
+  const riskPanel = !risk ? '' :
+    '<div class="pnl"><div class="sec-t">Referral checks</div>' +
+    '<p class="note">These are patterns, not accusations. Three of the four have ' +
+    'ordinary explanations: an association signs a dozen members up at an event, a ' +
+    'husband and wife share an address, one owner pays for two studios. The fourth is ' +
+    'something the database already refused, so no commission was ever created.</p>' +
+    (risk.length
+      ? '<div class="tw" style="margin-top:12px"><table><thead><tr><th>What</th>' +
+        '<th>Referrer</th><th class="hide-sm">Business</th><th class="hide-sm">Detail</th>' +
+        '</tr></thead><tbody>' +
+        risk.map(r => {
+          const m = RISK[r.kind] || ['grey', r.kind];
+          return '<tr>' +
+            '<td><span class="pill ' + m[0] + '">' + esc(m[1]) + '</span></td>' +
+            '<td>' + esc(r.partner || '\u2014') +
+              (r.code ? '<div class="note"><code>' + esc(r.code) + '</code></div>' : '') + '</td>' +
+            '<td class="hide-sm">' + esc(r.business || '\u2014') + '</td>' +
+            '<td class="hide-sm note">' + esc(r.detail) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>'
+      : '<div class="empty">Nothing to look at.<br><span class="note">No shared cards, no ' +
+        'lookalike addresses, and nothing has been refused.</span></div>') +
+    '</div>';
 
   if (!all.length) {
     return head + bar +
@@ -856,25 +898,31 @@ PAGES.partners = function () {
      disappearing, because "who is this and are they in" is the whole job of
      this list and the address is half of who. */
   const rows = list.map(p =>
-    '<tr>' +
+    '<tr class="klik" onclick="openPartner(\'' + p.id + '\')">' +
     '<td><b>' + esc(p.name || '(no name)') + '</b>' +
     (p.business ? '<div class="note">' + esc(p.business) + '</div>' : '') +
     (p.email ? '<div class="note show-sm brk">' + esc(p.email) + '</div>' : '') + '</td>' +
     '<td class="hide-sm"><code>' + esc(p.code) + '</code></td>' +
-    '<td>' + esc(TIER[p.tier] || p.tier) + '</td>' +
-    '<td class="hide-sm brk">' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—') + '</td>' +
-    '<td>' + (p.pending
+    '<td>' + (Number(p.referralsPaying) || 0) +
+      '<div class="note">of ' + (Number(p.referrals) || 0) + ' brought</div></td>' +
+    '<td class="num">' + ((Number(p.owed) || 0) ? money(p.owed) : '—') +
+      (Number(p.pending) ? '<div class="note">' + moneyShort(p.pending) + ' on hold</div>' : '') + '</td>' +
+    '<td class="hide-sm">' + (p.lastPayoutOn
+      ? fmtD(p.lastPayoutOn) + '<div class="note">' + esc(p.lastPayoutRef || '') + '</div>'
+      : '<span class="note">Never paid out</span>') + '</td>' +
+    '<td>' + (p.frozen ? '<span class="pill red">Payouts frozen</span> ' : '') +
+      (p.pending
       ? '<span class="pill amber">Invited, not in yet</span>'
       : (p.status === 'active' ? '<span class="pill green">Active</span>'
         : '<span class="pill red">' + esc(p.status) + '</span>')) + '</td>' +
-    '<td class="note hide-sm">' + (p.joined ? esc(p.joined) : '—') + '</td>' +
+    '<td class="chev">&rsaquo;</td>' +
     '</tr>').join('');
 
-  return head + bar +
+  return head + bar + riskPanel +
     (list.length
       ? '<div class="pnl"><div class="tw"><table><thead><tr>' +
-        '<th>Name</th><th class="hide-sm">Code</th><th>Tier</th>' +
-        '<th class="hide-sm">Email</th><th>Access</th><th class="hide-sm">Joined</th>' +
+        '<th>Name</th><th class="hide-sm">Code</th><th>Paying</th>' +
+        '<th class="num">Owed</th><th class="hide-sm">Last payout</th><th>Access</th><th></th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
       : '<div class="pnl"><div class="empty">Nothing matches.</div></div>');
 };

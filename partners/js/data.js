@@ -79,45 +79,57 @@ function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one +
 
 /* ---------------- plan catalogue (mirrors the admin console) ---------------- */
 const PLANS = [
-  { id: 'starter', name: 'Starter', monthly: 29000, annual: 290000, seats: 3 },
-  { id: 'pro', name: 'Pro', monthly: 49000, annual: 490000, seats: 10 },
-  { id: 'premium', name: 'Premium', monthly: 79000, annual: 790000, seats: 30 },
-  { id: 'trial', name: 'Trial', monthly: 0, annual: 0, seats: 3 }
+  { id: 'starter', name: 'Basic', monthly: 20000, annual: 220000, studios: 1, seats: 5 },
+  { id: 'pro', name: 'Pro', monthly: 49000, annual: 539000, studios: 5, seats: 50 },
+  /* Bespoke has no list price, so a referred Bespoke business is worth
+     whatever its own contract says. The demo needs SOME number to show its
+     working against and 120,000 a month is a plausible one. In live mode
+     nothing reads it: the portal shows what the console actually billed. */
+  { id: 'premium', name: 'Bespoke', monthly: 120000, annual: 1320000, studios: 0, seats: 0, invoiceOnly: true },
+  { id: 'trial', name: 'Trial', monthly: 0, annual: 0, studios: 1, seats: 3 }
 ];
 const planById = id => PLANS.find(p => p.id === id);
 
-/* ---------------- the tier ladder ----------------
-   Rewritten 19 September 2026. This used to be a one off share of each
-   referred business's FIRST payment, 15 to 25 per cent. It is now a
-   RECURRING share of what they keep paying, 0 to 8 per cent, on a four year
-   clock per business with a 3% taper in years three and four.
+/* ---------------- the rate ----------------
+   Rewritten 20 September 2026, and this is the third shape in a month, so
+   it is worth writing down what each one was for.
 
-   The rate is decided by the partner's CURRENT count of active paying
-   businesses, so it moves both ways, and it applies from that day forward.
-   Nothing already credited is ever recalculated. The ids are unchanged
-   because partners.tier in the database holds them.
+   The first was a one off share of a referred business's FIRST payment,
+   which paid a partner the same for a business that lasted one month as
+   for one that lasted five years. The second fixed that and overcorrected:
+   four years, a taper in years three and four, and a rate that moved with
+   a live count of active businesses. It was fair and nobody could hold it
+   in their head, which for a programme whose whole promise is "you can
+   check the working" is a failure rather than a detail.
+
+   This one is a single number:
+
+     monthly plan   8% of every monthly payment, for TERM_MONTHS months
+                    counted from THAT BUSINESS's first payment
+     yearly plan    8% of that year's payment, once, because there is one
+                    payment to take a share of
+
+   and two conditions: the business has to still be paying, and only the
+   partner earns. A referred business is an ordinary customer at the
+   ordinary price, so nothing here ever looks at what they were offered.
 
    THIS IS A DISPLAY COPY. The rate that decides money is worked out by
    partner_referral_rate() in the database, which the browser cannot run.
    supabase/tests/partner_commission_harness.mjs is what proves it. */
-const TIERS = [
-  { id: 'bronze', name: 'Getting started', min: 0, pct: 0 },
-  { id: 'silver', name: 'Unlocked', min: 5, pct: 6 },
-  { id: 'gold', name: 'Established', min: 15, pct: 7 },
-  { id: 'platinum', name: 'Senior', min: 30, pct: 8 }
-];
+const RATE_PCT = 8;
+const TERM_MONTHS = 12;
 
-/* Years one and two at the tier rate, years three and four here, then it
-   ends. Per business, from the day that business first paid. */
-const TAPER_PCT = 3;
-const TERM_YEARS = 4;
-const TAPER_AFTER_YEARS = 2;
-function tierFor(n) {
-  let t = TIERS[0];
-  TIERS.forEach(x => { if (n >= x.min) t = x; });
-  return t;
+/* The day a referred business stops earning. Per business, from its own
+   first payment, and it never resets or pauses. A yearly plan has one
+   payment and therefore one commission, so its term is over the day it is
+   credited; returning the subscription date rather than null keeps every
+   caller from having to special-case it. */
+function termEndFor(r) {
+  if (!r || !r.subscribedOn) return null;
+  const s = parseD(r.subscribedOn);
+  if (r.cycle === 'annual') return iso(s);
+  return iso(new Date(s.getFullYear(), s.getMonth() + TERM_MONTHS, s.getDate()));
 }
-function nextTier(n) { return TIERS.find(x => n < x.min) || null; }
 
 /* ---------------- the demo directory ----------------
    Three partners rather than one, because a portal with a front door and
@@ -287,7 +299,13 @@ function buildReferrals(profile, links) {
 
 /* ---------------- the earnings ledger ---------------- */
 const HOLD_DAYS = 31;
-const PAYOUT_DAY = 5;   // payouts run on the 5th of each month
+/* Payouts run ONCE A YEAR, at the end of January, for everything that
+   cleared in the year before. The demo used to walk a monthly calendar on
+   the 5th while the website, PARTNERS.md and partner_payout_run() in the
+   database all said yearly, so the one surface a partner would check was
+   the one telling them the wrong thing. */
+const PAYOUT_MONTH = 0;   // January
+const PAYOUT_DAY = 31;
 
 /* The minimum a run has to reach before it is worth a transfer. It came down
    from 25,000 to 10,000 earlier this year, and the history has to reflect
@@ -298,48 +316,56 @@ const THRESHOLD_CHANGED_ON = iso(dAgo(75));
 function minPayoutOn(runDate) { return iso(runDate) >= THRESHOLD_CHANGED_ON ? MIN_PAYOUT : MIN_PAYOUT_BEFORE; }
 
 function payoutRef(d) {
-  const x = parseD(d);
-  return 'PO-' + x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0');
+  const x = (d instanceof Date) ? d : parseD(d);
+  return 'PO-' + x.getFullYear();
 }
 function payoutDateFor(clearedOn) {
   const d = parseD(clearedOn);
-  let run = new Date(d.getFullYear(), d.getMonth(), PAYOUT_DAY);
-  if (d > run) run = new Date(d.getFullYear(), d.getMonth() + 1, PAYOUT_DAY);
+  let run = new Date(d.getFullYear(), PAYOUT_MONTH, PAYOUT_DAY);
+  if (d > run) run = new Date(d.getFullYear() + 1, PAYOUT_MONTH, PAYOUT_DAY);
   return run;
 }
 
-const MILESTONES = { 5: 25000, 10: 50000, 20: 100000, 30: 150000 };
+/* One row per payment we would take a share of, which is twelve rows for a
+   business on a monthly plan and one for a business on a yearly plan. It
+   used to be a single row per business carrying the whole commission,
+   described as recurring. A partner cannot check a total against their
+   bank; they can check a month.
 
+   basis is firstPayment rather than mrr because mrr is zeroed on a lapsed
+   referral, and a business that has left still has to show what it earned
+   while it was here. */
 function buildLedger(referrals) {
   const rows = [];
   let id = 1;
 
-  /* Commission uses the rate the partner was on when that account started
-     paying, so we walk conversions in the order they actually happened. */
-  const converted = referrals.filter(r => r.subscribedOn)
-    .slice().sort((a, b) => a.subscribedOn.localeCompare(b.subscribedOn));
+  referrals.filter(r => r.subscribedOn).forEach(r => {
+    const start = parseD(r.subscribedOn);
+    const stop = r.lapsedOn ? parseD(r.lapsedOn) : null;
+    const amount = Math.round(r.firstPayment * RATE_PCT / 100);
 
-  converted.forEach((r, i) => {
-    const tier = tierFor(i);              // i accounts had converted before this one
-    const clearsOn = iso(new Date(parseD(r.subscribedOn).getTime() + HOLD_DAYS * DAY));
-    rows.push({
-      id: id++, type: 'signup', refId: r.id, business: r.business,
-      date: r.subscribedOn, clearsOn,
-      rate: tier.pct, tier: tier.name,
-      basis: r.firstPayment,
-      basisLabel: r.cycle === 'annual' ? 'a year, paid up front' : 'a month',
-      amount: Math.round(r.firstPayment * tier.pct / 100),
-      note: r.planName + ' · ' + tier.pct + '% of ' + money(r.firstPayment) + ', recurring'
-    });
-
-    const n = i + 1;
-    if (MILESTONES[n]) {
+    if (r.cycle === 'annual') {
       rows.push({
-        id: id++, type: 'bonus', refId: r.id, business: null,
-        date: r.subscribedOn, clearsOn,
-        rate: 0, tier: tier.name, basis: 0, basisLabel: '',
-        amount: MILESTONES[n],
-        note: n + ' paying accounts referred · milestone bonus'
+        id: id++, type: 'yearly', refId: r.id, business: r.business,
+        date: r.subscribedOn, clearsOn: iso(new Date(start.getTime() + HOLD_DAYS * DAY)),
+        rate: RATE_PCT, basis: r.firstPayment, basisLabel: 'a year, paid up front',
+        month: 1, months: 1, amount,
+        note: r.planName + ' \u00b7 ' + RATE_PCT + '% of ' + money(r.firstPayment) + ', paid once'
+      });
+      return;
+    }
+
+    for (let m = 0; m < TERM_MONTHS; m++) {
+      const on = new Date(start.getFullYear(), start.getMonth() + m, start.getDate());
+      if (on > TODAY) break;                       // not earned yet
+      if (stop && on >= stop) break;               // stopped paying, stops that day
+      rows.push({
+        id: id++, type: 'recurring', refId: r.id, business: r.business,
+        date: iso(on), clearsOn: iso(new Date(on.getTime() + HOLD_DAYS * DAY)),
+        rate: RATE_PCT, basis: r.firstPayment, basisLabel: 'a month',
+        month: m + 1, months: TERM_MONTHS, amount,
+        note: r.planName + ' \u00b7 month ' + (m + 1) + ' of ' + TERM_MONTHS + ', ' +
+              RATE_PCT + '% of ' + money(r.firstPayment)
       });
     }
   });
@@ -350,7 +376,7 @@ function buildLedger(referrals) {
 /* ---------------- settlement ----------------
    Walks the payout calendar forward from the first commission that cleared.
    A run only happens when what is waiting reaches the minimum in force that
-   month; anything short of it rolls into the next run rather than going out
+   year; anything short of it rolls into the next run rather than going out
    as a transfer worth less than the fee. This is the only place a row's
    status is decided, and the payouts fall out of the same pass, so a
    statement cannot disagree with the ledger that produced it. */
@@ -376,7 +402,7 @@ function settle(rows) {
       runs.push({ ref, paidOn, amount: total, items: waiting.slice() });
       waiting = [];
     }
-    run = new Date(run.getFullYear(), run.getMonth() + 1, PAYOUT_DAY);
+    run = new Date(run.getFullYear() + 1, PAYOUT_MONTH, PAYOUT_DAY);
   }
   return runs;
 }
@@ -406,18 +432,18 @@ function buildPayouts(runs, accounts) {
 /* ---------------- news, the same for every partner ---------------- */
 function buildUpdates() {
   const seed = [
-    ['Gold partners now earn 22%', 'programme', -6,
-      'The programme is now recurring: you earn a share of every month a referred account pays, for four years, instead of a single share when they started paying. Your rate follows how many accounts are active and paying right now. Nothing you have already earned changes.'],
-    ['August payouts landed on the 5th', 'payouts', -22,
-      'Every cleared commission went out on schedule. If your bank has not shown it yet, give it one working day before raising a ticket, and check that the account marked primary is the one you expect.'],
-    ['Co-branded launch kit for Gold and above', 'programme', -33,
+    ['One rate for everybody: 8%', 'programme', -6,
+      'The tiers and the milestone bonuses are gone. Every partner now earns 8% of what each referred business actually pays: every month for twelve months on a monthly plan, or once on a yearly plan. There is nothing to unlock and nothing to lose. Commission still stops the day a business stops paying, and nothing already credited to you changes.'],
+    ['Last year\u2019s payouts have landed', 'payouts', -22,
+      'Every commission that had cleared went out in one run at the end of January. If your bank has not shown it yet, give it one working day before raising a ticket, and check that the account marked primary is the one you expect.'],
+    ['A co-branded launch kit for every partner', 'programme', -33,
       'Posters, an Instagram carousel and a one-page explainer, all carrying your name and your code. Ask your partner manager and they will send the pack over.'],
     ['Concierge is live for Premium studios', 'product', -46,
       'Premium accounts can now take measurements and style briefs through a guided panel that hands off to WhatsApp. It is the strongest reason a bigger studio moves up a plan, so it is worth leading with when you pitch.'],
     ['The production board now works without signal', 'product', -60,
       'The board keeps working offline and syncs once the connection is back. Useful for anyone who has told you their workshop has no reception.'],
     ['Payout threshold dropped to 10,000', 'payouts', -75,
-      'You no longer need to reach 25,000 before a payout runs. Anything cleared above 10,000 goes out on the 5th.'],
+      'You no longer need to reach 25,000 before a payout runs. Anything cleared above 10,000 goes out in the yearly run.'],
     ['Lagos Fashion Week stand, October', 'event', 39,
       'We are taking a stand again this year. Partners get two passes and a slot at the table if you want to bring people by. Reply to your partner manager to claim yours.'],
     ['Referral links now carry campaign names', 'product', -98,
@@ -446,7 +472,9 @@ function buildDB(profile) {
     const mine = referrals.filter(r => r.linkId === l.id);
     l.signups = mine.length;
     l.converted = mine.filter(r => r.subscribedOn).length;
-    l.earned = ledger.filter(x => x.type === 'signup' && mine.some(r => r.id === x.refId))
+    /* Every ledger row is commission now, so there is no type to filter
+       out. A link earns whatever its own referrals earned. */
+    l.earned = ledger.filter(x => mine.some(r => r.id === x.refId))
       .reduce((t, x) => t + x.amount, 0);
   });
 
@@ -463,13 +491,15 @@ function buildDB(profile) {
         email: 'partners@thelabelboard.com', phone: '+234 701 220 8845' }
     },
     plans: PLANS,
-    tiers: TIERS,
+    ratePct: RATE_PCT,
+    termMonths: TERM_MONTHS,
     links, referrals, ledger, accounts, payouts,
     updates: buildUpdates(),
     settings: {
-      baseRatePct: 6,
+      baseRatePct: RATE_PCT,
+      termMonths: TERM_MONTHS,
       holdDays: HOLD_DAYS,
-      payoutDay: PAYOUT_DAY,
+      payoutRuns: '31 January, for the year before',
       minPayout: MIN_PAYOUT,
       currency: 'NGN',
       readUpdates: [],

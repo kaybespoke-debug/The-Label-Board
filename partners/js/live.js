@@ -27,10 +27,10 @@ async function supaSelect(table, query, token) {
   return r.body;
 }
 
-/* Display only, and it has to agree with TIERS in data.js and with
-   partner_rate_bands in the database. The figure a partner is actually paid
-   comes off the ledger row, which stores the rate it was worked out at. */
-const LIVE_TIER_PCT = { bronze: 0, silver: 6, gold: 7, platinum: 8 };
+/* There is one rate now, so there is no table to keep in step. It still
+   comes from RATE_PCT in data.js rather than being typed again here, and
+   the figure a partner is actually PAID comes off the ledger row, which
+   stores the rate it was worked out at. */
 
 /* The portal wants a plan NAME on a referral for its captions; the database
    stores the plan id. PLANS already exists for the demo and is the same list
@@ -156,7 +156,9 @@ async function buildLiveDB(session) {
     const mine = R.filter(r => r.linkId === l.id);
     l.signups = mine.length;
     l.converted = mine.filter(r => r.subscribedOn).length;
-    l.earned = X.filter(x => x.type === 'signup' && mine.some(r => r.id === x.refId))
+    /* Every ledger row is commission now, so there is no type to filter
+       out. A link earns whatever its own referrals earned. */
+    l.earned = X.filter(x => mine.some(r => r.id === x.refId))
       .reduce((t, x) => t + x.amount, 0);
   });
 
@@ -177,16 +179,17 @@ async function buildLiveDB(session) {
       }
     },
     plans: (typeof PLANS !== 'undefined') ? PLANS : [],
-    tiers: (typeof TIERS !== 'undefined') ? TIERS : [],
+    ratePct: (typeof RATE_PCT !== 'undefined') ? RATE_PCT : 0,
+    termMonths: (typeof TERM_MONTHS !== 'undefined') ? TERM_MONTHS : 12,
     links: L, referrals: R, ledger: X, accounts: A, payouts: P,
     updates: (typeof buildUpdates === 'function') ? buildUpdates() : [],
     settings: {
-      /* No fallback to a number. A partner whose tier we failed to read must
-         not be shown somebody elses rate: 0 is the honest answer, and it is
-         also what an unrecognised tier actually earns. */
-      baseRatePct: LIVE_TIER_PCT[me.tier] != null ? LIVE_TIER_PCT[me.tier] : 0,
+      /* Every partner is on the same rate, so there is nothing to look up
+         and nothing to get wrong for one partner in particular. */
+      baseRatePct: (typeof RATE_PCT !== 'undefined') ? RATE_PCT : 0,
+      termMonths: (typeof TERM_MONTHS !== 'undefined') ? TERM_MONTHS : 12,
       holdDays: HOLD_DAYS,
-      payoutDay: PAYOUT_DAY,
+      payoutRuns: '31 January, for the year before',
       minPayout: MIN_PAYOUT,
       currency: 'NGN',
       readUpdates: [],
