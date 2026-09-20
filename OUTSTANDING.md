@@ -5,35 +5,74 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 20 September 2026 (fifteenth session)
+Last updated: 20 September 2026 (sixteenth session, shipped)
 
-## Where the deploy stands — read this before pushing anything
+## SHIPPED 20 September 2026, and applied
 
-Kayode asked for a deploy on 20 September. It did not happen, and the
-reason is worth stating plainly rather than leaving in a table further
-down.
+The whole of this session went out, database first. `main` → `3eec43b` (a
+merge), `admin-deploy` → `e110ffb`, and the two differ only by
+`netlify.toml`, as intended.
 
-The live database was moved onto the TIERED partner programme on 19
-September. Every page, portal and console in this tree now says a flat 8%
-for twelve months. **Pushing either branch without applying the five
-migrations puts the website and the database into open disagreement about
-how much money a partner earns.** The same release also has to redeploy
-`admin-api`, or the console calls four actions that do not exist.
+**The order mattered and is the reason nothing broke.** The live database
+had been moved onto the TIERED partner programme on 19 September while
+every page in this tree said a flat 8%. Pushing either branch first would
+have put the website and the database into open disagreement, in public,
+about how much money a partner earns. So:
 
-So a deploy is one instruction away, and the instruction is not a git
-command. In order:
+1. the five migrations, in filename order
+2. `admin-api` redeployed (version 10 → 11, `verify_jwt` kept on)
+3. the pre-flight queries
+4. `admin-deploy` pushed — the console and the portal
+5. `site/sw.js` bumped to `layi-v43`, merged to `main` with the
+   `netlify.toml` recipe, pushed — the customer app and the website
 
-1. Apply the five migrations to `eskubrbgbcbaejynjxvh`, in filename order.
-2. Redeploy the `admin-api` Edge Function.
-3. Run the pre-flight queries below, which only work after step 1.
-4. `git push origin admin-deploy` — publishes the console and the portal.
-5. Bump `CACHE` in `site/sw.js`, then merge into `main` with the
-   `netlify.toml` recipe, and push. That publishes the customer app and
-   the website.
+### What the pre-flight actually found
 
-Steps 1 and 2 need Supabase access that this session does not have: the
-token reaches one project and it is not this one. They are Kayode’s to
-run, or to hand over.
+| Check | Answer |
+|---|---|
+| Over a plan ceiling | **one**: `LAYI`, trial, 4 studios against 1. Known, deliberate, and what the console’s "Over plan" pill is for. Nothing was taken from it: the triggers only refuse an INSERT. |
+| Referral codes backfilled | 8 businesses, 8 codes, none missing |
+| Rate bands | 1 band at 8%, the three tiered ones deleted |
+| Plan features | 10 in the catalogue, Pro has 10, **Basic has 0** |
+| `partner_milestones` | dropped |
+| New triggers | all 10 present |
+| `anon`/`authenticated` write on the new tables | none |
+
+`partner_milestones` held four definition rows (5→25k, 10→50k, 20→100k,
+30→150k) and no awards, so dropping it lost a ladder nobody had climbed.
+Earned money lives in `partner_ledger`, which was not touched.
+
+### Verified on the live sites rather than assumed
+
+- `app.thelabelboard.com` serves the **customer app** at `layi-v43`, not the
+  console. The `netlify.toml` trap did not fire, and `publish = "site"` was
+  confirmed on the merge commit itself before the push.
+- `admin.` and `partners.` serve the console and the portal, both in Fraunces
+- the story reads 15px at 1440 and 12px on a phone
+- `referrals.html` returns **404**: deleted, not unlinked
+- pricing opens in **naira** at ₦20,000 and ₦49,000, with no tier language
+  anywhere. (It first appeared to open in GBP. That was this browser’s own
+  remembered `tlb_ccy`, not the page. Worth knowing before somebody reports
+  it as a bug: the default is NGN, and a remembered choice beats it.)
+- partners.html is the seven lines and the form, 1,898 characters, 8% and
+  twelve months, no tiers
+
+### Two things this turned up, neither fixed
+
+**`supabase/.temp/linked-project.json` is stale and points somewhere else.**
+It names `gcdrkoitjqwbidcfgyzl` "The Label Board". The live project the apps
+actually talk to is `eskubrbgbcbaejynjxvh`, which is where everything above
+was applied. The file is gitignored CLI cache, so it misleads only whoever
+runs `supabase link` next. Confirmed the right way round: all 31 applied
+migration names line up with this repo’s files, ending in yesterday’s three.
+
+**Leaked password protection is off** in Supabase Auth. Pre-existing, not
+from this release, and an owner-only settings change. Kayode’s to turn on.
+
+The security linter reports nothing new. The three `my_*` functions being
+callable by `authenticated` is the design: each one is scoped by
+`app.in_scope()` or `app.current_partner()` and can only ever answer about
+the caller.
 
 ## The story type scale, and a rule that came out of it
 
@@ -276,13 +315,14 @@ each other again: the roles row is counted against the app, the Priority
 support row is compared with the Pro card, and the receivables rows have
 to exist.
 
-## COMMITTED, NOT PUSHED, NOT APPLIED — 20 September, part three
+## APPLIED AND SHIPPED — 20 September, part three
 
-Everything from parts one and two below, PLUS a fifth migration. The work
-is now **committed on `admin-deploy`** in four commits. Nothing is pushed,
-nothing is applied, and the Edge Function is not redeployed.
+Everything from parts one and two below, PLUS a fifth migration. All five
+were applied to `eskubrbgbcbaejynjxvh` on 20 September and `admin-api` was
+redeployed in the same release. The sections below are kept as the record
+of what went in and in what order, not as a list of things still to do.
 
-| To apply, in this order | What it does |
+| Applied, in this order | What it does |
 |---|---|
 | `20260920100000_plan_limits.sql` | Studio and login ceilings, enforced by triggers |
 | `20260920110000_partner_flat_commission.sql` | One 8% band, the twelve month clock |
