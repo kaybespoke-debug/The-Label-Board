@@ -685,11 +685,19 @@ plans.filter(pl => pl.invoiceOnly).forEach(pl => {
     'the structured data puts a price on ' + pl.name + ', which is agreed per business');
 });
 
-/* every picture the pages ask for is actually in the folder */
+/* every picture the pages ask for is actually in the folder.
+
+   A src may carry ?v=N. That is a cache bust, not part of the filename: the
+   screenshots are served with a week of Cache-Control and their names never
+   change, so a browser that has seen the old capture keeps drawing it until
+   the URL moves. Kayode reported exactly that on 20 Sep and reasonably asked
+   whether the deploy had failed; it had not, the bytes on the server were
+   already right. So the query is stripped before the file is looked for. */
+const onDisk = src => src.split('?')[0];
 built.forEach(p => {
   const wanted = new Set();
   all(html[p], /(?:src|data-photo)="(img\/[^"]+)"/g).forEach(m => wanted.add(m[1]));
-  wanted.forEach(f => check(fs.existsSync(path.join(dir, f)), p + ' asks for a picture that exists: ' + f));
+  wanted.forEach(f => check(fs.existsSync(path.join(dir, onDisk(f))), p + ' asks for a picture that exists: ' + f));
 });
 
 /* ================= photography ================= */
@@ -1014,7 +1022,11 @@ shotTags.forEach(tag => {
   const src = attrs(tag, 'src') || '';
   const name = src.split('/').pop();
   check(src.indexOf('img/screens/') === 0, 'the screenshot comes out of img/screens: ' + src);
-  check(fs.existsSync(path.join(dir, src)), 'the screenshot file is really there: ' + src);
+  check(fs.existsSync(path.join(dir, onDisk(src))), 'the screenshot file is really there: ' + src);
+  /* Required, not optional. A recapture that keeps the filename and does not
+     move the version is invisible to every visitor who has been here in the
+     last week, which is the failure this gate now exists to stop. */
+  check(/\?v=\d+$/.test(src), 'the screenshot carries a version so a recapture actually reaches people: ' + src);
   check((attrs(tag, 'alt') || '').length >= 20, 'the screenshot says what it shows: ' + name);
   check(attrs(tag, 'width') && attrs(tag, 'height'), 'the screenshot reserves its space: ' + name);
 });
@@ -1250,7 +1262,14 @@ check(/setCcy\(remembered\(\) \|\| 'NGN'\)/.test(siteJs),
   'the currency picker opens on naira rather than on a guess');
 check(siteJs.indexOf('guessCcy') === -1,
   'and the guess is gone rather than left unreachable');
-check(siteJs.indexOf("'tlb_ccy'") !== -1, 'the chosen currency is remembered under our own key');
+/* The key carries a number because the OLD one holds guesses. Before 20 Sep
+   the page guessed a currency from the time zone and wrote that guess to
+   localStorage exactly as if somebody had chosen it, so every returning
+   browser overrode the naira default with something nobody picked. Reading
+   the old key again would bring all of that straight back. */
+check(/'tlb_ccy\d+'/.test(siteJs), 'the chosen currency is remembered under our own key');
+check(siteJs.indexOf("'tlb_ccy'") === -1,
+  'and never reads the pre-20-September key, whose values are guesses rather than choices');
 check(!/layi_/.test(siteJs), 'the website still never touches the app storage keys');
 
 /* The one call the site makes, pinned to exactly what it may be.
