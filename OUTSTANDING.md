@@ -287,22 +287,32 @@ account never sees an IBAN box.
   Confirmed: he wants BOTH
 - The signature block
 
-### Two things his list did not settle
+### Settled 21 September, second pass
 
-1. **Quantity.** His real invoice has a PRICE / QUANTITY / AMOUNT table and
-   his spec does not mention quantity at all. It is the ONLY structural
-   change in the whole list: an order stores a price per piece and no count,
-   so a quantity column touches the order record, `invoiceFigures`, the
-   totals and the migration path. Everything else is additive. **Do not
-   build it on a guess either way.**
-2. **What the tax applies to.** Before discount or after; on shipping or not;
-   inclusive or added on top. Nigerian VAT is 7.5% and normally added, but a
-   studio invoicing from the UK may want it shown as included. Ask before
-   picking, because getting it wrong misstates what a client owes.
+**Quantity is in.** Price, Qty, Amount, as on his own invoice. It is the only
+structural change in the list: an order stores a price per piece and no count,
+so it touches the order record, `invoiceFigures`, the totals and the migration
+path.
 
-Also unasked and worth raising once: a **US domestic** dollar account uses a
-routing number rather than an IBAN. His own USD account is a GB-based Revolut,
-so IBAN and BIC are right for him, but a US studio would be stuck.
+**Currencies are optional.** The invoice prints only the accounts a studio
+actually added. A studio paid only in naira gets one line, never an empty GBP
+or USD block. Today `invoiceInner` filters accounts to the order currency and
+falls back to printing ALL of them when none match, which is the behaviour to
+watch.
+
+**One page.** His own invoice is one page and he wants that. The finished-piece
+photo goes on its own page after it rather than lengthening the document.
+
+### Still open
+
+**What the tax applies to.** Before discount or after, on shipping or not,
+added on top or shown as included. Nigerian VAT is 7.5% and normally added; a
+studio invoicing from the UK may want it shown as included. Getting it wrong
+misstates what a client owes, so ask rather than pick.
+
+**A US domestic dollar account** uses a routing number, not an IBAN. His own
+USD account is a GB-based Revolut, so IBAN and BIC suit him and would strand an
+American studio.
 
 **Both pieces of work are the customer app**, so they ship from `main`, not
 from `admin-deploy` where this session has been. They are the same piece of
