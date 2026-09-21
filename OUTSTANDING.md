@@ -51,6 +51,48 @@ through it. The customer app is exempt and the gate says why: its `.main` keeps
 | `account_directory` | a view saying which app each auth account belongs to |
 | `rename_seeded_layi_studio` | the September fixture is **Seed Multi Studio**, freeing the name |
 | `prepare_layi_studio` | **LAYI** exists, on Pro at zero, waiting for its owner |
+| `partner_and_studio_together` | a partner who was also prepared a studio gets both |
+
+### The studio that was prepared and then swallowed
+
+Kayode created the account. The studio was not claimed, he was attached to
+partner **KUNLE** instead, and nothing anywhere said so: the business kept its
+pending address, the trigger returned happily, and `account_directory` quietly
+read "partner". `app.provision_studio()` opened with a partner claim that
+returned outright, so the prepared-studio branch below it was unreachable for
+anybody who had been invited as a partner first.
+
+The early return was not wrong, it was too wide. It exists to stop the INVENT
+path from handing a studio to somebody who never asked for one, and that is
+still refused. A studio prepared by an operator is not a guess.
+
+**Then it cost an hour, because the function has four generations.** The first
+attempt copied the 4 September body — the one the partner claim was added to —
+and silently undid the billing record added on the 5th and the referral code
+added on the 20th. `billing_harness` went red in under a minute, which is the
+only reason this is a paragraph and not an incident. The live function was
+wrong for about ten minutes; no account was created in that window and every
+studio was checked afterwards for its billing row. **Before touching that
+function again: grep every migration for the name, take the LAST, and diff
+what you are about to apply against it.**
+
+**And the re-diff found a third thing that had to change.** `partners.user_id`
+is UNIQUE, and the whole function is wrapped in `exception when others`. So
+the referral code the trigger hands every new studio blows up for somebody who
+is already a partner, and the rollback takes the profile and the membership
+with it: no studio at all, one warning in a log nobody reads. Guarded now, and
+`onboarding_harness` went 28 -> 35 checks. Mutating that one guard out fails
+nine of them.
+
+**LAYI has no referral code of its own, and that is correct.** Kayode already
+holds partner KUNLE personally, `user_id` is unique, so the studio cannot also
+have one. His referral code is KUNLE. Worth a decision at some point: whether
+an owner's personal partner row and their studio's referral code should be the
+same thing.
+
+**Leaked password protection is off** in Supabase Auth. One toggle,
+Authentication -> Policies. Worth turning on now that real people have
+passwords.
 
 **A button that looked like it worked.** Kayode renamed a studio in the
 console, watched it rename, and found it unchanged afterwards.
@@ -105,28 +147,19 @@ companion view, or a check in a harness.
    migrations and `seed_sql.mjs` look the fixture up by it.
 3. ~~invite `layiojomo@gmail.com` as a studio called LAYI~~ done — the row is
    prepared and live, `slug = 'layi'`, one branch, waiting to be claimed.
-4. **Set the app password. This one is his and only his.** Nothing in this
-   system ever sends or stores a password on somebody's behalf, which is why
-   the console invites rather than creating accounts. Two ways, both fine:
-   - Supabase → Authentication → Users → Add user, `layiojomo@gmail.com`,
-     a password he picks, Auto Confirm on. Fewest moving parts.
-   - Or press Invite a studio in the console with the same address. It finds
-     the prepared row rather than making a second one, and emails a
-     set-password link — which depends on the redirect URL config and the
-     mail key, so it has more that can go wrong.
-   Either way `app.provision_studio()` fires on the account insert and attaches
-   it to LAYI. Use a different password from the console; splitting the two
-   logins is the point.
+4. ~~set the app password~~ done, by him, 21 September. Nothing in this system
+   ever sends or stores a password on somebody's behalf, which is why the
+   console invites rather than creating accounts.
 5. ~~change the plan to Pro~~ done — **Pro at a price of zero**, on purpose.
    The plan gates what the app allows; the price is what we invoice. LAYI is
    our own label, so it needs what Pro unlocks (5 studios, 50 seats, enforced
    by `plan_limits`) and must not turn up as ₦49,000 of revenue nobody is
    going to pay us.
 
-**The order matters and is the reason 3 came before 4.** `provision_studio()`
-claims a row whose `pending_owner_email` matches, at the moment the account is
-inserted. Create the account first and there is nothing to claim, so the
-trigger builds a brand new empty studio and LAYI sits there unclaimed forever.
+**All five are done.** `layiojomo@gmail.com` reads `partner + studio`, owner of
+LAYI, one profile, one membership, plan `pro`, nothing stranded. Step 4 was the
+one that turned up the bug above, which is the argument for doing these in
+order against a live database rather than reasoning about them.
 
 
 ## The free trial is SILENT until Flutterwave, 21 September
