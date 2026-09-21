@@ -90,9 +90,22 @@ have one. His referral code is KUNLE. Worth a decision at some point: whether
 an owner's personal partner row and their studio's referral code should be the
 same thing.
 
-**Leaked password protection is off** in Supabase Auth. One toggle,
-Authentication -> Policies. Worth turning on now that real people have
-passwords.
+**Leaked password protection is off** in Supabase Auth, and it is not where
+the first note said it was. It lives under **Authentication -> Sign In /
+Providers -> Email**, in the Password section, as "Prevent use of leaked
+passwords". It checks new passwords against HaveIBeenPwned and refuses the
+ones already in a breach list. Pro plan and above, and the organisation is on
+Pro, so it is available.
+
+It is an Auth config setting rather than anything in the database, so no
+migration reaches it and the Supabase MCP tools here have no action for it.
+It is also a security setting on a live project, which is Kayode's to change
+rather than mine. Thirty seconds in the dashboard, and worth doing now that
+real people have passwords on it.
+
+Worth a look on the same screen while it is open: minimum password length
+(default 6) and the required character classes. Both are the same kind of
+change and the same one toggle away.
 
 **A button that looked like it worked.** Kayode renamed a studio in the
 console, watched it rename, and found it unchanged afterwards.
