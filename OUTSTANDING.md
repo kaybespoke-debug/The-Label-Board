@@ -319,9 +319,21 @@ the order of those two lines load-bearing rather than cosmetic.
 USD account is a GB-based Revolut, so IBAN and BIC suit him and would strand an
 American studio.
 
-**Both pieces of work are the customer app**, so they ship from `main`, not
-from `admin-deploy` where this session has been. They are the same piece of
-work and should be one fresh chat, per the one-app-per-chat rule.
+### Where the build happens
+
+**Both pieces of work are the customer app, and they are one piece of work.**
+One fresh chat for both, per the one-app-per-chat rule.
+
+**On `admin-deploy`, not on `main`.** An earlier pass in this session said the
+opposite and it was wrong. The customer app SHIPS from `main`; the work happens
+on `admin-deploy` like everything else, and merging is the release step at the
+end, with the `netlify.toml` recipe at the top of CLAUDE.md. Starting the build
+on `main` would also mean starting without this spec, because these twelve
+commits are on `admin-deploy` and `main` has none of them.
+
+Green before starting and green before shipping: `node verify.js`, then
+`node audit_safearea.js` after any stylesheet or table change. Bump `CACHE` in
+`site/sw.js` before the release or installed phones keep the old version.
 
 
 ## The free trial is SILENT until Flutterwave, 21 September
