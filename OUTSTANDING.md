@@ -175,6 +175,88 @@ one that turned up the bug above, which is the argument for doing these in
 order against a live database rather than reasoning about them.
 
 
+## The order form and the invoice, 21 September — PROTOTYPED, NOT BUILT
+
+Kayode signed into the app as LAYI for the first time, tried to add an order,
+and said it was "just a very long unending list ... its certain this is not the
+only affected page". Then: "theres no where for me to create an invoice? like
+we said, invoicing should be first before an order is created".
+
+**Both complaints are one complaint.** Invoice-first is built and working
+exactly as decided. The form hides it.
+
+### Measured rather than eyeballed
+
+`renderOrderModal` is **42 fields** with three headings, and between field 10
+and field 38 there are **28 fields with no signpost at all**. That stretch is
+the unending list.
+
+The quote switch — *"Not agreed yet, this is a quote"*, the entry to the whole
+invoice-first flow — is **field 40 of 42**. You fill in stock used, who is
+making it, the profit and loss and the director allocation before the app
+mentions you could have been invoicing. Of course it looks like invoicing is
+not there.
+
+He is right that it is not the only form, but it is narrower than it feels. Of
+22 forms with six fields or more, only two are long: this one and **Add staff**
+at 35. Everything else is 12 or fewer. Fifteen have no headings, which matters
+much less at seven fields.
+
+### The shape proposed
+
+Prototype, five boards: <https://claude.ai/artifact/Ke4FCtCLqX6HnesNm71LBG>
+
+**28 of the 42 fields are things you only know AFTER the yes** — what fabric
+went in, who made it, what it cost, what stage it is at. Asking for them while
+you are still quoting is why the form never ends. They move onto the order
+itself, in closed sections. That leaves eight fields to price a job, and two
+doors in: *Quote & invoice*, or *Straight to an order* when it is already
+agreed. Same record either way, so the decision already made survives.
+
+### The invoice: five things the app cannot produce
+
+He sent his real LAYI invoice (#308, Dr Ellis Enabosi, 21 Aug 2026) and the
+app it comes from. Compared against `invoiceInner`:
+
+| His invoice | The app today |
+|---|---|
+| PRICE x QUANTITY = AMOUNT | item and amount only; no quantity outside a batch |
+| photo in the line itself | up to four thumbnails in a strip at the foot |
+| sort code, IBAN, BIC/SWIFT | a bank row is currency, bank, account name, number. **His GBP and USD accounts cannot be written down at all.** |
+| signature, name, date | nothing |
+| two trading addresses (Lagos and Stotfold) | one free-text address box |
+
+Smaller: his logo sits top right and the app's sits left; he writes a discount
+as `(N40,000.00)` and the app writes `- N40,000`; he says **Amount due** and the
+app says **Balance due**.
+
+**Quantity is the only structural one.** An order stores a price per piece and
+no count, so a quantity column touches the order record, the totals,
+`invoiceFigures` and the migration path. The other four are additive.
+
+### Waiting on him
+
+1. Is the two-door shape right.
+2. The line thumbnail AND a large finished-piece photo at the end, or does the
+   thumbnail replace the strip? His own PDF has both.
+3. The signature: a per-studio uploaded image, set once, on every invoice?
+
+### And a spec that cannot be found
+
+He said he had given specifications for how the invoice should look, with
+specific details. Searched `OUTSTANDING.md`, every repo `.md`, and the memory
+files. What exists is the invoice **flow** — quote becomes order on payment,
+the confirming line, quotes off the production board. **Nothing about how the
+document should look.** So either it was said in a session that was never
+written down, or it is somewhere none of those searches reach. Told him so
+rather than reconstruct it from memory, and asked him to restate it. When he
+does, it goes here.
+
+**Both pieces of work are the customer app**, so they ship from `main`, not
+from `admin-deploy` where this session has been. They are the same piece of
+work and should be one fresh chat, per the one-app-per-chat rule.
+
+
 ## The free trial is SILENT until Flutterwave, 21 September
 
 Kayode asked whether the trial, demo and partner buttons should all be
