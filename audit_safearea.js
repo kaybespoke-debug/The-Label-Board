@@ -279,6 +279,70 @@ section('The page header stays put while the page scrolls');
   }
 }
 
+// =====================================================================
+section('Opening something takes you to the top of it');
+// =====================================================================
+// Kayode, 21 September 2026: "when you open a subscribr from the list, the
+// page goes to the middle so i have to scroll back up."
+//
+// Below 680px .main stops being the scroll container and the document itself
+// scrolls. Setting .main.scrollTop then moves nothing, and because the page
+// you opened is usually SHORTER than the list you came from, the browser
+// clamps your old offset to the new height and drops you somewhere arbitrary.
+//
+// The partner portal found this and fixed it with a two line helper. The
+// console kept the bug for months, which is the same shape as the unquoted
+// ids: fixed once, in one app, while the others carried on.
+//
+// So this checks the rule rather than the app: wherever a front end routes
+// between pages, resetting the container is not enough on its own.
+{
+  const ROUTERS = [
+    { name: 'console', file: 'admin/js/core.js',    fns: ['go', 'openDetail', 'goBack'] },
+    { name: 'portal',  file: 'partners/js/core.js', fns: ['go', 'openDetail', 'goBack'] },
+  ];
+
+  ROUTERS.forEach(app => {
+    const src = fs.readFileSync(path.join(root, app.file), 'utf8');
+
+    /* the helper exists and does BOTH halves */
+    const helper = src.slice(src.indexOf('function scrollTop()'));
+    const body = helper.slice(0, helper.indexOf('}') + 1);
+    ok(app.name + ': there is a scrollTop helper', src.indexOf('function scrollTop()') !== -1);
+    ok(app.name + ': it resets the container', /\.scrollTop\s*=\s*0/.test(body));
+    ok(app.name + ': and the window, which is what scrolls on a phone',
+       /window\.scrollTo\(\s*0\s*,\s*0\s*\)/.test(body),
+       'without this, opening a record on a narrow screen lands you mid page');
+
+    /* and every route goes through it rather than doing half the job inline */
+    app.fns.forEach(fn => {
+      const at = src.indexOf('function ' + fn + '(');
+      const chunk = at < 0 ? '' : src.slice(at, src.indexOf('\n}', at));
+      ok(app.name + ': ' + fn + ' exists', at >= 0);
+      ok(app.name + ': ' + fn + ' scrolls to the top through the helper',
+         /\bscrollTop\(\)/.test(chunk),
+         'it resets .main directly, which does nothing under 680px');
+    });
+
+    ok(app.name + ': no route still resets the container by hand',
+       !/document\.querySelector\('\.main'\)\.scrollTop\s*=\s*0/.test(src),
+       'that is the half fix this whole check exists to catch');
+  });
+
+  /* The customer app is the exception and it is worth writing down why, or
+     somebody will "fix" it to match and wonder why nothing changed. Its .main
+     keeps overflow-y:auto at every width, so it never hands scrolling to the
+     document and resetting the container really is enough. */
+  {
+    const app = fs.readFileSync(path.join(root, 'site/layi_dashboard.html'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    const mains = [...app.matchAll(/\.main\{[^}]*\}/g)].map(m => m[0]);
+    const handsOver = mains.some(r => /overflow[^:]*:\s*visible/.test(r));
+    ok('app: .main never hands scrolling to the document', !handsOver,
+       'if it ever does, it needs the same helper as the other two');
+  }
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass.length + ' passed, ' + failures.length + ' FAILED:');
