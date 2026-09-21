@@ -105,7 +105,7 @@ serving the old version.
 Every object the apps talk to is created by a migration in
 `supabase/migrations/`, applied in filename order. Nothing is created by hand
 any more: five objects once were, and were missing from the migrations
-entirely, so a fresh project would have run none of it. Thirteen suites guard it:
+entirely, so a fresh project would have run none of it. Fourteen suites guard it:
 
 ```bash
 node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
@@ -121,6 +121,7 @@ node supabase/tests/referral_fraud_harness.mjs  # nobody earns a commission off 
 node supabase/tests/plan_feature_harness.mjs   # Basic cannot write a Pro feature, by app or by hand
 node supabase/tests/trial_harness.mjs           # a free trial gives away the product, never the commission
 node supabase/tests/account_directory_harness.mjs # which app each account belongs to, and who may ask
+node supabase/tests/storage_rls_harness.mjs    # a studio reaches its own photos and nobody else's
 ```
 
 The first reads the shipped code for every table, function and column it
@@ -128,7 +129,7 @@ names — the two Edge Functions included, because they are the half that
 talks to the tables the browser is deliberately not allowed to touch. So a
 new table the app starts using is checked the day it is used.
 
-**The last one builds a different database on purpose.** Every other suite
+**`tlb_policy_harness` builds a different database on purpose.** Every other suite
 runs the migrations at a bare Postgres, which is right for the tenant
 tables because they grant and revoke explicitly. It is wrong for the `tlb_`
 tables, which granted nothing and relied on an absence — and a bare
@@ -138,7 +139,7 @@ authenticated` on every project, so a table in `public` is reachable with
 the public anon key from the moment it exists. `tlb_policy_harness` sets
 that default first, so the policies are actually reached and tested.
 
-Four of the eleven are different in kind. Every other suite proves something is
+Four of the fourteen are different in kind. Every other suite proves something is
 walled off; `plan_limits_harness`, `partner_commission_harness` and
 `referral_fraud_harness` and `plan_feature_harness` prove something is REFUSED, and both show the refusal and then the same operation
 succeeding once it is allowed. A check that only ever sees the refusal cannot
