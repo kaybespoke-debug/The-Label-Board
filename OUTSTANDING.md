@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 21 September 2026 (seventeenth session)
+Last updated: 21 September 2026 (eighteenth session)
 
 ## Shipped 21 September 2026
 
@@ -30,8 +30,18 @@ an id in unquoted.
 work and was tried first: keeping `.main`'s top padding and pulling the header
 up with a negative margin leaves it stuck 26px down with a live strip above it.
 Sticky positions against the scrollport. The padding moved onto the header
-instead, safe-area inset with it. `audit_safearea` went 23 -> 45 checks and
+instead, safe-area inset with it. `audit_safearea` went 23 -> 66 checks and
 refuses the negative margin coming back.
+
+**Opening a record landed you mid-page.** Below 680px `.main` stops being the
+scroll container and the document itself scrolls, so resetting `.main.scrollTop`
+moves nothing — and because the record is usually shorter than the list you
+came from, the browser clamps your old offset to the new height and drops you
+somewhere arbitrary. The partner portal found this months ago and fixed it with
+a two-line helper; the console never got it, the same shape as the unquoted
+ids. Same helper now, and `go`, `openDetail`, `goBack` and `setVTab` all route
+through it. The customer app is exempt and the gate says why: its `.main` keeps
+`overflow-y:auto` at every width, so it never hands scrolling to the document.
 
 ### Applied to the live database
 
@@ -39,6 +49,32 @@ refuses the negative margin coming back.
 |---|---|
 | `console_owner_email_swap` | the console owner signs in as `layiwolaojomo@thelabelboard.com` |
 | `account_directory` | a view saying which app each auth account belongs to |
+| `rename_seeded_layi_studio` | the September fixture is **Seed Multi Studio**, freeing the name |
+| `prepare_layi_studio` | **LAYI** exists, on Pro at zero, waiting for its owner |
+
+**A button that looked like it worked.** Kayode renamed a studio in the
+console, watched it rename, and found it unchanged afterwards.
+`doEditSubscriber` wrote to the in-memory object and called `render()`, so the
+screen agreed with him and the database never heard about it. `doChangePlan`
+did the same, and `liveSetPlan` had sat in `live.js` since the gateway was
+built with nothing ever calling it.
+
+This is the worst shape a bug can take. A button that does nothing gets
+reported in a minute; a button that looks like it worked is found days later,
+from the wrong direction, and by then you have made decisions on it.
+
+`doChangePlan` now goes through the gateway. `formEditSubscriber` has no
+gateway action behind it at all, so on a live studio it now refuses and says
+what *does* reach the database. `audit_console_pages` gained a block that will
+not let either come back — every editing action must reach the gateway or
+refuse outright, and no write function in `live.js` may sit uncalled. Run
+against three broken copies; none survived.
+
+**Still not wired: `setTenant`.** Editing a real studio's name, contact or
+notes needs a gateway action that does not exist yet, which is an Edge Function
+deploy and therefore Kayode's call. Until then Edit is honest about it rather
+than silent. `liveSetState` is exempted in the gate with a written reason: the
+feedback screen is read-only by omission, not by bug.
 
 The email moved in all three places at once: `auth.users.email`,
 `auth.identities.identity_data` and `platform_admins.email`.
@@ -62,14 +98,35 @@ companion view, or a check in a harness.
 ## Still to do, Kayode's own list
 
 1. ~~rename the console login~~ done
-2. Rename the seeded **LAYI** studio to something disposable. The Edit button
-   works now and is live.
-3. Invite `layiojomo@gmail.com` as a studio called **LAYI**.
-4. Set the app password from the invitation email. Use a different one from the
-   console; splitting the two logins is the point.
-5. Change the plan to **Pro**. Every studio is invited on `trial`, so this is
-   the step that makes it real. Pro is 5 studios and 50 seats, enforced by
-   `plan_limits`.
+2. ~~rename the seeded LAYI studio~~ done — it is **Seed Multi Studio**. He
+   renamed it in the console on the 21st and it did not save; see the
+   write-through bug below. Done by migration instead, matched on the slug,
+   which is deliberately left as `layi-multi-studio` because two other
+   migrations and `seed_sql.mjs` look the fixture up by it.
+3. ~~invite `layiojomo@gmail.com` as a studio called LAYI~~ done — the row is
+   prepared and live, `slug = 'layi'`, one branch, waiting to be claimed.
+4. **Set the app password. This one is his and only his.** Nothing in this
+   system ever sends or stores a password on somebody's behalf, which is why
+   the console invites rather than creating accounts. Two ways, both fine:
+   - Supabase → Authentication → Users → Add user, `layiojomo@gmail.com`,
+     a password he picks, Auto Confirm on. Fewest moving parts.
+   - Or press Invite a studio in the console with the same address. It finds
+     the prepared row rather than making a second one, and emails a
+     set-password link — which depends on the redirect URL config and the
+     mail key, so it has more that can go wrong.
+   Either way `app.provision_studio()` fires on the account insert and attaches
+   it to LAYI. Use a different password from the console; splitting the two
+   logins is the point.
+5. ~~change the plan to Pro~~ done — **Pro at a price of zero**, on purpose.
+   The plan gates what the app allows; the price is what we invoice. LAYI is
+   our own label, so it needs what Pro unlocks (5 studios, 50 seats, enforced
+   by `plan_limits`) and must not turn up as ₦49,000 of revenue nobody is
+   going to pay us.
+
+**The order matters and is the reason 3 came before 4.** `provision_studio()`
+claims a row whose `pending_owner_email` matches, at the moment the account is
+inserted. Create the account first and there is nothing to claim, so the
+trigger builds a brand new empty studio and LAYI sits there unclaimed forever.
 
 
 ## The free trial is SILENT until Flutterwave, 21 September
