@@ -303,12 +303,17 @@ watch.
 **One page.** His own invoice is one page and he wants that. The finished-piece
 photo goes on its own page after it rather than lengthening the document.
 
-### Still open
+### Settled, and one still open
 
-**What the tax applies to.** Before discount or after, on shipping or not,
-added on top or shown as included. Nigerian VAT is 7.5% and normally added; a
-studio invoicing from the UK may want it shown as included. Getting it wrong
-misstates what a client owes, so ask rather than pick.
+**Tax, settled 21 September.** Optional, off by default. It applies to the
+whole order **after the discount** and **not to shipping**, so:
+
+    taxable = subtotal - discount
+    tax     = taxable * rate
+    total   = subtotal - discount + tax + shipping
+
+Shipping sits outside the tax and after it on the invoice, which is what makes
+the order of those two lines load-bearing rather than cosmetic.
 
 **A US domestic dollar account** uses a routing number, not an IBAN. His own
 USD account is a GB-based Revolut, so IBAN and BIC suit him and would strand an
