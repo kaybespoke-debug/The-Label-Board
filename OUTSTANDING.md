@@ -5,7 +5,72 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 20 September 2026 (sixteenth session, shipped twice)
+Last updated: 21 September 2026 (seventeenth session)
+
+## Shipped 21 September 2026
+
+`main` -> `a7660eb`, `admin-deploy` -> `d78d0c0`, branches differing only by
+`netlify.toml` as intended, `publish = "site"` confirmed on the merge commit.
+
+**Every button on the console was broken for a real studio.** Seventy-three
+inline handlers passed the id into the call unquoted, which is valid while ids
+are numbers and a syntax error the moment one is a uuid. Demo data has numeric
+ids, so every gate was green and only the live console was dead. It had been
+found once in August for the row-opening handler and fixed there alone. Fixed
+in two halves now: the ids are quoted, and twenty-five lookups reading them
+with `x.id === +id` compare as text, because `+id` is NaN for a uuid.
+
+**`audit_console_clicks.js` is new**, 185 checks. It renders all sixteen pages,
+all ten detail screens and every tab, pulls every inline handler out of the
+HTML, checks the function exists, calls the ones that do not reach the gateway,
+then does it all again with a uuid in place and fails on any handler that drops
+an id in unquoted.
+
+**The page header is now firm in all three apps.** The obvious fix does not
+work and was tried first: keeping `.main`'s top padding and pulling the header
+up with a negative margin leaves it stuck 26px down with a live strip above it.
+Sticky positions against the scrollport. The padding moved onto the header
+instead, safe-area inset with it. `audit_safearea` went 23 -> 45 checks and
+refuses the negative margin coming back.
+
+### Applied to the live database
+
+| Migration | What |
+|---|---|
+| `console_owner_email_swap` | the console owner signs in as `layiwolaojomo@thelabelboard.com` |
+| `account_directory` | a view saying which app each auth account belongs to |
+
+The email moved in all three places at once: `auth.users.email`,
+`auth.identities.identity_data` and `platform_admins.email`.
+`auth.identities.email` is GENERATED from identity_data so it followed, and
+`provider_id` was checked first and holds the user id rather than the address.
+Kayode confirmed sign-in afterwards. `layiojomo@gmail.com` is now free.
+
+### What the directory showed on its first run
+
+Every one of the six seeded test studios is ALSO a partner, which is the seed
+data rather than a bug, but it means `is_partner` is noisy until the test rows
+are cleared. There is also a real partner signup nobody had mentioned,
+`r2wapparels@gmail.com`, last seen 15 September.
+
+**Two orphan memberships are invisible to it and should not be.** Test Studio
+and Test Studio Two have owner rows pointing at auth users that do not exist,
+so they are not accounts with nothing behind them, they are studios with nobody
+in front. The directory lists auth users, so it cannot show them. Worth a
+companion view, or a check in a harness.
+
+## Still to do, Kayode's own list
+
+1. ~~rename the console login~~ done
+2. Rename the seeded **LAYI** studio to something disposable. The Edit button
+   works now and is live.
+3. Invite `layiojomo@gmail.com` as a studio called **LAYI**.
+4. Set the app password from the invitation email. Use a different one from the
+   console; splitting the two logins is the point.
+5. Change the plan to **Pro**. Every studio is invited on `trial`, so this is
+   the step that makes it real. Pro is 5 studios and 50 seats, enforced by
+   `plan_limits`.
+
 
 ## The free trial is SILENT until Flutterwave, 21 September
 
