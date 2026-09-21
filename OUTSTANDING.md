@@ -213,6 +213,8 @@ itself, in closed sections. That leaves eight fields to price a job, and two
 doors in: *Quote & invoice*, or *Straight to an order* when it is already
 agreed. Same record either way, so the decision already made survives.
 
+**Kayode approved the two doors on 21 September**: "2 doors is okay".
+
 ### The invoice: five things the app cannot produce
 
 He sent his real LAYI invoice (#308, Dr Ellis Enabosi, 21 Aug 2026) and the
@@ -234,23 +236,73 @@ app says **Balance due**.
 no count, so a quantity column touches the order record, the totals,
 `invoiceFigures` and the migration path. The other four are additive.
 
-### Waiting on him
+### THE INVOICE SPEC, as Kayode gave it on 21 September 2026
 
-1. Is the two-door shape right.
-2. The line thumbnail AND a large finished-piece photo at the end, or does the
-   thumbnail replace the strip? His own PDF has both.
-3. The signature: a per-studio uploaded image, set once, on every invoice?
+He had given this before and it was never written down, which is how a
+session came to ask for it twice. It is written down now. Anything added
+later goes here, not into a commit message and not into a chat.
 
-### And a spec that cannot be found
+Prototype, six boards: <https://claude.ai/artifact/Ke4FCtCLqX6HnesNm71LBG>
 
-He said he had given specifications for how the invoice should look, with
-specific details. Searched `OUTSTANDING.md`, every repo `.md`, and the memory
-files. What exists is the invoice **flow** — quote becomes order on payment,
-the confirming line, quotes off the production board. **Nothing about how the
-document should look.** So either it was said in a session that was never
-written down, or it is somewhere none of those searches reach. Told him so
-rather than reconstruct it from memory, and asked him to restate it. When he
-does, it goes here.
+**Set once in Settings, carried onto every invoice automatically.**
+
+| | State |
+|---|---|
+| Logo | exists |
+| Company name | exists |
+| Email | exists |
+| Address | exists, but ONE box. He trades from Lagos and Stotfold, so it has to take more than one line and print them both |
+| Phone | exists |
+| Company registration number | exists (`co.reg`) |
+| Payment instruction | exists (`co.pay`) |
+| **Signature** | **NEW.** An image he uploads once. Prints above his name and the date at the foot of every invoice. Not a typed name |
+| **Tax** | **NEW.** Optional: a switch, a label (VAT) and a rate. Off by default, because most studios will not charge it |
+| Payment accounts | exists, but only currency / bank / account name / number |
+
+**Payment accounts are REACTIVE to the currency.** His words: *"add the
+sortcode, iban and bic but make it reactive, so it reflects when its the
+currency that requires it."* Every business adds its own accounts and the
+invoice carries them. The point is that a Nigerian studio with one Naira
+account never sees an IBAN box.
+
+| Currency | Fields shown |
+|---|---|
+| NGN | bank, account name, account number |
+| GBP | bank, account name, account number, **sort code** |
+| USD | bank, account name, account number, **IBAN**, **BIC/SWIFT** |
+| EUR | bank, account name, **IBAN**, **BIC/SWIFT** |
+
+**On the invoice itself.**
+
+- Client name, email, phone. Email is the one not shown today
+- Line items, with a **thumbnail in the row**
+- **Shipment details.** The order already stores courier, delivery address,
+  waybill number and status, and the invoice uses only the fee, as a
+  Shipping money line. All four should print
+- Discount
+- Tax, when it is on
+- **Deposit already paid**, deducted, so the figure at the foot is what is
+  actually owed. Labelled **Amount due**, not Balance due
+- **The large finished-piece photo at the end**, as well as the thumbnail.
+  Confirmed: he wants BOTH
+- The signature block
+
+### Two things his list did not settle
+
+1. **Quantity.** His real invoice has a PRICE / QUANTITY / AMOUNT table and
+   his spec does not mention quantity at all. It is the ONLY structural
+   change in the whole list: an order stores a price per piece and no count,
+   so a quantity column touches the order record, `invoiceFigures`, the
+   totals and the migration path. Everything else is additive. **Do not
+   build it on a guess either way.**
+2. **What the tax applies to.** Before discount or after; on shipping or not;
+   inclusive or added on top. Nigerian VAT is 7.5% and normally added, but a
+   studio invoicing from the UK may want it shown as included. Ask before
+   picking, because getting it wrong misstates what a client owes.
+
+Also unasked and worth raising once: a **US domestic** dollar account uses a
+routing number rather than an IBAN. His own USD account is a GB-based Revolut,
+so IBAN and BIC are right for him, but a US studio would be stuck.
 
 **Both pieces of work are the customer app**, so they ship from `main`, not
 from `admin-deploy` where this session has been. They are the same piece of
