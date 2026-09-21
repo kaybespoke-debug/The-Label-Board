@@ -252,8 +252,33 @@ function doAddSubscriber() {
   logAction('sub_edit', 'Subscriber created', 'Kayode Ojomo created ' + name + ' on the ' + p.name + ' plan', 'subscriber:' + id);
   closeModal(); toast(name + ' added'); render();
 }
+/* EDITING A REAL STUDIO IS NOT BUILT YET, and this form used to pretend it
+   was. It wrote to the in-memory object and re-rendered, so the change
+   appeared and then was gone on the next refresh. Kayode renamed a studio,
+   saw it renamed, and found it unchanged an hour later.
+
+   Every other write on this screen has a gateway action behind it. This one
+   never did, and most of what it edits has nowhere to go: businesses holds
+   a name, a contact email and a status, and has no column for owner, phone,
+   city, health or seats. Those are shapes the example data has.
+
+   So on a real studio it now says so instead. A refusal somebody reads is
+   worth more than a save they believe. The proper fix is a setTenant action
+   on admin-api taking the two fields that exist, and it is written up in
+   OUTSTANDING.md rather than half done here. */
 function formEditSubscriber(id) {
   const s = Q.sub(id);
+  if (s.live) {
+    modal('Editing a real studio is not built yet', s.name,
+      '<p class="note">This form only ever changed the copy on this screen. On an example ' +
+      'subscriber that is fine. On a real studio it looked like it saved and did not, so it ' +
+      'has been stopped rather than left to mislead.</p>' +
+      '<p class="hint">What DOES reach the database from this record: <b>Change plan</b>, ' +
+      '<b>Agree a limit</b>, <b>Storage</b>, <b>Record a payment</b> and <b>Make a partner</b>. ' +
+      'A studio is named when it is invited.</p>',
+      '<button class="btn" onclick="closeModal()">Close</button>');
+    return;
+  }
   modal('Edit ' + s.name, 'TLB-S' + String(s.id).padStart(4, '0'),
     '<div class="f2"><div class="fg"><label>Trading name</label><input id="esName" value="' + esc(s.name) + '"></div>' +
     '<div class="fg"><label>Owner</label><input id="esOwner" value="' + esc(s.owner) + '"></div></div>' +
@@ -293,17 +318,39 @@ function formChangePlan(id) {
     '<button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn gold" onclick="doChangePlan(\'' + id + '\')">Change plan</button>');
 }
-function doChangePlan(id) {
+/* A plan change on a REAL studio has to go through the gateway, or it is a
+   change to a JavaScript object that disappears on the next refresh.
+
+   liveSetPlan has existed since the gateway was built and nothing ever
+   called it: every other write on this screen was wired up and this one was
+   not. Kayode changed a studio's plan, saw it change, came back and found it
+   unchanged. An action that looks like it worked is worse than one that
+   plainly fails, because you only find out later and from the wrong place.
+
+   The example subscribers keep the old path. They have no row behind them,
+   so there is nothing to write and liveSetPlan refuses them by design. */
+async function doChangePlan(id) {
   const s = Q.sub(id);
   const oldName = s.planName;
   const pid = document.getElementById('cpPlan').value;
   const cycle = document.getElementById('cpCycle').value;
   const p = planById(pid);
-  s.plan = pid; s.planName = p.name; s.cycle = pid === 'trial' ? 'trial' : cycle;
-  s.seats = p.seats;
-  s.status = pid === 'trial' ? 'trial' : 'active';
-  s.mrr = planMrr(p, cycle, document.getElementById('cpPrice') && document.getElementById('cpPrice').value);
-  if (planIsInvoiced(p) && !s.mrr) { toast('Bespoke has no list price. Type what ' + s.name + ' agreed to pay, or it counts for nothing.'); return; }
+  const price = planMrr(p, cycle, document.getElementById('cpPrice') && document.getElementById('cpPrice').value);
+  if (planIsInvoiced(p) && !price) { toast('Bespoke has no list price. Type what ' + s.name + ' agreed to pay, or it counts for nothing.'); return; }
+
+  if (s.live) {
+    try {
+      await liveSetPlan(id, pid, pid === 'trial' ? 'trial' : cycle, price);
+    } catch (e) {
+      toast(e.message || 'Could not change that plan');
+      return;
+    }
+  } else {
+    s.plan = pid; s.planName = p.name; s.cycle = pid === 'trial' ? 'trial' : cycle;
+    s.seats = p.seats;
+    s.status = pid === 'trial' ? 'trial' : 'active';
+    s.mrr = price;
+  }
   logAction('plan_change', 'Subscription plan changed',
     'Kayode Ojomo moved ' + s.name + ' from ' + oldName + ' to ' + p.name +
     (document.getElementById('cpWhy').value ? ' — ' + document.getElementById('cpWhy').value : ''), 'subscriber:' + s.id);
