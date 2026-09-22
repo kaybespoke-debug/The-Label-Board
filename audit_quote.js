@@ -91,11 +91,22 @@ else{
     if(!att.act||!/confirmOrder/.test(att.act.fn||''))F('there is no way to confirm a quote from the order');
   }
 
-  /* 4) The invoice tells the client what makes it an order. ------------------------- */
+  /* 4) The invoice tells the client what makes it an order. -------------------------
+     This used to assert a line the app wrote itself, on a quote only: paying it confirms
+     the order, nothing is cut until then. Kayode had it removed on 22 September 2026
+     because a studio says that better in its own words, and his own payment terms already
+     do. So the assertion moved rather than went: what a client is asked to pay must still
+     be headed as an invoice, and whatever the studio HAS written about payment must reach
+     the document, because it is now the only thing on the page carrying the condition.
+
+     Deliberately not asserted: that a studio has written any terms at all. That is theirs
+     to decide and an empty invoice is a worse thing to fail somebody's build over than an
+     unexplained one. It is written down in OUTSTANDING.md as a known edge instead. */
+  run("SETTINGS.company=Object.assign({},SETTINGS.company,{payInstructions:'Deposit confirms the booking.'});save('layi_dash_settings',SETTINGS);");
   const inv=run("invoiceInner(getOrders().find(o=>o.id==='"+qid+"'),'invoice')");
-  if(!/once payment is received/i.test(inv))
-    F('the invoice for an unconfirmed order does not say that paying it confirms the order');
   if(!/INVOICE/.test(inv))F('the document a client is asked to pay is no longer headed as an invoice');
+  if(inv.indexOf('Deposit confirms the booking.')<0)
+    F('the studio wrote payment terms and the invoice does not carry them, so nothing on it says what paying does');
   const rec=run("invoiceInner(getOrders().find(o=>o.id==='"+qid+"'),'receipt')");
   if(/once payment is received/i.test(rec))F('a receipt is telling somebody their payment will confirm the order');
 

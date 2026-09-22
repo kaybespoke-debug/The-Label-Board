@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 21 September 2026 (eighteenth session)
+Last updated: 22 September 2026 (nineteenth session)
 
 ## Shipped 21 September 2026
 
@@ -175,7 +175,7 @@ one that turned up the bug above, which is the argument for doing these in
 order against a live database rather than reasoning about them.
 
 
-## The order form and the invoice, 21 September — PROTOTYPED, NOT BUILT
+## The order form and the invoice, 21–22 September — SHIPPED
 
 Kayode signed into the app as LAYI for the first time, tried to add an order,
 and said it was "just a very long unending list ... its certain this is not the
@@ -334,6 +334,216 @@ commits are on `admin-deploy` and `main` has none of them.
 Green before starting and green before shipping: `node verify.js`, then
 `node audit_safearea.js` after any stylesheet or table change. Bump `CACHE` in
 `site/sw.js` before the release or installed phones keep the old version.
+
+### Built 21–22 September, shipped 22 September as `layi-v44`
+
+All of the above is in `site/layi_dashboard.html`.
+
+**The form.** Eight fields stand open — who it is for, their phone, the piece,
+what to call it, the price, how many, the deposit and when it is ready. The
+other 28 are in seven closed sections, in the prototype's own order: Client
+details, Discount & currency, Where it has got to, Who is making it, Fabric &
+stock used, What it made you, Getting it to them. Each item carries its own
+"More about this piece" for its cloth, photographs, styling and finishing.
+
+**Closed, never removed, and that is the load-bearing bit.** Every field still
+renders; a field that stops rendering stops saving, and `syncOrderDraft` reads
+the form by id. So the same 42 fields save exactly as they did, and the gates
+that drive this form — `audit_fabric`, `audit_method`, `audit_pieces`,
+`audit_quote` — still find every string they look for.
+
+**A shut section answers its own question.** "Ready for Delivery", "Franklin,
+Tunde, Idara Umah", "₦65,000", "Red Star Express · ₦15,000". A section that
+shuts and says nothing is hiding work rather than deferring it, and the gate
+refuses an empty summary.
+
+**The doors.** `newOrder()` is what the buttons call and it is what asks;
+`openOrder()` still opens the editor directly, because that is how a row has
+always opened one and how four gates drive it. The quote door sets `quoted`
+before the first field, so the switch that used to be field 40 of 42 is now the
+first thing on the form. The door screen also lists what is awaiting a yes.
+
+**Quantity** is on the item, defaulting to 1, and `migrate()` stamps it, so an
+order written before today reads as one piece and never as none. It flows
+through `outfitsTotal` into `o.value`, so `orderNet`, the profit, the
+commissions and every total follow it without a second code path.
+
+**The invoice** was rebuilt against #308: logo top right, the client's email,
+PRICE × QTY = AMOUNT with a thumbnail in the row, all four shipment details,
+discount in brackets, tax, shipping, the deposit deducted, **Amount due**, the
+payment accounts the studio actually added, and a signature above the name and
+the date. It measures 941px tall, so it prints on one page on A4 and on Letter;
+the large finished-piece photo follows on a page of its own.
+
+**Settings** gained the tax switch (off by default, a label and a rate), the
+signature upload, and payment accounts whose boxes follow the currency — pounds
+add a sort code, dollars an IBAN and BIC, euros both and no account number.
+Switching an account's currency drops the fields the new currency does not ask
+for, so a naira account cannot print a sort code it kept from being a GBP one.
+
+**`audit_invoice.js` is new**, 131 checks, wired into `verify.js`. Eight
+injected faults were checked against it and it caught all eight: quantity read
+as none, totals ignoring quantity, tax taken before the discount, tax charged
+on the shipping, the deposit not deducted, Amount due reverting to Balance due,
+a naira studio shown an IBAN box, and the large photo lengthening the invoice.
+The tax rules are asserted as arithmetic rather than as strings — putting the
+carriage up must move the total by exactly the carriage and move the tax by
+nothing — because that is the only form of the assertion a reworded invoice
+cannot quietly pass.
+
+### The item row, 22 September
+
+Kayode sent three screenshots of the item sheet from the invoicing app he uses, with
+"Still on the invoice". Four things on it that ours did not have. All four are built.
+
+**Product code.** Optional, on the item, printed small under the name on the invoice and
+only when it is set. A code existed on retail products for the website import; an order
+line never had one.
+
+**A discount on the piece.** His reason, in his words: *"we can agree to give an outfit
+off one outfit and not on the other outfits, so its useful too having both, we can do
+from indivudial piece or from all pieces."* So both exist, and they stack in one fixed
+order, which is now the only place that decides it:
+
+    line total   = price × quantity − that line's discount
+    subtotal     = the line totals added up
+    taxable      = subtotal − the discount on the whole order
+    tax          = taxable × rate
+    total        = taxable + tax + shipping
+
+A line discount can never exceed its own line, because a line that pays the client back
+is a refund and does not belong in an item row. The invoice shows the arithmetic in the
+line — `₦290,000.00 less ₦5,000.00 discount` — rather than silently printing a smaller
+amount, because a client checking a bill wants to see where the figure came from.
+
+**Save this piece for future invoices.** Ticking it writes the piece into the product
+types with its price and code, so picking that type again fills both. Two deliberate
+differences from the sheet he sent:
+
+- it remembers the **type**, not the per-order description — `Agbada`, never `Wedding
+  agbada for Adaeze, size 43`. The catalogue IS the product-type dropdown, and filling
+  it with one-off jobs would wreck the one list every order picks from.
+- it is **off by default**, where his is on. A price quoted once with a discount on it
+  should not quietly become the studio's list price.
+
+Filling a box is only ever done into a box nobody has typed in. Overwriting a price
+somebody has already quoted is the one thing a convenience like this must never do.
+
+**Inventory from the piece.** A row inside the piece that opens the order's Fabric &
+stock used section, rather than a second place to record stock.
+
+All four sit inside the piece's own closed section, so the eight fields it takes to
+price a job are still eight. A discount typed in there shows under the price from
+outside it, and the shut summary says so, because nobody should price a job off a figure
+the invoice will not print.
+
+**Off by default, confirmed.** Kayode, asked directly: *"keep it off by default"*. A gate
+now says so, because it is the sort of default that gets flipped by somebody being
+helpful.
+
+`audit_invoice.js` went 131 → 205 checks and the mutation run went 8 → 23 faults, all
+caught: the piece discount not deducted, a discount bigger than its line, the piece
+discount taken after the tax instead of before it, the code never printing, save-for-
+future writing the description instead of the type, the catalogue never being stored,
+picking a type overwriting a quoted price, the inventory row pointing nowhere, and the
+studio's payment terms silently dropping off the invoice.
+
+### General terms every studio rewrites, 22 September
+
+Kayode: *"lets make the terms general but each studios can edit and write theirs since no
+2 studios have same."*
+
+`DEFAULT_PAY_TERMS` is three plain lines about a deposit, a balance and proof of payment.
+`payTerms()` returns the studio's own words when it has any and the general ones when it
+has none, so the invoice can no longer be bare and a studio's own wording always wins.
+It is a fallback rather than a value written into their settings, so nothing is ever put
+in their mouth that they then have to delete.
+
+Settings calls the box **Payment terms** now rather than "other payment notes", because it
+is no longer a footnote: it is the only thing on the page saying what paying does. There
+is a button that drops the standard wording into the box to edit, which does not save on
+its own.
+
+That closes the edge left open above. A studio that never opens the box still sends an
+invoice that says what paying does.
+
+### The invoice on a phone, 22 September
+
+The table stays a table. Four columns do not fit 360px, so under 600px **Price and Qty
+fold into the item cell** as one line and their columns are dropped, which is the same
+call this app made everywhere else. Per-row card stacking was rejected months ago and an
+invoice is the last place to reopen it, because a client reading a bill expects columns
+that line up.
+
+The header, the bill-to band, the shipment-and-totals row and the signature all stack.
+
+**The rules travel with the document.** Inline styles cannot hold a media query and this
+HTML is handed to a print window as often as it is shown in the app, so `invoiceInner`
+emits its own `<style>`. Every selector is under `.tlb-`, which is what makes a stylesheet
+in the middle of a page safe: it cannot reach the app around it. A gate parses that
+stylesheet and fails on any selector that escapes the prefix. `@media print` puts the wide
+layout back, so a phone does not print a phone invoice.
+
+Measured in a browser at 320, 360 and 414: no sideways scroll, nothing overflowing, the
+price and quantity still on the page.
+
+**One page, honestly.** A one-item invoice like his #308 is 886px and fits A4 and US
+Letter. Two items with long descriptions is 954px: fits A4, about 5px over US Letter.
+Nigeria and the UK are both A4, so this is noted rather than fixed. More items will always
+need a second sheet and no layout can change that.
+
+### The app stopped writing its own line on a quote, 22 September
+
+A quote's invoice carried a sentence the app wrote itself: *"This confirms your order once
+payment is received. Nothing is cut until then."* Kayode had it removed.
+
+It is a fair call. It said in the app's voice what a studio says better in its own, and
+his own terms already say it: *"Full payment is required upfront to ensure a smooth
+production process and timely delivery. Proof of payment must be forwarded via WhatsApp
+before production commences."* Two sentences making the same promise on a one-page
+document is one too many.
+
+**`audit_quote.js` guarded that line**, so the assertion moved rather than went. What a
+client is asked to pay must still be headed as an invoice, and whatever the studio HAS
+written about payment must reach the page, because it is now the only thing on it
+carrying the condition. `audit_invoice.js` asserts the same from the other side, and that
+the app does not start writing its own promise again alongside the studio's.
+
+**The edge this leaves, which is nobody's bug yet.** A studio that has written no payment
+terms at all now sends a quote carrying nothing about what paying does. Deliberately not
+failed over: an empty terms box is a studio's decision, not a broken build. If October's
+cohort turns out to skip that box, the fix is a nudge in Settings when it is empty rather
+than the app putting words in their mouth again.
+
+### One thing to decide: Amount due is not what the app chases
+
+The invoice says **₦832,000 total, ₦432,000 due** because it adds tax and
+shipping. What the app counts as owed — `orderOutstanding`, the receivables
+list, the chase messages — is order value less discount less paid, with neither
+tax nor shipping in it. On the same order that is ₦360,000, not ₦432,000.
+
+**This is not new and it was not introduced here.** Shipping has been on the
+invoice and out of the receivables for as long as both have existed; tax widens
+the same gap. It was left alone deliberately: `orderNet` feeds finance, profit,
+commissions, pots, plan limits and most of the 24 gates, and the spec was
+explicit that quantity was the only structural change.
+
+It is still a real question, and it is Kayode's: **does a studio chase the
+invoice total or the order value?** Either answer is one small change —
+fold tax and shipping into `orderNet`, or print a line on the invoice saying
+which figure the reminders will quote. Nothing should be guessed at here,
+because the wrong guess is a studio asking a client for the wrong money.
+
+### Released, 22 September
+
+Kayode: *"then deploy this with the new order setting."*
+
+1. `node verify.js` — 24 gates green, `audit_safearea.js` and `audit_web.js` too
+2. `APP_VERSION` and `CACHE` both to `layi-v44`, which `audit_build_stamp`
+   checks agree, because a version that disagrees with the service worker
+   reports a fix as landed while the browser still serves the build before it
+3. Merged to `main` with the `netlify.toml` recipe at the top of `CLAUDE.md`,
+   and the published directory checked on the merge commit before pushing
 
 
 ## The free trial is SILENT until Flutterwave, 21 September
