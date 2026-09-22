@@ -643,6 +643,83 @@ section('Only partners earn, and the console says so');
      !/Bronze'|15%|18%|22%|25%/.test(everyScript.split('Housing is 15%').join('')));
 }
 
+// ---------------------------------------------------------------------
+section('An action that changes a real studio actually reaches the database');
+// ---------------------------------------------------------------------
+/* Kayode renamed a studio in the console on 21 September, watched it rename,
+   and found it unchanged afterwards. doEditSubscriber wrote to the in-memory
+   object and called render(), so the screen agreed with him and the database
+   never heard about it. doChangePlan did the same, and liveSetPlan had sat in
+   live.js since the gateway was built with nothing ever calling it.
+
+   This is the worst shape a bug can take. A button that does nothing gets
+   reported in a minute. A button that looks like it worked is found days
+   later, from the wrong direction, and by then you have made decisions on it.
+
+   So: every action that edits a subscriber must either reach the gateway or
+   refuse a live studio outright. Doing neither is what this catches. */
+{
+  const src = srcOf('js/actions.js');
+
+  /* Each entry: the action, and how it is allowed to satisfy the rule. */
+  const WRITERS = [
+    { fn: 'doChangePlan',   via: 'liveSetPlan' },
+    { fn: 'doStorageCap',   via: 'liveSetStorageCap' },
+    { fn: 'doStudioLimits', via: 'liveSetStudioLimits' },
+    { fn: 'doRecordPayment', via: 'liveRecordPayment' },
+  ];
+
+  WRITERS.forEach(w => {
+    const at = src.indexOf('function ' + w.fn + '(');
+    ok(w.fn + ' exists', at >= 0);
+    if (at < 0) return;
+    const body = src.slice(at, src.indexOf('\n}', at));
+    ok(w.fn + ' reaches the database through ' + w.via,
+       body.indexOf(w.via + '(') !== -1,
+       'it only changes the copy on screen, which disappears on refresh');
+  });
+
+  /* The one that is NOT wired has to say so rather than pretend. */
+  {
+    const at = src.indexOf('function formEditSubscriber(');
+    const body = at < 0 ? '' : src.slice(at, src.indexOf('\n}', at));
+    ok('formEditSubscriber refuses a real studio rather than pretending',
+       /if\s*\(\s*s\.live\s*\)/.test(body),
+       'there is no gateway action behind it, so on a live studio it must not offer to save');
+  }
+
+  /* And nothing in the gateway is left wired to nothing. A write function
+     nobody calls is a promise the console is not keeping. */
+  {
+    const live = srcOf('js/live.js');
+    const everything = files.map(f => srcOf(f)).join('\n');
+    const defined = [...live.matchAll(/async function (liveSet[A-Za-z]+|liveRecord[A-Za-z]+)\s*\(/g)]
+      .map(m => m[1]);
+    /* Named, with the reason, rather than quietly skipped. A gateway write
+       nobody calls is either a bug or an unfinished feature, and the
+       difference matters: the first misleads an operator, the second just is
+       not there yet. Anything not on this list has to be called. */
+    const NOT_WIRED_YET = {
+      liveSetState: 'filing a feedback message is read-only on the screen so far: '
+                  + 'the inbox loads, but marking one resolved and replying to it '
+                  + 'are not built. Tracked in OUTSTANDING.md.',
+    };
+
+    ok('the gateway declares some write functions (' + defined.length + ')', defined.length > 0);
+    defined.forEach(fn => {
+      /* calls, not the definition itself */
+      const calls = everything.split(fn + '(').length - 1;
+      if (NOT_WIRED_YET[fn]) {
+        ok(fn + ' is knowingly not wired up yet', calls === 1,
+           'it has a call site now, so take it off the list: ' + NOT_WIRED_YET[fn]);
+        return;
+      }
+      ok(fn + ' is actually called by something (' + (calls - 1) + ' call site(s))', calls > 1,
+         'defined and never used, which is how a plan change silently did nothing');
+    });
+  }
+}
+
 console.log('\n' + '='.repeat(62));
 if (failures.length) {
   console.log(pass + ' passed, ' + failures.length + ' FAILED:');

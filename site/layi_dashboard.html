@@ -560,6 +560,64 @@ body.modal-open{overflow:hidden}
 .outfit .rmo{position:absolute;top:12px;right:14px;color:var(--text-faint);cursor:pointer;font-size:13px}.outfit .rmo:hover{color:var(--red)}
 .total-line{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1px solid var(--line-soft);margin-top:2px;font-size:13px;color:var(--text-dim)}
 .total-line b{font-family:'Playfair Display',serif;font-size:22px;color:var(--gold)}
+/* A closed section on the order form. The 28 fields you only know AFTER the client says
+   yes live behind these: still one tap away, still in the document, just not standing
+   between somebody and the price. The summary carries what is inside it, so a shut
+   section still answers the question it is hiding. */
+.osec{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);margin-bottom:10px;overflow:hidden}
+.osec>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:11px;min-height:44px;box-sizing:border-box}
+.osec>summary::-webkit-details-marker{display:none}
+.osec>summary:hover .osec-t{color:var(--gold)}
+.osec>summary svg{flex:0 0 auto;color:var(--gold)}
+.osec-t{font-size:14px;font-weight:600;color:var(--text)}
+.osec-n{flex:1;text-align:right;font-size:12.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.osec-c{flex:0 0 auto;display:flex;color:var(--text-faint);transition:transform .15s}
+.osec[open]>summary .osec-c{transform:rotate(180deg)}
+.osec[open]>summary{border-bottom:1px solid var(--line)}
+.osec-b{padding:14px}
+.osec-b>.field:last-child,.osec-b>.outfit:last-child{margin-bottom:0}
+.osec-in{background:transparent;margin:2px 0 0}
+.osec-in>summary{padding:10px 0}
+.osec-in[open]>summary{border-bottom:1px solid var(--line-soft)}
+.osec-in>.osec-b{padding:12px 0 0}
+/* On a phone the summary has no room beside the title, and a section summarised as
+   "Franklin, Tunde…" in 80px is a section that has stopped answering its own question.
+   So it drops onto its own line and takes the full width. The body loses its side padding
+   too, so a cost row inside a section is exactly as wide as it was when it sat loose in
+   the form. Three boxes share that line already; any padding here comes straight off the
+   box you type the amount into. */
+@media(max-width:680px){
+  .osec>summary{flex-wrap:wrap}
+  .osec-n{flex:1 0 100%;order:3;text-align:left;margin-top:3px;white-space:normal;overflow:visible}
+  .osec-t{flex:1}
+  .osec-b{padding:12px 0}
+  .osec-in>.osec-b{padding:12px 0 0}
+}
+/* The two doors. Same record either way; which one you pick only decides whether it
+   starts on the production board. */
+.door{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:13px;padding:16px;background:var(--panel-2);color:var(--text);font:inherit;cursor:pointer;margin-bottom:12px}
+.door.lead{border:2px solid var(--gold);background:var(--panel)}
+.door:hover{border-color:var(--gold)}
+.door-h{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700}
+.door-h svg{flex:0 0 auto;color:var(--gold)}
+.door-p{display:block;font-size:13px;color:var(--text-dim);line-height:1.45;margin-top:7px}
+.door-n{display:block;font-size:12px;font-weight:600;color:var(--gold);margin-top:7px}
+/* A row that goes somewhere, and a row that switches something. Both borrowed from the
+   shape of a phone settings list, because that is what everybody already knows how to
+   read. 44px minimum, so a thumb can hit them. */
+.navrow{display:flex;width:100%;align-items:center;gap:12px;min-height:56px;padding:12px 14px;margin:2px 0 10px;
+  border:1px solid var(--line);border-radius:11px;background:var(--panel-2);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.navrow:hover{border-color:var(--gold)}
+.navrow-i{flex:0 0 auto;display:flex;color:var(--gold)}
+.navrow-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.navrow-t b{font-size:14px;font-weight:600}
+.navrow-t span{font-size:12.5px;color:var(--text-faint);line-height:1.4}
+.navrow-c{flex:0 0 auto;display:flex;color:var(--text-faint)}
+.switchrow{display:flex;align-items:flex-start;gap:12px;padding:12px 0 0;margin:0;cursor:pointer;
+  border-top:1px solid var(--line-soft);text-transform:none;letter-spacing:0}
+.switchrow>span{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.switchrow b{font-size:14px;font-weight:600;color:var(--text)}
+.switchrow input[type=checkbox]{flex:0 0 auto;width:20px;height:20px;margin-top:2px;accent-color:var(--gold)}
 .lightbox{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:30px;cursor:zoom-out}
 .lightbox.show{display:flex}.lightbox img{max-width:100%;max-height:100%;border-radius:8px}
 .detail-out{border:1px solid var(--line-soft);border-radius:12px;padding:16px;margin-bottom:12px}
@@ -1109,7 +1167,7 @@ body.modal-open{overflow:hidden}
           <button class="chip" data-f="qcfail" onclick="setProdFilter('qcfail',this)">Rework</button>
           <button class="chip" data-f="ready" onclick="setProdFilter('ready',this)">Ready / dispatched</button>
           <span style="flex:1"></span>
-          <button class="btn sm" id="newOrderBtn" onclick="openOrder()">+ New order</button>
+          <button class="btn sm" id="newOrderBtn" onclick="newOrder()">+ New order</button>
         </div>
         <div class="panel" id="pipelinePanel" style="display:none"><div class="panel-head"><h3>Pipeline</h3><span class="page-sub" id="pipeSub"></span></div><div class="pipeline" id="pipeline"></div></div>
         <div class="panel" id="pipelineTablePanel" style="display:none"><div class="panel-head"><h3 style="cursor:pointer" onclick="togglePipe()"><span id="pipeTableChev" style="color:var(--gold);font-size:12px">▾</span> Pipeline</h3><span class="page-sub" id="pipeTableSub"></span></div><div class="pt-wrap"><div id="pipelineTable"></div></div></div>
@@ -1122,7 +1180,7 @@ body.modal-open{overflow:hidden}
         <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
           <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px"><select class="fld sortsel" id="sort_orders" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_orders" onclick="toggleSortDir('orders')" title="Reverse order">↑</button>
           <select class="fld" id="ordersStatusSel" onchange="setOrdersFilter(this.value)" style="width:auto;min-width:150px"></select>
-          <button class="btn sm" id="newOrderBtn2" onclick="openOrder()">+ New order</button>
+          <button class="btn sm" id="newOrderBtn2" onclick="newOrder()">+ New order</button>
         </div>
         <div class="panel"><div class="panel-head"><h3>All orders</h3><span class="page-sub" id="ordersLedgerSub"></span></div><div class="pt-wrap"><div id="ordersLedger"></div></div></div>
       </section>
@@ -1376,14 +1434,22 @@ body.modal-open{overflow:hidden}
           <div class="field"><label>Logo</label><div style="display:flex;align-items:center;gap:14px"><div id="logoPreview" style="width:64px;height:64px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Upload logo</button><button class="btn ghost sm" onclick="clearLogo()">Remove</button><input type="file" id="logoFile" accept="image/*" style="display:none" onchange="uploadLogo(this)"></div></div>
           <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="LAYI"></div>
           <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@yourlabel.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
-          <div class="field"><label>Address</label><textarea class="fld" id="co_address" placeholder="Studio address"></textarea></div>
+          <div class="field"><label>Address</label><textarea class="fld" id="co_address" rows="3" style="min-height:76px" placeholder="Lagos, Nigeria&#10;Stotfold, UK"></textarea><div class="sd" style="color:var(--text-faint);margin-top:5px">Trade from more than one place? Put each on its own line. Every line prints on the invoice.</div></div>
           <div class="field"><label>Business registration (RC / TIN)</label><input class="fld" id="co_reg" placeholder="RC123456"></div>
-          <div class="field"><label>Bank accounts (for invoices)</label>
-            <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add an account per currency you collect in: Naira, Pounds, USD, Euro. All show on the invoice.</div>
-            <div id="bankRows"></div>
-            <button class="btn ghost sm" style="width:100%" onclick="addBankRow()">＋ Add bank account</button>
+          <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+            <label style="display:flex;align-items:center;gap:10px;margin:0;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600"><input type="checkbox" id="co_taxon" onchange="renderTaxFields()" style="width:18px;height:18px;accent-color:var(--gold)"> Charge tax on invoices</label>
+            <div class="sd" style="color:var(--text-faint);margin-top:6px">Off unless you actually charge it. When it is on it applies to the order after any discount, and never to shipping.</div>
+            <div id="taxFields"></div>
           </div>
-          <div class="field"><label>Other payment notes (optional)</label><textarea class="fld" id="co_pay" placeholder="Anything else, e.g. cash on collection, payment terms"></textarea></div>
+          <div class="field"><label>Signature</label><div style="display:flex;align-items:center;gap:14px"><div id="sigPreview" style="width:150px;height:56px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('sigFile').click()">Upload signature</button><button class="btn ghost sm" onclick="clearSignature()">Remove</button><input type="file" id="sigFile" accept="image/*" style="display:none" onchange="uploadSignature(this)"></div><div class="sd" style="color:var(--text-faint);margin-top:6px">Set once. It prints above your name and the date at the foot of every invoice.</div></div>
+          <div class="field"><label>Payment accounts (for invoices)</label>
+            <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add only the accounts you actually collect into. The boxes follow the currency: pounds ask for a sort code, dollars and euros for an IBAN and BIC. Only the accounts you add ever print.</div>
+            <div id="bankRows"></div>
+            <button class="btn ghost sm" style="width:100%" onclick="addBankRow()">＋ Add payment account</button>
+          </div>
+          <div class="field"><label>Payment terms</label><textarea class="fld" id="co_pay" rows="4" style="min-height:92px" placeholder="How you take money, in your own words"></textarea>
+            <div class="sd" style="color:var(--text-faint);margin-top:6px">These print on every invoice and receipt. No two studios collect money the same way, so write yours. Leave it empty and a general set prints instead, which is better than nothing but is not yours.</div>
+            <button class="btn ghost sm" style="margin-top:8px" onclick="useStandardTerms()">Start from the standard wording</button></div>
           <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="co_photos" style="width:18px;height:18px;accent-color:var(--gold)"> Include order photos on invoices</label>
           <button class="btn" id="coSaveBtn" onclick="saveCompany()">Save company details</button>
         </div>
@@ -1620,7 +1686,7 @@ const DEFAULTS={ownerPassword:'layi2025',currency:'NGN',tiers:[{name:'Starter',m
      job sheet, not in the platform's own list of studios, which the app writes
      from this value. Blank is an unanswered question; every reader falls back to
      a neutral word until the first-run screen is answered. */
-  company:{name:'',address:'',email:'',phone:'',reg:'',logo:'',payInstructions:'',showPhotos:true,banks:[]},
+  company:{name:'',address:'',email:'',phone:'',reg:'',logo:'',signature:'',payInstructions:'',showPhotos:true,taxOn:false,taxLabel:'VAT',taxRate:0,banks:[]},
   suppliers:[],invoiceNo:1000,stagesV2:false,
   qcChecklist:['Construction sound (seams, linings, interfacing)','Measurements match the spec','Stitching & seams clean','Symmetry \u2014 left matches right','Fit confirmed / tried on','Finishing & detailing correct','Embellishment / monogram correct','Pressed & packaged neatly'],
   defaults:{depositPct:50,leadDays:21,deliveryFee:0,lowStock:5},
@@ -1976,11 +2042,41 @@ function hasOwnPieces(o){
   const crafts={};a.forEach(x=>{crafts[itemCraft(x)]=1;});
   return Object.keys(crafts).length>1;
 }
+/* ---- Price × quantity ---------------------------------------------------------------
+   An item line is a price and a count. Before September 2026 it was a price alone, so
+   these three read an absent count as one rather than as none: a migration that costs
+   nothing and cannot zero an existing order's value. Declared as functions, not consts,
+   because migrate() runs the moment anything reads storage and would otherwise reach
+   them before they exist. */
+function ofQty(x){return Math.max(1,+((x&&x.qty))||1);}
+function ofGross(x){return (+((x&&x.price))||0)*ofQty(x);}
+/* A discount on the line, 22 September. It can never exceed the line, because a line that
+   pays the client back is a refund and belongs nowhere near an item row. */
+function ofDiscount(x){return Math.min(ofGross(x),Math.max(0,+((x&&x.discount))||0));}
+/* What the line is actually worth, which is what every total downstream wants. Line
+   discounts come off here, so o.value is already net of them; the order-level discount
+   then comes off THAT in orderNet, and the tax comes off what is left. The three stack in
+   that order and nowhere else decides it. */
+function ofLine(x){return ofGross(x)-ofDiscount(x);}
+function outfitsTotal(list){return (list||[]).reduce((s,x)=>s+ofLine(x),0);}
+/* What sits under an item's price box: the multiplication when there is more than one,
+   and the base-currency figure when the client is not paying in the studio's own. */
+function ofLineNote(x,d){const q=ofQty(x),pr=+((x&&x.price))||0;const disc=ofDiscount(x);const bits=[];
+  if(!pr)return '';
+  if(q>1)bits.push(q+' × '+curO(pr,d)+' = '+curO(ofGross(x),d));
+  /* A discount typed inside a shut section has to show outside it, or somebody prices a
+     job off a figure the invoice will not print. */
+  if(disc>0)bits.push('less '+curO(disc,d)+' → '+curO(ofLine(x),d));
+  if(ocur(d)!==SETTINGS.currency)bits.push('≈ '+cur(ofLine(x)*ofx(d)));
+  return bits.join(' · ');}
 function migrate(o){
-  if(!o.outfits)o.outfits=[{type:'Bespoke outfit',name:o.garment||'Bespoke piece',price:o.value||0,photos:[],style:'',finish:''}];
-  o.outfits.forEach(x=>{x.photos=x.photos||[];if(!x.type)x.type='Bespoke outfit';});
+  if(!o.outfits)o.outfits=[{type:'Bespoke outfit',name:o.garment||'Bespoke piece',price:o.value||0,qty:1,photos:[],style:'',finish:''}];
+  /* Quantity arrived in September 2026. Every order written before it stored a price and no
+     count, so an absent qty means one piece — never zero, which would wipe the line. */
+  o.outfits.forEach(x=>{x.photos=x.photos||[];if(!x.type)x.type='Bespoke outfit';x.qty=Math.max(1,+x.qty||1);
+    x.discount=Math.max(0,+x.discount||0);if(x.code==null)x.code='';});
   o.clientPhotos=o.clientPhotos||[];
-  if(o.value==null)o.value=o.outfits.reduce((s,x)=>s+(+x.price||0),0);
+  if(o.value==null)o.value=outfitsTotal(o.outfits);
   o.discount=+o.discount||0;
   o.makerId=o.makerId||'';
   o.referrerId=o.referrerId||'';
@@ -2161,7 +2257,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v43';
+const APP_VERSION='layi-v44';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4674,7 +4770,7 @@ function fabricCheckNeeded(o){
   if(qc>=0&&(+o.stageIndex||0)>=qc)return false;
   return orderHasFabric(o);
 }
-function blankOutfit(){return{type:'Bespoke outfit',name:'',price:0,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:'',craft:'',method:''};}
+function blankOutfit(){return{type:'Bespoke outfit',name:'',code:'',price:0,qty:1,discount:0,saveToCatalog:false,photos:[],style:'',finish:'',person:'',meas:{},measFit:'',measPosture:'',measNote:'',stageIndex:0,materials:[],fabricFrom:'',craft:'',method:''};}
 function outfitMaterialsHtml(i){
   const o=(draft&&draft.outfits&&draft.outfits[i])||{};const sel=o.materials||[];
   const opts=materialOptionsFor(o.type);
@@ -4739,15 +4835,124 @@ function setOutfitCraft(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i
 function setOutfitFabricFrom(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i].fabricFrom=(draft.outfits[i].fabricFrom===k?'':k);renderFabricSource(i);}
 function toggleOutfitMat(i,m){if(!draft||!draft.outfits[i])return;const arr=draft.outfits[i].materials=draft.outfits[i].materials||[];const k=arr.indexOf(m);if(k>=0)arr.splice(k,1);else arr.push(m);renderOutfitMaterials(i);}
 function addOutfitMat(i){const inp=document.getElementById('of_matadd_'+i);if(!inp||!draft||!draft.outfits[i])return;const v=(inp.value||'').trim();if(!v)return;const arr=draft.outfits[i].materials=draft.outfits[i].materials||[];if(!arr.includes(v))arr.push(v);renderOutfitMaterials(i);}
-function ofTypeChanged(i){if(!draft||!draft.outfits[i])return;const t=fvOther('of_type_'+i);if(t!==undefined)draft.outfits[i].type=t;draft.outfits[i].materials=[];renderOutfitMaterials(i);}
-function openOrder(id){
+/* Picking a product type fills the code and the price it was last saved with, but only
+   into boxes nobody has typed in. Overwriting a price somebody has already quoted is the
+   one thing a convenience like this must never do. */
+function ofTypeChanged(i){if(!draft||!draft.outfits[i])return;const o=draft.outfits[i];
+  const t=fvOther('of_type_'+i);if(t!==undefined)o.type=t;
+  o.materials=[];renderOutfitMaterials(i);
+  const saved=productByName(o.type);
+  if(saved){
+    if(!o.code&&saved.code){o.code=saved.code;const e=document.getElementById('of_code_'+i);if(e)e.value=saved.code;}
+    if(!(+o.price)&&+saved.price){o.price=+saved.price;const e=document.getElementById('of_price_'+i);if(e)e.value=fmtNum(saved.price);recalcProfit();}
+  }
+}
+/* Remembering a piece. The catalogue IS the product-type list, so this writes the type
+   rather than the per-order description: 'Agbada' with its price, never 'Wedding agbada
+   for Adaeze, size 43'. productCatalog() invents ids on the fly when nothing is stored,
+   so the generated list is written down once before anything is added to it — otherwise
+   the entry is added to an array that is thrown away on the next call. */
+function rememberItems(outfits){
+  const wanted=(outfits||[]).filter(x=>x.saveToCatalog&&String(x.type||'').trim());
+  if(!wanted.length)return;
+  const list=JSON.parse(JSON.stringify(productCatalog()));
+  let changed=false;
+  wanted.forEach(x=>{
+    const name=String(x.type).trim();
+    let hit=list.find(e=>(e.name||'').toLowerCase()===name.toLowerCase());
+    if(!hit){hit={id:uid('pc'),name:name,category:guessCategory(name),materials:[]};list.push(hit);}
+    if(x.code)hit.code=x.code;
+    if(+x.price)hit.price=+x.price;
+    changed=true;
+  });
+  if(!changed)return;
+  SETTINGS.productCatalog=list;save('layi_dash_settings',SETTINGS);
+  logAudit('Saved to product types',wanted.map(x=>x.type).join(', '));
+}
+/* Drawn, not typed. A closed section has to say what is inside it at a glance, and an icon
+   does that faster than a word does. 18px stroke, inheriting the colour it sits on. */
+function _ico(d){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';}
+const OSEC_ICO={
+  client:_ico('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>'),
+  money:_ico('<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"></path><path d="M7.5 7.5h.01"></path>'),
+  stage:_ico('<path d="M3 6h18"></path><path d="M7 12h10"></path><path d="M10 18h4"></path>'),
+  people:_ico('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>'),
+  fabric:_ico('<path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path>'),
+  profit:_ico('<path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>'),
+  van:_ico('<path d="M10 17h4V5H2v12h3"></path><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h2"></path><circle cx="7.5" cy="17.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle>'),
+  piece:_ico('<path d="M12 2 2 7l10 5 10-5-10-5Z"></path><path d="m2 17 10 5 10-5"></path><path d="m2 12 10 5 10-5"></path>'),
+  quote:_ico('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 14h6"></path><path d="M9 18h4"></path>'),
+  board:_ico('<path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle>'),
+  chev:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>',
+  chevR:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>'
+};
+/* Moving to a section from somewhere else on the form. The modal scrolls in #overlay below
+   680px and in itself above it, so this sets the scroll rather than trusting
+   scrollIntoView on its own, which has silently done nothing in this codebase before. */
+function openOrderSection(id){
+  const d=document.getElementById(id);if(!d)return;
+  d.open=true;
+  const ov=document.getElementById('overlay');
+  if(ov&&d.offsetTop)ov.scrollTop=Math.max(0,d.offsetTop-40);
+  try{d.scrollIntoView({block:'start'});}catch(e){}
+}
+/* What a shut "More about this piece" is holding. Answering the question without being
+   opened is the whole point of closing it. */
+function itemSectionNote(o,d){
+  const bits=[];
+  if(o.code)bits.push(esc(o.code));
+  if(ofDiscount(o)>0)bits.push(curO(ofDiscount(o),d)+' off');
+  if((o.materials||[]).length)bits.push(esc((o.materials||[]).slice(0,2).join(', ')));
+  if((o.photos||[]).length)bits.push((o.photos||[]).length+' photo'+((o.photos||[]).length>1?'s':''));
+  if(o.style||o.finish)bits.push('styling');
+  if(isGroup(d)&&o.meas&&Object.keys(o.meas).filter(k=>o.meas[k]).length)bits.push('measurements');
+  return bits.length?bits.join(' · '):'materials, photos, styling';
+}
+/* ---- The two doors ------------------------------------------------------------------
+   Kayode, 21 September: "theres no where for me to create an invoice? like we said,
+   invoicing should be first before an order is created". It was built and working; the
+   form hid it, forty fields down. So the choice is now the first thing you meet, and it
+   is a choice about one record rather than about two kinds of record — which door you
+   pick only decides whether the job starts on the production board.
+
+   "2 doors is okay" — approved the same day. */
+let orderDoor=null;
+function newOrder(){
   if(!can('orders'))return;
+  const waiting=getOrders().filter(o=>isClientOrder(o)&&isQuote(o)).filter(inBranch)
+    .sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).slice(0,4);
+  const rows=waiting.map(o=>{
+    const paid=+o.paid||0;
+    return `<div class="field" style="margin-bottom:8px;border:1px solid var(--line);border-left:3px solid ${paid>0?'var(--green)':'var(--amber)'};border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;cursor:pointer" onclick="closeModal();openDetail('${o.id}')">
+      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${esc(o.client||'Client')}</div><div class="sd" style="color:var(--text-faint);margin-top:2px">${o.invoiceNo?'Invoice #'+esc(String(o.invoiceNo)):'No invoice raised yet'} · ${esc(o.id)}</div></div>
+      <div style="text-align:right"><div style="font-size:14px;font-weight:700">${curO(orderNet(o),o)}</div><div class="sd" style="color:${paid>0?'var(--green)':'var(--amber)'};margin-top:2px">${paid>0?'deposit in':'unpaid'}</div></div>
+    </div>`;}).join('');
+  openModal(`<h3>New order</h3><div class="msub">Same record, two ways in.</div>
+    <button type="button" class="door lead" onclick="openOrder(null,'quote')">
+      <span class="door-h">${OSEC_ICO.quote}Quote &amp; invoice</span>
+      <span class="door-p">Price it and send it. Their deposit is the yes, and it becomes a real order the moment it lands.</span>
+      <span class="door-n">8 fields</span>
+    </button>
+    <button type="button" class="door" onclick="openOrder(null,'order')">
+      <span class="door-h">${OSEC_ICO.board}Straight to an order</span>
+      <span class="door-p">Already agreed, already paying. It goes on the production board now.</span>
+      <span class="door-n">Same 8 fields, no invoice step</span>
+    </button>
+    ${rows?`<div class="bd-sub">Awaiting a yes</div>${rows}`:''}
+    <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
+}
+/* openOrder() still opens the editor, and opens it as an ordinary order when nobody named
+   a door — every gate that drives this form calls it that way. newOrder() is the thing the
+   buttons call, and it is the thing that asks. */
+function openOrder(id,door){
+  if(!can('orders'))return;
+  orderDoor=id?null:(door==='quote'?'quote':'order');
   editingOrderId=id||null;
   if(id){draft=JSON.parse(JSON.stringify(getOrders().find(x=>x.id===id)));
     draft.commissions=(draft.commissions||[]).filter(c=>c.kind!=='director');
     if(!draft.commissions.length)draft.commissions=[{staffId:'',kind:'maker',amount:0}];
   }
-  else{draft={client:'',email:'',whatsapp:'',address:'',branch:defaultBranchName(),meas:{},measFit:'',measPosture:'',measNote:'',clientPhotos:[],outfits:[blankOutfit()],discount:0,costs:[],commissions:[{staffId:'',kind:'maker',amount:0}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[],stockUsed:[],currency:SETTINGS.currency,fx:1,batch:{on:false},delivery:{enabled:false,fee:((SETTINGS.defaults&&+SETTINGS.defaults.deliveryFee)||0),location:'',company:'',tracking:'',status:'Pending'},paid:0,due:defaultDueDate(),stageIndex:0};}
+  else{draft={client:'',email:'',whatsapp:'',address:'',branch:defaultBranchName(),meas:{},measFit:'',measPosture:'',measNote:'',clientPhotos:[],outfits:[blankOutfit()],discount:0,costs:[],commissions:[{staffId:'',kind:'maker',amount:0}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[],stockUsed:[],currency:SETTINGS.currency,fx:1,batch:{on:false},delivery:{enabled:false,fee:((SETTINGS.defaults&&+SETTINGS.defaults.deliveryFee)||0),location:'',company:'',tracking:'',status:'Pending'},paid:0,due:defaultDueDate(),stageIndex:0,quoted:orderDoor==='quote'};}
   draft.costs=draft.costs||[];draft.discount=+draft.discount||0;draft.commissions=draft.commissions||[{staffId:'',kind:'maker',amount:0}];draft.stockUsed=draft.stockUsed||[];
   draft.meas=draft.meas||{};orderMeasOpen=false;
   if(draft.directorPct==null)draft.directorPct=25;if(draft.directorOn===undefined)draft.directorOn=true;if(draft.directorAmount===undefined)draft.directorAmount=null;
@@ -4844,7 +5049,7 @@ function removePotContrib(i){syncOrderDraft();draft.potContribs.splice(i,1);reRe
 function recalcProfit(){
   if(!draft)return;
   syncOrderDraft();
-  const ot=document.getElementById('orderTotal');if(ot)ot.textContent=curO(draft.value||0,draft)+(isBatch(draft)?` <span style="color:var(--text-faint);font-weight:400">(${draft.outfits.reduce((s,o)=>s+(+o.price||0),0)?curO(draft.outfits.reduce((s,o)=>s+(+o.price||0),0),draft):'0'} × ${(draft.batch&&draft.batch.qty)||1})</span>`:'');
+  const ot=document.getElementById('orderTotal');if(ot)ot.textContent=curO(draft.value||0,draft)+(isBatch(draft)?` <span style="color:var(--text-faint);font-weight:400">(${outfitsTotal(draft.outfits)?curO(outfitsTotal(draft.outfits),draft):'0'} × ${(draft.batch&&draft.batch.qty)||1})</span>`:'');
   const op=orderOperatingProfit(draft);
   const pe=document.getElementById('orderProfit');if(pe){pe.textContent=cur(op);pe.style.color=op>=0?'var(--green)':'var(--red)';}
   const dal=directorAllocation(draft);const dl=document.getElementById('dirAllocLive');if(dl)dl.textContent=cur(dal);
@@ -4852,8 +5057,8 @@ function recalcProfit(){
   const fe=document.getElementById('orderFinal');if(fe){fe.textContent=cur(retained);fe.style.color=retained>=0?'var(--green)':'var(--red)';}
   // live currency conversion hints
   const isBase=ocur(draft)===SETTINGS.currency;const rate=ofx(draft);
-  draft.outfits.forEach((o,i)=>{const el=document.getElementById('ofconv_'+i);if(el)el.textContent=(!isBase&&+o.price)?('≈ '+cur((+o.price||0)*rate)):'';});
-  const unit=draft.outfits.reduce((s,o)=>s+(+o.price||0),0);const gross=isBatch(draft)?unit*((draft.batch&&+draft.batch.qty)||1):unit;
+  draft.outfits.forEach((o,i)=>{const el=document.getElementById('ofconv_'+i);if(el)el.textContent=ofLineNote(o,draft);});
+  const unit=outfitsTotal(draft.outfits);const gross=isBatch(draft)?unit*((draft.batch&&+draft.batch.qty)||1):unit;
   const otb=document.getElementById('orderTotalBase');if(otb)otb.textContent=isBase?'':('≈ '+cur(gross*rate)+' at 1 '+ocur(draft)+' = '+fmtNum(draft.fx||1)+' '+SETTINGS.currency);
 }
 function syncOrderDraft(){
@@ -4894,6 +5099,10 @@ function syncOrderDraft(){
     if(fvOther('of_type_'+i)!==undefined)o.type=fvOther('of_type_'+i);
     if(fv('of_name_'+i)!==undefined)o.name=fv('of_name_'+i);
     if(fv('of_price_'+i)!==undefined)o.price=parseAmt(fv('of_price_'+i));
+    if(fv('of_qty_'+i)!==undefined)o.qty=Math.max(1,+fv('of_qty_'+i)||1);
+    if(fv('of_code_'+i)!==undefined)o.code=fv('of_code_'+i);
+    if(fv('of_disc_'+i)!==undefined)o.discount=parseAmt(fv('of_disc_'+i));
+    if(document.getElementById('of_save_'+i))o.saveToCatalog=document.getElementById('of_save_'+i).checked;
     if(fv('of_style_'+i)!==undefined)o.style=fv('of_style_'+i);
     if(fv('of_finish_'+i)!==undefined)o.finish=fv('of_finish_'+i);
     // fabricFrom is set by a chip rather than a field, so it is already on the draft
@@ -4932,7 +5141,7 @@ function syncOrderDraft(){
     if(fv('f_del_tracking')!==undefined)draft.delivery.tracking=fv('f_del_tracking');
     if(fv('f_del_status')!==undefined)draft.delivery.status=fv('f_del_status');
   }
-  {const _unit=draft.outfits.reduce((s,o)=>s+(+o.price||0),0);draft.value=isBatch(draft)?_unit*((draft.batch&&draft.batch.qty)||1):_unit;}
+  {const _unit=outfitsTotal(draft.outfits);draft.value=isBatch(draft)?_unit*((draft.batch&&draft.batch.qty)||1):_unit;}
 }
 function toggleBatch(){syncOrderDraft();if(draft.batch&&draft.batch.on){draft.group={on:false};if(!draft.batch.qty||draft.batch.qty<1)draft.batch.qty=1;if(!draft.batch.reached||!draft.batch.reached.length)draft.batch.reached=normalizeReached([],draft.batch.qty);}reRenderOrder();}
 function toggleGroup(){syncOrderDraft();if(draft.group&&draft.group.on){draft.batch={on:false};draft.outfits=draft.outfits||[];draft.outfits.forEach(o=>{if(o.stageIndex==null)o.stageIndex=0;o.meas=o.meas||{};});}reRenderOrder();}
@@ -5048,7 +5257,7 @@ function outfitPhotoGrid(i,photos){
 function reRenderOrder(){const ov=document.getElementById('overlay');window.__omScroll=ov?ov.scrollTop:0;window.__omKeep=true;renderOrderModal.call(window);}
 function renderOrderModal(){
   const staffList=getStaff();
-  {const _u=draft.outfits.reduce((s,o)=>s+(+o.price||0),0);draft.value=isBatch(draft)?_u*((draft.batch&&draft.batch.qty)||1):_u;}
+  {const _u=outfitsTotal(draft.outfits);draft.value=isBatch(draft)?_u*((draft.batch&&draft.batch.qty)||1):_u;}
   const staffOpts=sel=>`<option value="">None</option>`+staffList.map(s=>`<option value="${s.id}" ${sel===s.id?'selected':''}>${esc(s.name)}${s.role?' ('+esc(s.role)+')':''}</option>`).join('');
   const items=draft.outfits.length;
   // team rows (makers / referrals) — person + role always; amount owner-only
@@ -5102,7 +5311,7 @@ function renderOrderModal(){
         <div class="field"><label>Tracking / waybill no. (optional)</label><input class="fld" id="f_del_tracking" value="${esc(dlv.tracking||'')}" placeholder="—"></div>
         <div class="field"><label>Status</label><select class="fld" id="f_del_status">${['Pending','Dispatched','Delivered'].map(s=>`<option ${dlv.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
       </div>`:''}`;
-  const total=draft.outfits.reduce((s,o)=>s+(+o.price||0),0);
+  const total=outfitsTotal(draft.outfits);
   const netBase=orderNetBase(draft);
   const mpc=orderMPC(draft);
   const operating=orderOperatingProfit(draft);
@@ -5140,17 +5349,25 @@ function renderOrderModal(){
     ${stockHtml}
     <button class="btn ghost sm" style="width:100%" onclick="addStockRow()">＋ Add stock item</button>
     ${recipesExist()?``:''}`:'';
-  const moneySection=can('money')?`
+  /* Split in two on 21 September: what a job cost belongs with the cloth it was cut from,
+     and what it made you is a different question asked at a different moment. They used to
+     be one run of fields in the middle of the form, which is part of why the middle of the
+     form never ended. */
+  const costsField=can('money')?`
     <div class="field"><label>Materials & production costs: fabric, trims, outsourced work</label>${costsHtml}
       <button class="btn ghost sm" style="width:100%" onclick="addCost()">＋ Add cost</button>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">Staff commissions & delivery are added below and also count as production costs. Don't list them here.</div></div>
-    <div class="bd-sub" style="margin-top:6px">This order's profit & loss <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(in ${SETTINGS.currency})</span></div>
+      <div class="sd" style="color:var(--text-faint);margin-top:6px">Staff commissions & delivery are counted as production costs on their own. Don't list them here.</div></div>`:'';
+  const pnlSection=can('money')?`
+    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">This order's profit & loss, in ${SETTINGS.currency}.</div>
     <div class="profit-line"><span>Revenue (after discount)</span><b>${cur(netBase)}</b></div>
     <div class="profit-line"><span>− Materials & production</span><b>${cur(mpc)}</b></div>
     <div class="profit-line"><span><b>Operating profit</b></span><b id="orderProfit" style="color:${operating>=0?'var(--green)':'var(--red)'}">${cur(operating)}</b></div>
     ${draft.directorOn&&dalloc>0?`<div class="profit-line"><span>− Director allocation</span><b>${cur(dalloc)}</b></div>`:''}
     ${potTotal>0?`<div class="profit-line"><span>− Funds & reserves</span><b>${cur(potTotal)}</b></div>`:''}
     <div class="profit-line" style="border-top:1px solid var(--line)"><span><b>Retained business profit</b></span><b id="orderFinal" style="color:${retained>=0?'var(--green)':'var(--red)'}">${cur(retained)}</b></div>`:'';
+  /* An item is a type, a description, a price and a count — that is the whole of what you
+     can know while you are still quoting. The rest of the piece (its cloth, who made it,
+     its photographs, its finishing) is real work and belongs behind one tap. */
   const outfitsHtml=draft.outfits.map((o,i)=>`
     <div class="outfit">
       <div class="oh">${isGroup(draft)?'Person '+(i+1):'Item '+(i+1)}</div>
@@ -5158,81 +5375,137 @@ function renderOrderModal(){
       ${isGroup(draft)?`<div class="field" style="margin-bottom:10px"><label>Wearer / person name</label><input class="fld" id="of_person_${i}" value="${esc(o.person||'')}" placeholder="e.g. Bride, Tunde, Aunty Bisi…"></div>`:''}
       <div class="row2">
         <div class="field" style="margin-bottom:10px"><label>Product type</label>${selOther('of_type_'+i,productTypes(),o.type||productTypes()[0],'Type of piece, e.g. Bridal robe','ofTypeChanged('+i+')')}</div>
-        <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()"><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${(ocur(draft)!==SETTINGS.currency&&+o.price)?'≈ '+cur((+o.price||0)*ofx(draft)):''}</div></div>
+        <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)}) &amp; how many</label><div style="display:flex;gap:8px"><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()" style="flex:1;min-width:0"><input class="fld" type="number" min="1" step="1" id="of_qty_${i}" value="${ofQty(o)}" oninput="recalcProfit()" aria-label="How many of this piece" title="How many of this piece" style="max-width:78px"></div><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${ofLineNote(o,draft)}</div></div>
       </div>
-      <div class="field" style="margin-bottom:10px"><label>Material(s) <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(tap to pick one or more)</span></label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
-      <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
-      <div id="of_craft_${i}">${itemCraftChips(i)}</div>
-      <div id="of_meth_${i}">${itemMethodChips(i)}</div>
-      <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="e.g. Wedding agbada, size 43 mules…"></div>
-      <div class="field" style="margin-bottom:10px"><label>Photos of this item / fabric</label>${outfitPhotoGrid(i,o.photos)}</div>
-      <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, fabric, size, inspiration…">${esc(o.style)}</textarea></div>
-      <div class="field" style="margin-bottom:${isGroup(draft)?'10px':'0'}"><label>Finishing details</label><textarea class="fld" id="of_finish_${i}" placeholder="Buttons, lining, monogram, sole, hem, special requests…">${esc(o.finish)}</textarea></div>
-      ${isGroup(draft)?`<details style="margin-top:4px"><summary style="cursor:pointer;color:var(--gold)">📐 Measurements for this person ▾</summary><div style="margin-top:10px"><div class="row2"><div class="field"><label>Fit</label><input class="fld" id="ofm_fit_${i}" value="${esc(o.measFit||'')}" placeholder="Slim, Regular…"></div><div class="field"><label>Posture / build</label><input class="fld" id="ofm_posture_${i}" value="${esc(o.measPosture||'')}" placeholder="Broad back…"></div></div>${measGrid('ofm'+i,o.meas)}<div class="field" style="margin-bottom:0"><label>Measurement note</label><input class="fld" id="ofm_note_${i}" value="${esc(o.measNote||'')}" placeholder="Anything else"></div></div></details>`:''}
+      <div class="field" style="margin-bottom:0"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="e.g. Wedding agbada, size 43 mules…"></div>
+      <details class="osec osec-in">
+        <summary>${OSEC_ICO.piece}<span class="osec-t">More about this piece</span><span class="osec-n">${itemSectionNote(o,draft)}</span><span class="osec-c">${OSEC_ICO.chev}</span></summary>
+        <div class="osec-b">
+          <div class="row2">
+            <div class="field" style="margin-bottom:10px"><label>Product code</label><input class="fld" id="of_code_${i}" value="${esc(o.code||'')}" placeholder="SKU12345"><div class="sd" style="color:var(--text-faint);margin-top:4px">Prints under the item on the invoice. Leave it blank and nothing prints.</div></div>
+            <div class="field" style="margin-bottom:10px"><label>Discount on this piece (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_disc_${i}" value="${o.discount?fmtNum(o.discount):''}" placeholder="0" oninput="recalcProfit()"><div class="sd" style="color:var(--text-faint);margin-top:4px">Comes off this line only. Any discount on the whole order comes off after it, and the tax after that.</div></div>
+          </div>
+          <div class="field" style="margin-bottom:10px"><label>Material(s) <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(tap to pick one or more)</span></label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
+          <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
+          <div id="of_craft_${i}">${itemCraftChips(i)}</div>
+          <div id="of_meth_${i}">${itemMethodChips(i)}</div>
+          <div class="field" style="margin-bottom:10px"><label>Photos of this item / fabric <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(the first one prints in the invoice line)</span></label>${outfitPhotoGrid(i,o.photos)}</div>
+          <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, fabric, size, inspiration…">${esc(o.style)}</textarea></div>
+          <div class="field" style="margin-bottom:${isGroup(draft)?'10px':'0'}"><label>Finishing details</label><textarea class="fld" id="of_finish_${i}" placeholder="Buttons, lining, monogram, sole, hem, special requests…">${esc(o.finish)}</textarea></div>
+          <button type="button" class="navrow" onclick="openOrderSection('osecStock')">
+            <span class="navrow-i">${OSEC_ICO.fabric}</span>
+            <span class="navrow-t"><b>Inventory</b><span>Keep track of the stock this order draws down</span></span>
+            <span class="navrow-c">${OSEC_ICO.chevR}</span>
+          </button>
+          <label class="switchrow"><span><b>Save this piece for future invoices</b><span class="sd" style="color:var(--text-faint)">Adds it to your product types, so the price and code fill themselves next time.</span></span><input type="checkbox" id="of_save_${i}" ${o.saveToCatalog?'checked':''}></label>
+          ${isGroup(draft)?`<div class="field" style="margin-bottom:0"><label>📐 Measurements for this person</label><div class="row2"><div class="field"><label>Fit</label><input class="fld" id="ofm_fit_${i}" value="${esc(o.measFit||'')}" placeholder="Slim, Regular…"></div><div class="field"><label>Posture / build</label><input class="fld" id="ofm_posture_${i}" value="${esc(o.measPosture||'')}" placeholder="Broad back…"></div></div>${measGrid('ofm'+i,o.meas)}<div class="field" style="margin-bottom:0"><label>Measurement note</label><input class="fld" id="ofm_note_${i}" value="${esc(o.measNote||'')}" placeholder="Anything else"></div></div>`:''}
+        </div>
+      </details>
     </div>`).join('');
-  openModal(`
-    <h3>${editingOrderId?'Edit order':'New order'}</h3>
-    <div class="msub">${editingOrderId?editingOrderId:'Add as many outfits as the client is ordering'}</div>
-    <div class="field"><label>Client</label><select class="fld" id="f_clientPick" onchange="clientPick()"><option value="__new__">➕ New client (type below)</option>${Object.values(getCustomers()).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${esc(c.name||'')}" ${nameKey(draft.client||'')===nameKey(c.name||'')?'selected':''}>${esc(c.name||'')}</option>`).join('')}</select><input class="fld" type="text" id="f_client" value="${esc(draft.client)}" placeholder="New client's name" autocomplete="off" onblur="clientChosen()" onchange="clientChosen()" style="margin-top:6px;display:${(draft.client&&getCustomers()[nameKey(draft.client)])?'none':'block'}"><div class="sd" style="color:var(--text-faint);margin-top:5px">Pick an existing client to auto-fill their details, or choose <b>New client</b> and type a name. They're saved to Customers on save.</div><div id="clientMatch" style="font-size:12.5px;margin-top:5px">${(()=>{const nm=(draft.client||'').trim();if(!nm)return '';return getCustomers()[nameKey(nm)]?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Customers on save</span>';})()}</div><div id="orderMeasRef">${orderMeasRefHtml(draft.client)}</div></div>
+  /* ---- The form, cut in two ----------------------------------------------------------
+     Measured rather than eyeballed, 21 September 2026: this form was 42 fields under three
+     headings, and between field 10 and field 38 there were 28 fields with no signpost at
+     all. That stretch is what reads as "a very long unending list".
+
+     28 of the 42 are things you only know AFTER the client says yes — what fabric went in,
+     who made it, what it cost, what stage it is at. Asking for them while you are still
+     quoting is why the form never ended. They are all still here and nothing has been
+     taken from anybody: they sit in closed sections, each one carrying a summary of what
+     it is holding, so a shut section still answers its own question.
+
+     What is left standing open is the eight fields it takes to price a job. And the quote
+     switch — the entry to the whole invoice-first flow, which used to be field 40 of 42,
+     asked after the stock used, the maker, the profit and the director allocation — is now
+     the first thing on the form, because the door you came in through already answered it.
+     That is the complaint that there is nowhere to create an invoice: there was, and this
+     form buried it. */
+  const _dl=draft.delivery||{};
+  const _teamNames=(draft.commissions||[]).map(c=>{const st=staffList.find(x=>x.id===c.staffId);return st?st.name:'';}).filter(Boolean);
+  const _costTotal=(draft.costs||[]).reduce((a,c)=>a+(+c.amount||0),0);
+  const _bal=Math.max(0,(total-(+draft.discount||0))-(+draft.paid||0));
+  const sect=(ico,title,note,body,id)=>`<details class="osec"${id?' id="'+id+'"':''}><summary>${OSEC_ICO[ico]}<span class="osec-t">${title}</span><span class="osec-n">${note||''}</span><span class="osec-c">${OSEC_ICO.chev}</span></summary><div class="osec-b">${body}</div></details>`;
+  const quoted=isQuote(draft);
+  /* The door, restated where the decision actually lives. On a confirmed order it stops
+     being a switch and becomes a record of when somebody said yes. */
+  const quoteStrip=draft.confirmedAt
+    ? `<div class="field" style="border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet &mdash; this is a quote</label>
+        <div class="sd" style="color:var(--green);margin-top:6px">Confirmed ${esc(new Date(draft.confirmedAt).toLocaleDateString('en-GB'))}${draft.confirmedBy?' by '+esc(draft.confirmedBy):''}. It is on the production board and counted in what you are owed.</div>
+      </div>`
+    : `<div class="field" style="border:1px solid var(--line);border-left:3px solid ${quoted?'var(--amber)':'var(--green)'};border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" ${quoted?'checked':''} onchange="syncOrderDraft();reRenderOrder()" style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet &mdash; this is a quote</label>
+        <div class="sd" style="color:var(--text-faint);margin-top:6px">${quoted
+          ?'Price it, send the invoice, and it becomes a real order the moment they pay or you confirm it. Until then it stays off the production board, out of what anyone owes you, and out of the work booked.'
+          :'Already agreed, so it goes on the production board as soon as you save. Tick the box if you are still only quoting for it.'}</div>
+      </div>`;
+  const clientSection=`
     <div class="row2">
-      <div class="field"><label>Email (for newsletters)</label><input class="fld" type="email" id="f_email" value="${esc(draft.email||'')}" placeholder="name@email.com"></div>
-      <div class="field"><label>WhatsApp number</label><input class="fld" type="tel" id="f_whatsapp" value="${esc(draft.whatsapp||'')}" placeholder="e.g. +234…"></div>
+      <div class="field"><label>Email</label><input class="fld" type="email" id="f_email" value="${esc(draft.email||'')}" placeholder="name@email.com"><div class="sd" style="color:var(--text-faint);margin-top:4px">Prints on the invoice, and newsletters go here.</div></div>
+      <div class="field"><label>Delivery address</label><textarea class="fld" id="f_address" placeholder="Street, city, landmark, used on invoices &amp; delivery">${esc(draft.address||'')}</textarea></div>
     </div>
-    <div class="field"><label>Delivery address</label><textarea class="fld" id="f_address" placeholder="Street, city, landmark, used on invoices & delivery">${esc(draft.address||'')}</textarea></div>
-    <div class="field"><label>Client photos (their look, inspiration, reference)</label>${photoGrid(draft.clientPhotos,'photo','addClientPhotos','removeClientPhoto')}<div class="sd" style="color:var(--text-faint);margin-top:5px">These also show on the client's profile under Customers.</div></div>
-    <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
-      <label style="margin:0;cursor:pointer" onclick="toggleOrderSpecial()">📦 Special order type? <span style="color:var(--text-faint);font-weight:400;text-transform:none;letter-spacing:0">(batch run or group / party)</span><span style="float:right;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0">${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?'Hide ▴':'Choose ▾'}</span></label>
-      ${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?`
-        <label style="margin:12px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>📦 Batch (multiple identical pieces)</span><input type="checkbox" id="f_batch_on" ${isBatch(draft)?'checked':''} ${isGroup(draft)?'disabled':''} onchange="toggleBatch()"></label>
-        ${isBatch(draft)?`<div class="row2" style="margin-top:10px"><div class="field"><label>How many pieces?</label><input class="fld" type="number" min="1" id="f_batch_qty" value="${(draft.batch&&draft.batch.qty)||1}" oninput="recalcProfit()"></div></div><div class="sd" style="color:var(--text-faint)">The item below describes <b>one piece</b>. Order value = item price × quantity. Progress is tracked wave-by-wave in Production.</div>`:''}
-        <label style="margin:14px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>👥 Group / party (different people, one invoice)</span><input type="checkbox" id="f_group_on" ${isGroup(draft)?'checked':''} ${isBatch(draft)?'disabled':''} onchange="toggleGroup()"></label>
-        ${isGroup(draft)?`<div class="sd" style="color:var(--text-faint);margin-top:6px">Add each person below as their own line: name, item, price and measurements. One invoice, tracked individually.</div>`:''}
-      `:`<div class="sd" style="color:var(--text-faint);margin-top:6px">Most orders are a single piece, so leave this closed. Open it only for a production run or a wedding party / aso-ebi.</div>`}
-    </div>
+    <div class="field"><label>Client photos (their look, inspiration, reference)</label>${photoGrid(draft.clientPhotos,'photo','addClientPhotos','removeClientPhoto')}<div class="sd" style="color:var(--text-faint);margin-top:5px">These also show on the client\u2019s profile under Customers.</div></div>
     ${isGroup(draft)?'':(()=>{const open=orderMeasOpen||(draft.meas&&Object.keys(draft.meas).length);const key=nameKey(draft.client||'');const hasFile=key&&latestMeasOf(key);
       return `<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)"><label style="margin:0">📐 Measurements <span style="float:right;cursor:pointer;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0" onclick="toggleOrderMeas()">${open?'Hide ▴':'Add / edit ▾'}</span></label>
-        ${open?`${hasFile?`<div class="kv" style="margin:8px 0 4px"><span style="cursor:pointer;color:var(--gold)" onclick="loadLatestMeasIntoOrder()">↧ Load this client's latest measurements</span></div>`:''}
+        ${open?`${hasFile?`<div class="kv" style="margin:8px 0 4px"><span style="cursor:pointer;color:var(--gold)" onclick="loadLatestMeasIntoOrder()">⇧ Load this client\u2019s latest measurements</span></div>`:''}
           <div class="row2" style="margin-top:8px"><div class="field"><label>Fit</label><input class="fld" id="om_fit" value="${esc(draft.measFit||'')}" placeholder="e.g. Slim, Regular, Relaxed"></div><div class="field"><label>Posture / build</label><input class="fld" id="om_posture" value="${esc(draft.measPosture||'')}" placeholder="e.g. Broad back, stooped"></div></div>
           ${measGrid('om',draft.meas)}
           <div class="field"><label>Measurement note</label><input class="fld" id="om_note" value="${esc(draft.measNote||'')}" placeholder="Anything else worth noting"></div>
-          <div class="sd" style="color:var(--text-faint)">Saved to this client's profile as a dated measurement record.</div>`
+          <div class="sd" style="color:var(--text-faint)">Saved to this client\u2019s profile as a dated measurement record.</div>`
         :`<div class="sd" style="color:var(--text-faint);margin-top:6px">${hasFile?'Measurements are on file. Open to view or update them.':'Capture the measurements this order is cut to.'}</div>`}</div>`;})()}
-    <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+    ${multiBranch()?`<div class="field" style="margin-bottom:0"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:''}`;
+  const pricingSection=`
+    <div class="field"><label>Discount (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_discount" value="${draft.discount?fmtNum(draft.discount):''}" placeholder="0" oninput="recalcProfit()"><div class="sd" style="color:var(--text-faint);margin-top:4px">Comes off before any tax, and prints on the invoice in brackets.</div></div>
+    <div class="field" style="margin-bottom:0;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)">
       <label style="margin:0 0 8px">💱 Pricing currency</label>
       <div class="row2">
         <div class="field" style="margin-bottom:0"><label>Client pays in</label><select class="fld" id="f_currency" onchange="onCurrencyChange()">${CURRENCIES.map(c=>`<option value="${c}" ${ocur(draft)===c?'selected':''}>${c} ${CUR_SYM[c]||''}</option>`).join('')}</select></div>
         <div class="field" id="f_fxWrap" style="margin-bottom:0;${ocur(draft)===SETTINGS.currency?'display:none':''}"><label>1 ${ocur(draft)} = ? ${SETTINGS.currency}</label><input class="fld" type="number" step="0.0001" id="f_fx" value="${draft.fx||1}" oninput="recalcProfit()" placeholder="e.g. 2200"></div>
       </div>
-      ${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:8px">Enter each item's price in <b>${ocur(draft)}</b> below. Totals auto-convert to ${SETTINGS.currency} at this rate for Finance, pots & tailor pay.</div>`:`<div class="sd" style="color:var(--text-faint);margin-top:8px">Prices below are in ${SETTINGS.currency}. Switch if this client pays in pounds, dollars, etc.</div>`}
-    </div>
+      ${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:8px">Each item\u2019s price is in <b>${ocur(draft)}</b>. Totals auto-convert to ${SETTINGS.currency} at this rate for Finance, pots &amp; tailor pay.</div>`:`<div class="sd" style="color:var(--text-faint);margin-top:8px">Prices are in ${SETTINGS.currency}. Switch if this client pays in pounds, dollars, etc.</div>`}
+    </div>`;
+  const stageSection=isBatch(draft)
+    ? '<div class="sd" style="color:var(--text-faint)">📦 This is a batch. Move pieces through the stages wave-by-wave from the Production card after saving.</div>'
+    : `<div class="field" style="margin-bottom:0"><label>Stage</label><select class="fld" id="f_stage">${stageOpts}</select></div>`;
+  openModal(`
+    <h3>${editingOrderId?'Edit order':(quoted?'New quote':'New order')}</h3>
+    <div class="msub">${editingOrderId?editingOrderId:(quoted?'Price it and send it. Their deposit is the yes.':'Already agreed, so it goes straight on the board.')}</div>
+    ${quoteStrip}
+    <div class="field"><label>Client</label><select class="fld" id="f_clientPick" onchange="clientPick()"><option value="__new__">➕ New client (type below)</option>${Object.values(getCustomers()).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${esc(c.name||'')}" ${nameKey(draft.client||'')===nameKey(c.name||'')?'selected':''}>${esc(c.name||'')}</option>`).join('')}</select><input class="fld" type="text" id="f_client" value="${esc(draft.client)}" placeholder="New client\u2019s name" autocomplete="off" onblur="clientChosen()" onchange="clientChosen()" style="margin-top:6px;display:${(draft.client&&getCustomers()[nameKey(draft.client)])?'none':'block'}"><div class="sd" style="color:var(--text-faint);margin-top:5px">Pick an existing client to auto-fill their details, or choose <b>New client</b> and type a name. They\u2019re saved to Customers on save.</div><div id="clientMatch" style="font-size:12.5px;margin-top:5px">${(()=>{const nm=(draft.client||'').trim();if(!nm)return '';return getCustomers()[nameKey(nm)]?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Customers on save</span>';})()}</div><div id="orderMeasRef">${orderMeasRefHtml(draft.client)}</div></div>
+    <div class="field"><label>Phone / WhatsApp</label><input class="fld" type="tel" id="f_whatsapp" value="${esc(draft.whatsapp||'')}" placeholder="e.g. +234…"></div>
+    <div class="bd-sub">What are you making</div>
     ${outfitsHtml}
-    <button class="btn ghost sm" style="width:100%;margin-bottom:6px" onclick="addOutfit()">${isGroup(draft)?'＋ Add another person':'＋ Add another item'}</button>
+    <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">${isGroup(draft)?'＋ Add another person':'＋ Add another piece'}</button>
+    <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+      <label style="margin:0;cursor:pointer" onclick="toggleOrderSpecial()">📦 Special order type? <span style="color:var(--text-faint);font-weight:400;text-transform:none;letter-spacing:0">(batch run or group / party)</span><span style="float:right;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0">${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?'Hide ▴':'Choose ▾'}</span></label>
+      ${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?`
+        <label style="margin:12px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>📦 Batch (multiple identical pieces)</span><input type="checkbox" id="f_batch_on" ${isBatch(draft)?'checked':''} ${isGroup(draft)?'disabled':''} onchange="toggleBatch()"></label>
+        ${isBatch(draft)?`<div class="row2" style="margin-top:10px"><div class="field"><label>How many pieces?</label><input class="fld" type="number" min="1" id="f_batch_qty" value="${(draft.batch&&draft.batch.qty)||1}" oninput="recalcProfit()"></div></div><div class="sd" style="color:var(--text-faint)">The item above describes <b>one piece</b>. Order value = item price × quantity. Progress is tracked wave-by-wave in Production.</div>`:''}
+        <label style="margin:14px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>👥 Group / party (different people, one invoice)</span><input type="checkbox" id="f_group_on" ${isGroup(draft)?'checked':''} ${isBatch(draft)?'disabled':''} onchange="toggleGroup()"></label>
+        ${isGroup(draft)?`<div class="sd" style="color:var(--text-faint);margin-top:6px">Add each person above as their own line: name, item, price and measurements. One invoice, tracked individually.</div>`:''}
+      `:`<div class="sd" style="color:var(--text-faint);margin-top:6px">Most orders are a single piece, so leave this closed. Open it only for a production run or a wedding party / aso-ebi.</div>`}
+    </div>
     <div class="total-line"><span>Total order value</span><b id="orderTotal">${curO(total,draft)}</b></div>
     <div id="orderTotalBase" class="sd" style="color:var(--text-faint);text-align:right;margin-bottom:8px">${ocur(draft)!==SETTINGS.currency?'≈ '+cur((total||0)*ofx(draft))+' at 1 '+ocur(draft)+' = '+fmtNum(draft.fx||1)+' '+SETTINGS.currency:''}</div>
     <div class="row2">
-      <div class="field"><label>Discount (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_discount" value="${draft.discount?fmtNum(draft.discount):''}" placeholder="0" oninput="recalcProfit()"></div>
-      <div class="field"><label>Paid so far (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_paid" value="${draft.paid?fmtNum(draft.paid):'0'}" oninput="onPaidChange()">${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:4px">Enter in ${ocur(draft)}, recorded as ${cur((+draft.paid||0)*ofx(draft))} in your books.</div>`:''}</div>
+      <div class="field"><label>${quoted?'Deposit asked':'Paid so far'} (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_paid" value="${draft.paid?fmtNum(draft.paid):'0'}" oninput="onPaidChange()">${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:4px">Enter in ${ocur(draft)}, recorded as ${cur((+draft.paid||0)*ofx(draft))} in your books.</div>`:''}</div>
+      <div class="field"><label>Ready by</label><input class="fld" type="date" id="f_due" value="${draft.due||''}"></div>
     </div>
     <div id="f_methodWrap" style="${(+draft.paid>0)?'':'display:none'}">${payMethodField('f_method',draft.payMethod,'How was that paid?')}</div>
-    ${moneySection}
-    ${stockSection}
-    ${assignSection}
-    ${potSection}
-    <div class="bd-sub" style="margin-top:6px">Delivery</div>
-    ${deliverySection}
-    <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
-      <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" ${draft.quoted&&!draft.confirmedAt?'checked':''} style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet &mdash; this is a quote</label>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">Price it, send the invoice, and it becomes a real order the moment they pay or you confirm it. Until then it stays off the production board, out of what anyone owes you, and out of the work booked.</div>
-      ${draft.confirmedAt?`<div class="sd" style="color:var(--green);margin-top:6px">Confirmed ${esc(new Date(draft.confirmedAt).toLocaleDateString('en-GB'))}${draft.confirmedBy?' by '+esc(draft.confirmedBy):''}.</div>`:''}
-    </div>
-    <div class="field"><label>Due date</label><input class="fld" type="date" id="f_due" value="${draft.due||''}"></div>
-    ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:''}
-    ${isBatch(draft)?'<div class="sd" style="color:var(--text-faint);margin:6px 0">📦 This is a batch. Move pieces through the stages wave-by-wave from the Production card after saving.</div>':`<div class="field"><label>Stage</label><select class="fld" id="f_stage">${stageOpts}</select></div>`}
+    <div class="sd" style="color:var(--text-faint);margin:2px 0 14px">Balance after that: <b style="color:var(--text)">${curO(_bal,draft)}</b>${draft.discount>0?' · after a '+curO(draft.discount,draft)+' discount':''}</div>
+    <div class="bd-sub">Everything else, when you need it</div>
+    <div class="sd" style="color:var(--text-faint);margin-bottom:10px">${editingOrderId?'Open a section to fill it in. Nothing here is required to save.':'None of this is in your way while you price the job. Most of it you cannot know yet anyway.'}</div>
+    ${sect('client','Client details',[draft.email?'email':'',draft.address?'address':'',(draft.meas&&Object.keys(draft.meas).length)?'measurements':''].filter(Boolean).join(', ')||'email, address, measurements',clientSection)}
+    ${sect('money','Discount &amp; currency',[draft.discount>0?curO(draft.discount,draft)+' off':'',ocur(draft)!==SETTINGS.currency?('paid in '+ocur(draft)):''].filter(Boolean).join(' · ')||'none',pricingSection)}
+    ${sect('stage','Where it has got to',isBatch(draft)?'tracked wave by wave':esc(STAGES[draft.stageIndex]||STAGES[0]),stageSection)}
+    ${sect('people','Who is making it',_teamNames.length?esc(_teamNames.join(', ')):'nobody yet',assignSection+potSection)}
+    ${sect('fabric','Fabric &amp; stock used',can('money')?(_costTotal?cur(_costTotal):'nothing recorded'):'',costsField+stockSection,'osecStock')}
+    ${can('money')?sect('profit','What it made you',cur(retained),pnlSection):''}
+    ${sect('van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery on this order',deliverySection)}
     <div class="modal-foot">
       ${editingOrderId&&can('del')?`<button class="btn danger sm" onclick="deleteOrder()">Delete</button>`:''}
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="saveOrder()">Save</button>
+      <button class="btn" onclick="saveOrder()">${editingOrderId?'Save':(quoted?'Save quote':'Save order')}</button>
     </div>`);
 }
 function saveOrder(){
@@ -5241,7 +5514,7 @@ function saveOrder(){
   if(!draft.batch)draft.batch={on:false};
   if(!draft.group)draft.group={on:false};
   if(draft.group.on&&draft.batch.on)draft.batch={on:false};
-  const _unit=draft.outfits.reduce((s,o)=>s+(+o.price||0),0);
+  const _unit=outfitsTotal(draft.outfits);
   if(draft.group.on){
     draft.outfits.forEach(o=>{if(o.stageIndex==null)o.stageIndex=0;o.meas=o.meas||{};});
     draft.value=_unit;
@@ -5271,6 +5544,8 @@ function saveOrder(){
   if(!saveSafe('layi_dash_orders',list)){alert('Storage is full. Too many or too-large photos to save. Remove a few images and try again.');return;}
   logAudit(editingOrderId?'Order updated':'Order created',(draft.id||'')+' · '+(draft.client||''));
   if(!editingOrderId&&typeof waOnEvent==='function')waOnEvent('confirm',draft); // auto-WhatsApp on new order (dormant until go-live)
+  // remember any piece the studio ticked, so its price and code fill themselves next time
+  rememberItems(draft.outfits);
   // remember a typed-in courier so it appears in the dropdown next time
   if(draft.delivery&&draft.delivery.company&&!courierOptions().includes(draft.delivery.company)&&draft.delivery.company!=='Other'){const sps=getSuppliers();sps.push({id:uid('sp'),business:draft.delivery.company,type:'Logistics Company',contact:'',phone:'',whatsapp:'',email:'',location:'',notes:'Added from an order',preferred:false});setSuppliers(sps);}
   // save/update the customer profile (keep existing measurements/note)
@@ -5503,66 +5778,247 @@ function openDetail(id){
 }
 
 /* ===== INVOICES ===== */
+/* ===== THE INVOICE =====================================================================
+   Rebuilt 21 September 2026 against the studio’s own invoice (#308), which this app could
+   not produce. Five gaps, and only one of them reached the order record:
+
+     PRICE × QUANTITY = AMOUNT   an order stored a price per piece and no count
+     a photo in the line itself   thumbnails were a strip at the foot, if at all
+     sort code, IBAN, BIC/SWIFT   a GBP or USD account could not be written down
+     signature, name, date        nothing
+     two trading addresses        one free-text box
+
+   One page, on purpose. The large finished-piece photo follows on a page of its own
+   rather than pushing the figures onto a second sheet. */
+
+/* Money on a document a client will check against their bank: always two decimals, and a
+   deduction in brackets rather than with a minus sign, which is how he writes his own. */
+function fmtMoney2(n){n=Number(n||0);const neg=n<0;const parts=Math.abs(n).toFixed(2).split('.');parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');return (neg?'-':'')+parts.join('.');}
+
 function invoiceFigures(o){
-  const subtotal=(o.outfits||[]).reduce((s,x)=>s+(+x.price||0),0);
+  const subtotal=outfitsTotal(o.outfits);
   const discount=+o.discount||0;
   const shipping=Math.round(orderDelivery(o)/ofx(o));
-  const total=Math.max(0,subtotal-discount+shipping);
+  /* Settled 21 September: tax lands on the work AFTER the discount and never on the
+     carriage. Both halves matter — taxing the pre-discount figure overcharges, and taxing
+     the courier’s fee charges the studio’s tax on somebody else’s service. Which is why
+     Shipping sits outside the tax and after it, and why the order of those two lines is
+     load-bearing rather than cosmetic. */
+  const taxable=Math.max(0,subtotal-discount);
+  const rate=taxOn()?taxRate():0;
+  const tax=rate?Math.round(taxable*rate)/100:0;
+  const total=taxable+tax+shipping;
   const paid=+o.paid||0;
   const balance=total-paid;
-  return {subtotal,discount,shipping,total,paid,balance};
+  return {subtotal,discount,taxable,taxRate:rate,tax,shipping,total,paid,balance};
 }
 function ensureInvoiceNo(o){if(!o.invoiceNo){const list=rawOrders();const t=list.find(x=>x.id===o.id);const n=(SETTINGS.invoiceNo||1000)+1;SETTINGS.invoiceNo=n;if(t)t.invoiceNo=n;o.invoiceNo=n;save('layi_dash_orders',list);save('layi_dash_settings',SETTINGS);}return o.invoiceNo;}
+/* The finished piece, as the client should see it. Progress photos are posted newest last,
+   so the last one posted is the piece as it left the workroom; an order with no updates
+   falls back to the item’s own photograph. Two at most, so the extra sheet stays one
+   sheet. */
+function finishedPhotos(o){
+  const ups=(o.updates||[]).slice().reverse().reduce((a,u)=>a.concat(u.photos||[]),[]);
+  const own=(o.outfits||[]).reduce((a,x)=>a.concat(x.photos||[]),[]);
+  const out=[];ups.concat(own).forEach(ph=>{if(ph&&out.indexOf(ph)<0)out.push(ph);});
+  return out.slice(0,2);
+}
+/* The accounts that actually print. Filtered to the currency the client is paying in; if
+   the studio has none in that currency it falls back to everything it has, which is never
+   an empty block because a blank account was never saved. A naira-only studio gets one
+   line and is never shown an empty GBP or USD heading. */
+/* ---- What the invoice says about payment ---------------------------------------------
+   The app used to write a line of its own onto a quote. That came off on 22 September,
+   and what replaced it is this: a general set of terms every studio starts with and every
+   studio is expected to rewrite, because no two studios collect money the same way. One
+   takes half up front, one takes everything, one takes cash on collection.
+
+   It is a FALLBACK rather than a value written into their settings, so a studio that has
+   never opened that box still sends an invoice that says what paying does. The moment
+   they write their own, theirs is the only thing that prints. */
+const DEFAULT_PAY_TERMS=
+  'A deposit confirms your order and work begins once it has been received.\n'+
+  'The balance is due before collection or delivery.\n'+
+  'Please send proof of payment so we can confirm it.';
+function payTerms(){const t=String((SETTINGS.company||{}).payInstructions||'').trim();return t||DEFAULT_PAY_TERMS;}
+function invoiceBanks(o){
+  const all=((SETTINGS.company||{}).banks||[]).filter(bankHasDetail);
+  const mine=all.filter(b=>(b.currency||'')===ocur(o));
+  return mine.length?mine:all;
+}
 /* The line that makes the invoice-first flow actually work. Without it the client is
    holding a bill for work that has not started and no idea what makes it start. */
 function invoiceInner(o,kind){const _R=kind==='receipt';
-  const _quoteNote=(!_R&&isQuote(o))
-    ? '<div style="margin:10px 0 14px;padding:9px 12px;border-left:3px solid #b88e2a;background:#faf6ee;font-size:12.5px;color:#5c5240">This confirms your order once payment is received. Nothing is cut until then.</div>'
-    : '';
   const co=SETTINGS.company||{};const cust=getCustomers()[nameKey(o.client)]||{};
   const f=invoiceFigures(o);const no=o.invoiceNo||'—';
   const cs=CUR_SYM[ocur(o)]||(ocur(o)+' ');
-  const banks=(co.banks||[]).filter(b=>(b.currency||'')===ocur(o));const showBanks=banks.length?banks:(co.banks||[]);
-  const items=(o.outfits||[]).map(x=>`<tr><td style="padding:8px 0;border-bottom:1px solid #eee">${isGroup(o)&&x.person?'<b>'+esc(x.person)+'</b> · ':''}${esc(x.name||x.type||'Item')}${x.style?'<br><span style="color:#888;font-size:12px">'+esc(x.style)+'</span>':''}</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${cs}${fmtNum(+x.price||0)}</td></tr>`).join('');
-  const photos=(co.showPhotos!==false)?(o.clientPhotos||[]).concat((o.outfits||[]).flatMap(x=>x.photos||[])).slice(0,4):[];
-  const line=(l,v,strong)=>`<tr><td style="padding:4px 0;${strong?'font-weight:700':''}">${l}</td><td style="padding:4px 0;text-align:right;${strong?'font-weight:700':''}">${v}</td></tr>`;
-  return `<div style="font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;max-width:640px;margin:0 auto;background:#fff;padding:32px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #c9a86a;padding-bottom:18px;margin-bottom:18px">
-      <div style="display:flex;gap:14px;align-items:center">${co.logo?`<img src="${co.logo}" style="width:64px;height:64px;object-fit:contain">`:''}<div><div style="font-size:24px;font-weight:700;letter-spacing:1px">${esc(co.name||tenantName())}</div>${co.address?`<div style="font-size:12px;color:#666;white-space:pre-line">${esc(co.address)}</div>`:''}<div style="font-size:12px;color:#666">${[co.email,co.phone].filter(Boolean).map(esc).join(' · ')}</div>${co.reg?`<div style="font-size:11px;color:#999">${esc(co.reg)}</div>`:''}</div></div>
-      <div style="text-align:right"><div style="font-size:20px;letter-spacing:2px;color:#c9a86a">${_R?'RECEIPT':'INVOICE'}</div>${_R&&f.balance<=0?'<div style="display:inline-block;margin-top:5px;font-size:10px;letter-spacing:1.5px;color:#3f7344;border:1px solid #3f7344;border-radius:4px;padding:2px 8px">PAID IN FULL</div>':''}<div style="font-size:13px;color:#444">#${no}</div><div style="font-size:12px;color:#888">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div></div>
-    </div>
-    ${_quoteNote}
-    <div style="display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px">
-      <div><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Billed to</div><div style="font-weight:700">${esc(o.client)}</div>${cust.address?`<div style="color:#666;white-space:pre-line">${esc(cust.address)}</div>`:''}<div style="color:#666">${[cust.email,cust.whatsapp].filter(Boolean).map(esc).join(' · ')}</div></div>
-      <div style="text-align:right"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Order</div><div>${esc(o.id)}</div>${o.due?`<div style="color:#666">Due ${new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>`:''}</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px"><thead><tr><th style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #ddd;padding-bottom:6px">Item</th><th style="text-align:right;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #ddd;padding-bottom:6px">Amount</th></tr></thead><tbody>${items}</tbody></table>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-left:auto;max-width:280px;margin-top:8px">
-      ${line('Subtotal',cs+fmtNum(f.subtotal))}
-      ${f.discount>0?line('Discount','− '+cs+fmtNum(f.discount)):''}
-      ${f.shipping>0?line('Shipping',cs+fmtNum(f.shipping)):''}
-      ${line('Total',cs+fmtNum(f.total),true)}
-      ${f.paid>0?line('Paid','− '+cs+fmtNum(f.paid)):''}
-      ${line('Balance due',cs+fmtNum(f.balance),true)}
-    </table>
-    ${photos.length?`<div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">${photos.map(p=>`<img src="${photoSrc(p)}" style="width:110px;height:110px;object-fit:cover;border-radius:6px">`).join('')}</div>`:''}
-    ${((showBanks&&showBanks.length)||co.payInstructions)?`<div style="margin-top:22px;padding:14px;background:#faf6ee;border-radius:8px;font-size:13px"><div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Payment ${ocur(o)!==SETTINGS.currency?'('+ocur(o)+')':''}</div>${(showBanks||[]).map(b=>`<div style="margin-bottom:3px"><b>${esc(b.currency||'')}</b> · ${[b.bank,b.name,b.no].filter(Boolean).map(esc).join(' · ')}</div>`).join('')}${co.payInstructions?`<div style="white-space:pre-line;margin-top:6px">${esc(co.payInstructions)}</div>`:''}</div>`:''}
-    <div style="margin-top:24px;text-align:center;color:#aaa;font-size:12px">Thank you for choosing ${esc(co.name||tenantName())}.</div>
+  const M=n=>cs+fmtMoney2(n);
+  const SANS="font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif";
+  const INK='#1a1a1a',DIM='#5a6560',LINE='#e3e7e5',BAND='#e8efe9',DARK='#0b3d25';
+  const cap='font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#4a5a52;font-weight:700';
+  const issued=new Date(o.createdAt||Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  /* There was a line here, on a quote's invoice only, saying that paying it confirmed the
+     order and that nothing was cut until then. Removed 22 September 2026 at Kayode's
+     instruction. It said in the app's voice what a studio says better in its own: his own
+     payment terms already read "Full payment is required upfront ... proof of payment must
+     be forwarded before production commences", and two sentences making the same promise
+     on one page is one sentence too many.
+
+     What that leaves: a studio with NO payment terms written now sends a quote carrying
+     nothing about what payment does. That is the studio's to fix in Settings, and the
+     gate below insists the terms print when they exist. */
+  const showPix=co.showPhotos!==false;
+  /* A thumbnail in the row, and the same piece large on the page after. Confirmed: he
+     wants both, because the thumbnail says which line this is and the large one is what
+     the client actually wants to look at. */
+  const items=(o.outfits||[]).map(x=>{
+    const th=showPix?((x.photos||[])[0]||''):'';
+    const desc=[x.style,x.finish].filter(Boolean).join('. ');
+    /* A discount on one piece and not the others. Shown as the arithmetic rather than as a
+       word, because a client checking a bill wants to see where the figure came from. */
+    const ld=ofDiscount(x);
+    return `<tr>
+      <td style="padding:11px;vertical-align:top;border-bottom:1px solid ${LINE}"><div style="display:flex;gap:11px">${th?`<img src="${photoSrc(th)}" style="flex:0 0 auto;width:46px;height:46px;border-radius:3px;object-fit:cover">`:''}<div><div style="font-size:14px;font-weight:600">${isGroup(o)&&x.person?esc(x.person)+' · ':''}${esc(x.name||x.type||'Item')}</div>${x.code?`<div style="${SANS};font-size:11px;color:${DIM};letter-spacing:.04em;margin-top:2px">${esc(x.code)}</div>`:''}${desc?`<div style="${SANS};font-size:11.5px;color:${DIM};line-height:1.55;margin-top:3px">${esc(desc)}</div>`:''}${ld>0?`<div style="${SANS};font-size:11.5px;color:${DIM};margin-top:4px">${M(ofGross(x))} less ${M(ld)} discount</div>`:''}<div class="tlb-only-narrow" style="${SANS};font-size:11.5px;color:${DIM};margin-top:4px">${M(+x.price||0)}${ofQty(x)>1?' × '+ofQty(x):''}</div></div></div></td>
+      <td class="tlb-only-wide" style="padding:11px;vertical-align:top;text-align:right;white-space:nowrap;font-size:13.5px;border-bottom:1px solid ${LINE}">${M(+x.price||0)}</td>
+      <td class="tlb-only-wide" style="padding:11px;vertical-align:top;text-align:right;font-size:13.5px;border-bottom:1px solid ${LINE}">${ofQty(x)}</td>
+      <td style="padding:11px;vertical-align:top;text-align:right;white-space:nowrap;font-size:13.5px;border-bottom:1px solid ${LINE}">${M(ofLine(x))}</td>
+    </tr>`;}).join('');
+  const batchNote=isBatch(o)?`<tr><td colspan="4" style="${SANS};padding:8px 11px;font-size:11.5px;color:${DIM}">Production run of ${(o.batch&&o.batch.qty)||1} × the piece above.</td></tr>`:'';
+  /* All four, not just the fee. The order already knows the courier, where it is going,
+     the waybill and where it has got to; the invoice used only the money. */
+  const d=o.delivery||{};
+  const ship=d.enabled?`<div style="${SANS};flex:1;min-width:0;font-size:11.5px;line-height:1.6;color:#33403a">
+      <div style="${cap};margin-bottom:4px">Shipment</div>
+      ${d.company?`<span style="color:${INK};font-weight:600">${esc(d.company)}</span><br>`:''}
+      ${(d.location||o.address||cust.address)?esc(d.location||o.address||cust.address).replace(/\n/g,'<br>')+'<br>':''}
+      ${d.tracking?`<span style="color:${DIM}">Waybill</span> ${esc(d.tracking)}${d.status?' · ':''}`:''}${d.status?`<span style="color:${DIM}">${esc(d.status)}</span>`:''}
+    </div>`:'<div style="flex:1"></div>';
+  const tot=(l,v,opt)=>`<div style="${SANS};display:flex;align-items:baseline;padding:5px 0;border-bottom:1px solid ${LINE};font-size:12.5px${(opt&&opt.rule)?';border-bottom:2px solid #33403a':''}"><span style="flex:1;color:${(opt&&opt.strong)?INK:DIM}${(opt&&opt.strong)?';font-weight:600':''}">${l}</span><span style="white-space:nowrap${(opt&&opt.strong)?';font-weight:600':''}">${v}</span></div>`;
+  const totals=[
+    tot('Subtotal',M(f.subtotal)),
+    f.discount>0?tot('Discount','('+M(f.discount)+')'):'',
+    f.tax>0?tot(esc(taxLabel())+' '+f.taxRate+'%',M(f.tax)):'',
+    f.shipping>0?tot('Shipping',M(f.shipping)):'',
+    tot('Total',M(f.total),{strong:true,rule:true}),
+    f.paid>0?tot(_R?'Paid':'Deposit paid','('+M(f.paid)+')'):''
+  ].join('');
+  /* "Amount due", not "Balance due". His words, and the deposit is already off it, so the
+     figure at the foot is what the client actually has to send. */
+  const dueLabel=_R?(f.balance<=0?'Paid in full':'Still outstanding'):'Amount due';
+  const banks=invoiceBanks(o);
+  const payBlock=`<div class="tlb-pay" style="${SANS};margin-top:14px;font-size:11.5px;line-height:1.65;color:#33403a">
+    <div style="${cap};margin-bottom:4px">Payment</div>
+    <div style="white-space:pre-line;margin-bottom:${banks.length?'8px':'0'}">${esc(payTerms())}</div>
+    ${banks.map(b=>`<div style="border-top:1px solid ${LINE};padding-top:7px;margin-top:7px"><span style="font-weight:700">${esc(b.currency||'')}</span> · ${esc(bankLine(b))}</div>`).join('')}
   </div>`;
+  /* An image he uploads once, above his name and the date. Not a typed name: a typed name
+     signs nothing. */
+  const sigName=(co.name||tenantName()||'').toUpperCase();
+  const sigBlock=`<div style="margin-top:20px;display:flex"><div class="tlb-sig" style="flex:0 0 auto;width:270px;text-align:center">
+    <div style="height:42px;display:flex;align-items:flex-end;justify-content:center">${co.signature?`<img src="${co.signature}" style="max-height:42px;max-width:220px;object-fit:contain">`:''}</div>
+    <div style="border-top:1px dotted #9aa5a0;padding-top:7px;font-size:11.5px;font-weight:700;letter-spacing:.06em">${esc(sigName)}</div>
+    <div style="${SANS};font-size:11.5px;color:${DIM};margin-top:4px">${today}</div>
+  </div></div>`;
+  /* ---- The same document on a phone -------------------------------------------------
+     Inline styles cannot hold a media query, and this HTML is handed to a print window as
+     often as it is shown in the app, so the rules travel with it. Every selector is under
+     .tlb-inv, which is why a <style> living in the middle of the page is safe here: it
+     cannot reach anything outside the invoice.
+
+     The table stays a table. Four columns do not fit 360px, so Price and Qty fold into the
+     item cell as one line and their columns go, which is the same decision this app made
+     everywhere else: keep the table, drop the columns, never stack a row into a card. */
+  const phoneCss=`<style>
+  .tlb-inv .tlb-only-wide{display:table-cell}
+  .tlb-inv .tlb-only-narrow{display:none}
+  @media(max-width:600px){
+    .tlb-inv,.tlb-photopage{padding:20px 16px!important}
+    .tlb-inv .tlb-head,.tlb-inv .tlb-billto,.tlb-inv .tlb-foot{flex-direction:column;gap:12px!important}
+    .tlb-inv .tlb-logo{order:-1;align-self:flex-start}
+    .tlb-inv .tlb-meta{min-width:0!important;width:100%}
+    .tlb-inv .tlb-totals{width:100%!important}
+    .tlb-inv .tlb-only-wide{display:none}
+    .tlb-inv .tlb-only-narrow{display:block}
+    .tlb-inv th,.tlb-inv td{padding:9px 8px!important}
+    .tlb-inv th:last-child,.tlb-inv td:last-child{width:104px;font-size:12.5px!important}
+    .tlb-inv .tlb-sig{width:100%!important}
+    .tlb-inv .tlb-due{font-size:17px!important}
+  }
+  @media print{.tlb-inv .tlb-only-narrow{display:none}.tlb-inv .tlb-only-wide{display:table-cell}}
+  </style>`;
+  const big=showPix?finishedPhotos(o):[];
+  const photoPage=big.length?`<div class="tlb-photopage" style="page-break-before:always;break-before:page;max-width:720px;margin:0 auto;background:#fff;padding:40px 48px;font-family:Georgia,'Times New Roman',serif;color:${INK}">
+    <div style="${cap};margin-bottom:12px">${esc(o.client)} · ${_R?'Receipt':'Invoice'} #${no}</div>
+    ${big.map(ph=>`<img src="${photoSrc(ph)}" style="width:100%;max-height:820px;object-fit:contain;margin-bottom:18px">`).join('')}
+  </div>`:'';
+  return `${phoneCss}<div class="tlb-inv" style="font-family:Georgia,'Times New Roman',serif;color:${INK};max-width:720px;margin:0 auto;background:#fff;padding:32px 48px">
+    <div class="tlb-head" style="display:flex;align-items:flex-start;gap:20px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:23px;font-weight:700;letter-spacing:.02em">${esc(co.name||tenantName())}</div>
+        <div style="${SANS};font-size:12px;color:${DIM};line-height:1.6;margin-top:6px">
+          ${co.address?`<span style="white-space:pre-line">${esc(co.address)}</span><br>`:''}
+          ${[co.phone,co.email].filter(Boolean).map(esc).join(' · ')}
+          ${co.reg?'<br>'+esc(co.reg):''}
+        </div>
+      </div>
+      ${co.logo?`<img class="tlb-logo" src="${co.logo}" style="flex:0 0 auto;width:76px;height:76px;object-fit:contain">`:''}
+    </div>
+    <div class="tlb-billto" style="margin-top:20px;background:${BAND};border-radius:6px;padding:14px 18px;display:flex;align-items:flex-start;gap:20px">
+      <div style="flex:1;min-width:0">
+        <div style="${cap}">Bill to</div>
+        <div style="font-size:17px;font-weight:700;margin-top:4px">${esc(o.client)}</div>
+        <div style="${SANS};font-size:12px;color:${DIM};line-height:1.55;margin-top:2px">${[o.email||cust.email,o.whatsapp||cust.whatsapp].filter(Boolean).map(esc).join(' · ')}</div>
+      </div>
+      <div class="tlb-meta" style="flex:0 0 auto;min-width:166px">
+        <div style="display:flex;align-items:baseline;gap:12px"><span style="${cap};flex:1">${_R?'RECEIPT':'INVOICE'} #</span><span style="font-size:13.5px;font-weight:600">${esc(String(no))}</span></div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-top:7px"><span style="${cap};flex:1">Issued</span><span style="font-size:12.5px">${issued}</span></div>
+        ${o.due?`<div style="display:flex;align-items:baseline;gap:12px;margin-top:7px"><span style="${cap};flex:1">Ready by</span><span style="font-size:12.5px">${new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span></div>`:''}
+        ${(_R&&f.balance<=0)?`<div style="${SANS};display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1.5px;color:#3f7344;border:1px solid #3f7344;border-radius:4px;padding:2px 8px">PAID IN FULL</div>`:''}
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-top:20px">
+      <thead><tr style="background:${DARK};color:#fff">
+        <th style="${cap};color:#fff;text-align:left;padding:8px 11px">Item</th>
+        <th class="tlb-only-wide" style="${cap};color:#fff;text-align:right;padding:8px 11px;width:112px">Price</th>
+        <th class="tlb-only-wide" style="${cap};color:#fff;text-align:right;padding:8px 11px;width:62px">Qty</th>
+        <th style="${cap};color:#fff;text-align:right;padding:8px 11px;width:120px">Amount</th>
+      </tr></thead>
+      <tbody>${items}${batchNote}</tbody>
+    </table>
+    <div class="tlb-foot" style="display:flex;gap:26px;margin-top:20px;align-items:flex-start">
+      ${ship}
+      <div class="tlb-totals" style="flex:0 0 auto;width:288px">
+        ${totals}
+        <div style="display:flex;align-items:baseline;padding:12px 0 0">
+          <span style="flex:1;font-size:16px;font-weight:700">${dueLabel}</span>
+          <span class="tlb-due" style="font-size:19px;font-weight:700;white-space:nowrap">${M(Math.max(0,f.balance))}</span>
+        </div>
+      </div>
+    </div>
+    ${payBlock}
+    ${sigBlock}
+  </div>${photoPage}`;
 }
+/* The text summary that goes out over WhatsApp or email. It has to agree with the document
+   line for line — a client reading one figure in a message and another on the PDF will
+   trust neither. */
 function invoiceText(o,kind){const _R=kind==='receipt';
   const co=SETTINGS.company||{};const f=invoiceFigures(o);const cs=CUR_SYM[ocur(o)]||(ocur(o)+' ');
+  const M=n=>cs+fmtMoney2(n);
   let t=`*${(co.name||'Your studio').toUpperCase()}* · ${_R?'Receipt':'Invoice'} #${o.invoiceNo||''}\n`;
   t+=`For: ${o.client}\nOrder: ${o.id}\n\n`;
-  (o.outfits||[]).forEach(x=>{t+=`• ${x.name||x.type||'Item'} · ${cs}${fmtNum(+x.price||0)}\n`;});
-  t+=`\nSubtotal: ${cs}${fmtNum(f.subtotal)}\n`;
-  if(f.discount>0)t+=`Discount: -${cs}${fmtNum(f.discount)}\n`;
-  if(f.shipping>0)t+=`Shipping: ${cs}${fmtNum(f.shipping)}\n`;
-  t+=`Total: ${cs}${fmtNum(f.total)}\n`;
-  if(f.paid>0)t+=`Paid: ${cs}${fmtNum(f.paid)}\n`;
-  t+=(_R?(f.balance<=0?'Status: PAID IN FULL':('Balance remaining: '+cs+fmtNum(f.balance))):('Balance due: '+cs+fmtNum(f.balance)))+`\n`;
-  if(co.banks&&co.banks.length){t+=`\nPayment:\n`;co.banks.forEach(b=>{t+=`${b.currency}: ${[b.bank,b.name,b.no].filter(Boolean).join(' · ')}\n`;});if(co.payInstructions)t+=co.payInstructions+`\n`;}
-  else if(co.payInstructions)t+=`\nPayment:\n${co.payInstructions}\n`;
+  (o.outfits||[]).forEach(x=>{const q=ofQty(x),ld=ofDiscount(x);t+=`• ${x.name||x.type||'Item'}${q>1?' ×'+q:''}${ld>0?' (less '+M(ld)+')':''} · ${M(ofLine(x))}\n`;});
+  t+=`\nSubtotal: ${M(f.subtotal)}\n`;
+  if(f.discount>0)t+=`Discount: (${M(f.discount)})\n`;
+  if(f.tax>0)t+=`${taxLabel()} ${f.taxRate}%: ${M(f.tax)}\n`;
+  if(f.shipping>0)t+=`Shipping: ${M(f.shipping)}\n`;
+  t+=`Total: ${M(f.total)}\n`;
+  if(f.paid>0)t+=`${_R?'Paid':'Deposit paid'}: (${M(f.paid)})\n`;
+  t+=(_R?(f.balance<=0?'Status: PAID IN FULL':('Still outstanding: '+M(f.balance))):('Amount due: '+M(Math.max(0,f.balance))))+`\n`;
+  const banks=invoiceBanks(o);
+  t+=`\nPayment:\n${payTerms()}\n`;
+  banks.forEach(b=>{t+=`${b.currency}: ${bankLine(b)}\n`;});
   t+=_R?`\nPayment received \u2014 thank you for your purchase!`:`\nThank you!`;
   return t;
 }
@@ -5683,11 +6139,11 @@ function openReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ens
     <div class="sd" style="color:var(--text-faint);margin-top:6px">A receipt confirms payment received. Best sent once the balance is settled.</div>
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="openDetail('${o.id}')">Back</button><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
-function printReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the receipt.');return;}w.document.write(`<!doctype html><html><head><title>Receipt ${o.invoiceNo} \u00b7 ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:14mm}}</style></head><body>${invoiceInner(o,'receipt')}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
+function printReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the receipt.');return;}w.document.write(`<!doctype html><html><head><title>Receipt ${o.invoiceNo} \u00b7 ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:10mm}}</style></head><body>${invoiceInner(o,'receipt')}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
 function sendReceiptWhatsApp(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(invoiceText(o,'receipt')),'_blank');}
 function sendReceiptEmail(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const subj='Receipt #'+(o.invoiceNo||'')+' \u00b7 '+((SETTINGS.company||{}).name||tenantName());location.href='mailto:'+(cust.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(invoiceText(o,'receipt'));}
 function copyReceiptText(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const txt=invoiceText(o,'receipt');if(navigator.clipboard){navigator.clipboard.writeText(txt).then(function(){if(typeof toast==='function')toast('Receipt copied');});}else if(typeof toast==='function'){toast('Copy not supported here');}}
-function printInvoice(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the invoice.');return;}w.document.write(`<!doctype html><html><head><title>Invoice ${o.invoiceNo} · ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:14mm}}</style></head><body>${invoiceInner(o)}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
+function printInvoice(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the invoice.');return;}w.document.write(`<!doctype html><html><head><title>Invoice ${o.invoiceNo} · ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:10mm}}</style></head><body>${invoiceInner(o)}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
 function sendInvoiceWhatsApp(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(invoiceText(o)),'_blank');}
 function sendInvoiceEmail(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const subj='Invoice #'+(o.invoiceNo||'')+' · '+(SETTINGS.company||{}).name;location.href='mailto:'+(cust.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(invoiceText(o));}
 function copyInvoiceText(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const t=invoiceText(o);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>alert('Invoice text copied.'),()=>alert('Copy failed. Select and copy manually.'));}else{alert(t);}}
@@ -7418,7 +7874,8 @@ function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSetti
   const co=SETTINGS.company||{};const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   setV('co_name',co.name);setV('co_email',co.email);setV('co_phone',co.phone);setV('co_address',co.address);setV('co_reg',co.reg);setV('co_pay',co.payInstructions);
   const ph=document.getElementById('co_photos');if(ph)ph.checked=co.showPhotos!==false;
-  renderLogoPreview();
+  renderLogoPreview();renderSigPreview();
+  {const tb=document.getElementById('co_taxon');if(tb)tb.checked=!!co.taxOn;renderTaxFields();}
   companyBanks=JSON.parse(JSON.stringify(co.banks||[]));renderBankRows();
   const qc=document.getElementById('set_qc');if(qc)qc.value=qcChecklist().join('\n');
   const qcw=document.getElementById('qcWhere');
@@ -7440,15 +7897,61 @@ function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSetti
   groupSettings();
 }
 let companyBanks=[];
-function renderBankRows(){const el=document.getElementById('bankRows');if(!el)return;el.innerHTML=companyBanks.map((bk,i)=>`<div class="cost-line" style="margin-bottom:6px">
-  <select class="fld" id="bk_cur_${i}" style="max-width:90px">${CURRENCIES.map(c=>`<option ${bk.currency===c?'selected':''}>${c}</option>`).join('')}</select>
-  <input class="fld" id="bk_bank_${i}" value="${esc(bk.bank||'')}" placeholder="Bank" style="max-width:120px">
-  <input class="fld" id="bk_name_${i}" value="${esc(bk.name||'')}" placeholder="Account name">
-  <input class="fld" id="bk_no_${i}" value="${esc(bk.no||'')}" placeholder="Account no" style="max-width:140px">
-  <span class="rm" onclick="removeBankRow(${i})">✕</span></div>`).join('');}
-function syncBanks(){companyBanks.forEach((bk,i)=>{const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};if(g('bk_cur_'+i)!==undefined)bk.currency=g('bk_cur_'+i);if(g('bk_bank_'+i)!==undefined)bk.bank=g('bk_bank_'+i);if(g('bk_name_'+i)!==undefined)bk.name=g('bk_name_'+i);if(g('bk_no_'+i)!==undefined)bk.no=g('bk_no_'+i);});}
-function addBankRow(){syncBanks();companyBanks.push({currency:'NGN',bank:'',name:'',no:''});renderBankRows();}
+/* ---- A payment account is shaped by its currency ------------------------------------
+   Kayode, 21 September: "add the sortcode, iban and bic but make it reactive, so it
+   reflects when its the currency that requires it." A Nigerian studio with one naira
+   account should never be shown an IBAN box, and his own pounds and dollars accounts
+   could not be written down at all before this.
+
+   Deliberately keyed on the currency rather than on the country: a US domestic dollar
+   account uses a routing number, not an IBAN, so an American studio is still stranded
+   here. His own USD account is a GB-based Revolut, which is why IBAN + BIC is right for
+   him and why that gap is recorded rather than guessed at. */
+const BANK_FIELDS={
+  NGN:['bank','name','no'],
+  GBP:['bank','name','no','sort'],
+  USD:['bank','name','no','iban','bic'],
+  EUR:['bank','name','iban','bic']
+};
+const BANK_LABELS={bank:'Bank',name:'Account name',no:'Account number',sort:'Sort code',iban:'IBAN',bic:'BIC / SWIFT'};
+const BANK_HINTS={NGN:'Bank, name and number',GBP:'Adds a sort code',USD:'Adds an IBAN and BIC',EUR:'IBAN and BIC, no account number'};
+function bankFieldsFor(ccy){return BANK_FIELDS[ccy]||BANK_FIELDS.NGN;}
+/* Only the keys this currency asks for. A studio that switches an account from pounds to
+   naira should not carry an orphan sort code onto its invoices. */
+function bankClean(bk){const out={currency:bk.currency||'NGN'};bankFieldsFor(out.currency).forEach(k=>{if(bk[k])out[k]=String(bk[k]).trim();});return out;}
+function bankHasDetail(bk){return bankFieldsFor(bk.currency||'NGN').some(k=>String(bk[k]||'').trim());}
+/* One line of an account, in the order the fields were asked for. */
+function bankLine(bk){return bankFieldsFor(bk.currency||'NGN').map(k=>String(bk[k]||'').trim()).filter(Boolean).join(' \u00b7 ');}
+function renderBankRows(){const el=document.getElementById('bankRows');if(!el)return;
+  el.innerHTML=companyBanks.map((bk,i)=>{const ccy=bk.currency||'NGN';const keys=bankFieldsFor(ccy);
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--panel-2)">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+      <select class="fld" id="bk_cur_${i}" onchange="onBankCurrency(${i})" style="max-width:96px">${CURRENCIES.map(c=>`<option ${ccy===c?'selected':''}>${c}</option>`).join('')}</select>
+      <span class="sd" style="flex:1;color:var(--text-faint)">${BANK_HINTS[ccy]||'Bank, name and number'}</span>
+      <span class="rm" onclick="removeBankRow(${i})">✕</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px">${keys.map(k=>`<input class="fld" id="bk_${k}_${i}" value="${esc(bk[k]||'')}" placeholder="${BANK_LABELS[k]}" aria-label="${BANK_LABELS[k]}">`).join('')}</div>
+    </div>`;}).join('');}
+function syncBanks(){companyBanks.forEach((bk,i)=>{const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
+  if(g('bk_cur_'+i)!==undefined)bk.currency=g('bk_cur_'+i);
+  Object.keys(BANK_LABELS).forEach(k=>{const v=g('bk_'+k+'_'+i);if(v!==undefined)bk[k]=v;});});}
+function onBankCurrency(i){syncBanks();renderBankRows();}
+function addBankRow(){syncBanks();companyBanks.push({currency:SETTINGS.currency||'NGN',bank:'',name:'',no:''});renderBankRows();}
 function removeBankRow(i){syncBanks();companyBanks.splice(i,1);renderBankRows();}
+/* ---- Tax: a switch, a name and a rate ------------------------------------------------
+   Off by default, because most studios will not charge it. Settled 21 September: it
+   applies to the order AFTER the discount and never to shipping, which is what makes the
+   order of those two lines on the invoice load-bearing rather than cosmetic. */
+function taxOn(){const co=SETTINGS.company||{};return !!co.taxOn&&taxRate()>0;}
+function taxRate(){const co=SETTINGS.company||{};const r=+co.taxRate||0;return (r>0&&r<=100)?r:0;}
+function taxLabel(){const co=SETTINGS.company||{};return String(co.taxLabel||'VAT').trim()||'VAT';}
+function renderTaxFields(){const el=document.getElementById('taxFields');if(!el)return;
+  const box=document.getElementById('co_taxon');const on=box?box.checked:!!(SETTINGS.company||{}).taxOn;
+  const co=SETTINGS.company||{};
+  el.innerHTML=on?`<div class="row2" style="margin-top:10px">
+    <div class="field" style="margin-bottom:0"><label>What you call it</label><input class="fld" id="co_taxlabel" value="${esc(co.taxLabel||'VAT')}" placeholder="VAT"></div>
+    <div class="field" style="margin-bottom:0"><label>Rate %</label><input class="fld" type="number" min="0" max="100" step="0.01" id="co_taxrate" value="${co.taxRate?co.taxRate:''}" placeholder="7.5"></div>
+  </div>`:'';}
 /* Emptying the box is a way of asking for the craft's own checks back, not a way of
    ending up with no quality control. */
 function saveQCChecklist(){
@@ -7757,8 +8260,22 @@ function toast(msg){var t=document.getElementById('layiToast');if(!t){t=document
 function renderLogoPreview(){const el=document.getElementById('logoPreview');if(!el)return;const logo=(SETTINGS.company||{}).logo;el.innerHTML=logo?`<img src="${logo}" style="width:100%;height:100%;object-fit:contain">`:'none';}
 async function uploadLogo(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
 function clearLogo(){SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
+/* A signature is an image he uploads once, not a typed name. The box is wider and shorter
+   than the logo's because that is the shape a signature actually is. */
+function renderSigPreview(){const el=document.getElementById('sigPreview');if(!el)return;const sig=(SETTINGS.company||{}).signature;el.innerHTML=sig?`<img src="${sig}" style="width:100%;height:100%;object-fit:contain">`:'none';}
+async function uploadSignature(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,600,0.9);SETTINGS.company=Object.assign({},SETTINGS.company,{signature:data});save('layi_dash_settings',SETTINGS);renderSigPreview();}catch(e){alert('Could not load that image.');}input.value='';}
+function clearSignature(){SETTINGS.company=Object.assign({},SETTINGS.company,{signature:''});save('layi_dash_settings',SETTINGS);renderSigPreview();}
+/* Puts the general wording in the box so it can be edited into theirs. It does not save;
+   nothing here is theirs until they press the button that says so. */
+function useStandardTerms(){const e=document.getElementById('co_pay');if(!e)return;e.value=DEFAULT_PAY_TERMS;e.focus();}
 function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one '+tradeWord()+' type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit(tradeWordCap()+' types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save '+tradeWord()+' types');}
-function saveCompany(){syncBanks();SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,banks:companyBanks.filter(b=>b.bank||b.name||b.no)});save('layi_dash_settings',SETTINGS);applyBranding();if(typeof renderActivity==='function')renderActivity();flashSaved('coSaveBtn','Update company details');}
+function saveCompany(){syncBanks();
+  const _tb=document.getElementById('co_taxon');const _ton=_tb?_tb.checked:!!(SETTINGS.company||{}).taxOn;
+  const _trate=(fv('co_taxrate')!==undefined)?(+fv('co_taxrate')||0):(+(SETTINGS.company||{}).taxRate||0);
+  SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,
+    taxOn:_ton,taxLabel:(fv('co_taxlabel')||(SETTINGS.company||{}).taxLabel||'VAT'),taxRate:Math.max(0,Math.min(100,_trate)),
+    banks:companyBanks.filter(bankHasDetail).map(bankClean)});
+  save('layi_dash_settings',SETTINGS);applyBranding();if(typeof renderActivity==='function')renderActivity();flashSaved('coSaveBtn','Update company details');}
 /* The studio's own name and logo, saved in Settings, drive every in-app surface.
    The login screen is deliberately NOT one of them: no tenant is known yet. */
 function tenantName(){const co=SETTINGS.company||{};return ((co.name||'').trim())||((SETTINGS.businessName||'').trim())||'';}
@@ -8361,7 +8878,7 @@ function loadExample(force){
      of this seed, so his brand and his books were on the marketing site.
      The email is on the .example TLD, which IANA reserves and which can
      therefore never belong to anybody. */
-  SETTINGS.company=Object.assign({},SETTINGS.company,{name:'Adé Atelier',address:'Adé Atelier, Lagos, Nigeria',email:'hello@adeatelier.example',phone:'+234 800 000 0000',reg:'RC 1234567',payInstructions:'Balance due on collection.',showPhotos:true,banks:[{currency:'NGN',bank:'GTBank',name:'Adé Atelier',no:'0123456789'},{currency:'GBP',bank:'Wise',name:'Adé Sowande',no:'GB00 ABCD 0000'},{currency:'USD',bank:'Wise',name:'Adé Sowande',no:'US00 1234 5678'}]});
+  SETTINGS.company=Object.assign({},SETTINGS.company,{name:'Adé Atelier',address:'Adé Atelier, Lagos, Nigeria',email:'hello@adeatelier.example',phone:'+234 800 000 0000',reg:'RC 1234567',payInstructions:'Balance due on collection.',showPhotos:true,banks:[{currency:'NGN',bank:'GTBank',name:'Adé Atelier',no:'0123456789'},{currency:'GBP',bank:'Wise',name:'Adé Sowande',no:'12345678',sort:'04-00-03'},{currency:'USD',bank:'Wise',name:'Adé Sowande',no:'8310002345',iban:'GB29 WEST 0000 0012 3456 78',bic:'TRWIGB2L'}]});
   delete SETTINGS.suppliers;SETTINGS.stagesV2=true;SETTINGS.currency='NGN';
   SETTINGS.productCatalog=[
     {id:'pc-agbada',name:'Agbada',category:'Garment',materials:[{name:'Aso-oke',variants:['Royal blue','Wine','Silver']},{name:'Guinea brocade',variants:[]},{name:'Velvet',variants:[]},{name:'Atiku',variants:[]}]},
@@ -8890,7 +9407,7 @@ function renderLogistics(){
     .filter(o=>!q||(o.client+' '+(o.delivery.company||'')+' '+(o.delivery.location||'')).toLowerCase().includes(q))
     .sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
   document.getElementById('logSub').innerHTML=periodInlineHTML(logPeriod,logCustom,'setLogPeriod','setLogCustom')+' <span style="color:var(--text-faint)">· '+list.length+(list.length===1?' delivery':' deliveries')+'</span>';
-  if(!all.length){document.getElementById('logList').innerHTML=emptyBlock('⛟','No deliveries yet','Turn on "This order needs delivery" inside an order to track its courier, destination and cost here.',can('orders')?'+ New order':null,'openOrder()');return;}
+  if(!all.length){document.getElementById('logList').innerHTML=emptyBlock('⛟','No deliveries yet','Turn on "This order needs delivery" inside an order to track its courier, destination and cost here.',can('orders')?'+ New order':null,'newOrder()');return;}
   const cust=getCustomers();
   document.getElementById('logList').innerHTML=list.length?`<div class="sup-tablewrap"><table class="sup-table">
     <thead><tr><th style="text-align:left">Client</th><th class="m-opt" style="text-align:left">Courier</th><th class="m-opt" style="text-align:left">Destination</th>${can('money')?'<th>Cost</th>':''}<th class="m-opt" style="text-align:left">Tracking</th><th>Status</th><th class="m-opt"></th></tr></thead>
@@ -10616,7 +11133,7 @@ function renderProduction(){
   const tablePanel=document.getElementById('pipelineTablePanel');
   if(tablePanel)tablePanel.style.display='';
   {const pp=document.getElementById('pipelinePanel');if(pp)pp.style.display='none';const op=document.getElementById('ordersListPanel');if(op)op.style.display='none';}
-  if(!orders.length){document.getElementById('pipelineTable').innerHTML=emptyBlock('✂','No orders yet',can('orders')?'Add your first order to start tracking it through the workroom.':'Orders added by the team will show here.',can('orders')?'+ New order':null,'openOrder()');const s=document.getElementById('pipeTableSub');if(s)s.innerHTML=periodInlineHTML(prodPeriod,prodCustom,'setProdPeriod','setProdCustom');return;}
+  if(!orders.length){document.getElementById('pipelineTable').innerHTML=emptyBlock('✂','No orders yet',can('orders')?'Add your first order to start tracking it through the workroom.':'Orders added by the team will show here.',can('orders')?'+ New order':null,'newOrder()');const s=document.getElementById('pipeTableSub');if(s)s.innerHTML=periodInlineHTML(prodPeriod,prodCustom,'setProdPeriod','setProdCustom');return;}
   renderPipelineTable(orders);
   {const pw=document.querySelector('#pipelineTablePanel .pt-wrap');if(pw)pw.style.display=pipeOpen?'':'none';const c=document.getElementById('pipeTableChev');if(c)c.textContent=pipeOpen?'▾':'▸';}
   return;
@@ -10634,7 +11151,7 @@ function renderProduction(){
   let list=orders.filter(o=>{const txt=(o.client+' '+o.garment+' '+o.id+' '+o.outfits.map(x=>x.name).join(' ')).toLowerCase();if(q&&!txt.includes(q))return false;const du=daysUntil(o.due);const DELI=STAGES.indexOf('Delivered');
     if(prodFilter==='active')return o.stageIndex<7;if(prodFilter==='ready')return o.stageIndex>=7&&o.stageIndex<DELI;if(prodFilter==='collect')return o.stageIndex===7;if(prodFilter==='newtoday')return isToday(o.createdAt);if(prodFilter==='overdue')return o.stageIndex<7&&du!==null&&du<0;if(prodFilter==='qcfail')return o.qc&&o.qc.status==='failed';return o.stageIndex<DELI;}).sort((a,b)=>(daysUntil(a.due)??999)-(daysUntil(b.due)??999));
   const osub=document.getElementById('ordersSub');if(osub)osub.innerHTML=periodInlineHTML(ordersPeriod,ordersCustom,'setOrdersPeriod','setOrdersCustom')+(list.length?' <span style="color:var(--text-faint)">· '+list.length+(list.length===1?' piece':' pieces')+'</span>':'');
-  if(!orders.length){document.getElementById('orderList').innerHTML=emptyBlock('✂','No orders yet',can('orders')?'Add your first order to start tracking it through the workroom.':'Orders added by the team will show here for you to update.',can('orders')?'+ New order':null,'openOrder()');return;}
+  if(!orders.length){document.getElementById('orderList').innerHTML=emptyBlock('✂','No orders yet',can('orders')?'Add your first order to start tracking it through the workroom.':'Orders added by the team will show here for you to update.',can('orders')?'+ New order':null,'newOrder()');return;}
   document.getElementById('orderList').innerHTML=list.length?list.map(o=>{
     const du=daysUntil(o.due);const stageName=STAGES[o.stageIndex];
     const bcl=o.stageIndex>=7?'b-green':o.stageIndex>=5?'b-blue':o.stageIndex>=2?'b-gold':'b-amber';
@@ -10789,7 +11306,7 @@ function renderOrders(){
   renderSortControl('orders');
   rows=applySort('orders',rows);
   const sub=document.getElementById('ordersLedgerSub');if(sub)sub.innerHTML=periodInlineHTML(ordersPeriod,ordersCustom,'setOrdersPeriod','setOrdersCustom')+(rows.length?' <span style="color:var(--text-faint)">· '+rows.length+(rows.length===1?' order':' orders')+'</span>':'');
-  if(!orders.length){wrap.innerHTML=emptyBlock('🧾','No orders yet',can('orders')?'Create your first order to start tracking it here.':'Orders added by the team will show here.',can('orders')?'+ New order':null,'openOrder()');return;}
+  if(!orders.length){wrap.innerHTML=emptyBlock('🧾','No orders yet',can('orders')?'Create your first order to start tracking it here.':'Orders added by the team will show here.',can('orders')?'+ New order':null,'newOrder()');return;}
   if(!rows.length){wrap.innerHTML='<div class="ad" style="color:var(--text-faint);padding:18px 4px">No orders match this filter.</div>';return;}
   const money=can('money');
   const bespokeView=showsBespoke()&&!showsRTW()&&!showsRetail();

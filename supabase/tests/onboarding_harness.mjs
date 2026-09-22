@@ -153,6 +153,90 @@ section('A partner is not a studio');
 }
 
 // ---------------------------------------------------------------------
+section('A partner who was ALSO prepared a studio gets both');
+// ---------------------------------------------------------------------
+// 21 September 2026. LAYI was prepared for layiojomo@gmail.com. Kayode
+// created the account. He was attached to partner KUNLE, the studio was
+// never claimed, and nothing said so: the business kept its pending
+// address and the trigger returned happily.
+//
+// provision_studio opened with a partner claim that returned outright, so
+// the prepared-studio branch below it was unreachable for anybody who had
+// been invited as a partner first.
+//
+// The early return was not wrong, it was too wide. It exists to stop the
+// INVENT path from handing a studio to somebody who never asked for one,
+// which the section above still proves. A studio prepared by an operator
+// is not a guess, and partner + studio is a combination this system
+// supports on purpose: all six seeded test studios are both.
+{
+  await db.exec(`insert into partners (name, code, tier, status, joined_on, email, pending_email)
+                 values ('Both Ways', 'BOTH-WAYS', 'bronze', 'active', current_date, 'both@example.com',
+                         'both@example.com')`);
+  await db.exec(`insert into businesses (name, slug, plan, status, contact_email, pending_owner_email)
+                 values ('Both Ways Studio', 'both-ways-studio', 'trial', 'active',
+                         'both@example.com', 'both@example.com')`);
+
+  const uid = await signUp('both@example.com');
+
+  const p = await q(`select pending_email from partners where user_id = $1`, [uid]);
+  ok('the partner claim still happens', p.length === 1, p.length + ' found');
+  ok('and is still cleared', p[0] && p[0].pending_email === null);
+
+  const b = await q(`select pending_owner_email from businesses where slug = 'both-ways-studio'`);
+  ok('the prepared studio is claimed too, not swallowed',
+     b.length === 1 && b[0].pending_owner_email === null,
+     'still pending: ' + String(b[0] && b[0].pending_owner_email));
+
+  const prof = await q(
+    `select count(*)::int as n from profiles p join businesses b on b.id = p.business_id
+      where p.id = $1 and b.slug = 'both-ways-studio'`, [uid]);
+  ok('they get a profile in it', prof[0].n === 1, String(prof[0].n));
+
+  const mem = await q(
+    `select count(*)::int as n from memberships m join businesses b on b.id = m.business_id
+      where m.user_id = $1 and b.slug = 'both-ways-studio'
+        and m.role = 'owner' and m.status = 'active'`, [uid]);
+  ok('and own it', mem[0].n === 1, String(mem[0].n));
+
+  const extra = await q(
+    `select count(*)::int as n from memberships where user_id = $1`, [uid]);
+  ok('and exactly one studio, not a second invented one', extra[0].n === 1, String(extra[0].n));
+
+  // partners.user_id is UNIQUE, and the whole function is wrapped in
+  // 'exception when others'. So the referral code the trigger hands every
+  // new studio blows up for somebody who is already a partner, and the
+  // rollback takes the profile and the membership with it. The account
+  // ends up with no studio and a warning in a log nobody reads.
+  const pn = await q(`select count(*)::int as n from partners where user_id = $1`, [uid]);
+  ok('and still exactly one partner row, not a second one it cannot have',
+     pn[0].n === 1, String(pn[0].n));
+
+  const bill = await q(
+    `select count(*)::int as n from tlb_customers c join businesses b on b.id = c.business_id
+      where b.slug = 'both-ways-studio'`);
+  ok('and the studio is on the books like any other', bill[0].n === 1, String(bill[0].n));
+}
+
+// ---------------------------------------------------------------------
+section('Nobody is left stranded');
+// ---------------------------------------------------------------------
+// The footprint the bug left behind: a business still carrying a pending
+// address for an account that already exists. The trigger runs once, at
+// account creation, so this state never resolves itself. It should always
+// be empty, in a fresh database and in the live one.
+{
+  const stranded = await q(
+    `select b.slug, b.pending_owner_email
+       from businesses b
+       join auth.users u on lower(u.email) = lower(b.pending_owner_email)
+      where b.pending_owner_email is not null`);
+  ok('no studio is waiting on an address that has already signed up',
+     stranded.length === 0,
+     stranded.map(s => s.slug + ' <- ' + s.pending_owner_email).join(', '));
+}
+
+// ---------------------------------------------------------------------
 section('Signing up twice does not build two studios');
 // ---------------------------------------------------------------------
 // Supabase can re-run this on an account that already exists, and the app

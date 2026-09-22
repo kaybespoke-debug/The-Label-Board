@@ -416,12 +416,32 @@ function hBars(items, opts) {
 }
 
 /* ---------------- router ---------------- */
+
+/* Below 680px .main stops being the scroll container and the document itself
+   scrolls, so setting .main.scrollTop moves nothing and you arrive halfway
+   down whatever you opened. Kayode, 21 September 2026: "when you open a
+   subscribr from the list, the page goes to the middle so i have to scroll
+   back up."
+
+   Worse than it sounds, because the new page is usually shorter than the list
+   you came from: the browser clamps the old offset to the new height, so you
+   do not even land in a consistent place.
+
+   The partner portal has had this exact helper, and the comment explaining it,
+   since it was found there. It was never carried across. Same shape as the
+   unquoted ids: fixed once, in one app, while the other two kept the bug. */
+function scrollTop() {
+  const m = document.querySelector('.main');
+  if (m) m.scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
 function go(page) {
   if (typeof canPage === 'function' && !canPage(page)) { refusePage(page); return; }
   UI.detail = null;
   UI.page = page;
   render();
-  document.querySelector('.main').scrollTop = 0;
+  scrollTop();
 }
 function refusePage(page) {
   const t = (typeof TITLES !== 'undefined' && TITLES[page]) ? TITLES[page][0] : page;
@@ -437,13 +457,13 @@ function openDetail(type, id) {
   UI.detail = { type: type, id: id };
   UI.vtab[type + id] = UI.vtab[type + id] || null;
   render();
-  document.querySelector('.main').scrollTop = 0;
+  scrollTop();
 }
 function goBack() {
   UI.detail = null;
   UI.page = UI.back || 'dashboard';
   render();
-  document.querySelector('.main').scrollTop = 0;
+  scrollTop();
 }
 /* The strip that picks between panels on a phone. Rendered always, shown by CSS
    only under 760px, so the desktop row of four is untouched. */
@@ -455,7 +475,9 @@ function swapTabs(labels) {
 function setDashPanel(i) { UI.dashPanel = i; render(); }
 
 function setFilter(page, val) { UI.filters[page] = val; render(); }
-function setVTab(key, val) { UI.vtab[key] = val; render(); }
+/* A tab on a record replaces everything below the strip, so the page you
+   are now looking at starts at the top whether the browser agrees or not. */
+function setVTab(key, val) { UI.vtab[key] = val; render(); scrollTop(); }
 
 /* ---------------- modal ---------------- */
 function modal(title, sub, bodyHtml, footHtml, wide) {

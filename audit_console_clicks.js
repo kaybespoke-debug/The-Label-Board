@@ -74,6 +74,11 @@ const { sb, run } = boot({});
   if (typeof sb.addEventListener !== 'function') sb.addEventListener = function () {};
   if (typeof sb.removeEventListener !== 'function') sb.removeEventListener = function () {};
   if (!sb.screen) sb.screen = { width: 1440, height: 900 };
+  /* Every route now calls window.scrollTo, because under 680px the document is
+     what scrolls. A browser has it and this sandbox did not, so five perfectly
+     good handlers were reported as throwing. audit_partners.js has stubbed it
+     for the same reason since the portal learned this first. */
+  if (typeof sb.scrollTo !== 'function') sb.scrollTo = function () {};
   const html = fs.readFileSync(path.join(root, 'admin', 'index.html'), 'utf8');
   let n = 0;
   html.split('<script').slice(1).forEach(part => {
