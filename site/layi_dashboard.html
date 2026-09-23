@@ -13636,29 +13636,50 @@ async function renderUsersCloud(){const el=document.getElementById('usersList');
       :'<div class="kv" style="color:var(--text-faint)">No team accounts yet.</div>';
   }catch(e){el.innerHTML='<div class="kv" style="color:var(--red)">Could not load team: '+esc(e.message)+'</div>';}
 }
-function openUserCloud(id){const u=id?_cloudTeam.find(x=>x.id===id):null;const roles=getRoles();
+/* Off with the Edge Function's own switch, and for the same reason: inviting
+   somebody currently makes them the owner of a brand new studio named after
+   them, because the provisioning trigger has no way to attach an account to a
+   business that already exists. Phase 1B. Until then the owner is told it is
+   unavailable rather than shown a form that leaves wreckage behind. Editing an
+   existing teammate is untouched. */
+const TEAM_INVITES_ENABLED=false;
+function openUserCloud(id){
+  if(!id&&!TEAM_INVITES_ENABLED){
+    openModal(`<h3>Add a team account</h3><div class="msub">Temporarily unavailable</div>
+      <p style="font-size:14px;color:var(--text-dim);line-height:1.65;margin-bottom:6px">Team invitations are temporarily unavailable. Everything else on this screen works as usual.</p>
+      <div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+    return;
+  }
+  const u=id?_cloudTeam.find(x=>x.id===id):null;const roles=getRoles();
   const linkedElsewhere=new Set(_cloudTeam.filter(x=>x.staff_id&&(!u||x.id!==u.id)).map(x=>x.staff_id));
   const staff=getStaff().filter(s=>!linkedElsewhere.has(s.id));
-  openModal(`<h3>${u?'Edit team account':'New team account'}</h3><div class="msub">A real login with email &amp; password for a team member</div>
+  openModal(`<h3>${u?'Edit team account':'Invite a teammate'}</h3><div class="msub">${u?'Their role and what they are linked to':'They get an email and choose their own password'}</div>
     <div class="field"><label>Display name</label><input class="fld" id="us_name" value="${u?esc(u.name||''):''}" placeholder="e.g. Idara Umah"></div>
-    <div class="row2">
-      <div class="field"><label>Email (their login)</label><input class="fld" id="us_email" type="email" value="${u?esc(u.email||''):''}" ${u?'disabled style="opacity:.6"':''} placeholder="idara@studio.com"></div>
-      <div class="field"><label>${u?'Reset password':'Temporary password'} <span style="color:var(--text-faint)">${u?'(blank = keep)':''}</span></label><input type="password" class="fld" id="us_pin" placeholder="${u?'leave blank':'they change it later'}"></div>
-    </div>
+    <div class="field"><label>Email (their login)</label><input class="fld" id="us_email" type="email" value="${u?esc(u.email||''):''}" ${u?'disabled style="opacity:.6"':''} placeholder="idara@studio.com"></div>
     <div class="row2">
       <div class="field"><label>Role</label><select class="fld" id="us_role">${roles.map(r=>`<option value="${r.id}" ${u&&u.role_id===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div>
       <div class="field"><label>Linked staff (optional)</label><select class="fld" id="us_staff"><option value="">None</option>${staff.map(s=>`<option value="${s.id}" ${u&&u.staff_id===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
     </div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">They sign in at this app with their email and password. Linking a staff record carries their pay, attendance &amp; reporting line.</div>
-    <div class="modal-foot">${u?`<button class="btn danger sm" onclick="delUserCloud('${u.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveUserCloud('${u?u.id:''}')">${u?'Update':'Create login'}</button></div>`);}
-async function saveUserCloud(id){const name=(fv('us_name')||'').trim();const email=(fv('us_email')||'').trim().toLowerCase();const pass=fv('us_pin')||'';const role_id=fv('us_role')||'cre';const staff_id=fv('us_staff')||null;
+    ${u?`<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
+      <label style="text-transform:none;letter-spacing:0;font-weight:600;margin:0">Password</label>
+      <div class="sd" style="color:var(--text-faint);margin:6px 0 10px">You cannot see or set it. Send them a reset and they choose their own, which is the only way their account stays theirs.</div>
+      <button class="btn ghost sm" onclick="resetUserCloud('${u.id}')">Send password reset</button>
+    </div>`:`<div class="sd" style="color:var(--text-faint);margin-bottom:8px">Nobody is ever sent a password. They get an invitation at that address, pick their own, and land in the app.</div>`}
+    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Linking a staff record carries their pay, attendance &amp; reporting line.</div>
+    <div class="modal-foot">${u?`<button class="btn danger sm" onclick="delUserCloud('${u.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveUserCloud('${u?u.id:''}')">${u?'Update':'Send invitation'}</button></div>`);}
+async function saveUserCloud(id){const name=(fv('us_name')||'').trim();const email=(fv('us_email')||'').trim().toLowerCase();const role_id=fv('us_role')||'cre';const staff_id=fv('us_staff')||null;
   if(!name){alert('Name is required.');return;}
   if(staff_id&&_cloudTeam.some(x=>x.staff_id===staff_id&&x.id!==id)){alert('That staff record is already linked to another account.');return;}
   try{
-    if(id){await callTeamAdmin('update',{id,name,role_id,staff_id,password:pass||undefined});toast&&toast('Account updated');}
-    else{if(!email||!pass){alert('Email and a temporary password are required for a new login.');return;}await callTeamAdmin('create',{email,password:pass,name,role_id,staff_id});toast&&toast('Login created for '+name);}
+    if(id){await callTeamAdmin('update',{id,name,role_id,staff_id});toast&&toast('Account updated');}
+    else{if(!email){alert('An email address is needed to send the invitation.');return;}await callTeamAdmin('invite',{email,name,role_id,staff_id});toast&&toast('Invitation sent to '+email);}
     closeModal();renderUsersCloud();
   }catch(e){alert('Could not save the account: '+e.message);}}
+/* The owner asks; Supabase emails THEM. No password is ever shown to, chosen by,
+   or passed through the owner. An owner who could set a colleague's password
+   could sign in as them and act as them in the audit trail. */
+async function resetUserCloud(id){if(!confirm('Email this person a link to choose a new password?'))return;
+  try{await callTeamAdmin('sendReset',{id});toast&&toast('Reset link sent');}catch(e){alert('Could not send the reset: '+e.message);}}
 async function delUserCloud(id){if(!confirm('Delete this login? They will no longer be able to sign in.'))return;
   try{await callTeamAdmin('delete',{id});closeModal();renderUsersCloud();}catch(e){alert('Could not delete: '+e.message);}}
 /* ===== ROLES & PERMISSIONS (owner / users perm) ===== */
