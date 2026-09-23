@@ -64,82 +64,91 @@ function actionBody(code, action) {
 }
 
 // =====================================================================
-section('team-admin: an id from the browser is proved before auth is touched');
+section('team-admin: the privileged calls are unreachable without a proved target');
 // =====================================================================
 {
   const code = src('team-admin');
 
-  /* The helper itself. It must READ the row back, not scope a write. */
-  const helperAt = code.indexOf('async function mustBeOurs(');
-  ok('there is a function whose whole job is proving ownership', helperAt >= 0,
-     'without it every action is re-deriving the check and one of them will get it wrong');
+  /* ---- the guard itself ---- */
+  const at = code.indexOf('async function verifyTarget(');
+  ok('there is one function whose whole job is proving ownership', at >= 0,
+     'without it every action re-derives the check and one of them gets it wrong');
 
-  if (helperAt >= 0) {
-    const helper = code.slice(helperAt, code.indexOf('\n    }', helperAt));
-    ok('it proves ownership with a SELECT',
-       /\.from\('profiles'\)\s*\.select\(/.test(helper),
-       'a scoped UPDATE that matches nothing returns no error, which is the whole bug');
-    ok('it scopes that read to the caller’s business',
-       /\.eq\('business_id',\s*biz\)/.test(helper));
-    ok('it scopes that read to the id it was given',
-       /\.eq\('id',\s*id\)/.test(helper));
-    ok('a row that is not found is a refusal, not a pass',
-       /if\s*\(!\s*data\s*\)\s*return/.test(helper),
+  if (at >= 0) {
+    const guard = code.slice(at, code.indexOf('\n    }', at));
+    ok('it proves ownership with a SELECT, not a scoped write',
+       /\.from\('profiles'\)\s*\.select\(/.test(guard),
+       'a scoped UPDATE that matches nothing returns no error. That was the bug');
+    ok('scoped to the caller’s business', /\.eq\('business_id',\s*biz\)/.test(guard));
+    ok('scoped to the id it was handed', /\.eq\('id',\s*wanted\)/.test(guard));
+    ok('a missing row is a refusal, not a pass',
+       /if\s*\(!data\)\s*return\s*\{\s*ok:\s*false/.test(guard),
        'maybeSingle returns null rather than throwing, so this has to be explicit');
+    ok('a platform admin is refused explicitly as well as implicitly',
+       /from\('platform_admins'\)/.test(guard),
+       'they hold no studio profile so the read already misses them, but say it out loud');
+    ok('it refuses with 403', /status:\s*403/.test(guard));
   }
 
-  /* Every action that reaches auth.admin with an id from the body. */
-  const DANGEROUS = [
-    { action: 'update', reaches: 'updateUserById', harm: 'resets that account’s password' },
-    { action: 'delete', reaches: 'deleteUser',     harm: 'deletes that account outright' },
-  ];
+  /* ---- THE STRUCTURAL PART ------------------------------------------
+     A rule people must remember is a rule that gets forgotten. The point
+     of the branded type is that passing a raw id to a privileged call is
+     a TYPE ERROR, caught on deploy, not something review has to spot. */
+  ok('there is a branded type for a target that has been proved',
+     /type VerifiedTarget = string & \{[^}]*unique symbol[^}]*\}/.test(code),
+     'without the brand, any string reaches the privileged helpers');
 
-  DANGEROUS.forEach(d => {
-    const body = actionBody(code, d.action);
-    ok(`'${d.action}' exists`, body.length > 0);
-    if (!body) return;
+  ok('the payload is typed unknown, so a raw id cannot satisfy the brand',
+     /payload\s*=\s*\(body\.payload\s*\?\?\s*\{\}\)\s*as Record<string,\s*unknown>/.test(code),
+     'if payload were `any`, `any` is assignable to anything and the brand proves nothing');
 
-    ok(`'${d.action}' calls mustBeOurs`, /mustBeOurs\(/.test(body),
-       'it ' + d.harm + ' using an id the browser chose');
+  ok('only verifyTarget can mint one',
+     (code.match(/as VerifiedTarget/g) || []).length === 1,
+     'found ' + (code.match(/as VerifiedTarget/g) || []).length + ' casts; a second one is a back door');
 
-    ok(`'${d.action}' refuses on the result rather than ignoring it`,
-       /if\s*\(\s*bad\s*\)\s*return\s+json\(/.test(body),
-       'calling the check and not reading its answer is the same as not calling it');
+  ok('the privileged helpers take the branded type',
+     /removeAccount = \(t: VerifiedTarget\)/.test(code)
+     && /emailPasswordReset = async \(t: VerifiedTarget\)/.test(code));
 
-    /* Order matters more than presence: a check AFTER the damage is done
-       is decoration. Compare the offsets inside this action's own body. */
-    const guardAt = body.indexOf('mustBeOurs(');
-    const authAt = body.indexOf(d.reaches);
-    ok(`'${d.action}' proves ownership BEFORE it reaches auth.admin`,
-       guardAt >= 0 && authAt >= 0 && guardAt < authAt,
-       'guard at ' + guardAt + ', ' + d.reaches + ' at ' + authAt);
-
-    ok(`'${d.action}' returns 403 for somebody else’s account`,
-       /return\s+json\(\{\s*error:\s*bad\s*\}\s*,\s*403\)/.test(body),
-       'a 400 reads as "you sent something malformed"; this is "that is not yours"');
-  });
-
-  /* And the same rule for any action added LATER. The two above are
-     named because they are the two that broke; this catches the third
-     one somebody writes next year. Any action block that reaches
-     auth.admin with the body's id has to prove ownership first.
-
-     Deliberately derived from the file rather than from a list, so a new
-     action is covered the day it is written rather than the day someone
-     remembers to add it here. */
+  /* ---- and the ordering, per action, derived from the file ---- */
   const allActions = [...code.matchAll(/if \(action === '([a-zA-Z]+)'\)/g)].map(m => m[1]);
-  ok('the actions were found in the file (' + allActions.join(', ') + ')', allActions.length >= 3);
+  ok('the actions were found (' + allActions.join(', ') + ')', allActions.length >= 4);
 
   allActions.forEach(a => {
     const body = actionBody(code, a);
-    /* auth.admin called with the body's id — createUser takes an email and
-       makes its own id, so it is not in scope and correctly not flagged. */
-    const touchesForeignId = /auth\.admin\.[a-zA-Z]+\(\s*id\b/.test(body);
-    if (!touchesForeignId) return;
-    ok(`'${a}' reaches auth.admin with a body id, and proves ownership first`,
-       /mustBeOurs\(/.test(body) && body.indexOf('mustBeOurs(') < body.search(/auth\.admin\.[a-zA-Z]+\(\s*id\b/),
-       'a new action inherited the old mistake');
+    /* does this action reach a privileged call with a target from the body? */
+    const priv = /(removeAccount|emailPasswordReset)\(/.exec(body);
+    if (!priv) return;
+    ok(`'${a}' proves ownership before the privileged call`,
+       /verifyTarget\(/.test(body) && body.indexOf('verifyTarget(') < priv.index,
+       'a guard after the damage is decoration');
+    ok(`'${a}' refuses on the guard’s own verdict`,
+       /if\s*\(!v\.ok\)\s*return json\(\{ error: v\.error \}, v\.status\)/.test(body),
+       'calling the check and not reading its answer is the same as not calling it');
   });
+
+  /* ---- passwords ---- */
+  ok('no action takes a password from the browser',
+     !/payload\.password/.test(code) && !/password:\s*str\(/.test(code),
+     'an owner who can set a colleague’s password can sign in as them');
+  ok('createUser with a caller-supplied password is gone',
+     !/auth\.admin\.createUser\(/.test(code),
+     'invitations replaced it: they choose their own and it never crosses this boundary');
+  ok('an invitation is what creates a teammate now',
+     /auth\.admin\.inviteUserByEmail\(/.test(code));
+  ok('a password sent anyway is refused rather than ignored',
+     /'password' in payload/.test(code),
+     'silently dropping it would leave an owner believing they had set one');
+
+  /* ---- what the caller is allowed to be ---- */
+  ok('the studio comes from the database, never the body',
+     /from\('profiles'\)\.select\('role_id,business_id'\)\.eq\('id', user\.id\)/.test(code)
+     && !/payload\.business_id/.test(code));
+  ok('everything that changes an account is owner only',
+     /if \(!isOwner\) return json\(/.test(code));
+  ok('the error handler does not echo the thrown object',
+     !/String\(\(e as Error\)\.message/.test(code),
+     'in a service-role context the detail in a thrown error is privileged');
 }
 
 // =====================================================================
