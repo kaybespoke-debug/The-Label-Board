@@ -54,6 +54,8 @@ const J=e=>JSON.parse(run('JSON.stringify('+e+')'));
 run("currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
 let fails=[];const F=x=>fails.push(x);
 let checks=0;const ok=(cond,msg)=>{checks++;if(!cond)F(msg);};
+/* Checks that cannot answer in the same tick queue here, and the report waits on them. */
+const PENDING=[];
 
 /* ===================================================================================
    PART ONE — QUANTITY, the one structural change
@@ -254,19 +256,36 @@ ok(/PAID IN FULL/.test(run("invoiceInner(getOrders().find(function(o){return o.i
 asInvoice({paid:400000});
 
 /* ===================================================================================
-   PART THREE — THE FORM, CUT IN TWO
+   PART THREE — TWO DOORS, AND A FORM THAT IS A FORM
+
+   Rewritten 23 September. The first shape was wrong and was said so plainly: "I don’t
+   like how this looks ... its still the same old complaints I have been having. The
+   stories and explanations are unnecessary, a form should be a form. The 2 doors should
+   be one for invoice only and one for new order. Invoice page has no business with
+   measurements and everything on image 5."
+
+   So two things are held here, and they pull in the same direction.
+
+   THE DOORS ARE AN INVOICE AND AN ORDER, not two flavours of the same form. Underneath it
+   is still ONE record, which is the decision audit_quote protects and which nothing here
+   changes: an invoice is an order nobody has confirmed. What differs is how much of that
+   record each door asks for. The invoice form carries nothing about the workroom, because
+   a client’s bill has no opinion about who is cutting the cloth.
+
+   AND A FORM IS A FORM. Helper sentences were asked to go three times. They are counted
+   here rather than described, because prose creeps back one well-meaning sentence at a
+   time and nobody ever notices the one they added.
    =================================================================================== */
 
-// The doors exist, and they are what the buttons call. openOrder() itself must keep
-// opening the editor, because that is how it has always been called from a row.
 ok(run("typeof newOrder")==='function','there is no door to pick, so adding an order never asks');
 run("closeModal();draft=null;newOrder();");
 let doors=run("document.getElementById('modal').innerHTML")||'';
-ok(/Quote &amp; invoice/.test(doors),'the quote door is missing, which is the complaint that there is nowhere to invoice');
-ok(/Straight to an order/.test(doors),'there is no way in for a job that is already agreed');
-ok(/openOrder\(null,'quote'\)/.test(doors)&&/openOrder\(null,'order'\)/.test(doors),
+ok(/>Invoice</.test(doors),'there is no door for an invoice');
+ok(/New order/.test(doors),'there is no door for an order');
+ok(/openOrder\(null,'invoice'\)/.test(doors)&&/openOrder\(null,'order'\)/.test(doors),
   'a door does not open anything');
-// Every handler the door screen wires up has to exist, same as the form's.
+// the door screen is two choices and a way out, not a page of reading
+ok((doors.match(/[.!?]/g)||[]).length<=6,'the door screen has turned into an explanation');
 (doors.match(/onclick="[^"]*"/g)||[]).forEach(att=>{
   (att.match(/(?:^|[^\w$.])([A-Za-z_$][\w$]*)\s*\(/g)||[]).forEach(hit=>{
     const fn=hit.replace(/[^\w$]/g,'');
@@ -274,82 +293,83 @@ ok(/openOrder\(null,'quote'\)/.test(doors)&&/openOrder\(null,'order'\)/.test(doo
   });
 });
 
-// The door decides one thing and one thing only: whether it starts on the board.
-run("closeModal();draft=null;openOrder(null,'quote');");
-ok(run("isQuote(draft)")===true,'coming in through the quote door does not make it a quote');
-run("closeModal();draft=null;openOrder(null,'order');");
-ok(run("isQuote(draft)")===false,'coming in through the order door still starts it as a quote');
-// and nobody who calls openOrder() the old way gets a surprise
-run("closeModal();draft=null;openOrder();");
-ok(run("isQuote(draft)")===false,'openOrder() with no door no longer opens an ordinary order');
-ok(!!run("document.getElementById('f_quoted')"),'the quote switch has gone from the form');
-
-/* The measurement that started this. Eight fields to price a job, before any section is
-   opened. Counted as form controls rather than by eye, and counted BEFORE the line that
-   introduces the closed sections, because everything after it is deferred by design.
-
-   The client picker is two controls for one question (pick an existing client, or type a
-   new name) and the product type is two more (a list, plus a box for anything not on it),
-   so the ceiling here is a little above eight. It is a ceiling, not a count: what it
-   refuses is the form creeping back towards forty. */
-run("closeModal();draft=null;openOrder(null,'quote');");
-let form=run("document.getElementById('modal').innerHTML")||'';
-ok(!!form,'the quote form rendered nothing');
-const openPart=form.split('Everything else, when you need it')[0];
-// What is actually standing open: the near half, minus anything already behind a tap —
-// which includes the per-piece section inside each item.
-const standing=openPart.replace(/<details[\s\S]*?<\/details>/g,'');
-const controls=(standing.match(/<input|<select|<textarea/g)||[]).length;
-ok(openPart!==form,'the form does not separate what you need now from what you need later');
-ok(controls<=14,'the form standing open has crept back to '+controls+' controls; it is meant to be the eight it takes to price a job, plus the door switch and the twin boxes on the client and on the product type');
-ok(/<textarea/.test(standing)===false,'a free-text box is standing open on a form that is meant to be eight fields');
-
-// The eight are actually there and actually open.
+/* --- the invoice door: one record, and none of the workroom ------------------------- */
+run("closeModal();draft=null;openOrder(null,'invoice');");
+ok(run("isQuote(draft)")===true,'an invoice does not start as a quote, so it goes on the production board before anybody has agreed to it');
+let inv=run("document.getElementById('modal').innerHTML")||'';
+ok(!!inv,'the invoice form rendered nothing');
+ok(/New invoice/.test(inv),'the invoice form is not headed as an invoice');
+// what a bill has no opinion about
+[['f_stage','what stage it is at'],['comm_staff_0','who is making it'],['c_amt_0','what the cloth cost'],
+ ['su_item_0','what stock it draws down'],['f_del_on','who is delivering it'],['om_fit','the measurements'],
+ ['f_diron','the director allocation'],['of_style_0','the styling'],['of_finish_0','the finishing']]
+  .forEach(([id,what])=>ok(inv.indexOf('id="'+id+'"')<0,'the invoice form is asking about '+what));
+ok(inv.indexOf('class="osec"')<0,'the invoice form has the order\u2019s closed sections on it');
+ok(!/orderProfit|Retained business profit/.test(inv),'the invoice form is showing the studio its own profit on a document meant for a client');
+// and it still asks everything a bill needs
 [['f_client','who it is for'],['f_whatsapp','their phone'],['of_type_0','what kind of piece'],
  ['of_name_0','what to call it'],['of_price_0','the price'],['of_qty_0','how many'],
- ['f_paid','the deposit'],['f_due','when it is ready']].forEach(([id,what])=>{
-  ok(openPart.indexOf('id="'+id+'"')>=0,'the form does not ask '+what+' without opening a section');
-});
-// and the deposit asks for a deposit, in the words of the door you came in by
-ok(/Deposit asked/.test(openPart),'the quote door asks what has been paid rather than what is being asked for');
+ ['of_code_0','the product code'],['of_disc_0','anything off that piece'],['f_discount','anything off the order'],
+ ['f_currency','what they pay in'],['f_paid','the deposit'],['f_due','when it is ready']]
+  .forEach(([id,what])=>ok(inv.indexOf('id="'+id+'"')>=0,'the invoice form does not ask '+what));
+ok(/Deposit asked/.test(inv),'the invoice asks what has been paid rather than what is being asked for');
 
-// The 28 are still here — closed, not deleted. Anything that vanished would stop saving.
-ok((form.match(/class="osec"/g)||[]).length>=6,'the deferred fields are not in sections, so they are back in one long run');
-[['f_email','the client’s email'],['f_address','where it is going'],['f_discount','the discount'],
+/* --- the order door: everything, with the after-the-yes half behind a tap ----------- */
+run("closeModal();draft=null;openOrder(null,'order');");
+ok(run("isQuote(draft)")===false,'coming in through the order door still starts it as a quote');
+run("closeModal();draft=null;openOrder();");
+ok(run("isQuote(draft)")===false,'openOrder() with no door no longer opens an ordinary order');
+ok(!!run("document.getElementById('f_quoted')"),'the quote switch has gone from the order form');
+let form=run("document.getElementById('modal').innerHTML")||'';
+ok((form.match(/class="osec"/g)||[]).length>=5,'the deferred fields are not in sections, so they are back in one long run');
+[['f_email','the client\u2019s email'],['f_address','where it is going'],['f_discount','the discount'],
  ['f_currency','the currency'],['f_stage','the stage'],['f_del_on','the delivery'],
- ['comm_staff_0','who is making it'],['of_style_0','the styling'],['of_finish_0','the finishing']].forEach(([id,what])=>{
+ ['comm_staff_0','who is making it'],['of_style_0','the styling'],['of_finish_0','the finishing'],
+ ['of_code_0','the product code'],['of_disc_0','the discount on a piece']].forEach(([id,what])=>{
   ok(form.indexOf('id="'+id+'"')>=0,'moving the form around lost '+what+'; a field that is not rendered is a field that stops saving');
 });
+ok(form.indexOf("openOrderSection('osecStock')")<0||form.indexOf('id="osecStock"')>=0,
+  'the inventory row points at a section that does not exist');
 
-// A shut section has to answer its own question, or it is hiding work rather than
-// deferring it. Opened on a real order, where there are answers to show.
-run("closeModal();draft=null;openOrder('"+OID+"');");
-form=run("document.getElementById('modal').innerHTML")||'';
-['Client details','Where it has got to','Who is making it','Fabric &amp; stock used','Getting it to them']
-  .forEach(title=>ok(form.indexOf(title)>=0,'there is no "'+title+'" section on the order'));
-const summaries=(form.match(/class="osec-n">([^<]*)</g)||[]).map(x=>x.replace(/.*>([^<]*)<$/,'$1').trim());
-ok(summaries.length>=6,'the sections carry no summaries, so a shut one says nothing about what is inside it');
-ok(summaries.filter(Boolean).length===summaries.length,'a section is shut with an empty summary, which tells nobody anything');
-ok(form.indexOf('Red Star Express')>=0,'the shut delivery section does not say who is carrying it');
-// every handler on the form still resolves, as audit_method asks of it
-const seen={};
-(form.match(/onclick="[^"]*"/g)||[]).forEach(att=>{
-  (att.match(/(?:^|[^\w$.])([A-Za-z_$][\w$]*)\s*\(/g)||[]).forEach(hit=>{
-    const fn=hit.replace(/[^\w$]/g,'');
-    if(seen[fn])return;seen[fn]=1;
-    ok(run("typeof "+fn)==='function','the order form wires up '+fn+'(), which does not exist');
-  });
-});
+/* --- a form is a form ---------------------------------------------------------------
+   Counted, not described. Every helper paragraph on the order form, and separately the
+   sentences on the shorter invoice form, which should have almost none. A cap rather than
+   a ban, because a figure like "Balance: N0" earns its line and a warning about a client\u2019s
+   own cloth is not chatter. */
+{const helpers=(form.match(/class="sd"/g)||[]).length;
+ ok(helpers<=12,'the order form is carrying '+helpers+' lines of helper text; a form is a form');
+ const invHelpers=(inv.match(/class="sd"/g)||[]).length;
+ ok(invHelpers<=4,'the invoice form is carrying '+invHelpers+' lines of helper text');
+ /* the specific sentences that were asked to go, by name, so they cannot drift back */
+ ['None of this is in your way','Most of it you cannot know yet',
+  'Pick an existing client to auto-fill','saved to Customers on save',
+  'Comes off before any tax','Switch if this client pays in pounds',
+  'Staff commissions & delivery are counted','Add fabric suppliers under Supplies',
+  'Most orders are a single piece','These also show on the client',
+  'Deducts from Supplies when you save','Everyone who earns on this order',
+  'A share of this order','Add couriers under Supplies',
+  'Prints under the item on the invoice','Comes off this line only'
+ ].forEach(sentence=>{
+   ok(form.indexOf(sentence)<0,'an explanation that was asked to go is back on the form: "'+sentence+'"');
+ });}
 
-// The form still reads the quantity back, which is the only way it reaches the record.
-run("closeModal();draft=null;openOrder(null,'order');");
+/* --- the phone book ------------------------------------------------------------------
+   The browser shows its own picker, so the app never sees the address book, only the one
+   person chosen. Where a browser does not offer it the button is not drawn, rather than
+   drawn and dead: this sandbox has no navigator.contacts, which is the same answer an
+   iPhone gives. */
+ok(run("typeof pickContact")==='function','there is no way to take a client from the phone book');
+ok(run("typeof contactsSupported")==='function','nothing checks whether the browser offers contacts');
+ok(run("contactsSupported()")===false,'a browser with no contacts API is being told it has one');
+ok(form.indexOf('pickContact()')<0,'a browser that cannot offer contacts is being shown the button anyway');
+
+// the form still reads the quantity and the piece discount back
 run("document.getElementById('of_price_0').value='400000';document.getElementById('of_qty_0').value='3';syncOrderDraft();");
 ok(run("draft.outfits[0].qty")===3,'typing a quantity into the form does not reach the order');
 ok(run("draft.value")===1200000,'the order value does not follow the quantity typed into the form');
 run("document.getElementById('of_qty_0').value='0';syncOrderDraft();");
 ok(run("draft.outfits[0].qty")===1,'a quantity of none can be saved, and the order is then worth nothing');
 run("closeModal();draft=null;");
-
 /* ===================================================================================
    PART FOUR — THE ITEM ROW, 22 September
 
@@ -455,18 +475,31 @@ ok(run("draft.outfits[0].price")===99,'picking a type overwrote a price somebody
 ok(run("draft.outfits[0].code")==='MINE','picking a type overwrote a code somebody had already typed');
 run("closeModal();draft=null;");
 
-/* --- the four boxes are on the item, and the way to the stock is too ---------------- */
-run("closeModal();draft=null;openOrder(null,'quote');");
+/* --- the item sheet is flat -----------------------------------------------------------
+   These four sat behind a tap until 23 September. They came out into the open because the
+   sheet Kayode sent has all of them on one screen, and because a code and a discount are
+   price, not work: they belong beside the price, not behind the cloth.
+
+   What stays behind the tap is the WORKROOM, which is checked below rather than counted:
+   a form that asks about beading while somebody is pricing a job is the original
+   complaint. */
+run("closeModal();draft=null;openOrder(null,'order');");
 form=run("document.getElementById('modal').innerHTML")||'';
 [['of_code_0','a product code'],['of_disc_0','a discount on the piece'],['of_save_0','a way to remember the piece']]
   .forEach(([id,what])=>ok(form.indexOf('id="'+id+'"')>=0,'the item row has no '+what));
 ok(form.indexOf("openOrderSection('osecStock')")>=0,'there is no way to reach the stock from the piece');
 ok(form.indexOf('id="osecStock"')>=0,'the inventory row points at a section that does not exist');
 ok(run("typeof openOrderSection")==='function','the inventory row calls something that does not exist');
-// the four stay behind the tap, so the eight fields to price a job are still eight
-{const near=form.split('Everything else, when you need it')[0].replace(/<details[\s\S]*?<\/details>/g,'');
- ['of_code_0','of_disc_0','of_save_0'].forEach(id=>
-   ok(near.indexOf('id="'+id+'"')<0,id+' is standing open, which puts the form back over eight fields'));}
+{/* everything outside a <details> is what somebody meets before tapping anything */
+ const near=form.replace(/<details[\s\S]*?<\/details>/g,'');
+ [['f_stage','what stage it is at'],['comm_staff_0','who is making it'],['c_amt_0','what the cloth cost'],
+  ['f_del_on','who is delivering it'],['om_fit','the measurements'],['f_diron','the director allocation'],
+  ['of_style_0','the styling'],['of_finish_0','the finishing'],['su_item_0','the stock it draws down']]
+   .forEach(([id,what])=>ok(near.indexOf('id="'+id+'"')<0,
+     'the order form asks '+what+' before anybody has tapped anything; that stretch is the original complaint'));
+ /* and the price half really is standing open, not buried with it */
+ ['f_client','f_whatsapp','of_type_0','of_price_0','of_qty_0','of_name_0','of_code_0','of_disc_0','f_discount','f_paid','f_due']
+   .forEach(id=>ok(near.indexOf('id="'+id+'"')>=0,id+' has been pushed behind a tap; it is what you need to price a job'));}
 // a discount typed inside a shut section still shows outside it
 run("document.getElementById('of_price_0').value='400000';document.getElementById('of_qty_0').value='2';document.getElementById('of_disc_0').value='5000';syncOrderDraft();");
 ok(run("draft.outfits[0].discount")===5000,'a discount typed on the piece does not reach the order');
@@ -513,15 +546,88 @@ ok(d.indexOf('class="tlb-only-narrow"')>=0,'nothing carries the price and quanti
   ok(d.indexOf('class="'+c+'"')>=0,'the '+c.replace('tlb-','')+' block is not marked, so it cannot stack on a phone'));
 
 /* ===================================================================================
+   PART SIX — STAYING SIGNED IN, 23 September
+
+   "the customer app, it keeps asking for a login each time I minimize or close the app,
+   the landing page is fine but not having to log in every single moment."
+
+   Not taste, a bug, and a one-line one. The session stored the account id, and restoring
+   it looked that id up in THIS DEVICE's user list. That works for a device account and
+   cannot ever work for a studio signed in against the cloud, whose id is the Supabase
+   account's and was never in the local list. Every lookup failed, every failure cleared
+   the session as stale, and a real studio met the sign-in card every time the phone
+   reclaimed the tab.
+
+   The fix remembers the account whole. So what is checked here is the case that was
+   broken: an account that is NOT in the device's list still comes back.
+   =================================================================================== */
+run("closeModal();draft=null;");
+{
+  /* a cloud studio: signed in, liveMode, and an id no local user has */
+  run("currentUser={id:'auth-uid-not-a-local-user',name:'LAYI',username:'owner@example.com',roleId:'owner',staffId:'',active:true};liveMode=true;myBusinessId='biz-1';saveSession();");
+  const saved=JSON.parse(run("localStorage.getItem(SESSION_KEY)"));
+  ok(!!(saved&&saved.user&&saved.user.id),'the session stores an id alone, so a cloud studio can never be restored from it');
+  ok(saved.live===true&&saved.biz==='biz-1','the session forgets that the studio was live, so it comes back offline from its own cloud');
+  ok(saved.user.pin===undefined,'the session is keeping a copy of the password');
+  ok(run("getUsers().some(function(u){return u.id==='auth-uid-not-a-local-user'})")===false,
+    'the fixture is not testing what it claims: that account IS in the local list');
+  /* now the thing he reported: come back as if the phone had reclaimed the tab */
+  run("currentUser=null;liveMode=false;myBusinessId=null;");
+  ok(run("restoreSession()")===true,
+    'a studio signed in against the cloud is not restored, so it meets the sign-in card every time the app is reopened');
+  ok(run("currentUser&&currentUser.id")==='auth-uid-not-a-local-user','the wrong account came back');
+  ok(run("liveMode")===true,'the studio came back but not as a live one, so its work would not sync');
+  ok(run("localStorage.getItem(SESSION_KEY)!==null")===true,'restoring a cloud studio threw its session away');
+
+  /* a device account still comes from the list, so a role changed since last time applies */
+  run("(function(){var u=getUsers()[0];currentUser=u;liveMode=false;myBusinessId=null;saveSession();})();");
+  run("(function(){var l=getUsers();l[0].name='Renamed Since';setUsers(l);})();");
+  run("currentUser=null;");
+  ok(run("restoreSession()")===true,'a device account is no longer restored');
+  ok(run("currentUser.name")==='Renamed Since',
+    'a device account came back from the session rather than the list, so a change made since is ignored');
+
+  /* a session that has been signed out of, and one that has aged out */
+  run("clearSession();currentUser=null;");
+  ok(run("restoreSession()")===false,'signing out leaves somebody signed in');
+  run("localStorage.setItem(SESSION_KEY,JSON.stringify({id:'x',at:0,user:{id:'x',name:'Old'}}));currentUser=null;");
+  ok(run("restoreSession()")===false,'a session older than the expiry is still accepted');
+  ok(run("localStorage.getItem(SESSION_KEY)")===null,'an expired session is left lying on the device');
+  ok(run("typeof verifyLiveSession")==='function',
+    'nothing ever asks the server whether that session is still good, so a revoked account keeps working offline forever');
+
+  /* And the check must not become a worse version of the bug. Found in a browser rather
+     than here: a studio whose cloud session has gone was being logged straight back out,
+     which is being ejected mid-job instead of merely being asked to sign in. Everything is
+     on the device and the app is built to work without a network, so it stays open and
+     stops claiming to be synced. */
+  run("currentUser={id:'auth-uid-not-a-local-user',name:'LAYI',roleId:'owner',active:true};liveMode=true;");
+  run("(function(){supa={auth:{getSession:function(){return Promise.resolve({data:{session:null}});}}};})();");
+  const before=run("currentUser.id");
+  /* It is async, so the report below waits on it rather than reading the answer a tick
+     before it exists. The first version of this check did exactly that and passed on a
+     version of the app that ejected the user. */
+  PENDING.push(Promise.resolve(run("verifyLiveSession()")).then(function(){
+    ok(run("currentUser&&currentUser.id")===before,
+      'a studio whose cloud session has gone is thrown out of the app it was working in');
+    ok(run("liveMode")===false,'the app still claims to be syncing after the cloud stopped knowing it');
+    /* tidied here rather than below, because below runs a tick before this does */
+    run("supa=null;clearSession();currentUser=getUsers().find(u=>u.roleId==='owner');liveMode=false;");
+  }));
+}
+
+/* ===================================================================================
    REPORT
    =================================================================================== */
+Promise.all(PENDING).then(function(){
 console.log('='.repeat(64));
 if(fails.length){
   console.log('audit_invoice: '+fails.length+' FAILED of '+checks+' checks\n');
   fails.forEach(f=>console.log('  ✗ '+f));
   process.exit(1);
 }
-console.log('✓ eight fields to price a job, 28 deferred not deleted, two doors, and an');
-console.log('  invoice with price × qty, a photo and a code in the line, a discount on one');
-console.log('  piece then on the whole order then the tax then the shipping, reactive payment');
-console.log('  accounts, a signature and an amount due. '+checks+' checks passed.');
+console.log('✓ two doors, an invoice form with nothing of the workroom on it, an order');
+console.log('  form that keeps the workroom behind a tap, no explanations, price × qty,');
+console.log('  a discount on one piece then on the whole order then the tax then the shipping,');
+console.log('  and a studio that stays signed in. '+checks+' checks passed.');
+});

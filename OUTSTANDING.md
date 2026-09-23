@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 22 September 2026 (nineteenth session)
+Last updated: 23 September 2026 (twentieth session)
 
 ## Shipped 21 September 2026
 
@@ -175,7 +175,7 @@ one that turned up the bug above, which is the argument for doing these in
 order against a live database rather than reasoning about them.
 
 
-## The order form and the invoice, 21–22 September — SHIPPED
+## The order form and the invoice, 21–23 September — SHIPPED
 
 Kayode signed into the app as LAYI for the first time, tried to add an order,
 and said it was "just a very long unending list ... its certain this is not the
@@ -335,7 +335,7 @@ Green before starting and green before shipping: `node verify.js`, then
 `node audit_safearea.js` after any stylesheet or table change. Bump `CACHE` in
 `site/sw.js` before the release or installed phones keep the old version.
 
-### Built 21–22 September, shipped 22 September as `layi-v44`
+### Built 21–23 September, shipped 23 September as `layi-v45`
 
 All of the above is in `site/layi_dashboard.html`.
 
@@ -514,6 +514,72 @@ terms at all now sends a quote carrying nothing about what paying does. Delibera
 failed over: an empty terms box is a studio's decision, not a broken build. If October's
 cohort turns out to skip that box, the fix is a nudge in Settings when it is empty rather
 than the app putting words in their mouth again.
+
+### Rebuilt after the first shape was rejected, 23 September
+
+*"I don't like how this looks. Tried working with it but it's still the same old complaints
+I have been having."* Five things, all of them fair.
+
+**1. A form should be a form.** Every explanatory sentence is off the order form and the
+invoice form. Not trimmed, gone: the paragraph under the quote switch, "None of this is in
+your way while you price the job", "Pick an existing client to auto-fill their details",
+"Comes off before any tax", "Staff commissions & delivery are counted as production costs
+on their own", "Add fabric suppliers under Supplies", "Deducts from Supplies when you
+save", "Everyone who earns on this order", and nine more. `audit_invoice` names all
+sixteen and fails if one comes back, and caps the helper lines at twelve on the order form
+and four on the invoice. Counted rather than described, because prose creeps back one
+well-meaning sentence at a time and nobody notices the one they added.
+
+**2. The doors are an Invoice and a New order.** Not two flavours of the same form, which
+is what they were and which was the wrong read of "2 doors is okay". Underneath it is
+still ONE record, which is what `audit_quote` protects and which has not changed. What
+differs is how much of that record each door asks for.
+
+**3. The invoice form has nothing of the workroom on it.** *"Invoice page has no business
+with measurements and everything on image 5."* So no stage, no maker, no cloth, no stock,
+no delivery, no profit, no measurements, and none of the closed sections. Client, phone,
+the pieces with their codes and their prices, a discount, a currency, a deposit, a date.
+The gate lists both halves: nine ids that must not be on it, twelve that must.
+
+The item sheet is flat now, like the one he sent: product code and the discount on a piece
+came out from behind the tap, because a code and a discount are price rather than work.
+What stays behind the tap on the ORDER form is the workroom, and that is checked as
+"absent from everything outside a `<details>`" rather than by counting fields.
+
+**4. A client can come from the phone book.** `pickContact()` uses the Contact Picker API.
+The browser shows its own picker, so the app never sees the address book, only the one
+person chosen, and it fills the name, the phone and the email.
+
+**It will not appear on his iPhone.** Safari on iOS does not expose contacts to a web page
+at all. The button is drawn only where the browser offers the API, which is Chrome on
+Android, rather than drawn and dead everywhere else. On iOS this needs a native wrapper,
+which is a separate piece of work and not a small one. Said here rather than left to be
+discovered.
+
+### The app kept asking for a login, 23 September
+
+*"it keeps asking for a login each time I minimize or close the app."* Not taste, a bug,
+and a one-line one.
+
+The session stored the account **id**, and restoring it looked that id up in **this
+device's** user list. That works for a device account and cannot ever work for a studio
+signed in against the cloud, whose id is the Supabase account's and was never in the local
+list. Every lookup failed, every failure cleared the session as stale, and a real studio
+met the sign-in card every time the phone reclaimed the tab. It has been broken for every
+live tenant since live tenants existed; the demo and device accounts always worked, which
+is why nothing caught it.
+
+The session now remembers the account whole, plus whether it was live and which business.
+A device account is still re-read from the list, so a role changed since last time takes
+effect. A cloud account comes back from the session and `verifyLiveSession()` then asks
+Supabase, which keeps and refreshes its own session, and re-enters through the same
+`enterLiveStudio()` the sign-in form uses.
+
+**One thing this must not become is a worse version of itself.** The first fix logged the
+studio out when Supabase had no session, which is being ejected mid-job rather than merely
+being asked to sign in. Found in a browser, not by the gate. It now stays open on device
+data and stops claiming to be synced, which is what an app built to work offline should
+do, and the gate holds that.
 
 ### One thing to decide: Amount due is not what the app chases
 
