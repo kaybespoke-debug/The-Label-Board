@@ -151,8 +151,47 @@ Deno.serve(async (req) => {
     if (!isOwner) return json({ error: 'Only the owner can add or change team accounts' }, 403)
 
     /* ---- invite: replaces `create`. No password crosses this boundary.
-       Supabase emails them; they choose their own and land in the app. */
+       Supabase emails them; they choose their own and land in the app.
+
+       =============== OFF, DELIBERATELY, SINCE 23 SEPTEMBER 2026 =========
+       Proved unsafe before it was ever deployed. inviteUserByEmail inserts
+       a row into auth.users, which fires app.provision_studio(). That
+       trigger finds no partner and no business waiting on the address, so
+       it takes its third path and INVENTS A STUDIO NAMED AFTER THE
+       INVITEE, makes them its owner, and writes their profile and an owner
+       membership. team-admin's own profile insert then dies on the primary
+       key, and the rescue path deletes the auth user while the invented
+       business stays behind.
+
+       Measured, not guessed: 9 businesses before an invite, 10 after.
+
+       Underneath that sits a second problem that a collision fix would not
+       touch. team-admin writes `profiles` and never writes `memberships`,
+       and every RLS policy in this system reads memberships. So a teammate
+       who did get through would hold a profile and be able to read
+       nothing: app.in_scope returns false for them. Seat limits are in the
+       same position, since their trigger is on memberships.
+
+       That is a lifecycle to design, not a line to patch, and it is Phase
+       1B. Until then this action does NOTHING AT ALL. It is deliberately
+       not "best effort": a half-working invite leaves orphan businesses
+       behind, and an orphan business is harder to explain than an error.
+
+       Phase 1B turns this back on by flipping the constant, after
+       provision_studio learns to attach somebody to a business that
+       already exists. Nothing else here needs to change. =============== */
+    const TEAM_INVITES_ENABLED = false
+
     if (action === 'invite') {
+      if (!TEAM_INVITES_ENABLED) {
+        /* Before any validation, so no code path below can run and no
+           argument about input shape can change the outcome. */
+        return json({
+          error: 'Team invitations are temporarily unavailable.',
+          code: 'invites_disabled',
+        }, 503)
+      }
+
       const email = str(payload.email).toLowerCase()
       const name = str(payload.name)
       if (!email || !email.includes('@')) return json({ error: 'A valid email address is needed' }, 400)

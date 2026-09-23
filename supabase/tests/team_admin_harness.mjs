@@ -248,6 +248,98 @@ section('Ownership cannot be borrowed from the other studio');
 }
 
 // =====================================================================
+section('Invitations are OFF, and off means nothing happens at all');
+// =====================================================================
+/* The invite path was proved unsafe before it ever shipped: inviteUserByEmail
+   inserts into auth.users, provision_studio fires, and the invitee becomes the
+   owner of a brand new studio named after them. 9 businesses became 10.
+
+   So the action is inert. "Inert" is a stronger claim than "returns an error",
+   and it is the claim worth testing: an invite that half-runs leaves an orphan
+   business behind, and an orphan business is harder to explain than an error.
+
+   The Edge Function is Deno, so what is asserted here is the switch and the
+   position of the early return — before any validation, before any call — plus
+   the fact that the trigger really does behave the way the switch exists to
+   avoid. */
+{
+  const fn = readFileSync(join(repo, 'supabase/functions/team-admin/index.ts'), 'utf8');
+
+  ok('the switch exists and is off',
+     /const TEAM_INVITES_ENABLED = false/.test(fn),
+     'Phase 1B turns it on; nothing else should need changing');
+
+  const inviteAt = fn.indexOf("if (action === 'invite')");
+  const body = fn.slice(inviteAt, fn.indexOf("\n    if (action === 'update')", inviteAt));
+  ok('the invite action still exists', inviteAt >= 0);
+
+  const guardAt = body.indexOf('if (!TEAM_INVITES_ENABLED)');
+  const inviteCall = body.indexOf('inviteUserByEmail');
+  const validation = body.indexOf('A valid email address is needed');
+  ok('it returns before it validates anything', guardAt >= 0 && guardAt < validation,
+     'guard ' + guardAt + ', first validation ' + validation);
+  ok('it returns before it reaches auth', guardAt >= 0 && guardAt < inviteCall,
+     'guard ' + guardAt + ', inviteUserByEmail ' + inviteCall);
+  ok('it answers 503, not 400 or 500', /\}, 503\)/.test(body.slice(guardAt, inviteCall)),
+     'a 400 blames the caller for something they did not do wrong');
+  ok('it says nothing about why, to the user',
+     !/provision_studio|trigger|orphan|vulnerab/i.test(
+       body.slice(guardAt, guardAt + 400)),
+     'the reason belongs in the comment above it, not in a response to a studio');
+
+  /* And the app agrees with the function rather than offering a form that
+     would fail. Two files, one decision, so check they have not drifted. */
+  const app = readFileSync(join(repo, 'site/layi_dashboard.html'), 'utf8');
+  ok('the app has the same switch, also off',
+     /const TEAM_INVITES_ENABLED=false/.test(app));
+  ok('and shows the neutral message instead of the form',
+     /Team invitations are temporarily unavailable/.test(app));
+  ok('editing an existing teammate is untouched',
+     /function saveUserCloud\(id\)/.test(app) && /callTeamAdmin\('update'/.test(app));
+}
+
+// =====================================================================
+section('Why the switch has to be there: the trigger, measured');
+// =====================================================================
+/* If this section ever fails, the reason for the switch has gone away and
+   Phase 1B can proceed. Until then it is the evidence. */
+{
+  const bizBefore = (await q(`select count(*)::int as n from businesses`))[0].n;
+  const usersBefore = (await q(`select count(*)::int as n from auth.users`))[0].n;
+
+  /* exactly what inviteUserByEmail does: a row in auth.users */
+  const invitee = await mkUser('would.be.teammate@example.com');
+
+  const bizAfter = (await q(`select count(*)::int as n from businesses`))[0].n;
+  ok('inserting an auth user INVENTS a studio (this is the bug)',
+     bizAfter === bizBefore + 1, bizBefore + ' -> ' + bizAfter);
+
+  const p = await q(`select p.role_id, b.name from profiles p
+                      join businesses b on b.id = p.business_id where p.id = $1`, [invitee]);
+  ok('and makes them its OWNER, not a teammate of anybody',
+     p.length === 1 && p[0].role_id === 'owner',
+     p.length ? p[0].role_id + ' of ' + p[0].name : 'no profile');
+
+  /* team-admin's own insert would then collide */
+  let collided = false;
+  try {
+    await q(`insert into profiles (id,name,role_id,business_id) values ($1,'X','cre',$2)`,
+            [invitee, A.biz]);
+  } catch (e) { collided = /profiles_pkey|duplicate key/.test(e.message); }
+  ok('so team-admin\u2019s profile insert collides on the primary key', collided,
+     'this is what the owner would have seen: a confusing error and a stray studio');
+
+  /* clean up this harness's own mess so later sections count straight */
+  await q(`delete from memberships where user_id = $1`, [invitee]);
+  await q(`delete from partners where user_id = $1`, [invitee]);
+  await q(`delete from profiles where id = $1`, [invitee]);
+  await q(`delete from businesses where id not in ($1,$2)`, [A.biz, B.biz]);
+  await q(`delete from auth.users where id = $1`, [invitee]);
+  const back = (await q(`select count(*)::int as n from auth.users`))[0].n;
+  ok('harness cleaned up after itself', back === usersBefore, back + ' vs ' + usersBefore);
+}
+
+// =====================================================================
 section('Skipped, and why');
 // =====================================================================
 skip('T09', 'Unauthenticated request returns 401',

@@ -13636,7 +13636,21 @@ async function renderUsersCloud(){const el=document.getElementById('usersList');
       :'<div class="kv" style="color:var(--text-faint)">No team accounts yet.</div>';
   }catch(e){el.innerHTML='<div class="kv" style="color:var(--red)">Could not load team: '+esc(e.message)+'</div>';}
 }
-function openUserCloud(id){const u=id?_cloudTeam.find(x=>x.id===id):null;const roles=getRoles();
+/* Off with the Edge Function's own switch, and for the same reason: inviting
+   somebody currently makes them the owner of a brand new studio named after
+   them, because the provisioning trigger has no way to attach an account to a
+   business that already exists. Phase 1B. Until then the owner is told it is
+   unavailable rather than shown a form that leaves wreckage behind. Editing an
+   existing teammate is untouched. */
+const TEAM_INVITES_ENABLED=false;
+function openUserCloud(id){
+  if(!id&&!TEAM_INVITES_ENABLED){
+    openModal(`<h3>Add a team account</h3><div class="msub">Temporarily unavailable</div>
+      <p style="font-size:14px;color:var(--text-dim);line-height:1.65;margin-bottom:6px">Team invitations are temporarily unavailable. Everything else on this screen works as usual.</p>
+      <div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+    return;
+  }
+  const u=id?_cloudTeam.find(x=>x.id===id):null;const roles=getRoles();
   const linkedElsewhere=new Set(_cloudTeam.filter(x=>x.staff_id&&(!u||x.id!==u.id)).map(x=>x.staff_id));
   const staff=getStaff().filter(s=>!linkedElsewhere.has(s.id));
   openModal(`<h3>${u?'Edit team account':'Invite a teammate'}</h3><div class="msub">${u?'Their role and what they are linked to':'They get an email and choose their own password'}</div>
