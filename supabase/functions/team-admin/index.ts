@@ -55,8 +55,39 @@ Deno.serve(async (req) => {
       return json({ id: created.user.id })
     }
 
+    /* ===== WHOSE ACCOUNT IS THIS? ==================================
+       Everything below reaches auth.admin with the SERVICE ROLE, which
+       is subject to no row level security at all. So the id in the body
+       has to be proved to belong to the caller's business BEFORE it is
+       used, and proved by a read — not by attaching .eq('business_id')
+       to the write and trusting it.
+
+       That was the bug, found by audit on 23 September 2026 and live
+       since 3 May. `update` scoped the profile write correctly:
+
+           .from('profiles').update({...}).eq('id', id).eq('business_id', biz)
+
+       but PostgREST returns NO ERROR when a write matches zero rows. So
+       `error` was null for somebody else's id, the guard below it never
+       fired, and the next line reset that account's password with an
+       UNSCOPED id. Any studio owner could take over any account on the
+       platform, another studio's owner or a Label Board admin included.
+       `delete` was worse: it did not look at the result at all.
+
+       A scoped write tells you nothing. A read does. ============== */
+    async function mustBeOurs(id: unknown) {
+      if (!id || typeof id !== 'string') return 'No account id'
+      const { data, error } = await admin
+        .from('profiles').select('id').eq('id', id).eq('business_id', biz).maybeSingle()
+      if (error) return error.message
+      if (!data) return 'That account is not in your studio.'
+      return null
+    }
+
     if (action === 'update') {
       const { id, name, role_id, staff_id, password } = payload
+      const bad = await mustBeOurs(id)
+      if (bad) return json({ error: bad }, 403)
       const { error } = await admin.from('profiles').update({ name, role_id, staff_id: staff_id || null }).eq('id', id).eq('business_id', biz)
       if (error) return json({ error: error.message }, 400)
       if (password) { const { error: pe } = await admin.auth.admin.updateUserById(id, { password }); if (pe) return json({ error: pe.message }, 400) }
@@ -66,6 +97,8 @@ Deno.serve(async (req) => {
     if (action === 'delete') {
       const { id } = payload
       if (id === user.id) return json({ error: 'You cannot delete your own account' }, 400)
+      const bad = await mustBeOurs(id)
+      if (bad) return json({ error: bad }, 403)
       await admin.from('profiles').delete().eq('id', id).eq('business_id', biz)
       const { error } = await admin.auth.admin.deleteUser(id)
       if (error) return json({ error: error.message }, 400)
