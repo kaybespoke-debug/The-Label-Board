@@ -1,27 +1,23 @@
 # ============================================================================
-# CUSTOMER APP — main
+# ADMIN DEPLOYMENT BRANCH — admin-deploy
 #
-# Netlify publishes the site/ folder: the app plus its PWA files, nothing else.
-# Connected to github.com/kaybespoke-debug/The-Label-Board, branch main, so a
-# push to main deploys the app every studio uses.
-#
-# Only site/ is served. The gates, the notes, the SQL and the other three apps
-# all sit outside it and are never reachable from the public URL.
+# Netlify publishes the admin/ folder for the Admin Control Centre.
+# Connected to github.com/kaybespoke-debug/The-Label-Board, branch admin-deploy.
 #
 # ---------------------------------------------------------------------------
-# THIS FILE IS DELIBERATELY DIFFERENT ON admin-deploy. DO NOT LET A MERGE
-# OVERWRITE IT.
+# THIS FILE IS DELIBERATELY DIFFERENT ON main. DO NOT LET A MERGE OVERWRITE IT.
 #
-# On admin-deploy it reads publish = "admin". If a merge brings that version
-# here, this site stops serving the customer app and starts serving the admin
-# console to every studio on the platform. Git will not warn you: main is an
-# ancestor of admin-deploy, so the merge is clean.
+# On main it reads publish = "site" and serves the customer app. If a merge
+# brings this version across, the customer app's Netlify site starts serving
+# the admin console to every studio on the platform. It is not a conflict git
+# will warn you about, because main is an ancestor of this branch and the
+# merge fast-forwards cleanly.
 #
 # Merging admin-deploy into main, safely:
 #
 #     git checkout main
 #     git merge --no-ff --no-commit admin-deploy
-#     git checkout HEAD -- netlify.toml      # keep this file as it is
+#     git checkout HEAD -- netlify.toml      # keep main's own publish path
 #     git commit
 #
 # The permanent fix is to set each site's publish directory in the Netlify
@@ -31,10 +27,4 @@
 # ============================================================================
 
 [build]
-  publish = "site"
-
-# Serve the single-file app at the site root.
-[[redirects]]
-  from = "/"
-  to = "/layi_dashboard.html"
-  status = 200
+  publish = "admin"
