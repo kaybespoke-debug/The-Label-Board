@@ -612,9 +612,21 @@ Kayode: *"then deploy this with the new order setting."*
    and the published directory checked on the merge commit before pushing
 
 
-## The contact picker on iOS and Android — SCOPED, NOT BUILT
+## The contact picker on iOS and Android — SCOPED, NOT BUILT, AND NOT WANTED
 
 Asked for on 23 September, after the picker shipped working on Android only.
+
+**Decided 23 September: neither option gets built. "dont build either, we will
+just manual for now."** Typing a client in is what happens for now.
+
+**What stays is the Android picker that already shipped in `layi-v45`.** It is
+written, gated and invisible where the browser does not offer it, so there is
+nothing to remove and nothing to maintain. An Android studio in October's
+cohort gets it; everybody else types. Pulling it would be work in exchange for
+less.
+
+The scope below is kept because the support table is the part that gets
+misremembered, and it already was once.
 
 ### First, a correction to what was said on 23 September
 
@@ -2925,3 +2937,11 @@ Kayode gave, which is time, not space.
   about it. It becomes enforceable the day reminders go through our own sender.
 - **Invoices as a separate record type.** See #4 — an unconfirmed order does
   the same job without a second set of books to reconcile.
+- **Getting the contact picker onto iPhones.** Both ways of doing it were
+  costed on 23 September and both were declined: clients get typed in for now.
+  vCard import works on an iPhone but is five taps and two trips out of the
+  app, and a native wrapper buys a real picker for $99 a year, App Store
+  review on every release, and the no-build-step deployment that makes this
+  app cheap to ship. Four taps is not worth either. The Android picker that
+  already works stays. Worth re-raising only if we go native for a reason that
+  is not contacts, or if Apple ever switches on the API it has had since 2021.
