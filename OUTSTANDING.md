@@ -612,6 +612,122 @@ Kayode: *"then deploy this with the new order setting."*
    and the published directory checked on the merge commit before pushing
 
 
+## The contact picker on iOS and Android — SCOPED, NOT BUILT
+
+Asked for on 23 September, after the picker shipped working on Android only.
+
+### First, a correction to what was said on 23 September
+
+It was said here that Safari on iOS "does not expose contacts to a web page at
+all". That is wrong, and the right version changes one option below.
+
+Checked against MDN's compatibility data rather than from memory:
+
+| Browser | Contact Picker |
+|---|---|
+| Chrome, Android | **80**, Feb 2020, on by default |
+| Android WebView | 80 |
+| Samsung Internet | 14.0 |
+| **Safari, iOS** | **14.5, Apr 2021, behind an experimental preference** |
+| Chrome / Edge / Firefox, desktop | never |
+| Safari, macOS | never |
+
+So Apple **implemented** it and has left it switched off for five years. It
+sits in Settings → Safari → Advanced → Experimental Features. That is not a
+product: nobody ships software that asks a customer to turn on an experimental
+browser flag, and a flag Apple has sat on for five years is not one to build a
+plan around. But it does mean the API is already there, so if Apple ever
+enables it the existing `pickContact()` starts working on iPhones with no
+release from us at all.
+
+It also means **desktop has no picker either**, on any browser. That was never
+mentioned and should have been.
+
+### What exists today
+
+`pickContact()` and `contactsSupported()` in `site/layi_dashboard.html`. The
+button is drawn only where the API answers, so today: Chrome and Samsung
+Internet on Android, including the installed PWA. Everywhere else it is absent
+rather than dead. Nothing below removes this; it is the cheapest correct path
+where it works.
+
+### Option A — vCard import. Works everywhere, including iPhone and desktop
+
+A file input that accepts `.vcf`, and a small parser for the four fields that
+matter: `FN`/`N`, `TEL`, `EMAIL`, and `ADR` if it is there.
+
+On an iPhone: Contacts → the person → Share Contact → Save to Files, then in
+the app tap **Import contact card** → Files → pick it. Five or six taps, two
+of them outside the app.
+
+**That is worse than a picker and it should be described that way rather than
+sold as one.** It is better than typing a Nigerian mobile number by hand and
+it is the only thing that works on an iPhone today.
+
+- Effort: **half a day to a day.** The parser is around sixty lines. The
+  fiddly parts are real but known: folded lines (a vCard wraps at 75
+  characters and continues with a leading space), quoted-printable encoding
+  from older Android exports, and `TEL;TYPE=CELL` versus `TEL;TYPE=VOICE`.
+- Cost: nothing.
+- Risk: low. It is a file input and a string parser; nothing about it can
+  break anything else.
+- Also fixes desktop, where there has never been a picker.
+
+### Option B — a native wrapper. A real picker on both platforms
+
+Capacitor around the existing single file, plus
+`@capacitor-community/contacts`. The app stays one HTML file; Capacitor wraps
+it and exposes the native contact picker on both platforms.
+
+This is not a contacts decision. It is a **distribution decision**, and it
+should be made for its own reasons rather than for a phone book.
+
+What it brings whether we want it or not:
+
+- **Money:** Apple Developer Program **$99/year**, Google Play **$25** once.
+- **Review:** every release waits on App Store review. Today a release is a
+  `git push` and it is live in ninety seconds. That becomes a day or more, and
+  two builds to keep in step with the web one.
+- **Apple Guideline 4.2, minimum functionality.** A wrapper around a website
+  gets rejected unless it does things a website cannot. Contacts plus offline
+  plus push is a defensible case, not a guaranteed one.
+- **Google Play and `READ_CONTACTS`.** Contacts is a sensitive permission. It
+  needs a prominent in-app disclosure, a data-safety declaration, and Google
+  may ask for a demonstration video and a written justification. Studios that
+  decline the permission still need Option A as a fallback, so Option A gets
+  built either way.
+- **`NSContactsUsageDescription`** and a privacy manifest on the Apple side.
+- **The single file stops being the asset it is.** `HANDOFF.md` calls
+  no-build-step deployment a genuine asset, and it is: drop it on Netlify,
+  done. Two store pipelines is the opposite of that, forever, not once.
+
+- Effort: **3 to 5 days** to a first build accepted by both stores, if nothing
+  is rejected. Add review turnaround. Then a permanent tax on every release.
+
+### Recommendation
+
+**Build Option A now. Do not go native for a phone book.**
+
+A is cheap, works on his iPhone today, fixes desktop as a side effect, and is
+needed as the fallback even if we go native later. B costs $99 a year, turns a
+ninety-second release into a reviewed one, and gives up the thing that makes
+this app cheap to ship, in exchange for saving four taps.
+
+**Go native when there is a reason that is not contacts.** The honest
+candidates are an App Store presence as a sales signal, and anything iOS
+genuinely refuses the web. Web push is no longer one of those: iOS has
+supported it in installed PWAs since 16.4. Which of those is worth $99 a year
+and a review queue is a commercial call and Kayode's, not one to be made here.
+
+### If Option A is wanted
+
+One function, one button, one gate. The button sits beside the existing
+**From contacts** so an Android studio sees both and an iPhone sees only the
+import. `audit_invoice` would grow checks that a folded line, a
+quoted-printable name and a `TEL;TYPE=CELL` all parse, and that a file that is
+not a vCard is refused without throwing.
+
+
 ## The free trial is SILENT until Flutterwave, 21 September
 
 Kayode asked whether the trial, demo and partner buttons should all be
