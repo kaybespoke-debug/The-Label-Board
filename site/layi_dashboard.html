@@ -2257,7 +2257,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v44';
+const APP_VERSION='layi-v45';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3848,10 +3848,25 @@ function enterApp(){
    card every time the phone reclaims memory. It expires so an abandoned device
    does not stay open forever, and logout clears it outright. */
 const SESSION_KEY='layi_session', SESSION_DAYS=30;
+/* The account is remembered whole, not just by id.
+
+   It used to be the id alone, and restoreSession() looked that id up in THIS DEVICE's
+   user list. That works for a device account and cannot ever work for a studio signed in
+   against the cloud, because its id is the Supabase account's and was never in the local
+   list. So the lookup failed, the session was cleared as stale, and a real studio was
+   thrown back to the sign-in card every time the phone reclaimed the tab. Reported
+   23 September: "it keeps asking for a login each time I minimize or close the app".
+
+   The pin is deliberately not carried. A device account's pin already lives in
+   layi_dash_users and this does not need a second copy of it. */
 function saveSession(){
   try{
     if(!currentUser||!currentUser.id)return;
-    localStorage.setItem(SESSION_KEY,JSON.stringify({id:currentUser.id,at:Date.now()}));
+    const u=currentUser;
+    localStorage.setItem(SESSION_KEY,JSON.stringify({id:u.id,at:Date.now(),
+      live:!!liveMode,biz:myBusinessId||'',
+      user:{id:u.id,name:u.name||'',username:u.username||'',roleId:u.roleId||'owner',
+            staffId:u.staffId||'',active:u.active!==false,branch:u.branch||''}}));
   }catch(e){}
 }
 function clearSession(){try{localStorage.removeItem(SESSION_KEY);}catch(e){}}
@@ -3860,11 +3875,49 @@ function restoreSession(){
     const raw=localStorage.getItem(SESSION_KEY);if(!raw)return false;
     const sess=JSON.parse(raw);if(!sess||!sess.id)return false;
     if(!sess.at||(Date.now()-sess.at)>SESSION_DAYS*864e5){clearSession();return false;}
+    /* A device account is re-read from the list rather than taken from the session, so a
+       role or a permission changed since last time takes effect on this open. */
     const u=getUsers().find(x=>x.id===sess.id);
-    if(!u||u.active===false){clearSession();return false;}
-    currentUser=u;
+    if(u&&u.active===false){clearSession();return false;}
+    if(!u&&!(sess.user&&sess.user.id)){clearSession();return false;}
+    currentUser=u||sess.user;
+    if(!u){liveMode=!!sess.live;myBusinessId=sess.biz||null;}
     const lg=document.getElementById('login');if(lg)lg.style.display='none';
     enterApp();
+    /* Straight in, then check with the server. Going in first is the point: the studio
+       works offline by design, and a phone with no signal must not be held at a sign-in
+       card over a session it already has. */
+    if(!u)setTimeout(verifyLiveSession,0);
+    return true;
+  }catch(e){return false;}
+}
+/* Does the cloud still know them? Supabase keeps and refreshes its own session, so this
+   asks rather than remembering anything more. It goes back in through the same
+   enterLiveStudio() the sign-in form uses, because two copies of load-the-studio drift and
+   the copy nobody signs in through is the one that rots.
+
+   Offline it does nothing at all, which is correct: not being able to ask is not the same
+   as being told no. */
+async function verifyLiveSession(){
+  if(!supa||!currentUser)return false;
+  if(('onLine'in navigator)&&!navigator.onLine)return false;
+  try{
+    const {data}=await supa.auth.getSession();
+    const user=data&&data.session&&data.session.user;
+    if(!user){
+      /* Signed out elsewhere, or the refresh token is spent. It does NOT throw them out.
+         Everything they have is on the device, the app is built to work without a network,
+         and being ejected mid-job is the exact complaint this whole change is answering.
+         So the studio stays open on device data and stops claiming to be synced; signing
+         in again picks the cloud back up. */
+      liveMode=false;
+      try{stopRealtime();}catch(e){}
+      try{show('syncBtn',false);}catch(e){}
+      if(typeof toast==='function')toast('Sign in again to sync this device');
+      return false;
+    }
+    const quiet={textContent:'',innerHTML:''};
+    await enterLiveStudio(user,String(user.email||'').toLowerCase(),quiet);
     return true;
   }catch(e){return false;}
 }
@@ -4919,40 +4972,54 @@ function itemSectionNote(o,d){
 let orderDoor=null;
 function newOrder(){
   if(!can('orders'))return;
-  const waiting=getOrders().filter(o=>isClientOrder(o)&&isQuote(o)).filter(inBranch)
-    .sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).slice(0,4);
-  const rows=waiting.map(o=>{
-    const paid=+o.paid||0;
-    return `<div class="field" style="margin-bottom:8px;border:1px solid var(--line);border-left:3px solid ${paid>0?'var(--green)':'var(--amber)'};border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;cursor:pointer" onclick="closeModal();openDetail('${o.id}')">
-      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${esc(o.client||'Client')}</div><div class="sd" style="color:var(--text-faint);margin-top:2px">${o.invoiceNo?'Invoice #'+esc(String(o.invoiceNo)):'No invoice raised yet'} · ${esc(o.id)}</div></div>
-      <div style="text-align:right"><div style="font-size:14px;font-weight:700">${curO(orderNet(o),o)}</div><div class="sd" style="color:${paid>0?'var(--green)':'var(--amber)'};margin-top:2px">${paid>0?'deposit in':'unpaid'}</div></div>
-    </div>`;}).join('');
-  openModal(`<h3>New order</h3><div class="msub">Same record, two ways in.</div>
-    <button type="button" class="door lead" onclick="openOrder(null,'quote')">
-      <span class="door-h">${OSEC_ICO.quote}Quote &amp; invoice</span>
-      <span class="door-p">Price it and send it. Their deposit is the yes, and it becomes a real order the moment it lands.</span>
-      <span class="door-n">8 fields</span>
+  openModal(`<h3>New</h3>
+    <button type="button" class="door lead" onclick="openOrder(null,'invoice')">
+      <span class="door-h">${OSEC_ICO.quote}Invoice</span>
+      <span class="door-p">Price it and send it. Their deposit turns it into an order.</span>
     </button>
     <button type="button" class="door" onclick="openOrder(null,'order')">
-      <span class="door-h">${OSEC_ICO.board}Straight to an order</span>
-      <span class="door-p">Already agreed, already paying. It goes on the production board now.</span>
-      <span class="door-n">Same 8 fields, no invoice step</span>
+      <span class="door-h">${OSEC_ICO.board}New order</span>
+      <span class="door-p">Already agreed. It goes on the production board.</span>
     </button>
-    ${rows?`<div class="bd-sub">Awaiting a yes</div>${rows}`:''}
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
 }
-/* openOrder() still opens the editor, and opens it as an ordinary order when nobody named
-   a door — every gate that drives this form calls it that way. newOrder() is the thing the
-   buttons call, and it is the thing that asks. */
+/* ---- The phone book -------------------------------------------------------------------
+   23 September: "adding a customer contact should be able to add a contact from the phone
+   book or contact". The Contact Picker is a real browser API and the browser shows its own
+   picker, so the app never sees the address book, only the one person chosen.
+
+   Chrome on Android has it. Safari on iOS does not expose contacts to a web page at all,
+   so the button is not drawn there rather than drawn and dead. On an iPhone this needs a
+   native wrapper, which is a different piece of work. */
+function contactsSupported(){
+  try{return !!(navigator.contacts&&typeof navigator.contacts.select==='function'&&window.ContactsManager);}catch(e){return false;}
+}
+async function pickContact(){
+  if(!contactsSupported()||!draft)return;
+  try{
+    const got=await navigator.contacts.select(['name','tel','email'],{multiple:false});
+    const c=got&&got[0];if(!c)return;
+    syncOrderDraft();
+    const nm=(c.name&&c.name[0])||'',tel=(c.tel&&c.tel[0])||'',em=(c.email&&c.email[0])||'';
+    if(nm)draft.client=String(nm).trim();
+    if(tel)draft.whatsapp=String(tel).trim();
+    if(em&&!draft.email)draft.email=String(em).trim();
+    /* A name that is already a client brings that client’s record with it, the same as
+       typing it would. */
+    const known=draft.client&&getCustomers()[nameKey(draft.client)];
+    if(known){if(!draft.email)draft.email=known.email||'';if(!draft.address)draft.address=known.address||'';}
+    reRenderOrder();
+  }catch(e){/* the picker was dismissed, which is not an error */}
+}
 function openOrder(id,door){
   if(!can('orders'))return;
-  orderDoor=id?null:(door==='quote'?'quote':'order');
+  orderDoor=id?null:(door==='invoice'?'invoice':'order');
   editingOrderId=id||null;
   if(id){draft=JSON.parse(JSON.stringify(getOrders().find(x=>x.id===id)));
     draft.commissions=(draft.commissions||[]).filter(c=>c.kind!=='director');
     if(!draft.commissions.length)draft.commissions=[{staffId:'',kind:'maker',amount:0}];
   }
-  else{draft={client:'',email:'',whatsapp:'',address:'',branch:defaultBranchName(),meas:{},measFit:'',measPosture:'',measNote:'',clientPhotos:[],outfits:[blankOutfit()],discount:0,costs:[],commissions:[{staffId:'',kind:'maker',amount:0}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[],stockUsed:[],currency:SETTINGS.currency,fx:1,batch:{on:false},delivery:{enabled:false,fee:((SETTINGS.defaults&&+SETTINGS.defaults.deliveryFee)||0),location:'',company:'',tracking:'',status:'Pending'},paid:0,due:defaultDueDate(),stageIndex:0,quoted:orderDoor==='quote'};}
+  else{draft={client:'',email:'',whatsapp:'',address:'',branch:defaultBranchName(),meas:{},measFit:'',measPosture:'',measNote:'',clientPhotos:[],outfits:[blankOutfit()],discount:0,costs:[],commissions:[{staffId:'',kind:'maker',amount:0}],directorPct:25,directorAmount:null,directorOn:true,potContribs:[],stockUsed:[],currency:SETTINGS.currency,fx:1,batch:{on:false},delivery:{enabled:false,fee:((SETTINGS.defaults&&+SETTINGS.defaults.deliveryFee)||0),location:'',company:'',tracking:'',status:'Pending'},paid:0,due:defaultDueDate(),stageIndex:0,quoted:orderDoor==='invoice'};}
   draft.costs=draft.costs||[];draft.discount=+draft.discount||0;draft.commissions=draft.commissions||[{staffId:'',kind:'maker',amount:0}];draft.stockUsed=draft.stockUsed||[];
   draft.meas=draft.meas||{};orderMeasOpen=false;
   if(draft.directorPct==null)draft.directorPct=25;if(draft.directorOn===undefined)draft.directorOn=true;if(draft.directorAmount===undefined)draft.directorAmount=null;
@@ -5274,26 +5341,22 @@ function renderOrderModal(){
   const isCustom=draft.directorAmount==null&&![20,25,30].includes(dpct);
   const directorSection=can('money')?`
     <div class="bd-sub" style="margin-top:10px">Director allocation</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">A share of this order's profit set aside for the director. Its own line, not a staff commission.</div>
     <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="f_diron" ${draft.directorOn?'checked':''} onchange="syncOrderDraft();reRenderOrder()" style="width:18px;height:18px;accent-color:var(--gold)"> Set aside a director allocation on this order</label>
     ${draft.directorOn?`
       <div class="field"><label>Share of operating profit (${cur(Math.max(0,op))})</label>
         <div class="toolbar" style="gap:6px;flex-wrap:wrap;margin-bottom:0">${chip(20)}${chip(25)}${chip(30)}<button type="button" class="chip ${isCustom?'active':''}" onclick="setDirectorPct('custom')">Custom %</button>
           <input class="fld" type="number" id="f_dirpct" value="${dpct}" style="max-width:80px" oninput="syncOrderDraft();recalcDirector()"></div>
       </div>
-      <div class="field"><label>Or enter an exact amount (${SETTINGS.currency}), leave blank to use the %</label><input class="fld money" type="text" inputmode="decimal" id="f_diramt" value="${draft.directorAmount!=null?fmtNum(draft.directorAmount):''}" placeholder="auto from %" oninput="recalcDirector()"></div>
+      <div class="field"><label>Or an exact amount (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="f_diramt" value="${draft.directorAmount!=null?fmtNum(draft.directorAmount):''}" placeholder="auto from %" oninput="recalcDirector()"></div>
       <div class="profit-line"><span>Director allocation</span><b id="dirAllocLive">${cur(dalloc)}</b></div>
     `:''}`:'';
   const pots=getPots();
   const setAsides=orderPotSetAsides(draft);
   const potSection=(can('money')&&pots.length)?`
-    <div class="bd-sub" style="margin-top:10px">Funds & reserves, taken automatically from this order</div>
-    ${editingOrderId?`<div class="sd" style="color:var(--text-faint)">Pot set-asides are applied when an order is first created.</div>`:
-      (setAsides.length?setAsides.map(s=>`<div class="profit-line"><span>${esc(s.name)} · ${s.pct}%</span><b>${cur(s.amount)}</b></div>`).join('')
-        :`<div class="sd" style="color:var(--text-faint)">No fund has a % set yet. Give a fund a "% of profit" in the Funds tab and it will draw from every order automatically.</div>`)}`:'';
+    <div class="bd-sub" style="margin-top:10px">Funds & reserves</div>
+    ${editingOrderId?'':setAsides.map(s=>`<div class="profit-line"><span>${esc(s.name)} · ${s.pct}%</span><b>${cur(s.amount)}</b></div>`).join('')}`:'';
   const assignSection=`
     <div class="bd-sub">Team & commission</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Everyone who earns on this order: tailor, shoemaker, or whoever referred the client.</div>
     ${teamHtml}
     <button class="btn ghost sm" style="width:100%;margin-bottom:6px" onclick="addCommRow()">＋ Add person</button>
     ${directorSection}`;
@@ -5305,10 +5368,9 @@ function renderOrderModal(){
         <div class="field"><label>Delivery company</label>${(()=>{const opts=['Select courier'].concat(courierOptions()).concat(['Other']);const cur=dlv.company||'Select courier';return selOther('f_del_company',opts,cur,'Courier name, e.g. Red Star Express');})()}</div>
         <div class="field"><label>Delivery fee (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="f_del_fee" value="${dlv.fee?fmtNum(dlv.fee):''}" placeholder="0" oninput="recalcProfit()"></div>
       </div>
-      <div class="sd" style="color:var(--text-faint);margin:-4px 0 8px">Add couriers under Supplies → Suppliers (type “Logistics Company”) to extend this list.</div>
-      <div class="field"><label>Delivery location / address</label><textarea class="fld" id="f_del_location" placeholder="Where it's going (defaults to the customer's address if blank)">${esc(dlv.location||'')}</textarea></div>
+      <div class="field"><label>Delivery location / address</label><textarea class="fld" id="f_del_location" placeholder="Where it is going">${esc(dlv.location||'')}</textarea></div>
       <div class="row2">
-        <div class="field"><label>Tracking / waybill no. (optional)</label><input class="fld" id="f_del_tracking" value="${esc(dlv.tracking||'')}" placeholder="—"></div>
+        <div class="field"><label>Tracking / waybill no.</label><input class="fld" id="f_del_tracking" value="${esc(dlv.tracking||'')}" placeholder="—"></div>
         <div class="field"><label>Status</label><select class="fld" id="f_del_status">${['Pending','Dispatched','Delivered'].map(s=>`<option ${dlv.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
       </div>`:''}`;
   const total=outfitsTotal(draft.outfits);
@@ -5328,7 +5390,7 @@ function renderOrderModal(){
     const outBits=c.out?`<div class="row2" style="margin-top:6px">
       <div class="field" style="margin-bottom:0"><label>Sent</label><input class="fld" type="date" id="c_sent_${i}" value="${esc(c.sentAt||'')}"></div>
       <div class="field" style="margin-bottom:0"><label>Due back</label><input class="fld" type="date" id="c_dueb_${i}" value="${esc(c.dueAt||'')}"></div>
-    </div>${c.backAt?`<div class="sd" style="color:var(--green);margin-top:5px">Back on ${esc(new Date(c.backAt).toLocaleDateString('en-GB'))}.</div>`:`<div class="sd" style="color:var(--text-faint);margin-top:5px">While it is out, the order reads as with them rather than as sitting untouched in the workroom.</div>`}`:'';
+    </div>${c.backAt?`<div class="sd" style="color:var(--green);margin-top:5px">Back on ${esc(new Date(c.backAt).toLocaleDateString('en-GB'))}.</div>`:''}`:'';
     return `<div style="border:1px solid ${c.out?'var(--line)':'transparent'};border-radius:10px;padding:${c.out?'10px 12px':'0'};margin-bottom:${c.out?'8px':'0'};background:${c.out?'var(--panel-2)':'transparent'}">
     <div class="cost-line">
     <input class="fld" id="c_label_${i}" value="${esc(c.label)}" placeholder="${c.out?'What went out, e.g. Beading':'e.g. Fabric, Lace, Trims'}">
@@ -5337,15 +5399,14 @@ function renderOrderModal(){
     <span class="rm" onclick="removeCost(${i})">✕</span></div>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:var(--text-dim);margin-top:${c.out?'8px':'4px'}"><input type="checkbox" ${c.out?'checked':''} onchange="toggleCostOut(${i},this.checked)" style="width:15px;height:15px"> Sent out to be done</label>
     ${outBits}</div>`;}).join('')
-    +(fabSup.length?'':`<div class="sd" style="color:var(--text-faint);margin-top:2px">Add fabric suppliers under Supplies → Suppliers to pick them here.</div>`);
+    ;
   const supItems=getSupplies();
   const stockHtml=(draft.stockUsed||[]).map((su,i)=>`<div class="cost-line">
     <select class="fld" id="su_item_${i}"><option value="">Item</option>${supItems.map(s=>`<option value="${s.id}" ${su.supplyId===s.id?'selected':''}>${esc(s.name)} · ${(+s.qty||0)} ${esc(s.unit||'')} left</option>`).join('')}</select>
     <input class="fld price" type="number" min="0" id="su_qty_${i}" value="${su.qty||''}" placeholder="qty" style="max-width:90px">
     <span class="rm" onclick="removeStockRow(${i})">✕</span></div>`).join('');
   const stockSection=(can('orders')&&supItems.length)?`
-    <div class="bd-sub" style="margin-top:6px">Stock used on this order</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Deducts from Supplies when you save. For inventory only, it does not change the order price or profit.</div>
+    <div class="bd-sub" style="margin-top:6px">Stock used</div>
     ${stockHtml}
     <button class="btn ghost sm" style="width:100%" onclick="addStockRow()">＋ Add stock item</button>
     ${recipesExist()?``:''}`:'';
@@ -5354,158 +5415,167 @@ function renderOrderModal(){
      be one run of fields in the middle of the form, which is part of why the middle of the
      form never ended. */
   const costsField=can('money')?`
-    <div class="field"><label>Materials & production costs: fabric, trims, outsourced work</label>${costsHtml}
-      <button class="btn ghost sm" style="width:100%" onclick="addCost()">＋ Add cost</button>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">Staff commissions & delivery are counted as production costs on their own. Don't list them here.</div></div>`:'';
+    <div class="field"><label>Materials & production costs</label>${costsHtml}
+      <button class="btn ghost sm" style="width:100%" onclick="addCost()">＋ Add cost</button></div>`:'';
   const pnlSection=can('money')?`
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">This order's profit & loss, in ${SETTINGS.currency}.</div>
     <div class="profit-line"><span>Revenue (after discount)</span><b>${cur(netBase)}</b></div>
     <div class="profit-line"><span>− Materials & production</span><b>${cur(mpc)}</b></div>
     <div class="profit-line"><span><b>Operating profit</b></span><b id="orderProfit" style="color:${operating>=0?'var(--green)':'var(--red)'}">${cur(operating)}</b></div>
     ${draft.directorOn&&dalloc>0?`<div class="profit-line"><span>− Director allocation</span><b>${cur(dalloc)}</b></div>`:''}
     ${potTotal>0?`<div class="profit-line"><span>− Funds & reserves</span><b>${cur(potTotal)}</b></div>`:''}
     <div class="profit-line" style="border-top:1px solid var(--line)"><span><b>Retained business profit</b></span><b id="orderFinal" style="color:${retained>=0?'var(--green)':'var(--red)'}">${cur(retained)}</b></div>`:'';
-  /* An item is a type, a description, a price and a count — that is the whole of what you
-     can know while you are still quoting. The rest of the piece (its cloth, who made it,
-     its photographs, its finishing) is real work and belongs behind one tap. */
-  const outfitsHtml=draft.outfits.map((o,i)=>`
-    <div class="outfit">
-      <div class="oh">${isGroup(draft)?'Person '+(i+1):'Item '+(i+1)}</div>
-      ${draft.outfits.length>1?`<span class="rmo" onclick="removeOutfit(${i})">✕ remove</span>`:''}
-      ${isGroup(draft)?`<div class="field" style="margin-bottom:10px"><label>Wearer / person name</label><input class="fld" id="of_person_${i}" value="${esc(o.person||'')}" placeholder="e.g. Bride, Tunde, Aunty Bisi…"></div>`:''}
-      <div class="row2">
-        <div class="field" style="margin-bottom:10px"><label>Product type</label>${selOther('of_type_'+i,productTypes(),o.type||productTypes()[0],'Type of piece, e.g. Bridal robe','ofTypeChanged('+i+')')}</div>
-        <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)}) &amp; how many</label><div style="display:flex;gap:8px"><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()" style="flex:1;min-width:0"><input class="fld" type="number" min="1" step="1" id="of_qty_${i}" value="${ofQty(o)}" oninput="recalcProfit()" aria-label="How many of this piece" title="How many of this piece" style="max-width:78px"></div><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${ofLineNote(o,draft)}</div></div>
-      </div>
-      <div class="field" style="margin-bottom:0"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="e.g. Wedding agbada, size 43 mules…"></div>
-      <details class="osec osec-in">
-        <summary>${OSEC_ICO.piece}<span class="osec-t">More about this piece</span><span class="osec-n">${itemSectionNote(o,draft)}</span><span class="osec-c">${OSEC_ICO.chev}</span></summary>
-        <div class="osec-b">
-          <div class="row2">
-            <div class="field" style="margin-bottom:10px"><label>Product code</label><input class="fld" id="of_code_${i}" value="${esc(o.code||'')}" placeholder="SKU12345"><div class="sd" style="color:var(--text-faint);margin-top:4px">Prints under the item on the invoice. Leave it blank and nothing prints.</div></div>
-            <div class="field" style="margin-bottom:10px"><label>Discount on this piece (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_disc_${i}" value="${o.discount?fmtNum(o.discount):''}" placeholder="0" oninput="recalcProfit()"><div class="sd" style="color:var(--text-faint);margin-top:4px">Comes off this line only. Any discount on the whole order comes off after it, and the tax after that.</div></div>
-          </div>
-          <div class="field" style="margin-bottom:10px"><label>Material(s) <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(tap to pick one or more)</span></label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
-          <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
-          <div id="of_craft_${i}">${itemCraftChips(i)}</div>
-          <div id="of_meth_${i}">${itemMethodChips(i)}</div>
-          <div class="field" style="margin-bottom:10px"><label>Photos of this item / fabric <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(the first one prints in the invoice line)</span></label>${outfitPhotoGrid(i,o.photos)}</div>
-          <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, fabric, size, inspiration…">${esc(o.style)}</textarea></div>
-          <div class="field" style="margin-bottom:${isGroup(draft)?'10px':'0'}"><label>Finishing details</label><textarea class="fld" id="of_finish_${i}" placeholder="Buttons, lining, monogram, sole, hem, special requests…">${esc(o.finish)}</textarea></div>
-          <button type="button" class="navrow" onclick="openOrderSection('osecStock')">
-            <span class="navrow-i">${OSEC_ICO.fabric}</span>
-            <span class="navrow-t"><b>Inventory</b><span>Keep track of the stock this order draws down</span></span>
-            <span class="navrow-c">${OSEC_ICO.chevR}</span>
-          </button>
-          <label class="switchrow"><span><b>Save this piece for future invoices</b><span class="sd" style="color:var(--text-faint)">Adds it to your product types, so the price and code fill themselves next time.</span></span><input type="checkbox" id="of_save_${i}" ${o.saveToCatalog?'checked':''}></label>
-          ${isGroup(draft)?`<div class="field" style="margin-bottom:0"><label>📐 Measurements for this person</label><div class="row2"><div class="field"><label>Fit</label><input class="fld" id="ofm_fit_${i}" value="${esc(o.measFit||'')}" placeholder="Slim, Regular…"></div><div class="field"><label>Posture / build</label><input class="fld" id="ofm_posture_${i}" value="${esc(o.measPosture||'')}" placeholder="Broad back…"></div></div>${measGrid('ofm'+i,o.meas)}<div class="field" style="margin-bottom:0"><label>Measurement note</label><input class="fld" id="ofm_note_${i}" value="${esc(o.measNote||'')}" placeholder="Anything else"></div></div>`:''}
-        </div>
-      </details>
-    </div>`).join('');
-  /* ---- The form, cut in two ----------------------------------------------------------
-     Measured rather than eyeballed, 21 September 2026: this form was 42 fields under three
-     headings, and between field 10 and field 38 there were 28 fields with no signpost at
-     all. That stretch is what reads as "a very long unending list".
-
-     28 of the 42 are things you only know AFTER the client says yes — what fabric went in,
-     who made it, what it cost, what stage it is at. Asking for them while you are still
-     quoting is why the form never ended. They are all still here and nothing has been
-     taken from anybody: they sit in closed sections, each one carrying a summary of what
-     it is holding, so a shut section still answers its own question.
-
-     What is left standing open is the eight fields it takes to price a job. And the quote
-     switch — the entry to the whole invoice-first flow, which used to be field 40 of 42,
-     asked after the stock used, the maker, the profit and the director allocation — is now
-     the first thing on the form, because the door you came in through already answered it.
-     That is the complaint that there is nowhere to create an invoice: there was, and this
-     form buried it. */
   const _dl=draft.delivery||{};
   const _teamNames=(draft.commissions||[]).map(c=>{const st=staffList.find(x=>x.id===c.staffId);return st?st.name:'';}).filter(Boolean);
   const _costTotal=(draft.costs||[]).reduce((a,c)=>a+(+c.amount||0),0);
   const _bal=Math.max(0,(total-(+draft.discount||0))-(+draft.paid||0));
   const sect=(ico,title,note,body,id)=>`<details class="osec"${id?' id="'+id+'"':''}><summary>${OSEC_ICO[ico]}<span class="osec-t">${title}</span><span class="osec-n">${note||''}</span><span class="osec-c">${OSEC_ICO.chev}</span></summary><div class="osec-b">${body}</div></details>`;
   const quoted=isQuote(draft);
-  /* The door, restated where the decision actually lives. On a confirmed order it stops
-     being a switch and becomes a record of when somebody said yes. */
+  /* Which door this was opened by. An invoice and an order are the same record; what
+     differs is how much of it you are asked for. */
+  const invoiceOnly=!editingOrderId&&orderDoor==='invoice';
+  /* ---- An item ------------------------------------------------------------------------
+     On an invoice: what it is, what it costs, how many, its code and anything off it.
+     On an order: all of that plus the cloth, the craft, the photographs and the finishing,
+     behind one tap because they are work rather than price. */
+  const itemExtras=i=>{const o=draft.outfits[i];return `
+          <div class="field" style="margin-bottom:10px"><label>Material(s)</label><div id="of_mat_${i}">${outfitMaterialsHtml(i)}</div></div>
+          <div class="field" style="margin-bottom:10px"><label>Whose material is it</label><div id="of_src_${i}">${fabricSourceChips(i)}</div></div>
+          <div id="of_craft_${i}">${itemCraftChips(i)}</div>
+          <div id="of_meth_${i}">${itemMethodChips(i)}</div>
+          <div class="field" style="margin-bottom:10px"><label>Styling details</label><textarea class="fld" id="of_style_${i}" placeholder="Cut, fit, colours, size">${esc(o.style)}</textarea></div>
+          <div class="field" style="margin-bottom:${isGroup(draft)?'10px':'0'}"><label>Finishing details</label><textarea class="fld" id="of_finish_${i}" placeholder="Buttons, lining, monogram, hem">${esc(o.finish)}</textarea></div>
+          <button type="button" class="navrow" onclick="openOrderSection('osecStock')">
+            <span class="navrow-i">${OSEC_ICO.fabric}</span>
+            <span class="navrow-t"><b>Inventory</b><span>The stock this order draws down</span></span>
+            <span class="navrow-c">${OSEC_ICO.chevR}</span>
+          </button>
+          ${isGroup(draft)?`<div class="field" style="margin-bottom:0"><label>Measurements for this person</label><div class="row2"><div class="field"><label>Fit</label><input class="fld" id="ofm_fit_${i}" value="${esc(o.measFit||'')}" placeholder="Slim, Regular"></div><div class="field"><label>Posture / build</label><input class="fld" id="ofm_posture_${i}" value="${esc(o.measPosture||'')}" placeholder="Broad back"></div></div>${measGrid('ofm'+i,o.meas)}<div class="field" style="margin-bottom:0"><label>Measurement note</label><input class="fld" id="ofm_note_${i}" value="${esc(o.measNote||'')}" placeholder="Anything else"></div></div>`:''}
+  `;};
+  const itemHead=(o,i)=>`
+      <div class="oh">${isGroup(draft)?'Person '+(i+1):'Item '+(i+1)}</div>
+      ${draft.outfits.length>1?`<span class="rmo" onclick="removeOutfit(${i})">✕ remove</span>`:''}
+      ${isGroup(draft)?`<div class="field" style="margin-bottom:10px"><label>Wearer / person name</label><input class="fld" id="of_person_${i}" value="${esc(o.person||'')}" placeholder="Bride, Tunde, Aunty Bisi"></div>`:''}
+      <div class="row2">
+        <div class="field" style="margin-bottom:10px"><label>Product type</label>${selOther('of_type_'+i,productTypes(),o.type||productTypes()[0],'Type of piece','ofTypeChanged('+i+')')}</div>
+        <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)}) &amp; how many</label><div style="display:flex;gap:8px"><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()" style="flex:1;min-width:0"><input class="fld" type="number" min="1" step="1" id="of_qty_${i}" value="${ofQty(o)}" oninput="recalcProfit()" aria-label="How many" style="max-width:78px"></div><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${ofLineNote(o,draft)}</div></div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="Wedding agbada, size 43 mules"></div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:10px"><label>Product code</label><input class="fld" id="of_code_${i}" value="${esc(o.code||'')}" placeholder="SKU12345"></div>
+        <div class="field" style="margin-bottom:10px"><label>Off this piece (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_disc_${i}" value="${o.discount?fmtNum(o.discount):''}" placeholder="0" oninput="recalcProfit()"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Photos</label>${outfitPhotoGrid(i,o.photos)}</div>
+      <label class="switchrow"><span><b>Save this piece for future invoices</b></span><input type="checkbox" id="of_save_${i}" ${o.saveToCatalog?'checked':''}></label>`;
+  const outfitsHtml=draft.outfits.map((o,i)=>`
+    <div class="outfit">${itemHead(o,i)}${invoiceOnly?'':`
+      <details class="osec osec-in">
+        <summary>${OSEC_ICO.piece}<span class="osec-t">Cloth &amp; making</span><span class="osec-n">${itemSectionNote(o,draft)}</span><span class="osec-c">${OSEC_ICO.chev}</span></summary>
+        <div class="osec-b">${itemExtras(i)}</div>
+      </details>`}
+    </div>`).join('');
+  const clientField=`<div class="field"><label>Client</label><select class="fld" id="f_clientPick" onchange="clientPick()"><option value="__new__">New client</option>${Object.values(getCustomers()).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${esc(c.name||'')}" ${nameKey(draft.client||'')===nameKey(c.name||'')?'selected':''}>${esc(c.name||'')}</option>`).join('')}</select><input class="fld" type="text" id="f_client" value="${esc(draft.client)}" placeholder="Client name" autocomplete="off" onblur="clientChosen()" onchange="clientChosen()" style="margin-top:6px;display:${(draft.client&&getCustomers()[nameKey(draft.client)])?'none':'block'}"><div id="clientMatch" style="font-size:12.5px;margin-top:5px">${(()=>{const nm=(draft.client||'').trim();if(!nm)return '';return getCustomers()[nameKey(nm)]?'<span style="color:var(--green)">Returning client</span>':'';})()}</div><div id="orderMeasRef">${invoiceOnly?'':orderMeasRefHtml(draft.client)}</div></div>`;
+  /* The phone book, where the browser offers one. Chrome on Android does; Safari on iOS
+     does not expose contacts to a web app at all, so the button is not drawn there rather
+     than drawn and dead. */
+  const phoneField=`<div class="field"><label>Phone / WhatsApp${contactsSupported()?' <span style="float:right;text-transform:none;letter-spacing:0;color:var(--gold);cursor:pointer;font-weight:600" onclick="pickContact()">From contacts</span>':''}</label><input class="fld" type="tel" id="f_whatsapp" value="${esc(draft.whatsapp||'')}" placeholder="+234…"></div>`;
+  const totalBlock=`
+    <div class="total-line"><span>Total</span><b id="orderTotal">${curO(total,draft)}</b></div>
+    <div id="orderTotalBase" class="sd" style="color:var(--text-faint);text-align:right;margin-bottom:8px">${ocur(draft)!==SETTINGS.currency?'≈ '+cur((total||0)*ofx(draft))+' at 1 '+ocur(draft)+' = '+fmtNum(draft.fx||1)+' '+SETTINGS.currency:''}</div>`;
+  const moneyRow=`
+    <div class="row2">
+      <div class="field"><label>Discount (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_discount" value="${draft.discount?fmtNum(draft.discount):''}" placeholder="0" oninput="recalcProfit()"></div>
+      <div class="field"><label>Currency</label><select class="fld" id="f_currency" onchange="onCurrencyChange()">${CURRENCIES.map(c=>`<option value="${c}" ${ocur(draft)===c?'selected':''}>${c} ${CUR_SYM[c]||''}</option>`).join('')}</select></div>
+    </div>
+    <div class="field" id="f_fxWrap" style="${ocur(draft)===SETTINGS.currency?'display:none':''}"><label>1 ${ocur(draft)} = ? ${SETTINGS.currency}</label><input class="fld" type="number" step="0.0001" id="f_fx" value="${draft.fx||1}" oninput="recalcProfit()" placeholder="2200"></div>
+    <div class="row2">
+      <div class="field"><label>${invoiceOnly?'Deposit asked':'Paid so far'} (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_paid" value="${draft.paid?fmtNum(draft.paid):'0'}" oninput="onPaidChange()"></div>
+      <div class="field"><label>Ready by</label><input class="fld" type="date" id="f_due" value="${draft.due||''}"></div>
+    </div>
+    <div id="f_methodWrap" style="${(+draft.paid>0)?'':'display:none'}">${payMethodField('f_method',draft.payMethod,'How was that paid?')}</div>
+    <div class="sd" style="color:var(--text-faint);margin:2px 0 14px">Balance: <b style="color:var(--text)">${curO(_bal,draft)}</b></div>`;
+  const branchField=multiBranch()?`<div class="field"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:'';
+
+  /* ---- The invoice form ---------------------------------------------------------------
+     23 September: "Invoice page has no business with measurements and everything on image
+     5. Those should be for new order page." So it is not the order form with things shut;
+     it is a different, shorter form over the same record. Nothing about the workroom is on
+     it: no stage, no maker, no cloth, no profit, no delivery, no measurements. */
+  if(invoiceOnly){
+    openModal(`
+      <h3>New invoice</h3>
+      ${clientField}
+      ${phoneField}
+      <div class="bd-sub">What you are invoicing for</div>
+      ${outfitsHtml}
+      <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">＋ Add item</button>
+      ${totalBlock}
+      ${moneyRow}
+      ${branchField}
+      <div class="modal-foot">
+        <span style="flex:1"></span>
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn" onclick="saveOrder()">Save invoice</button>
+      </div>`);
+    return;
+  }
+
+  /* ---- The order form -----------------------------------------------------------------
+     Everything the workroom needs, with the 28 fields you only learn after the yes in
+     closed sections. */
   const quoteStrip=draft.confirmedAt
     ? `<div class="field" style="border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
-        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet &mdash; this is a quote</label>
-        <div class="sd" style="color:var(--green);margin-top:6px">Confirmed ${esc(new Date(draft.confirmedAt).toLocaleDateString('en-GB'))}${draft.confirmedBy?' by '+esc(draft.confirmedBy):''}. It is on the production board and counted in what you are owed.</div>
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet — this is a quote</label>
+        <div class="sd" style="color:var(--green);margin-top:6px">Confirmed ${esc(new Date(draft.confirmedAt).toLocaleDateString('en-GB'))}${draft.confirmedBy?' by '+esc(draft.confirmedBy):''}</div>
       </div>`
-    : `<div class="field" style="border:1px solid var(--line);border-left:3px solid ${quoted?'var(--amber)':'var(--green)'};border-radius:10px;padding:12px 14px;background:var(--panel-2)">
-        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;margin:0"><input type="checkbox" id="f_quoted" ${quoted?'checked':''} onchange="syncOrderDraft();reRenderOrder()" style="width:16px;height:16px;flex:0 0 auto"> Not agreed yet &mdash; this is a quote</label>
-        <div class="sd" style="color:var(--text-faint);margin-top:6px">${quoted
-          ?'Price it, send the invoice, and it becomes a real order the moment they pay or you confirm it. Until then it stays off the production board, out of what anyone owes you, and out of the work booked.'
-          :'Already agreed, so it goes on the production board as soon as you save. Tick the box if you are still only quoting for it.'}</div>
-      </div>`;
+    : `<label class="switchrow" style="border-top:0;padding:0 0 12px"><span><b>Not agreed yet — this is a quote</b></span><input type="checkbox" id="f_quoted" ${quoted?'checked':''} onchange="syncOrderDraft();reRenderOrder()"></label>`;
   const clientSection=`
     <div class="row2">
-      <div class="field"><label>Email</label><input class="fld" type="email" id="f_email" value="${esc(draft.email||'')}" placeholder="name@email.com"><div class="sd" style="color:var(--text-faint);margin-top:4px">Prints on the invoice, and newsletters go here.</div></div>
-      <div class="field"><label>Delivery address</label><textarea class="fld" id="f_address" placeholder="Street, city, landmark, used on invoices &amp; delivery">${esc(draft.address||'')}</textarea></div>
+      <div class="field"><label>Email</label><input class="fld" type="email" id="f_email" value="${esc(draft.email||'')}" placeholder="name@email.com"></div>
+      <div class="field"><label>Delivery address</label><textarea class="fld" id="f_address" placeholder="Street, city, landmark">${esc(draft.address||'')}</textarea></div>
     </div>
-    <div class="field"><label>Client photos (their look, inspiration, reference)</label>${photoGrid(draft.clientPhotos,'photo','addClientPhotos','removeClientPhoto')}<div class="sd" style="color:var(--text-faint);margin-top:5px">These also show on the client\u2019s profile under Customers.</div></div>
+    <div class="field"><label>Client photos</label>${photoGrid(draft.clientPhotos,'photo','addClientPhotos','removeClientPhoto')}</div>
     ${isGroup(draft)?'':(()=>{const open=orderMeasOpen||(draft.meas&&Object.keys(draft.meas).length);const key=nameKey(draft.client||'');const hasFile=key&&latestMeasOf(key);
-      return `<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)"><label style="margin:0">📐 Measurements <span style="float:right;cursor:pointer;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0" onclick="toggleOrderMeas()">${open?'Hide ▴':'Add / edit ▾'}</span></label>
-        ${open?`${hasFile?`<div class="kv" style="margin:8px 0 4px"><span style="cursor:pointer;color:var(--gold)" onclick="loadLatestMeasIntoOrder()">⇧ Load this client\u2019s latest measurements</span></div>`:''}
-          <div class="row2" style="margin-top:8px"><div class="field"><label>Fit</label><input class="fld" id="om_fit" value="${esc(draft.measFit||'')}" placeholder="e.g. Slim, Regular, Relaxed"></div><div class="field"><label>Posture / build</label><input class="fld" id="om_posture" value="${esc(draft.measPosture||'')}" placeholder="e.g. Broad back, stooped"></div></div>
+      return `<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)"><label style="margin:0">Measurements <span style="float:right;cursor:pointer;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0" onclick="toggleOrderMeas()">${open?'Hide':'Add / edit'}</span></label>
+        ${open?`${hasFile?`<div class="kv" style="margin:8px 0 4px"><span style="cursor:pointer;color:var(--gold)" onclick="loadLatestMeasIntoOrder()">Load the latest on file</span></div>`:''}
+          <div class="row2" style="margin-top:8px"><div class="field"><label>Fit</label><input class="fld" id="om_fit" value="${esc(draft.measFit||'')}" placeholder="Slim, Regular, Relaxed"></div><div class="field"><label>Posture / build</label><input class="fld" id="om_posture" value="${esc(draft.measPosture||'')}" placeholder="Broad back, stooped"></div></div>
           ${measGrid('om',draft.meas)}
-          <div class="field"><label>Measurement note</label><input class="fld" id="om_note" value="${esc(draft.measNote||'')}" placeholder="Anything else worth noting"></div>
-          <div class="sd" style="color:var(--text-faint)">Saved to this client\u2019s profile as a dated measurement record.</div>`
-        :`<div class="sd" style="color:var(--text-faint);margin-top:6px">${hasFile?'Measurements are on file. Open to view or update them.':'Capture the measurements this order is cut to.'}</div>`}</div>`;})()}
-    ${multiBranch()?`<div class="field" style="margin-bottom:0"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:''}`;
-  const pricingSection=`
-    <div class="field"><label>Discount (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_discount" value="${draft.discount?fmtNum(draft.discount):''}" placeholder="0" oninput="recalcProfit()"><div class="sd" style="color:var(--text-faint);margin-top:4px">Comes off before any tax, and prints on the invoice in brackets.</div></div>
-    <div class="field" style="margin-bottom:0;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)">
-      <label style="margin:0 0 8px">💱 Pricing currency</label>
-      <div class="row2">
-        <div class="field" style="margin-bottom:0"><label>Client pays in</label><select class="fld" id="f_currency" onchange="onCurrencyChange()">${CURRENCIES.map(c=>`<option value="${c}" ${ocur(draft)===c?'selected':''}>${c} ${CUR_SYM[c]||''}</option>`).join('')}</select></div>
-        <div class="field" id="f_fxWrap" style="margin-bottom:0;${ocur(draft)===SETTINGS.currency?'display:none':''}"><label>1 ${ocur(draft)} = ? ${SETTINGS.currency}</label><input class="fld" type="number" step="0.0001" id="f_fx" value="${draft.fx||1}" oninput="recalcProfit()" placeholder="e.g. 2200"></div>
-      </div>
-      ${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:8px">Each item\u2019s price is in <b>${ocur(draft)}</b>. Totals auto-convert to ${SETTINGS.currency} at this rate for Finance, pots &amp; tailor pay.</div>`:`<div class="sd" style="color:var(--text-faint);margin-top:8px">Prices are in ${SETTINGS.currency}. Switch if this client pays in pounds, dollars, etc.</div>`}
-    </div>`;
+          <div class="field" style="margin-bottom:0"><label>Measurement note</label><input class="fld" id="om_note" value="${esc(draft.measNote||'')}" placeholder="Anything else"></div>`
+        :''}</div>`;})()}
+    ${branchField}`;
   const stageSection=isBatch(draft)
-    ? '<div class="sd" style="color:var(--text-faint)">📦 This is a batch. Move pieces through the stages wave-by-wave from the Production card after saving.</div>'
+    ? `<div class="sd" style="color:var(--text-faint)">Tracked wave by wave from the Production card.</div>`
     : `<div class="field" style="margin-bottom:0"><label>Stage</label><select class="fld" id="f_stage">${stageOpts}</select></div>`;
   openModal(`
-    <h3>${editingOrderId?'Edit order':(quoted?'New quote':'New order')}</h3>
-    <div class="msub">${editingOrderId?editingOrderId:(quoted?'Price it and send it. Their deposit is the yes.':'Already agreed, so it goes straight on the board.')}</div>
+    <h3>${editingOrderId?'Edit order':'New order'}</h3>
+    ${editingOrderId?`<div class="msub">${editingOrderId}</div>`:''}
     ${quoteStrip}
-    <div class="field"><label>Client</label><select class="fld" id="f_clientPick" onchange="clientPick()"><option value="__new__">➕ New client (type below)</option>${Object.values(getCustomers()).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${esc(c.name||'')}" ${nameKey(draft.client||'')===nameKey(c.name||'')?'selected':''}>${esc(c.name||'')}</option>`).join('')}</select><input class="fld" type="text" id="f_client" value="${esc(draft.client)}" placeholder="New client\u2019s name" autocomplete="off" onblur="clientChosen()" onchange="clientChosen()" style="margin-top:6px;display:${(draft.client&&getCustomers()[nameKey(draft.client)])?'none':'block'}"><div class="sd" style="color:var(--text-faint);margin-top:5px">Pick an existing client to auto-fill their details, or choose <b>New client</b> and type a name. They\u2019re saved to Customers on save.</div><div id="clientMatch" style="font-size:12.5px;margin-top:5px">${(()=>{const nm=(draft.client||'').trim();if(!nm)return '';return getCustomers()[nameKey(nm)]?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Customers on save</span>';})()}</div><div id="orderMeasRef">${orderMeasRefHtml(draft.client)}</div></div>
-    <div class="field"><label>Phone / WhatsApp</label><input class="fld" type="tel" id="f_whatsapp" value="${esc(draft.whatsapp||'')}" placeholder="e.g. +234…"></div>
+    ${clientField}
+    ${phoneField}
     <div class="bd-sub">What are you making</div>
     ${outfitsHtml}
     <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">${isGroup(draft)?'＋ Add another person':'＋ Add another piece'}</button>
     <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
-      <label style="margin:0;cursor:pointer" onclick="toggleOrderSpecial()">📦 Special order type? <span style="color:var(--text-faint);font-weight:400;text-transform:none;letter-spacing:0">(batch run or group / party)</span><span style="float:right;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0">${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?'Hide ▴':'Choose ▾'}</span></label>
+      <label style="margin:0;cursor:pointer" onclick="toggleOrderSpecial()">Batch run or group / party?<span style="float:right;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0">${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?'Hide':'Choose'}</span></label>
       ${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?`
-        <label style="margin:12px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>📦 Batch (multiple identical pieces)</span><input type="checkbox" id="f_batch_on" ${isBatch(draft)?'checked':''} ${isGroup(draft)?'disabled':''} onchange="toggleBatch()"></label>
-        ${isBatch(draft)?`<div class="row2" style="margin-top:10px"><div class="field"><label>How many pieces?</label><input class="fld" type="number" min="1" id="f_batch_qty" value="${(draft.batch&&draft.batch.qty)||1}" oninput="recalcProfit()"></div></div><div class="sd" style="color:var(--text-faint)">The item above describes <b>one piece</b>. Order value = item price × quantity. Progress is tracked wave-by-wave in Production.</div>`:''}
-        <label style="margin:14px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>👥 Group / party (different people, one invoice)</span><input type="checkbox" id="f_group_on" ${isGroup(draft)?'checked':''} ${isBatch(draft)?'disabled':''} onchange="toggleGroup()"></label>
-        ${isGroup(draft)?`<div class="sd" style="color:var(--text-faint);margin-top:6px">Add each person above as their own line: name, item, price and measurements. One invoice, tracked individually.</div>`:''}
-      `:`<div class="sd" style="color:var(--text-faint);margin-top:6px">Most orders are a single piece, so leave this closed. Open it only for a production run or a wedding party / aso-ebi.</div>`}
+        <label style="margin:12px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>Batch (multiple identical pieces)</span><input type="checkbox" id="f_batch_on" ${isBatch(draft)?'checked':''} ${isGroup(draft)?'disabled':''} onchange="toggleBatch()"></label>
+        ${isBatch(draft)?`<div class="row2" style="margin-top:10px"><div class="field" style="margin-bottom:0"><label>How many pieces?</label><input class="fld" type="number" min="1" id="f_batch_qty" value="${(draft.batch&&draft.batch.qty)||1}" oninput="recalcProfit()"></div></div>`:''}
+        <label style="margin:14px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>Group / party (different people, one invoice)</span><input type="checkbox" id="f_group_on" ${isGroup(draft)?'checked':''} ${isBatch(draft)?'disabled':''} onchange="toggleGroup()"></label>
+      `:''}
     </div>
-    <div class="total-line"><span>Total order value</span><b id="orderTotal">${curO(total,draft)}</b></div>
-    <div id="orderTotalBase" class="sd" style="color:var(--text-faint);text-align:right;margin-bottom:8px">${ocur(draft)!==SETTINGS.currency?'≈ '+cur((total||0)*ofx(draft))+' at 1 '+ocur(draft)+' = '+fmtNum(draft.fx||1)+' '+SETTINGS.currency:''}</div>
-    <div class="row2">
-      <div class="field"><label>${quoted?'Deposit asked':'Paid so far'} (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_paid" value="${draft.paid?fmtNum(draft.paid):'0'}" oninput="onPaidChange()">${ocur(draft)!==SETTINGS.currency?`<div class="sd" style="color:var(--text-faint);margin-top:4px">Enter in ${ocur(draft)}, recorded as ${cur((+draft.paid||0)*ofx(draft))} in your books.</div>`:''}</div>
-      <div class="field"><label>Ready by</label><input class="fld" type="date" id="f_due" value="${draft.due||''}"></div>
-    </div>
-    <div id="f_methodWrap" style="${(+draft.paid>0)?'':'display:none'}">${payMethodField('f_method',draft.payMethod,'How was that paid?')}</div>
-    <div class="sd" style="color:var(--text-faint);margin:2px 0 14px">Balance after that: <b style="color:var(--text)">${curO(_bal,draft)}</b>${draft.discount>0?' · after a '+curO(draft.discount,draft)+' discount':''}</div>
-    <div class="bd-sub">Everything else, when you need it</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:10px">${editingOrderId?'Open a section to fill it in. Nothing here is required to save.':'None of this is in your way while you price the job. Most of it you cannot know yet anyway.'}</div>
+    ${totalBlock}
+    ${moneyRow}
+    <div class="bd-sub">More</div>
     ${sect('client','Client details',[draft.email?'email':'',draft.address?'address':'',(draft.meas&&Object.keys(draft.meas).length)?'measurements':''].filter(Boolean).join(', ')||'email, address, measurements',clientSection)}
-    ${sect('money','Discount &amp; currency',[draft.discount>0?curO(draft.discount,draft)+' off':'',ocur(draft)!==SETTINGS.currency?('paid in '+ocur(draft)):''].filter(Boolean).join(' · ')||'none',pricingSection)}
-    ${sect('stage','Where it has got to',isBatch(draft)?'tracked wave by wave':esc(STAGES[draft.stageIndex]||STAGES[0]),stageSection)}
+    ${sect('stage','Where it has got to',isBatch(draft)?'wave by wave':esc(STAGES[draft.stageIndex]||STAGES[0]),stageSection)}
     ${sect('people','Who is making it',_teamNames.length?esc(_teamNames.join(', ')):'nobody yet',assignSection+potSection)}
     ${sect('fabric','Fabric &amp; stock used',can('money')?(_costTotal?cur(_costTotal):'nothing recorded'):'',costsField+stockSection,'osecStock')}
     ${can('money')?sect('profit','What it made you',cur(retained),pnlSection):''}
-    ${sect('van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery on this order',deliverySection)}
+    ${sect('van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery',deliverySection)}
     <div class="modal-foot">
       ${editingOrderId&&can('del')?`<button class="btn danger sm" onclick="deleteOrder()">Delete</button>`:''}
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="saveOrder()">${editingOrderId?'Save':(quoted?'Save quote':'Save order')}</button>
+      <button class="btn" onclick="saveOrder()">Save</button>
     </div>`);
 }
 function saveOrder(){
