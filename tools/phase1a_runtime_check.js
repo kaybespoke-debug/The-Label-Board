@@ -32,11 +32,23 @@
    ===================================================================== */
 
 (async () => {
-  const c = window.supa || window.supabase;
-  if (!c || !c.auth) return console.error('Run this on the app tab, signed in.');
+  /* The app declares its client as `let supa=null;` at the top level, and a
+     top-level let/const never becomes a property of window. So window.supa is
+     undefined even on the right tab, and window.supabase is the LIBRARY, not a
+     signed-in client — it has no .auth. The bare name does resolve, because
+     the console evaluates through the global scope chain.
+
+     Got this wrong first time and sent Kayode round in circles on the correct
+     tab. `window.x` and `x` are not the same lookup. */
+  const c = (typeof supa !== 'undefined' && supa) ? supa : null;
+  if (!c || !c.auth) {
+    return console.error(
+      'No Supabase client on this page. This must run on the app.thelabelboard.com tab.');
+  }
 
   const { data: { session } } = await c.auth.getSession();
   if (!session) return console.error('No session. Sign in first.');
+  console.log('Signed in as', session.user.email);
 
   const call = async (action, payload) => {
     const r = await fetch(
