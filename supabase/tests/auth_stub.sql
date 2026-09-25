@@ -140,3 +140,43 @@ alter table storage.buckets enable row level security;
 grant usage on schema storage to anon, authenticated, service_role;
 grant select, insert, update, delete on storage.objects to authenticated;
 grant select on storage.buckets to anon, authenticated;
+
+-- =====================================================================
+-- pgcrypto shim, test only.
+--
+-- Supabase ships pgcrypto in the `extensions` schema on every project, so
+-- app.create_team_invitation calls extensions.digest() and
+-- extensions.gen_random_bytes() directly. PGlite has no pgcrypto, so this
+-- provides the same two names with the same shapes.
+--
+-- IT IS NOT SHA-256. It is md5 twice, concatenated, to produce the 64 hex
+-- characters the check constraint wants. That is deliberate and it is
+-- enough, because the tests prove BEHAVIOUR — the genuine nonce is
+-- recognised, a wrong one is not — and behaviour is identical under any
+-- deterministic one-way-ish function. What these tests do NOT prove is
+-- the cryptographic strength of the real hash, and no test in node could.
+-- Production uses real pgcrypto.
+--
+-- Same principle as auth.uid() above: recreate the shape so the migration
+-- under test is the real one rather than a paraphrase.
+-- =====================================================================
+create schema if not exists extensions;
+
+create or replace function extensions.digest(p_data text, p_type text)
+returns bytea
+language sql
+immutable
+as $$
+  select decode(md5(p_data) || md5(p_data || ':' || p_type), 'hex');
+$$;
+
+create or replace function extensions.gen_random_bytes(p_n int)
+returns bytea
+language sql
+volatile
+as $$
+  select decode(
+    string_agg(md5(random()::text || clock_timestamp()::text), '')
+      , 'hex')
+  from generate_series(1, greatest(1, (p_n + 15) / 16));
+$$;
