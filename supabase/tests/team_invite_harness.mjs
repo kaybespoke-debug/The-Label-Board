@@ -21,6 +21,12 @@
    non-zero, because an XFAIL turning green without anybody deciding to
    change it is exactly the kind of drift a gate exists to catch.
 
+   AG2 ANSWERED, 25 September, against real GoTrue on staging: both
+   metadata keys ARE present at INSERT, values intact, and invited_at is
+   NULL at that moment (it is written a fraction of a millisecond later by
+   a follow-up UPDATE). So the nonce works and invited_at could never have.
+   The xfails below stay until the branch is actually written.
+
    Kayode's correction, 25 September, and the reason AG2 is now a gate
    before the trigger is touched at all rather than before invitations
    are enabled: an earlier draft argued the nonce was safe to adopt
@@ -427,6 +433,88 @@ await joinBiz(C.biz, C.owner, 'owner');
   ok('SEAT-CONVERT-5: after a rolled back acceptance the invitation is pending again',
      still[0].status === 'pending', still[0].status);
   ok('and its seat is still reserved', await seats(C.biz) === held, String(await seats(C.biz)));
+}
+
+// =====================================================================
+section('FAIL-GOTRUE: the invitation is written before GoTrue is called');
+// =====================================================================
+/* It has to be. The trigger must be able to see a pending invitation at the
+   moment the auth.users INSERT fires, and the INSERT IS the GoTrue call.
+   Reverse the order and the trigger invents a studio.
+
+   So a GoTrue failure leaves a seat reserved for somebody with no account who
+   was never emailed. A ghost. Three of those on a five seat plan is most of a
+   studio's capacity gone with nothing to show for it. */
+{
+  const held = await seats(C.biz);
+
+  /* FAIL-GOTRUE-1 — invitation written, account creation fails */
+  const inv = await invite(C.biz, 'gotrue.failed@example.com');
+  ok('the invitation reserves a seat before GoTrue is called',
+     await seats(C.biz) === held + 1);
+
+  const r1 = await q(`select * from app.discard_invitation($1, $2)`,
+                     [inv.invitation_id, 'rate limited']);
+  ok('FAIL-GOTRUE-1: the compensating action reports what it did',
+     r1[0].outcome === 'discarded' && r1[0].seat_released === true,
+     r1[0].outcome);
+  ok('FAIL-GOTRUE-1: and the seat is released', await seats(C.biz) === held,
+     String(await seats(C.biz)));
+
+  const row = await q(`select status, cancelled_reason, nonce_hash, cancelled_at
+                        from public.team_invitations where id=$1`, [inv.invitation_id]);
+  ok('the row survives as the record that it happened', row[0].status === 'cancelled');
+  ok('with a reason', row[0].cancelled_reason === 'rate limited');
+  ok('and the provenance nonce is dead', row[0].nonce_hash === null);
+
+  /* FAIL-GOTRUE-2 — called twice */
+  const r2 = await q(`select * from app.discard_invitation($1)`, [inv.invitation_id]);
+  ok('FAIL-GOTRUE-2: a second call is safe and says so',
+     r2[0].outcome === 'already_discarded' && r2[0].seat_released === false,
+     r2[0].outcome);
+  ok('FAIL-GOTRUE-2: and does not release a second seat',
+     await seats(C.biz) === held, String(await seats(C.biz)));
+
+  /* an id that never existed */
+  const r3 = await q(`select * from app.discard_invitation($1)`,
+                     ['00000000-0000-4000-8000-000000000000']);
+  ok('an unknown id is reported, not raised', r3[0].outcome === 'not_found');
+
+  /* FAIL-GOTRUE-3 — GoTrue succeeded, so nothing is discarded */
+  const good = await invite(C.biz, 'gotrue.ok@example.com');
+  const stillPending = await q(`select status from public.team_invitations where id=$1`,
+                               [good.invitation_id]);
+  ok('FAIL-GOTRUE-3: a successful invite stays pending until acceptance',
+     stillPending[0].status === 'pending');
+  ok('FAIL-GOTRUE-3: and keeps holding its seat', await seats(C.biz) === held + 1);
+
+  /* the one that matters most: a late failure handler must never undo a
+     real membership */
+  const u = await mkInvitee('gotrue.ok@example.com');
+  await asUser(u);
+  await q(`select * from public.accept_invitation($1)`, [good.invitation_id]);
+  await db.exec(`reset role`);
+  const late = await q(`select * from app.discard_invitation($1, $2)`,
+                       [good.invitation_id, 'a failure handler arriving late']);
+  ok('a discard AFTER acceptance refuses and says why',
+     late[0].outcome === 'already_accepted' && late[0].seat_released === false,
+     late[0].outcome);
+  const mem = await q(`select status from public.memberships
+                        where business_id=$1 and user_id=$2`, [C.biz, u]);
+  ok('and the membership it created is untouched',
+     mem.length === 1 && mem[0].status === 'active');
+
+  /* FAIL-GOTRUE-4 — metadata cleanup failing is harmless.
+     Proved against real GoTrue in AG2: updateUserById MERGES metadata, so
+     removing a key means sending it as null, and a failure there leaves the
+     two provenance keys in place. That is not a security problem, because
+     nonce_hash is already null server side and the trigger only runs on
+     INSERT. The pair in metadata points at nothing and can never fire again. */
+  const consumed = await q(`select nonce_hash, status from public.team_invitations
+                             where id=$1`, [good.invitation_id]);
+  ok('FAIL-GOTRUE-4: the nonce is already dead server side after acceptance',
+     consumed[0].nonce_hash === null,
+     'so leftover metadata is inert whatever the cleanup call did');
 }
 
 // =====================================================================
