@@ -55,6 +55,113 @@ const json = (o: unknown, status = 200) =>
 const withSlash = (u: string) => (u.endsWith('/') ? u : u + '/')
 const APP_URL = withSlash(Deno.env.get('STUDIO_APP_URL') || 'https://app.thelabelboard.com/')
 
+/* ===== SENDING THE INVITATION OURSELVES ==============================
+   The same Resend path admin-api has used since September, and the same
+   two environment variables, so there is one sending identity across the
+   platform rather than two that can drift.
+
+   WHY WE SEND IT AND NOT SUPABASE. inviteUserByEmail hands the message to
+   Supabase's own mailer, which is rate limited to a handful an hour and
+   whose wording is not ours. generateLink makes the same account and
+   returns the link instead of posting it, so we choose the words, we
+   choose the sender, and a studio invitation reads like it came from the
+   studio rather than from a database. ACCOUNTS.md also records Supabase's
+   SMTP as broken since 13 September; this path does not touch it. */
+const RESEND_KEY = Deno.env.get('RESEND_API_KEY') || ''
+const MAIL_FROM = Deno.env.get('INVITE_FROM') || 'The Label Board <hello@thelabelboard.com>'
+
+async function sendViaResend(to: string, subject: string, html: string, text: string) {
+  if (!RESEND_KEY) return { ok: false, error: 'No mail provider is configured.' }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: MAIL_FROM, to: [to], subject, html, text }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    return { ok: false, error: 'The mail provider refused it (' + res.status + '): ' + body.slice(0, 200) }
+  }
+  return { ok: true }
+}
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/* ---- the invitation itself -------------------------------------------
+   TWO KINDS, and the difference is the whole point.
+
+   'new'      they have no account. The link is GoTrue's, it confirms the
+              address and lets them choose a password, and it carries our
+              invitation id in the fragment so the app knows what they are
+              accepting once they land.
+
+   'existing' they already use The Label Board. They must NOT be walked
+              through account creation — they have an account, and telling
+              somebody to "set a password" when they already have one is
+              how a person ends up resetting a login that was working. The
+              link goes straight to the app; they sign in as they always
+              do and the invitation is waiting.
+
+   Nothing in here is a password and nothing in here is a secret. The
+   fragment carries an invitation id, which grants nothing on its own:
+   accept_invitation still requires a session whose confirmed email
+   matches the address the invitation names. */
+function invitationEmail(kind: 'new' | 'existing', c: {
+  studio: string; role: string; branch: string; inviter: string; link: string; expires: string;
+}) {
+  const S = esc(c.studio)
+  const subject = kind === 'new'
+    ? `${c.studio} has invited you to join them on The Label Board`
+    : `${c.studio} has added you on The Label Board`
+  const opening = kind === 'new'
+    ? `${esc(c.inviter)} has invited you to join <b>${S}</b> on The Label Board, the system they use to run the studio.`
+    : `${esc(c.inviter)} has added you to <b>${S}</b> on The Label Board. You already have an account, so there is nothing to set up.`
+  const cta = kind === 'new' ? `Join ${c.studio}` : `Open ${c.studio}`
+  const note = kind === 'new'
+    ? 'You will choose your own password on the way in. Nobody at the studio can see it.'
+    : `Sign in with this email address and ${S} will be there.`
+
+  const html = `<!doctype html><html><body style="margin:0;background:#f4f5f7;padding:24px 12px;font-family:ui-sans-serif,system-ui,'Segoe UI',Helvetica,Arial,sans-serif;color:#111827">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:14px;padding:32px" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#17385c;padding-bottom:22px">The Label Board</td></tr>
+<tr><td style="font-size:21px;font-weight:700;line-height:1.35;padding-bottom:14px">${esc(cta)}</td></tr>
+<tr><td style="font-size:15px;line-height:1.65;color:#3f4a5a;padding-bottom:20px">${opening}</td></tr>
+<tr><td style="padding-bottom:22px">
+  <table role="presentation" width="100%" style="background:#f5f6f9;border-radius:10px;padding:14px 16px" cellpadding="0" cellspacing="0">
+    <tr><td style="font-size:13px;color:#6b7280;padding-bottom:4px">Studio</td><td style="font-size:14px;font-weight:600;text-align:right">${S}</td></tr>
+    <tr><td style="font-size:13px;color:#6b7280;padding:4px 0">Your role</td><td style="font-size:14px;font-weight:600;text-align:right">${esc(c.role)}</td></tr>
+    <tr><td style="font-size:13px;color:#6b7280;padding-top:4px">Branch</td><td style="font-size:14px;font-weight:600;text-align:right">${esc(c.branch)}</td></tr>
+  </table></td></tr>
+<tr><td style="padding-bottom:18px"><a href="${esc(c.link)}" style="display:inline-block;background:#17385c;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:10px">${esc(cta)}</a></td></tr>
+<tr><td style="font-size:13px;line-height:1.6;color:#6b7280;padding-bottom:6px">${note}</td></tr>
+<tr><td style="font-size:13px;line-height:1.6;color:#6b7280;padding-bottom:22px">This invitation expires on ${esc(c.expires)}.</td></tr>
+<tr><td style="border-top:1px solid #e5e7eb;padding-top:18px;font-size:12px;line-height:1.6;color:#9ca3af">
+  Not expecting this? Ignore it and nothing happens.<br>
+  Need a hand? Reply to this email and a person will read it.</td></tr>
+</table></td></tr></table></body></html>`
+
+  const text = [
+    'THE LABEL BOARD', '',
+    cta, '',
+    kind === 'new'
+      ? `${c.inviter} has invited you to join ${c.studio} on The Label Board, the system they use to run the studio.`
+      : `${c.inviter} has added you to ${c.studio} on The Label Board. You already have an account, so there is nothing to set up.`,
+    '',
+    `Studio:    ${c.studio}`,
+    `Your role: ${c.role}`,
+    `Branch:    ${c.branch}`,
+    '', cta + ':', c.link, '',
+    note,
+    `This invitation expires on ${c.expires}.`,
+    '',
+    'Not expecting this? Ignore it and nothing happens.',
+    'Need a hand? Reply to this email and a person will read it.',
+  ].join('\n')
+
+  return { subject, html, text }
+}
+
 /* A target id PROVED to be a profile in the caller's business. Only
    verifyTarget() returns one, and `unknown` is not assignable to it, so a
    raw payload id cannot reach the privileged helpers below. */
