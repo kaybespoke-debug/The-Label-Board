@@ -534,7 +534,7 @@ section('L: a platform admin is not invitable through this door');
 }
 
 // =====================================================================
-section('The discriminator — XFAIL until AG2 passes against real GoTrue');
+section('The discriminator — AG2 passed, the branch is in the migrations');
 // =====================================================================
 /* provision_studio is UNCHANGED. These describe the behaviour it must have
    once AG2 proves the nonce is visible at INSERT. They fail now, on
@@ -550,11 +550,11 @@ section('The discriminator — XFAIL until AG2 passes against real GoTrue');
                                     'team_invitation_nonce', $3::text), now())
      returning id`, ['discriminator@example.com', inv.invitation_id, inv.nonce]))[0].id;
 
-  xok('AS9: a genuine nonce pair makes the trigger abstain — no studio invented',
+  ok('AS9: a genuine nonce pair makes the trigger abstain — no studio invented',
       await bizCount() === bizBefore, bizBefore + ' -> ' + await bizCount());
-  xok('AS9: and writes no profile',
+  ok('AS9: and writes no profile',
       (await q(`select count(*)::int as n from public.profiles where id=$1`, [u]))[0].n === 0);
-  xok('AS9: and no membership',
+  ok('AS9: and no membership',
       (await q(`select count(*)::int as n from public.memberships where user_id=$1`, [u]))[0].n === 0);
 
   /* AS1 and friends: nothing else may ever cause an abstain. These pass
@@ -613,5 +613,5 @@ if (xpass) {
   console.log('AG2, or this harness is lying to you. Both are worth stopping for.');
 }
 if (fail || xpass) process.exit(1);
-console.log('\nThe table, the seat accounting and both functions behave. The');
-console.log('discriminator does not exist yet, on purpose.');
+console.log('\nThe table, the seat accounting, both functions and the nonce');
+console.log('discriminator all behave, against the real migrations.');
