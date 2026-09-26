@@ -1641,14 +1641,43 @@ body.modal-open{overflow:hidden}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ============================================================================
-   LIVE BACKEND (Supabase)
-   Paste your project's URL and anon (publishable) key between the quotes below.
-   Both blank = the app runs entirely on this device, which is the safe default.
-   Where to find them: Supabase Dashboard -> Project Settings -> API.
+   LIVE BACKEND (Supabase) — CHOSEN BY WHERE THIS PAGE IS SERVED FROM
    Full step by step: SUPABASE_SETUP.md
+
+   This used to be two hardcoded constants pointing at the live project, and
+   there is no build step here, so a Netlify environment variable could never
+   have reached them. Any copy of this file served from anywhere talked to
+   production. That is fine while there is only one place it is served from,
+   and it is how a staging site ends up writing real accounts into the live
+   database the moment there are two.
+
+   ANON KEYS ARE PUBLIC. Both of these ship in the page already and are meant
+   to; they identify a project, they do not authorise anything on their own.
+   Row level security is what stands between a caller and the data. So the
+   risk here is not exposure, it is pointing the wrong one at the wrong
+   project, which is why the mapping is explicit and short.
+
+   AN UNKNOWN HOST GETS NOTHING. No default, no nearest match, no falling back
+   to production. A hostname nobody listed — a preview build, a fork, a file
+   opened straight off the disk — runs entirely on the device, which the rest
+   of this file already handles and calls the safe default. Failing toward NO
+   data beats failing toward LIVE data, and it is the difference between a
+   confusing afternoon and an incident.
    ============================================================================ */
-const SUPA_URL='https://eskubrbgbcbaejynjxvh.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc';
+const SUPA_ENVS = {
+  'app.thelabelboard.com': {
+    url: 'https://eskubrbgbcbaejynjxvh.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc',
+  },
+  'the-label-board-staging.netlify.app': {
+    url: 'https://pakxhimjhrcpqvtsqwqz.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBha3hoaW1qaHJjcHF2dHNxd3F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjI3MDgsImV4cCI6MjEwNTkzODcwOH0.-gC6bciKA2D5gxC9b1Ur_YvAW8In62cdBzJ-90PkGXk',
+  },
+};
+/* location.hostname is '' for file://, which matches nothing and is the point. */
+const SUPA_ENV = SUPA_ENVS[String(location.hostname || '').toLowerCase()] || null;
+const SUPA_URL = SUPA_ENV ? SUPA_ENV.url : '';
+const SUPA_KEY = SUPA_ENV ? SUPA_ENV.key : '';
 let supa=null;
 /* Read BEFORE the Supabase client is created, because creating it consumes the
    token in the URL and clears it, and by the time any of our own code runs the

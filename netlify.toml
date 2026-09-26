@@ -28,3 +28,21 @@
 
 [build]
   publish = "admin"
+
+# ---------------------------------------------------------------------------
+# STAGING SITE — the-label-board-staging.netlify.app, branch
+# phase-1b-team-invitations.
+#
+# This branch was cut from admin-deploy, so it inherited publish = "admin"
+# above and the staging site served the Admin Control Centre instead of the
+# customer app. Staging exists to test the customer app's invitation flow, so
+# it has to publish site/.
+#
+# A named-branch context only ever matches a deploy of that one branch, so
+# main and admin-deploy are untouched by this block. It is also why this is
+# additive rather than an edit to [build]: changing the line above would send
+# the admin console's own site the customer app.
+# ---------------------------------------------------------------------------
+
+[context."phase-1b-team-invitations"]
+  publish = "site"
