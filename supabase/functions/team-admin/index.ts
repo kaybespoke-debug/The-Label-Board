@@ -79,16 +79,82 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, service)
 
-    // ---- 2. Which business, and what may they do? From the database, not the body.
-    const { data: me } = await admin
-      .from('profiles').select('role_id,business_id').eq('id', user.id).single()
-    if (!me) return json({ error: 'No profile for this user' }, 403)
-    const biz = me.business_id as string
-    const isOwner = me.role_id === 'owner'
-
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
     const action = str(body.action)
     const payload = (body.payload ?? {}) as Record<string, unknown>
+
+    /* ---- 2. WHICH BUSINESS, AND WHAT MAY THEY DO THERE ----------------
+       This used to read profiles.business_id and profiles.role_id, and
+       that was wrong for anybody who belongs to more than one studio.
+       `profiles` holds ONE business per person and accept_invitation
+       overwrites both fields, so somebody who owns Adé Bespoke and later
+       joins Ìfé Leather as a viewer reads as "viewer of Ìfé Leather" —
+       the one they joined last. team-admin would list the wrong team and
+       refuse the right one. Measured on staging, 26 September.
+
+       It was never a cross-tenant hole: every query was scoped to that
+       same business, so the caller only ever reached one they genuinely
+       belonged to. It failed toward LESS access. But an owner of two
+       studios could be locked out of managing either, which is broken
+       whichever way you say it.
+
+       So the security fact is now `memberships`, which is what every RLS
+       policy in this system already reads. A business_id in the request
+       is a SELECTOR: it says which studio the caller means, and nothing
+       more. The membership row says whether they may. */
+
+    /* What each action needs. Taken from the code this replaces, not
+       invented: `list` sat ABOVE the owner gate and everything else sat
+       below it. Manager is deliberately NOT granted anything new here
+       just because memberships.role has the word in it. */
+    const OWNER_ONLY = ['invite', 'update', 'sendReset', 'delete']
+    const needsOwner = OWNER_ONLY.includes(action)
+
+    const eligible = async () => {
+      const { data } = await admin
+        .from('memberships').select('business_id,role')
+        .eq('user_id', user.id).eq('status', 'active')
+      return (data ?? []).filter(m => !needsOwner || m.role === 'owner')
+    }
+
+    let biz: string
+    let myRole: string
+
+    const wanted = str(payload.business_id) || str(body.business_id)
+    if (wanted) {
+      /* A selector, verified. Never taken on trust. */
+      const { data: m } = await admin
+        .from('memberships').select('business_id,role')
+        .eq('user_id', user.id).eq('business_id', wanted).eq('status', 'active')
+        .maybeSingle()
+      if (!m) return json({ error: 'You are not a member of that studio.' }, 403)
+      if (needsOwner && m.role !== 'owner') {
+        return json({ error: 'Only the owner can add or change team accounts' }, 403)
+      }
+      biz = m.business_id as string
+      myRole = m.role as string
+    } else {
+      /* No selector. Fall back to the caller's memberships — never to
+         profiles — and refuse rather than guess when there is a choice
+         to be made. Guessing is how somebody ends up editing the wrong
+         studio's team and not noticing. */
+      const rows = await eligible()
+      if (rows.length === 0) {
+        return json({ error: needsOwner
+          ? 'You do not own a studio on this account.'
+          : 'This account does not belong to a studio.' }, 403)
+      }
+      if (rows.length > 1) {
+        return json({
+          error: 'You belong to more than one studio. Say which one.',
+          code: 'choose_business',
+          choices: rows.map(r => r.business_id),
+        }, 409)
+      }
+      biz = rows[0].business_id as string
+      myRole = rows[0].role as string
+    }
+    const isOwner = myRole === 'owner'
 
     /* ---- 3. THE ONLY ROUTE TO A PRIVILEGED CALL ----------------------
        Reads the row back and confirms it is in the caller's business. A
@@ -109,8 +175,15 @@ Deno.serve(async (req) => {
         .from('platform_admins').select('id').eq('id', wanted).maybeSingle()
       if (isStaff) return { ok: false, status: 403, error: 'That account is not in your studio.' }
 
+      /* MEMBERSHIPS, not profiles. Same reason as the caller's own
+         business above: profiles names one studio and the target may
+         belong to several, so asking profiles would miss a genuine
+         teammate and could match somebody who has since moved on. The
+         membership is the fact every RLS policy already trusts. */
       const { data, error } = await admin
-        .from('profiles').select('id').eq('id', wanted).eq('business_id', biz).maybeSingle()
+        .from('memberships').select('user_id')
+        .eq('user_id', wanted).eq('business_id', biz)
+        .in('status', ['active', 'invited']).maybeSingle()
       if (error) return { ok: false, status: 500, error: error.message }
       if (!data) return { ok: false, status: 403, error: 'That account is not in your studio.' }
 
@@ -130,21 +203,36 @@ Deno.serve(async (req) => {
       return await admin.auth.resetPasswordForEmail(email, { redirectTo: APP_URL })
     }
 
-    // ---- list: this business's team, and nobody else's.
+    /* ---- list: this business's team, and nobody else's.
+       Driven by MEMBERSHIPS. Listing by profiles.business_id would show
+       only the people whose single profile happens to point here, and
+       would silently omit anybody who has since joined a second studio —
+       they would vanish from a team they are still a member of. */
     if (action === 'list') {
-      const { data: profs } = await admin
-        .from('profiles').select('id,name,role_id,staff_id').eq('business_id', biz)
+      const { data: mems } = await admin
+        .from('memberships').select('user_id,role,status,branch_id')
+        .eq('business_id', biz).in('status', ['active', 'invited'])
       const rows = []
-      for (const p of profs ?? []) {
-        const { data: au } = await admin.auth.admin.getUserById(p.id)
+      for (const m of mems ?? []) {
+        const { data: au } = await admin.auth.admin.getUserById(m.user_id)
+        /* the display name and the app-level role still live on profiles;
+           they are labels, not authority */
+        const { data: p } = await admin
+          .from('profiles').select('name,role_id,staff_id').eq('id', m.user_id).maybeSingle()
         rows.push({
-          ...p,
+          id: m.user_id,
+          name: p?.name ?? '',
+          role_id: p?.role_id ?? m.role,
+          staff_id: p?.staff_id ?? null,
+          membership_role: m.role,
+          status: m.status,
+          branch_id: m.branch_id,
           email: au?.user?.email ?? '',
           /* so the team screen can say "invited, not signed in yet" */
           accepted: !!au?.user?.last_sign_in_at,
         })
       }
-      return json({ rows })
+      return json({ rows, business_id: biz, your_role: myRole })
     }
 
     // ---- Everything below changes accounts — owner only.
@@ -240,14 +328,35 @@ Deno.serve(async (req) => {
         }, 400)
       }
 
+      /* NO .eq('business_id') HERE, AND THAT IS DELIBERATE.
+         verifyTarget has already proved this person is a member of this
+         studio; the scope check is done. Leaving it on would reintroduce
+         B1's exact shape in a new place: a multi-business teammate whose
+         profile points at their OTHER studio would match zero rows, and a
+         zero-row write reports success. The owner would watch a rename
+         succeed and find it unchanged, which is the bug this whole phase
+         started with. */
       const { error } = await admin.from('profiles')
         .update({
           name: str(payload.name),
           role_id: str(payload.role_id) || 'cre',
           staff_id: str(payload.staff_id) || null,
         })
-        .eq('id', v.target).eq('business_id', biz)
+        .eq('id', v.target)
       if (error) return json({ error: error.message }, 400)
+
+      /* And the role THIS studio grants them lives on the membership, which
+         is per business and is what RLS reads. Only touched when asked. */
+      const wantRole = str(payload.membership_role)
+      if (wantRole) {
+        if (!['manager', 'staff', 'viewer'].includes(wantRole)) {
+          return json({ error: 'role must be manager, staff or viewer' }, 400)
+        }
+        const { error: merr } = await admin.from('memberships')
+          .update({ role: wantRole })
+          .eq('user_id', v.target).eq('business_id', biz)
+        if (merr) return json({ error: merr.message }, 400)
+      }
       return json({ ok: true })
     }
 
@@ -261,7 +370,11 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
-    // ---- delete: the profile and the account, in that order, both proved first.
+    /* ---- delete: remove them from THIS studio, and only delete the account
+       if that was the last studio they belonged to.
+       Deleting the auth user outright would have been right when everybody
+       had exactly one studio. It is wrong now: removing somebody from Adé
+       Bespoke must not destroy the account they use to run their own label. */
     if (action === 'delete') {
       if (str(payload.id) === user.id) {
         return json({ error: 'You cannot delete your own account' }, 400)
@@ -269,13 +382,26 @@ Deno.serve(async (req) => {
       const v = await verifyTarget(payload.id)
       if (!v.ok) return json({ error: v.error }, v.status)
 
-      const { error: derr } = await admin.from('profiles')
-        .delete().eq('id', v.target).eq('business_id', biz)
-      if (derr) return json({ error: derr.message }, 400)
+      const { error: merr } = await admin.from('memberships')
+        .delete().eq('user_id', v.target).eq('business_id', biz)
+      if (merr) return json({ error: merr.message }, 400)
 
+      /* anything left anywhere else? */
+      const { data: rest } = await admin.from('memberships')
+        .select('business_id').eq('user_id', v.target)
+      if ((rest ?? []).length > 0) {
+        /* They still work somewhere. Point their profile at one of the
+           studios they are actually in, so it stops naming this one. */
+        await admin.from('profiles')
+          .update({ business_id: rest![0].business_id }).eq('id', v.target)
+        return json({ ok: true, removed_from_studio: true, account_deleted: false })
+      }
+
+      const { error: perr } = await admin.from('profiles').delete().eq('id', v.target)
+      if (perr) return json({ error: perr.message }, 400)
       const { error } = await removeAccount(v.target)
       if (error) return json({ error: error.message }, 400)
-      return json({ ok: true })
+      return json({ ok: true, removed_from_studio: true, account_deleted: true })
     }
 
     return json({ error: 'Unknown action' }, 400)

@@ -77,8 +77,11 @@ section('team-admin: the privileged calls are unreachable without a proved targe
   if (at >= 0) {
     const guard = code.slice(at, code.indexOf('\n    }', at));
     ok('it proves ownership with a SELECT, not a scoped write',
-       /\.from\('profiles'\)\s*\.select\(/.test(guard),
+       /\.from\('memberships'\)\s*\.select\(/.test(guard),
        'a scoped UPDATE that matches nothing returns no error. That was the bug');
+    ok('and it asks MEMBERSHIPS, which is what RLS reads',
+       !/\.from\('profiles'\)/.test(guard),
+       'profiles names one studio; a teammate may belong to several');
     ok('scoped to the caller’s business', /\.eq\('business_id',\s*biz\)/.test(guard));
     ok('scoped to the id it was handed', /\.eq\('id',\s*wanted\)/.test(guard));
     ok('a missing row is a refusal, not a pass',
@@ -127,6 +130,21 @@ section('team-admin: the privileged calls are unreachable without a proved targe
        'calling the check and not reading its answer is the same as not calling it');
   });
 
+  /* ---- THE PRIVILEGE MATRIX MUST NOT HAVE WIDENED ----
+     memberships.role has the word 'manager' in it. That is not a reason to
+     start letting managers administer team accounts. Before this change
+     `list` sat above the owner gate and everything else sat below it, and
+     that is exactly what must still be true. */
+  ok('only these four actions are owner-only, as before',
+     /const OWNER_ONLY = \['invite', 'update', 'sendReset', 'delete'\]/.test(code),
+     'list was always open to any member; the rest never were');
+  ok('the owner gate tests for owner and nothing else',
+     code.includes("if (needsOwner && m.role !== 'owner') {")
+     && !code.includes("m.role !== 'owner' &&"),
+     'memberships.role has the word manager in it; that is not a reason to start letting them');
+  ok('the owner gate still stands in front of the mutating actions',
+     /if \(!isOwner\) return json\(/.test(code));
+
   /* ---- passwords ---- */
   ok('no action takes a password from the browser',
      !/payload\.password/.test(code) && !/password:\s*str\(/.test(code),
@@ -140,10 +158,32 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      /'password' in payload/.test(code),
      'silently dropping it would leave an owner believing they had set one');
 
-  /* ---- what the caller is allowed to be ---- */
-  ok('the studio comes from the database, never the body',
-     /from\('profiles'\)\.select\('role_id,business_id'\)\.eq\('id', user\.id\)/.test(code)
-     && !/payload\.business_id/.test(code));
+  /* ---- WHERE THE CALLER'S BUSINESS COMES FROM ----------------------
+     It used to be profiles.business_id, which names ONE studio and is
+     overwritten by accept_invitation. An owner of two studios read as a
+     member of whichever they joined last, so team-admin listed the wrong
+     team and refused the right one.
+
+     Now the request may carry business_id as a SELECTOR, and the selector
+     is worthless on its own: it has to be matched against an active
+     membership before it means anything. These checks are the difference
+     between "the client chose" and "the client asked and the server
+     agreed". */
+  ok('profiles is no longer the caller\u2019s security authority',
+     !/from\('profiles'\)\.select\('role_id,business_id'\)/.test(code),
+     'that read is what made a multi-business owner unmanageable');
+  ok('a business_id from the request is verified against memberships',
+     /\.from\('memberships'\)[\s\S]{0,200}\.eq\('business_id', wanted\)[\s\S]{0,120}\.eq\('status', 'active'\)/.test(code),
+     'a selector that is not checked is just the client choosing');
+  ok('an unmatched selector is refused',
+     /if \(!m\) return json\(\{ error: 'You are not a member of that studio\.' \}, 403\)/.test(code));
+  ok('the role comes from that membership row',
+     /myRole = m\.role as string/.test(code) && /const isOwner = myRole === 'owner'/.test(code));
+  ok('with no selector it refuses to guess between studios',
+     /code: 'choose_business'/.test(code),
+     'silently picking one is how somebody edits the wrong team and never notices');
+  ok('and never falls back to profiles',
+     !/me\.business_id/.test(code));
   ok('everything that changes an account is owner only',
      /if \(!isOwner\) return json\(/.test(code));
   ok('the error handler does not echo the thrown object',
@@ -159,10 +199,11 @@ section('team-admin: the caller is still established the same way');
 {
   const code = src('team-admin');
   ok('the caller is resolved from their own token, not from the body',
-     /auth\.getUser\(\)/.test(code) && !/payload\.(user_id|caller|business_id)/.test(code));
+     /auth\.getUser\(\)/.test(code) && !/payload\.(user_id|caller)\b/.test(code),
+     'business_id is allowed as a selector; an identity never is');
   ok('an unsigned caller is refused', /return json\(\{ error: 'Not signed in' \}, 401\)/.test(code));
-  ok('the business comes from the caller’s profile, never the body',
-     /from\('profiles'\)\.select\('role_id,business_id'\)\.eq\('id', user\.id\)/.test(code));
+  ok('the business comes from a verified membership, never from the body alone',
+     /\.eq\('user_id', user\.id\)[\s\S]{0,80}\.eq\('business_id', wanted\)/.test(code));
   ok('everything that changes an account is owner only',
      /if \(!isOwner\) return json\(/.test(code));
 }
