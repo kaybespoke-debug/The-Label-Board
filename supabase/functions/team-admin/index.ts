@@ -335,15 +335,24 @@ Deno.serve(async (req) => {
          profile points at their OTHER studio would match zero rows, and a
          zero-row write reports success. The owner would watch a rename
          succeed and find it unchanged, which is the bug this whole phase
-         started with. */
-      const { error } = await admin.from('profiles')
-        .update({
-          name: str(payload.name),
-          role_id: str(payload.role_id) || 'cre',
-          staff_id: str(payload.staff_id) || null,
-        })
-        .eq('id', v.target)
-      if (error) return json({ error: error.message }, 400)
+         started with.
+
+         ONLY WHAT WAS ASKED FOR. This used to write
+         `role_id: str(payload.role_id) || 'cre'` and
+         `staff_id: str(payload.staff_id) || null`, so a caller who sent
+         just a name silently reset the person's role to the default and
+         unlinked their staff record. The app's own form always sends all
+         three, which is why nobody had seen it; anything else calling the
+         same action would quietly demote somebody. */
+      const patch: Record<string, unknown> = {}
+      if ('name' in payload) patch.name = str(payload.name)
+      if ('role_id' in payload) patch.role_id = str(payload.role_id) || 'cre'
+      if ('staff_id' in payload) patch.staff_id = str(payload.staff_id) || null
+
+      if (Object.keys(patch).length) {
+        const { error } = await admin.from('profiles').update(patch).eq('id', v.target)
+        if (error) return json({ error: error.message }, 400)
+      }
 
       /* And the role THIS studio grants them lives on the membership, which
          is per business and is what RLS reads. Only touched when asked. */
@@ -388,13 +397,40 @@ Deno.serve(async (req) => {
 
       /* anything left anywhere else? */
       const { data: rest } = await admin.from('memberships')
-        .select('business_id').eq('user_id', v.target)
+        .select('business_id,role').eq('user_id', v.target)
       if ((rest ?? []).length > 0) {
         /* They still work somewhere. Point their profile at one of the
-           studios they are actually in, so it stops naming this one. */
+           studios they are actually in, so it stops naming this one.
+
+           AND DROP THE ROLE WITH IT. profiles.role_id is global — it is
+           the app's own permission label, not per business — so leaving
+           it alone means somebody removed from a studio where they were a
+           manager keeps a manager's menus in the studio where they are a
+           viewer. Measured on staging: removed from A as 'mgr', left in B
+           as a viewer, profile still said 'mgr'.
+
+           RLS was never fooled by it: in_scope and is_business_admin read
+           memberships and nothing else. This is the app's UI, which is
+           still worth getting right rather than leaving a label above
+           what the remaining membership grants.
+
+           Mapped conservatively and downward. An owner stays an owner
+           because that is what their remaining membership says; everybody
+           else lands on the app's own default. Being asked to restore
+           somebody's role is a better failure than not noticing they kept
+           one they should have lost. */
+        const stays = rest![0]
+        const APP_ROLE: Record<string, string> = { owner: 'owner', manager: 'mgr' }
         await admin.from('profiles')
-          .update({ business_id: rest![0].business_id }).eq('id', v.target)
-        return json({ ok: true, removed_from_studio: true, account_deleted: false })
+          .update({
+            business_id: stays.business_id,
+            role_id: APP_ROLE[String(stays.role)] ?? 'cre',
+          })
+          .eq('id', v.target)
+        return json({
+          ok: true, removed_from_studio: true, account_deleted: false,
+          now_in: stays.business_id,
+        })
       }
 
       const { error: perr } = await admin.from('profiles').delete().eq('id', v.target)

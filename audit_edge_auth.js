@@ -145,6 +145,29 @@ section('team-admin: the privileged calls are unreachable without a proved targe
   ok('the owner gate still stands in front of the mutating actions',
      /if \(!isOwner\) return json\(/.test(code));
 
+  /* ---- THE LIFECYCLE, once somebody can belong to two studios ----
+     Removal and editing both used to assume one studio per person. They
+     no longer can. */
+  ok('update only writes the fields it was actually given',
+     code.includes("if ('name' in payload)")
+     && code.includes("if ('role_id' in payload)")
+     && code.includes("if ('staff_id' in payload)"),
+     'it used to default role_id to cre and staff_id to null, so sending just '
+     + 'a name silently demoted somebody and unlinked their staff record');
+  ok('delete removes the MEMBERSHIP, not the person',
+     /from\('memberships'\)\s*\n?\s*\.delete\(\)\.eq\('user_id', v\.target\)\.eq\('business_id', biz\)/.test(code),
+     'removing somebody from one studio must not destroy the account they run '
+     + 'their own label with');
+  ok('and only deletes the account when that was their last studio',
+     /if \(\(rest \?\? \[\]\)\.length > 0\)/.test(code));
+  ok('a repointed profile does not keep the role it had elsewhere',
+     code.includes('role_id: APP_ROLE[String(stays.role)] ?? \'cre\''),
+     'removed from A as a manager, left in B as a viewer, still labelled manager');
+  ok('and that mapping only ever goes downward',
+     code.includes("const APP_ROLE: Record<string, string> = { owner: 'owner', manager: 'mgr' }")
+     && !/staff: '/.test(code) && !/viewer: '/.test(code),
+     'anything not owner or manager lands on the app default');
+
   /* ---- passwords ---- */
   ok('no action takes a password from the browser',
      !/payload\.password/.test(code) && !/password:\s*str\(/.test(code),
