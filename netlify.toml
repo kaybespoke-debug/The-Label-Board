@@ -31,17 +31,22 @@
 
 # ---------------------------------------------------------------------------
 # STAGING SITE — the-label-board-staging.netlify.app, branch
-# phase-1b-team-invitations.
+# phase-1b-team-invitations. Dormant backup, not the thing doing the work.
 #
-# This branch was cut from admin-deploy, so it inherited publish = "admin"
-# above and the staging site served the Admin Control Centre instead of the
-# customer app. Staging exists to test the customer app's invitation flow, so
-# it has to publish site/.
+# That site is configured in the Netlify dashboard with a BASE DIRECTORY of
+# "site", so Netlify reads site/netlify.toml and never opens this file at all.
+# You can see it from outside: https://the-label-board-staging.netlify.app/
+# serves the app at "/", and the rule that rewrites "/" to
+# "/layi_dashboard.html" exists only in site/netlify.toml.
 #
-# A named-branch context only ever matches a deploy of that one branch, so
-# main and admin-deploy are untouched by this block. It is also why this is
-# additive rather than an edit to [build]: changing the line above would send
-# the admin console's own site the customer app.
+# The block below matters if that setting is ever cleared. This branch was cut
+# from admin-deploy, so it inherits publish = "admin" above, and a staging site
+# reading this file without it would serve the Admin Control Centre to a
+# tester expecting the customer app — which is exactly what it did on its
+# first deploy. A named-branch context only ever matches a deploy of that one
+# branch, so main and admin-deploy cannot be touched by it, and [build] is
+# left alone rather than edited, which would have handed the admin console's
+# own site the customer app.
 # ---------------------------------------------------------------------------
 
 [context."phase-1b-team-invitations"]
