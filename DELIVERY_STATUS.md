@@ -183,13 +183,78 @@ holding `money` came back with `seeCost` true.
 
 ---
 
-## IN PROGRESS
+### Batch F, operations. Staging, 29 Sep
 
-### Batch F, operations
-Error and unhandled-rejection monitoring, Edge Function failure monitoring,
-backup verification and a real restore drill, export, account and studio
-deletion including the `partners` foreign key that makes a studio
-undeletable, and tenant recovery.
+**It tells us when it breaks.** `window.onerror` and `unhandledrejection`
+post to `public.error_reports`, along with the three Edge Functions when they
+fail. Append-only, platform admins only, and `source` is stamped by the
+database — a browser labelling itself `server` is overruled, measured. Phone
+numbers, addresses and tokens are scrubbed out of the message before it
+leaves the device, because a stack trace we can read is worth having and a
+client’s number in our logs is not. Ten per load and one per message on the
+device; two hundred an hour per studio in the database, because the client’s
+throttle lives inside the page that is broken. Faults raised before anybody
+signed in wait on the device and go up when a session arrives: a fault during
+boot is the one that loses a studio a day.
+
+**A studio can leave, and leaving is not deleting.** Closing keeps every row
+for thirty days, signs everybody out, and can be undone by the person who did
+it without asking us. Purging is ours, only after the thirty days, and writes
+the name, plan, dates and row counts into `tlb_closed_studios` first —
+`partner_referrals` and `tlb_customers` both point at `businesses` with ON
+DELETE SET NULL, so a purge never fails, it just quietly cuts a commission we
+owe from the studio it was earned on.
+
+Enforcement is one mechanism, not thirty: closing sets the memberships to
+`closed`, and since every policy in this database goes through an active
+membership, nothing is reachable. Reopening restores what each person was, so
+the suspended member comes back suspended rather than promoted.
+
+**A person can leave.** Refused for the only owner of a running studio, with
+both ways out in the message. And almost everybody is in that position, which
+the suite found the first time it ran: signing up provisions a studio, so a
+plain refusal would have meant nobody could ever delete an account. The caller
+now says which they mean, and closing on the way out still gives each studio
+its thirty days.
+
+**The export is from the server, not the device.** A manager’s device never
+held the costs and a workroom device never held a phone number, so the browser
+backup was never the studio’s data. `export_studio` assembles it where all of
+it is visible, and works for thirty days after closing — which is when people
+think to ask. The browser backup was also missing four keys, the worst being
+`layi_dash_orders_done`: it held the unfinished work and left out the finished
+work, most of a studio’s history by year two.
+
+**And the restore is drilled, not described.** `restore_harness.mjs` builds a
+studio with orders, costs, contact details, money, a changed permission table
+and an audit trail; exports it; **purges it for real**; restores it from the
+file alone; and compares both sides row for row and naira for naira. 53
+assertions, including the two a careless restore changes quietly: the history
+would have named whoever ran the restore, and the suspended member would have
+come back able to sign in. `RECOVERY.md` is the runbook for the cases a
+per-studio restore does not cover.
+
+**Sixteen objects existed on staging and in no migration.** Found by counting
+both sides rather than by testing behaviour: a database built from the
+migrations alone had 753 objects and the real project had 769. The sixteen
+included `audit_log.source`, `app.audit` and the five audit triggers — the
+whole audit-authenticity claim from Batch E — so `sensitive_data_probe` was
+proving something true about staging and nothing at all about a fresh project.
+Copied into a migration from the live definitions rather than retyped. The two
+sides now agree on one md5 over 771 objects, and
+`schema_inventory.mjs` makes that check one command each way.
+
+Found by these tests rather than by luck: a purge was impossible, because the
+AFTER DELETE audit triggers tried to record "Member removed" against a
+business row that had already gone; the hourly ceiling on fault reports did
+not exist, because a SECURITY INVOKER trigger counts with the invoker’s SELECT
+and a tenant has none; and `outboxResult` computed `revoked` and then returned
+`revoked:false`, so somebody removed from a studio mid-session was told
+"something did not send" instead of "sign in again".
+
+---
+
+## IN PROGRESS
 
 ### Batch G, Flutterwave
 Architecture confirmed against current documentation before anything was

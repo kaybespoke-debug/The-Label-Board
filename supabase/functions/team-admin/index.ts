@@ -175,6 +175,43 @@ type VerifiedTarget = string & { readonly __inCallersStudio: unique symbol }
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
+/* WHEN THIS FUNCTION IS THE THING THAT BROKE.
+   Deno logs are there, and reading them means somebody deciding to go and
+   look, on a day nobody knows there is anything to look for. A row in
+   error_reports is the same failure in the place we already watch, beside
+   the browser faults, so "the invitation did not arrive" has an answer
+   before the studio has to ask twice.
+
+   It writes as the service role, which is how this function already talks
+   to the database, and the row is stamped source=server by the trigger
+   rather than by this claim — the claim is only a default.
+
+   return=minimal on purpose: error_reports has no SELECT for anybody but a
+   platform admin, and asking for the row back runs that policy.
+
+   And it can never be the thing that fails. Every path swallows. */
+async function reportEdgeFault(where: string, e: unknown, businessId?: string | null) {
+  try {
+    const u = Deno.env.get('SUPABASE_URL')
+    const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!u || !service) return
+    const msg = String((e as Error)?.message ?? e ?? '').slice(0, 1000)
+    const stack = String((e as Error)?.stack ?? '').slice(0, 4000)
+    await fetch(u + '/rest/v1/error_reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: service,
+        Authorization: 'Bearer ' + service,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        business_id: businessId ?? null, kind: 'edge', source: 'server',
+        message: where + ': ' + msg, stack, at_url: where,
+      }),
+    })
+  } catch { /* reporting must never be the thing that fails */ }
+}
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
@@ -954,6 +991,7 @@ Deno.serve(async (req) => {
     /* Never echo the thrown object: it can carry request detail, and in a
        service-role context that detail is privileged. */
     console.error('team-admin:', e)
+    await reportEdgeFault('team-admin', e)
     return json({ error: 'Something went wrong handling that request.' }, 500)
   }
 })

@@ -104,8 +104,11 @@ serving the old version.
 
 Every object the apps talk to is created by a migration in
 `supabase/migrations/`, applied in filename order. Nothing is created by hand
-any more: five objects once were, and were missing from the migrations
-entirely, so a fresh project would have run none of it. Fourteen suites guard it:
+any more, and there is now a way to prove it rather than believe it. Five
+objects once were made by hand and were missing from the migrations entirely,
+so a fresh project would have run none of it. It happened again on 29
+September with sixteen more, including the two columns the whole
+audit-authenticity claim rests on. Sixteen suites guard it:
 
 ```bash
 node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
@@ -122,7 +125,24 @@ node supabase/tests/plan_feature_harness.mjs   # Basic cannot write a Pro featur
 node supabase/tests/trial_harness.mjs           # a free trial gives away the product, never the commission
 node supabase/tests/account_directory_harness.mjs # which app each account belongs to, and who may ask
 node supabase/tests/storage_rls_harness.mjs    # a studio reaches its own photos and nobody else's
+node supabase/tests/lifecycle_harness.mjs       # a studio can close, come back, and be purged without taking our books with it
+node supabase/tests/restore_harness.mjs         # a studio exported, purged, and put back from the file alone
 ```
+
+And one check that is not a suite, because it compares the repo with a real
+project rather than testing behaviour:
+
+```bash
+node supabase/tests/schema_inventory.mjs --check       # the migrations still produce what is recorded
+node supabase/tests/schema_inventory.mjs --fingerprint # one md5, to compare with a live project
+node supabase/tests/schema_inventory.mjs --sql         # the query to run there
+```
+
+**Never apply SQL to a project except from a migration file.** That is the
+rule the sixteen broke. Nothing in the repo referenced those objects by name,
+so no gate that reads the app could have found them; only counting both sides
+did. `supabase/schema_inventory.txt` is the snapshot that makes it one command
+each way. `RECOVERY.md` is what to do when data is actually gone.
 
 The first reads the shipped code for every table, function and column it
 names — the two Edge Functions included, because they are the half that
@@ -139,7 +159,7 @@ authenticated` on every project, so a table in `public` is reachable with
 the public anon key from the moment it exists. `tlb_policy_harness` sets
 that default first, so the policies are actually reached and tested.
 
-Four of the fourteen are different in kind. Every other suite proves something is
+Four of the sixteen are different in kind. Every other suite proves something is
 walled off; `plan_limits_harness`, `partner_commission_harness` and
 `referral_fraud_harness` and `plan_feature_harness` prove something is REFUSED, and both show the refusal and then the same operation
 succeeding once it is allowed. A check that only ever sees the refusal cannot

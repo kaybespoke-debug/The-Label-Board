@@ -1569,6 +1569,22 @@ body.modal-open{overflow:hidden}
           </div>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
         </div>
+        <!-- Separate panel from the browser backup above, because they are not
+             the same thing and a studio that thinks they are has a backup with
+             no costs and no phone numbers in it. -->
+        <div class="panel" data-setperm="setData">
+          <div class="panel-head"><h3>Your data, from the server</h3></div>
+          <p class="page-sub" style="margin-bottom:16px">Everything the studio has, gathered where all of it is visible — orders with their costs, clients with their contact details, and the full activity log. The backup above only holds what this device was allowed to see.</p>
+          <button class="btn" id="srvExportBtn" onclick="exportStudioFromServer()">⤓ Download everything</button>
+        </div>
+        <div class="panel" data-setperm="setData" id="closingPanel">
+          <div class="panel-head"><h3>Closing</h3></div>
+          <p class="page-sub" style="margin-bottom:16px">Closing the studio signs everybody out and stops the subscription. <strong>Nothing is deleted for 30 days</strong> — you can reopen it, or download everything, at any point in that time.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn danger" id="closeStudioBtn" onclick="closeThisStudio()">Close the studio…</button>
+            <button class="btn ghost" onclick="deleteMyAccount()">Delete my account…</button>
+          </div>
+        </div>
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Import old data</h3></div>
           <p class="page-sub" style="margin-bottom:16px">Bring your history across from another app, a spreadsheet or your old website. Columns are matched automatically, and re-importing updates records rather than duplicating them.</p>
@@ -2481,7 +2497,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v57';
+const APP_VERSION='layi-v58';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -2728,6 +2744,13 @@ async function sendOutboxEntry(e){
     return outboxResult(error);
   }
   if(e.kind==="orders"){return await pushOrderRows(e.payload);}
+  if(e.kind==="fault"){
+    /* No return=representation here either, and for a stronger reason:
+       a studio has NO select on error_reports at all, so asking for the
+       row back would turn every successful report into a refusal. */
+    const {error}=await supa.from("error_reports").insert(e.payload);
+    return outboxResult(error);
+  }
   return {ok:true};
 }
 function outboxResult(error){
@@ -2738,7 +2761,88 @@ function outboxResult(error){
      is how a queue fills with things that will never be accepted. */
   const fatal=code==="42501"||/permission denied|row-level security/i.test(msg);
   const revoked=/JWT|not a member|row-level security/i.test(msg)&&code==="42501";
-  return {ok:false,fatal:fatal,revoked:false,error:msg||code};
+  /* This said revoked:false, so onMembershipRevoked never once ran and
+     somebody removed from a studio mid-session was told "something did
+     not send" instead of "sign in again". The value was computed on the
+     line above and discarded. */
+  return {ok:false,fatal:fatal,revoked:revoked,error:msg||code};
+}
+
+/* ===== WHEN IT BREAKS ===============================================
+   Until now an error in a browser in Ibadan at 11pm was a sentence the
+   studio might or might not repeat to us, usually as "it stopped
+   working". There was no line to read. These two listeners are that
+   line, and they are deliberately modest about what they collect.
+
+   WHAT IS SCRUBBED AND WHY. A message can carry whatever was in the
+   variable that threw, and this app holds clients’ phone numbers and
+   addresses. So anything shaped like an address, a phone number or a
+   token is replaced before the report leaves the device. A stack trace
+   we can read is worth having; a client’s number in our logs is not.
+
+   TEN PER LOAD AND ONE PER MESSAGE. A broken render throws on every
+   frame. The database has its own ceiling for the same reason, because
+   this one lives inside the page that is broken.
+
+   AND THE ONES BEFORE SIGN-IN MATTER MOST, because a fault during boot
+   is the one that loses a studio a day. Nothing can be written without
+   a session, so those wait on the device and go up when one arrives. */
+const FAULT_KEY='layi_dash_faults';
+let faultsThisLoad=0;const faultSeen=Object.create(null);
+function scrubFault(t){
+  return String(t==null?'':t)
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g,'[email]')
+    .replace(/eyJ[A-Za-z0-9_.-]{12,}/g,'[token]')
+    .replace(/\+?\d[\d ()-]{7,}\d/g,'[number]')
+    .slice(0,1800);
+}
+function localFaults(){try{return JSON.parse(store.get(FAULT_KEY)||"[]")||[];}catch(e){return [];}}
+function reportFault(kind,message,stack){
+  try{
+    if(faultsThisLoad>=10)return;
+    const sig=kind+'|'+String(message||'').slice(0,120);
+    if(faultSeen[sig])return;
+    faultSeen[sig]=1;faultsThisLoad++;
+    const row={kind:kind,message:scrubFault(message)||"(no message)",
+      stack:scrubFault(stack),at_url:scrubFault(String(location.hash||"")),
+      app_version:(typeof APP_VERSION!=="undefined")?APP_VERSION:null,
+      ua:String(navigator.userAgent||"").slice(0,300)};
+    if(supa&&liveMode&&myBusinessId){
+      row.business_id=myBusinessId;
+      outboxQueue({kind:"fault",key:"fault:"+uid("f"),payload:row});
+    }else{
+      const list=localFaults();list.push(row);
+      while(list.length>20)list.shift();
+      try{store.set(FAULT_KEY,JSON.stringify(list));}catch(e){}
+    }
+  }catch(e){}
+}
+/* Whatever broke before there was a session to report it under. */
+function flushLocalFaults(){
+  try{
+    if(!(supa&&liveMode&&myBusinessId))return;
+    const list=localFaults();if(!list.length)return;
+    store.del(FAULT_KEY);
+    list.forEach(function(row){
+      row.business_id=myBusinessId;
+      outboxQueue({kind:"fault",key:"fault:"+uid("f"),payload:row});
+    });
+  }catch(e){}
+}
+/* Guarded, like the other four places that reach for window at the top
+   level: the gates run this file in node, where window is the sandbox and
+   has no addEventListener. An unguarded one took twenty-three gates red at
+   once, which is at least a fast way to find out. */
+if(typeof window!=='undefined'&&window.addEventListener){
+  window.addEventListener('error',function(ev){
+    reportFault("error",(ev&&(ev.message||(ev.error&&ev.error.message)))||"script error",
+      (ev&&ev.error&&ev.error.stack)||((ev&&ev.filename)?ev.filename+":"+ev.lineno:""));
+  });
+  window.addEventListener('unhandledrejection',function(ev){
+    const r=ev&&ev.reason;
+    reportFault("rejection",(r&&(r.message||r.error_description))||String(r||"rejected"),
+      (r&&r.stack)||"");
+  });
 }
 
 /* Access taken away while this device was elsewhere. Not an error to
@@ -4014,6 +4118,7 @@ async function enterLiveStudio(user,username,errEl){
       try{await adoptPlan();}catch(e){}       // billing decides, not this device
       try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
       try{reportTenantPresence();}catch(e){}
+      try{flushLocalFaults();}catch(e){}
       startRealtime();
       /* Photos: find out how full they are, mint the URLs this screen needs,
          then move anything still held as bytes up to storage. The sweep runs
@@ -4704,6 +4809,8 @@ function enterApp(){
   show('navLeave',can('team'));show('msLeave',can('team'));
   show('navCompanylog',can('team'));show('msCompanylog',can('team'));
   applyTeamVisibility();applyExampleVisibility();updateConnPill();updateSyncPill();refreshInstallUI();
+  try{const cb=document.getElementById('closeStudioBtn');
+    if(cb)cb.style.display=ownsThisStudio()?'':'none';}catch(e){}
   show('navExpenses',can('expenses'));show('msExpenses',can('expenses'));document.getElementById('expLockIco').style.display='none';
   show('navAudit',can('audit'));show('msAudit',can('audit'));
   show('msSwitch',isOwner());
@@ -9524,7 +9631,21 @@ function hasOwnData(){
   }catch(e){return false;}
 }
 function clearAll(){if(!confirm('This deletes ALL orders, customers, transactions, appointments, supplies, suppliers, bills, staff, accounts, tasks, attendance, leave, the company log and pots from this browser. Continue?'))return;save('layi_dash_orders',[]);setTxns([]);setAppts([]);setSupplies([]);setProducts([]);setSuppliers([]);setBills([]);setCustomers({});setStaff([]);setPots([]);setTasks([]);setAnns([]);setAttendance([]);setLeave([]);setLog([]);setAudit([]);renderAll();go('activity');}
-const BACKUP_KEYS=['layi_dash_orders','layi_dash_txns','layi_dash_appts','layi_dash_supplies','layi_dash_products','layi_dash_suppliers','layi_dash_bills','layi_dash_customers','layi_dash_staff','layi_dash_pots','layi_dash_roles','layi_dash_users','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_log','layi_dash_audit','layi_dash_campaigns','layi_dash_settings','layi_theme'];
+/* FOUR KEYS WERE MISSING FROM THIS LIST, and a backup that quietly drops
+   a quarter of the work is worse than no backup because nobody finds out
+   until they restore it. layi_dash_orders_done is the worst of them: it
+   is where an order goes the moment it is delivered and paid, so this
+   list held the unfinished work and left out the finished work — most of
+   a studio’s history by year two. It arrived when the orders store was
+   split in two and nothing pointed at the list that needed splitting too.
+
+   Device-local keys stay out on purpose: the outbox is unsent writes, the
+   media URLs are expiring tokens, the storage figure and the current
+   studio are caches of things the server owns.
+
+   layi_dash_faults is out for a different reason — it is a queue of
+   crash reports waiting for a session, ours rather than the studio’s. */
+const BACKUP_KEYS=['layi_dash_orders','layi_dash_orders_done','layi_dash_txns','layi_dash_appts','layi_dash_supplies','layi_dash_products','layi_dash_suppliers','layi_dash_bills','layi_dash_customers','layi_dash_staff','layi_dash_pots','layi_dash_roles','layi_dash_users','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_planner','layi_dash_log','layi_dash_audit','layi_dash_campaigns','layi_dash_feedback','layi_dash_settings','layi_theme'];
 function exportData(){
   const bundle={_app:'The Label Board',_version:1,_exportedAt:new Date().toISOString(),data:{}};
   BACKUP_KEYS.forEach(k=>{const v=store.get(k);if(v!=null)bundle.data[k]=v;});
@@ -9533,6 +9654,80 @@ function exportData(){
   a.href=url;a.download='label-board-backup-'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
+/* WHAT THIS DEVICE HOLDS IS NOT THE STUDIO’S DATA.
+   A manager’s device never held the costs. A workroom device never held
+   a phone number. No device holds more than the last six hundred lines
+   of the audit trail. exportData() above is a browser backup and stays
+   one; this is the owner asking the server for everything, which is what
+   somebody means when they say they want their data.
+
+   It works after the studio has been closed too, for the thirty days,
+   because that is when people think to ask. */
+async function exportStudioFromServer(){
+  if(!(supa&&liveMode&&myBusinessId)){
+    alert('This needs a connection. Use Export backup for what is on this device.');return;
+  }
+  const btn=document.getElementById('srvExportBtn');
+  if(btn){btn.disabled=true;btn.textContent='Gathering\u2026';}
+  try{
+    const {data,error}=await supa.rpc('export_studio',{p_business:myBusinessId});
+    if(error)throw error;
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download='label-board-studio-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    logAudit('Exported the studio from the server','');
+  }catch(e){
+    alert('Could not build the export: '+((e&&e.message)||'unknown error'));
+  }
+  if(btn){btn.disabled=false;btn.textContent='\u2913 Download everything';}
+}
+
+/* ===== CLOSING =====================================================
+   Closing is not deleting, and the wording has to carry that or nobody
+   will believe it. Thirty days, everything kept, reopen at any point,
+   and the export above still works the whole time. The database enforces
+   all three; this screen only has to say so honestly. */
+async function closeThisStudio(){
+  if(!(supa&&liveMode&&myBusinessId)){alert('This needs a connection.');return;}
+  if(!ownsThisStudio()){alert('Only the owner can close the studio.');return;}
+  const reason=prompt('Closing '+(SETTINGS.bizName||'this studio')+'.\n\nEverything is kept for 30 days and you can reopen it at any point in that time. Nobody will be able to sign in meanwhile.\n\nWhy are you closing? (optional)');
+  if(reason===null)return;
+  if(!confirm('Close the studio now? Everyone signed out, nothing deleted for 30 days.'))return;
+  try{
+    const {data,error}=await supa.rpc('close_studio',{p_business:myBusinessId,p_reason:reason||null});
+    if(error)throw error;
+    const when=(data&&data.purge_after)?new Date(data.purge_after).toLocaleDateString('en-GB'):'in 30 days';
+    alert('The studio is closed. Everything is kept until '+when+'. Sign in again as the person who closed it to reopen it or download the data.');
+    location.reload();
+  }catch(e){
+    alert('Could not close the studio: '+((e&&e.message)||'unknown error'));
+  }
+}
+
+/* The other half of the same decision, and the reason this one asks
+   twice: deleting the account is the only step here that cannot be
+   undone by us. The studio it owns is still only closed. */
+async function deleteMyAccount(){
+  if(!(supa&&liveMode)){alert('This needs a connection.');return;}
+  if(!confirm('Delete your account?\n\nYou will be removed from every studio you are in. Any studio you are the only owner of will be CLOSED, not deleted \u2014 it is kept for 30 days.\n\nDownload your data first if you want a copy.'))return;
+  if(!confirm('Last check. This cannot be undone by us. Delete the account?'))return;
+  try{
+    let {data,error}=await supa.rpc('delete_my_account',{p_close_solely_owned:false});
+    if(error&&/only owner/i.test(String(error.message||""))){
+      if(!confirm(String(error.message)+'\n\nClose it as you go? It is kept for 30 days.'))return;
+      ({data,error}=await supa.rpc('delete_my_account',{p_close_solely_owned:true}));
+    }
+    if(error)throw error;
+    try{await supa.auth.signOut();}catch(e){}
+    try{TENANT_KEYS.forEach(function(k){store.del(k);});}catch(e){}
+    alert('Your account is gone. Thank you for trying The Label Board.');
+    location.reload();
+  }catch(e){
+    alert('Could not delete the account: '+((e&&e.message)||'unknown error'));
+  }
+}
+
 function importData(input){
   const file=input.files&&input.files[0];if(!file)return;
   const reader=new FileReader();

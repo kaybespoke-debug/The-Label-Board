@@ -27,8 +27,15 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    how full the studio is, as the upload policy computes it. Syncing a cache
    of a server value is how two devices end up arguing about it; each refreshes
    from my_storage_usage() instead. */
+/* layi_dash_faults is the crash reports this device produced BEFORE it had a
+   session to file them under — a fault during boot is the one that loses a
+   studio a day, and there is no way to write one without being signed in.
+   They go up the moment a session arrives and the key is deleted, so it is a
+   staging post rather than a store. It is also ours rather than the studio's,
+   which is why it stays out of the backup as well. */
 const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls',
-  'layi_dash_storage_usage','layi_dash_current_biz','layi_dash_outbox']);
+  'layi_dash_storage_usage','layi_dash_current_biz','layi_dash_outbox',
+  'layi_dash_faults']);
 /* layi_dash_outbox is THIS DEVICE's queue of writes that have not reached
    the server yet. Syncing a queue of unsent writes would be a contradiction:
    the whole point is that it is the part the server has not seen. */

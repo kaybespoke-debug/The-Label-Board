@@ -89,7 +89,14 @@ create table if not exists auth.users (
   -- that depended on it then passes by not running.
   email_confirmed_at  timestamptz,
   last_sign_in_at     timestamptz,
-  banned_until        timestamptz
+  banned_until        timestamptz,
+  -- Added 29 September 2026 for account_for_recovery, which is how
+  -- auth-recover decides between a reset link and an invitation and whether
+  -- one went out in the last minute. deleted_at with it: the same function
+  -- excludes deleted accounts, and a stub missing one column of a pair fails
+  -- in exactly the way the note above describes.
+  recovery_sent_at    timestamptz,
+  deleted_at          timestamptz
 );
 
 -- =====================================================================
