@@ -136,7 +136,7 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      `list` sat above the owner gate and everything else sat below it, and
      that is exactly what must still be true. */
   ok('only these four actions are owner-only, as before',
-     /const OWNER_ONLY = \['invite', 'update', 'sendReset', 'delete'\]/.test(code),
+     code.includes("const OWNER_ONLY = ['invite', 'resendInvitation', 'update', 'sendReset', 'delete']"),
      'list was always open to any member; the rest never were');
   ok('the owner gate tests for owner and nothing else',
      code.includes("if (needsOwner && m.role !== 'owner') {")
@@ -165,8 +165,9 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      'removed from A as a manager, left in B as a viewer, still labelled manager');
   ok('and that mapping only ever goes downward',
      code.includes("const APP_ROLE: Record<string, string> = { owner: 'owner', manager: 'mgr' }")
-     && !/staff: '/.test(code) && !/viewer: '/.test(code),
-     'anything not owner or manager lands on the app default');
+     && code.includes("APP_ROLE[String(stays.role)] ?? 'cre'"),
+     'the map names only the two roles that keep something, and everything '
+     + 'else lands on the app default rather than on whatever it had');
 
   /* ---- passwords ---- */
   ok('no action takes a password from the browser',
@@ -176,7 +177,79 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      !/auth\.admin\.createUser\(/.test(code),
      'invitations replaced it: they choose their own and it never crosses this boundary');
   ok('an invitation is what creates a teammate now',
-     /auth\.admin\.inviteUserByEmail\(/.test(code));
+     code.includes('auth.admin.generateLink({')
+     && !/auth\.admin\.inviteUserByEmail\(/.test(code),
+     'generateLink makes the same account and hands back the link instead of '
+     + 'posting it, so the wording and the sender are ours and Supabase\u2019s own '
+     + 'mailer, broken since 13 September, is not in the path');
+
+  /* ---- THE ORDER OF THE TWO WRITES ----------------------------------
+     This is the whole Phase 1A bug in one property. The account INSERT
+     fires provision_studio; if no invitation exists yet for that address
+     the trigger invents a studio named after the invitee. So the
+     invitation must be written first, and the nonce it mints is what the
+     trigger recognises. */
+  ok('the invitation is created BEFORE the account',
+     code.indexOf("rpc('create_team_invitation'") > 0
+     && code.indexOf("rpc('create_team_invitation'") < code.indexOf('auth.admin.generateLink({'),
+     'the other way round and the trigger invents a studio, which is what 9 '
+     + 'businesses becoming 10 looked like');
+  ok('and the account carries the nonce so the trigger can abstain',
+     code.includes('team_invitation_id: inv.invitation_id')
+     && code.includes('team_invitation_nonce: inv.nonce'),
+     'without it provision_studio cannot tell our own invitation from a '
+     + 'stranger signing up, and it must not guess');
+  ok('no membership and no profile are written at invite time',
+     !/from\('memberships'\)\s*\n?\s*\.insert\(/.test(code)
+     && !/from\('profiles'\)\.insert\(/.test(code),
+     'the seat is held by the pending invitation; access starts at '
+     + 'acceptance, by the invitee, or an owner grants entry to somebody who '
+     + 'never answered');
+
+  /* ---- WHAT HAPPENS WHEN THE EMAIL DOES NOT GO ---------------------
+     An invitation nobody was told about still holds a seat, still
+     expires silently, and the owner believes it was sent. */
+  ok('a failed send takes the invitation back',
+     /rpc\('discard_invitation'[\s\S]{0,400}could not be sent/.test(code),
+     'otherwise a seat is held for somebody who was never contacted');
+  ok('and the account it just made with it',
+     /if \(createdUser\) await admin\.auth\.admin\.deleteUser\(createdUser\)/.test(code),
+     'an account with no studio and no invitation is an orphan the owner '
+     + 'cannot see or clear');
+  ok('but a failed RESEND takes nothing back',
+     /NOTHING IS DISCARDED HERE/.test(code),
+     'the invitation was already sent once and may already be in use; a '
+     + 'flaky second send must not cancel it');
+  const resendBlock = (function () {
+    const from = code.indexOf("if (action === 'resendInvitation') {");
+    if (from < 0) return '';
+    const to = code.indexOf("if (action === 'update')", from);
+    return code.slice(from, to > 0 ? to : code.length);
+  })();
+  ok('resend re-uses the invitation rather than minting another',
+     resendBlock.length > 0 && resendBlock.indexOf("rpc('create_team_invitation'") < 0,
+     'a second invitation row would hold a second seat and leave two live '
+     + 'links for one person');
+  ok('and never re-issues the nonce',
+     /No `data` on any of these/.test(code),
+     'it was single-use and is already spent; the INSERT it identified '
+     + 'cannot happen twice');
+
+  /* ---- THE NONCE IS NOT A SECRET IN TRANSIT ------------------------ */
+  ok('the nonce never reaches the email or the link',
+     !/nonce[\s\S]{0,80}(action_link|landingFor|link =)/.test(code)
+     && !/link[\s\S]{0,40}nonce/.test(code),
+     'it is provenance for the trigger, not a credential for the invitee, '
+     + 'and the invitation id is what the link carries');
+  ok('and is cleared from the invitee\u2019s own metadata immediately',
+     /user_metadata: \{ name, team_invitation_id: null, team_invitation_nonce: null \}/.test(code),
+     'sent as null because updateUserById MERGES \u2014 and the name stays, '
+     + 'because accept_invitation reads it to write their profile');
+  ok('the metadata is not wiped wholesale',
+     !/^\s*user_metadata: \{\},?\s*$/m.test(code)
+     && !/updateUserById\([^)]*user_metadata: \{\}/.test(code),
+     'that would leave every invited teammate named after the front of '
+     + 'their email address');
   ok('a password sent anyway is refused rather than ignored',
      /'password' in payload/.test(code),
      'silently dropping it would leave an owner believing they had set one');

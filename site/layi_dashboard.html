@@ -1701,6 +1701,33 @@ const AUTH_ARRIVAL=(function(){
   }catch(e){}
   return null;
 })();
+/* ===== ARRIVING ON A TEAM INVITATION =====
+   The id of the invitation, if this link is one. It rides in the QUERY
+   STRING rather than the fragment, and that is not a preference: GoTrue
+   appends its own fragment to whatever redirect it was given, so an id in
+   the fragment would arrive as '#invitation=...#access_token=...', the
+   browser would hand the whole run to location.hash, and AUTH_ARRIVAL just
+   above would find no access_token at all.
+
+   It is NOT a credential and nothing here treats it as one. accept_invitation
+   runs in the database as the signed-in person and checks that their
+   CONFIRMED email is the address the invitation names, so an id on its own
+   opens nothing. Read once, used once, and wiped out of the address bar
+   before the studio renders, because a screenshot of somebody's dashboard
+   should not carry the link they came in on.
+
+   Shape-checked rather than trusted: anything that is not a uuid is
+   ignored, so a hand-edited url cannot push a string into an rpc call. */
+const INVITATION_ID=(function(){
+  try{
+    const v=String(new URLSearchParams(String(location.search||'')).get('invitation')||'').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)?v:'';
+  }catch(e){ return ''; }
+})();
+/* Kept for one reason: if acceptance fails AND they turn out to have no
+   studio, this is the only sentence that explains why they are looking at a
+   wall. On its own it is not an error worth interrupting anybody with. */
+let INVITATION_ERROR='';
 /* An invitation and a reset both mean the same thing to this app: you are here,
    we know who you are, and you need a password. 'signup' is a confirmation link,
    which arrives the same way. */
@@ -2286,7 +2313,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v46';
+const APP_VERSION='layi-v47';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3235,6 +3262,32 @@ async function doLogin(){
    somebody came through. It used to live inside doLogin, which is why an invited
    studio owner reached a login form and stopped. */
 async function enterLiveStudio(user,username,errEl){
+      /* An invitation is accepted HERE, before anything reads profiles,
+         because acceptance is what writes the profile and the membership.
+         Ask first and there is nothing to find.
+
+         Everybody arrives through this one function — the invitation link,
+         an ordinary sign-in, a password reset — so the invitation is picked
+         up whichever door was used. An existing teammate invited to a second
+         studio simply signs in as they always do; there is no separate path
+         for them and no second account. */
+      if(INVITATION_ID&&supa){
+        errEl.textContent='Joining the studio…';
+        let ierr=null;
+        try{
+          const r=await supa.rpc('accept_invitation',{p_invitation_id:INVITATION_ID});
+          ierr=(r&&r.error)||null;
+        }catch(e){ ierr={message:'Could not reach the live server.'}; }
+        /* Out of the address bar either way, so a reload does not try again
+           and a shared screenshot does not carry it. */
+        try{history.replaceState(null,'',location.pathname);}catch(e){}
+        /* NOT FATAL ON ITS OWN. The commonest cause by far is a link opened
+           twice, and somebody who is already a member should land in their
+           studio rather than be told off. So it is remembered and the sign-in
+           carries on; the only place it is spoken aloud is the screen for
+           somebody who has no studio at all. */
+        if(ierr)INVITATION_ERROR=String(ierr.message||'That invitation is no longer valid.');
+      }
       const {data:prof,error:pe}=await supa.from('profiles').select('name,role_id,business_id,staff_id').eq('id',user.id).maybeSingle();
       /* The password was right and the account is real; there is simply no
          studio attached to it. That is not a sign-in failure and must not be
@@ -3268,6 +3321,12 @@ async function enterLiveStudio(user,username,errEl){
             +'The partner portal is the right door.'
             +'<br><a href="'+PARTNER_PORTAL_URL+'" style="display:inline-block;margin-top:10px;color:var(--gold);font-weight:600">'
             +'Continue to the partner portal &rsaquo;</a>';
+          return;
+        }
+        if(INVITATION_ERROR){
+          errEl.innerHTML='That invitation could not be accepted: '+esc(INVITATION_ERROR)
+            +'<br><span style="opacity:.75">Ask the studio to send it again. An '
+            +'invitation expires, and each one can only be used once.</span>';
           return;
         }
         errEl.innerHTML=pe

@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
        invented: `list` sat ABOVE the owner gate and everything else sat
        below it. Manager is deliberately NOT granted anything new here
        just because memberships.role has the word in it. */
-    const OWNER_ONLY = ['invite', 'update', 'sendReset', 'delete']
+    const OWNER_ONLY = ['invite', 'resendInvitation', 'update', 'sendReset', 'delete']
     const needsOwner = OWNER_ONLY.includes(action)
 
     const eligible = async () => {
@@ -345,39 +345,46 @@ Deno.serve(async (req) => {
     // ---- Everything below changes accounts — owner only.
     if (!isOwner) return json({ error: 'Only the owner can add or change team accounts' }, 403)
 
-    /* ---- invite: replaces `create`. No password crosses this boundary.
-       Supabase emails them; they choose their own and land in the app.
+    /* ---- invite ------------------------------------------------------
+       WHAT PHASE 1A TURNED OFF, AND WHAT REPLACED IT.
 
-       =============== OFF, DELIBERATELY, SINCE 23 SEPTEMBER 2026 =========
-       Proved unsafe before it was ever deployed. inviteUserByEmail inserts
-       a row into auth.users, which fires app.provision_studio(). That
-       trigger finds no partner and no business waiting on the address, so
-       it takes its third path and INVENTS A STUDIO NAMED AFTER THE
-       INVITEE, makes them its owner, and writes their profile and an owner
-       membership. team-admin's own profile insert then dies on the primary
-       key, and the rescue path deletes the auth user while the invented
-       business stays behind.
+       The old body called inviteUserByEmail and then inserted a profile.
+       That was proved unsafe before it ever ran: the auth.users INSERT
+       fires app.provision_studio(), which found no invitation waiting on
+       the address, took its third path, and INVENTED A STUDIO NAMED AFTER
+       THE INVITEE. Measured, not guessed: 9 businesses before an invite,
+       10 after. Underneath that, it wrote `profiles` and never
+       `memberships`, and every RLS policy in this system reads
+       memberships — so anybody who did get through held a profile and
+       could read nothing.
 
-       Measured, not guessed: 9 businesses before an invite, 10 after.
+       THE ORDER BELOW IS THE FIX, and it is the whole reason this reads
+       the way it does:
 
-       Underneath that sits a second problem that a collision fix would not
-       touch. team-admin writes `profiles` and never writes `memberships`,
-       and every RLS policy in this system reads memberships. So a teammate
-       who did get through would hold a profile and be able to read
-       nothing: app.in_scope returns false for them. Seat limits are in the
-       same position, since their trigger is on memberships.
+         1. the invitation row is written FIRST, with a one-time nonce
+         2. the account is created SECOND, carrying that nonce
+         3. provision_studio sees its own invitation and abstains
+         4. we send the email ourselves
+         5. the membership is written at ACCEPTANCE, by the invitee, and
+            not one moment earlier
 
-       That is a lifecycle to design, not a line to patch, and it is Phase
-       1B. Until then this action does NOTHING AT ALL. It is deliberately
-       not "best effort": a half-working invite leaves orphan businesses
-       behind, and an orphan business is harder to explain than an error.
+       Reverse 1 and 2 and the trigger invents a studio again, because at
+       the moment it fires there is nothing on the address for it to find.
 
-       Phase 1B turns this back on by flipping the constant, after
-       provision_studio learns to attach somebody to a business that
-       already exists. Nothing else here needs to change. =============== */
+       NO MEMBERSHIP AND NO PROFILE ARE WRITTEN HERE. The seat is held by
+       the pending invitation itself — app.seats_used counts pending
+       invitations as well as memberships — so the studio cannot invite
+       its way past the plan, and nobody holds access they have not yet
+       accepted.
+
+       WE SEND THE EMAIL, NOT SUPABASE. generateLink makes the same
+       account and hands back the link instead of posting it, so the
+       wording is ours, the sender is ours, and we are not behind
+       Supabase's own mailer, which ACCOUNTS.md records as broken since
+       13 September and which rate limits to a handful an hour. */
     const TEAM_INVITES_ENABLED = false
 
-    if (action === 'invite') {
+    if (action === 'invite' || action === 'resendInvitation') {
       if (!TEAM_INVITES_ENABLED) {
         /* Before any validation, so no code path below can run and no
            argument about input shape can change the outcome. */
@@ -386,42 +393,261 @@ Deno.serve(async (req) => {
           code: 'invites_disabled',
         }, 503)
       }
+    }
 
+    /* Shared by invite and resend, so the two emails cannot drift. */
+    const ROLE_WORD: Record<string, string> = {
+      manager: 'Manager', staff: 'Team member', viewer: 'Can view only',
+    }
+    const studioAndInviter = async () => {
+      const { data: b } = await admin.from('businesses').select('name').eq('id', biz).maybeSingle()
+      const { data: p } = await admin.from('profiles').select('name').eq('id', user.id).maybeSingle()
+      return {
+        studio: str(b?.name) || 'your studio',
+        inviter: str(p?.name) || 'The owner',
+      }
+    }
+    const branchWord = async (branch: string | null) => {
+      if (!branch) return 'All branches'
+      const { data: br } = await admin
+        .from('branches').select('name').eq('id', branch).eq('business_id', biz).maybeSingle()
+      return br ? str(br.name) : ''
+    }
+    const dayOf = (iso: string) => {
+      try {
+        return new Date(iso).toLocaleDateString('en-GB',
+          { day: 'numeric', month: 'long', year: 'numeric' })
+      } catch { return String(iso).slice(0, 10) }
+    }
+    /* The landing page. The invitation id travels in the QUERY STRING and
+       not the fragment, which the design originally called for.
+
+       Reason, and it is mechanical: GoTrue appends its own fragment to
+       redirect_to. A redirect_to that already ends in "#invitation=..."
+       produces "#invitation=...#access_token=...", the browser hands the
+       whole thing to location.hash as one string, and the app's arrival
+       parser then finds no access_token at all. The id in the query is
+       read before anything else runs and is wiped from the address bar on
+       the way in.
+
+       It costs privacy of the id — a query string reaches the web server's
+       logs, a fragment does not. That is acceptable for this value and for
+       nothing else: an invitation id is a POINTER, not a credential.
+       accept_invitation still requires a session whose CONFIRMED email
+       matches the address the invitation names, so an id on its own buys
+       an attacker nothing at all. */
+    const landingFor = (invitationId: string) => APP_URL + '?invitation=' + invitationId
+
+    if (action === 'invite') {
       const email = str(payload.email).toLowerCase()
       const name = str(payload.name)
+      const role = str(payload.role) || str(payload.membership_role) || 'staff'
+      const branch = str(payload.branch_id) || null
       if (!email || !email.includes('@')) return json({ error: 'A valid email address is needed' }, 400)
       if (!name) return json({ error: 'A name is needed' }, 400)
+      if (!['manager', 'staff', 'viewer'].includes(role)) {
+        return json({ error: 'role must be manager, staff or viewer' }, 400)
+      }
 
-      const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: APP_URL,
-        data: { name },
+      /* A Label Board operator is not somebody's teammate, and support
+         staff holding a studio membership is how a support account ends
+         up inside a tenant's data. platform_admins carries the address,
+         so this costs one read and does not need the auth user. */
+      const { data: staff } = await admin
+        .from('platform_admins').select('id').eq('email', email).maybeSingle()
+      if (staff) {
+        return json({ error: 'That address belongs to a Label Board operator, not a studio account.' }, 403)
+      }
+
+      const bw = await branchWord(branch)
+      if (!bw) return json({ error: 'That branch is not in this studio.' }, 400)
+      const who = await studioAndInviter()
+
+      /* 1. THE INVITATION FIRST. One transaction, and it is the one that
+            takes the seat lock, refuses somebody already on the team, and
+            refuses an invite that would break the plan. The nonce comes
+            back exactly once and is never stored on this side. */
+      const { data: made, error: cerr } = await admin.rpc('create_team_invitation', {
+        p_business: biz,
+        p_email: email,
+        p_role: role,
+        p_branch: branch,
+        p_invited_by: user.id,
       })
-      if (error) {
-        const already = /already|registered|exists/i.test(error.message || '')
+      if (cerr) return json({ error: cerr.message }, 400)
+      const inv = (Array.isArray(made) ? made[0] : made) as
+        { invitation_id: string; nonce: string; expires_at: string } | undefined
+      if (!inv?.invitation_id) return json({ error: 'The invitation could not be created.' }, 500)
+
+      /* 2. THE ACCOUNT SECOND, carrying the nonce so provision_studio can
+            recognise its own invitation and write nothing. */
+      let kind: 'new' | 'existing' = 'new'
+      let link = landingFor(inv.invitation_id)
+      let createdUser = ''
+
+      const { data: gl, error: gerr } = await admin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: {
+          redirectTo: link,
+          data: {
+            name,
+            team_invitation_id: inv.invitation_id,
+            team_invitation_nonce: inv.nonce,
+          },
+        },
+      })
+
+      if (gerr) {
+        /* An address that already has an account is not an error, it is
+           the other half of the feature: they sign in as themselves and
+           the invitation is waiting. Anything else is a real failure and
+           the invitation goes back. */
+        const exists = /already|registered|exists/i.test(gerr.message || '')
+        if (!exists) {
+          await admin.rpc('discard_invitation', {
+            p_invitation_id: inv.invitation_id,
+            p_reason: 'account creation failed: ' + (gerr.message || '').slice(0, 120),
+          })
+          return json({ error: 'Could not create the account: ' + gerr.message }, 400)
+        }
+        kind = 'existing'
+      } else {
+        createdUser = str(gl?.user?.id)
+        link = str(gl?.properties?.action_link) || link
+        /* THE PAIR IS CLEARED IMMEDIATELY. The nonce has already done its
+           only job — the trigger fired during the INSERT above and wiped
+           nonce_hash — so leaving it in the invitee's own metadata gains
+           nobody anything and is one more copy of a secret than needed.
+
+           NOT `user_metadata: {}`. updateUserById MERGES, so sending a key
+           as null is what deletes it, and the name has to survive:
+           accept_invitation reads raw_user_meta_data->>'name' to write
+           their profile. Wiping the object wholesale would leave every
+           invited teammate named after the front of their email address. */
+        if (createdUser) {
+          await admin.auth.admin.updateUserById(createdUser, {
+            user_metadata: { name, team_invitation_id: null, team_invitation_nonce: null },
+          })
+        }
+      }
+
+      /* 3. SEND IT. Nothing in the message is a secret: the studio, the
+            role, the branch, the expiry, and a link. */
+      const mail = invitationEmail(kind, {
+        studio: who.studio,
+        role: ROLE_WORD[role] || role,
+        branch: bw,
+        inviter: who.inviter,
+        link,
+        expires: dayOf(inv.expires_at),
+      })
+      const sent = await sendViaResend(email, mail.subject, mail.html, mail.text)
+      if (!sent.ok) {
+        /* An invitation nobody was told about is worse than no invitation:
+           it holds a seat, it expires silently, and the owner believes it
+           was sent. So it goes back, and the account we just made goes
+           with it. Both compensations are safe — no business was created,
+           no membership was written, and the invitee has no session. */
+        await admin.rpc('discard_invitation', {
+          p_invitation_id: inv.invitation_id,
+          p_reason: 'invitation email could not be sent',
+        })
+        if (createdUser) await admin.auth.admin.deleteUser(createdUser)
         return json({
-          error: already
-            ? 'That email already has an account. Ask them to sign in, or use Send password reset.'
-            : 'Could not send the invitation: ' + error.message,
-        }, 400)
+          error: 'The invitation could not be emailed, so nothing was kept. ' + sent.error,
+          code: 'mail_failed',
+        }, 502)
       }
 
-      const newId = invited?.user?.id
-      if (!newId) return json({ error: 'The invitation was sent but no account came back.' }, 500)
-
-      const { error: perr } = await admin.from('profiles').insert({
-        id: newId,
-        name,
-        role_id: str(payload.role_id) || 'cre',
-        business_id: biz,
-        staff_id: str(payload.staff_id) || null,
+      return json({
+        ok: true,
+        invitation_id: inv.invitation_id,
+        invited: email,
+        kind,
+        role,
+        branch_id: branch,
+        expires_at: inv.expires_at,
+        account_created: !!createdUser,
       })
-      /* The account exists but is attached to nothing, which would leave them
-         able to sign in with no studio. Undo it rather than leave that. */
-      if (perr) {
-        await admin.auth.admin.deleteUser(newId)
-        return json({ error: perr.message }, 400)
+    }
+
+    /* ---- resendInvitation: the same invitation, a fresh link.
+       NOT a new invitation and NOT a new account. A second invitation row
+       would hold a second seat and leave two live links for one person,
+       and a second account is not possible anyway — the address is taken
+       by the first one.
+
+       WHICH LINK depends on what the account can do with it, and this is
+       the part the design said was unproven until it ran against real
+       GoTrue:
+         invite    — what we want, but GoTrue refuses it for an address it
+                     already holds in most versions
+         recovery  — a password link, which is right for somebody who was
+                     invited and never chose one
+         magiclink — signs them in without a password, which is right for
+                     somebody who already has one
+       Tried in that order, and the one that worked is reported so the
+       behaviour is recorded rather than assumed. */
+    if (action === 'resendInvitation') {
+      const invId = str(payload.invitation_id)
+      if (!invId) return json({ error: 'Which invitation?' }, 400)
+
+      const { data: row } = await admin
+        .from('team_invitations')
+        .select('id,email,role,branch_id,status,expires_at')
+        .eq('id', invId).eq('business_id', biz).maybeSingle()
+      if (!row) return json({ error: 'That invitation is not in this studio.' }, 403)
+      if (row.status !== 'pending') {
+        return json({ error: 'That invitation is no longer pending.' }, 400)
       }
-      return json({ id: newId, invited: email })
+      if (new Date(String(row.expires_at)).getTime() <= Date.now()) {
+        return json({ error: 'That invitation has expired. Send a new one.' }, 400)
+      }
+
+      const email = String(row.email)
+      const landing = landingFor(invId)
+      const bw = await branchWord(row.branch_id ? String(row.branch_id) : null)
+      const who = await studioAndInviter()
+
+      let link = landing
+      let via = 'none'
+      let confirmed = false
+      for (const type of ['invite', 'recovery', 'magiclink'] as const) {
+        /* No `data` on any of these. The nonce was single-use and is
+           already spent; re-issuing one would mean a second abstain signal
+           for an INSERT that cannot happen again. */
+        const { data: gl, error } = await admin.auth.admin.generateLink({
+          type, email, options: { redirectTo: landing },
+        })
+        if (!error && gl?.properties?.action_link) {
+          link = String(gl.properties.action_link)
+          via = type
+          confirmed = !!gl?.user?.email_confirmed_at
+          break
+        }
+      }
+
+      /* Somebody who has never confirmed needs the 'new' wording, because
+         they still have no password. Somebody confirmed gets 'existing',
+         because telling them to set a password is how a working login gets
+         reset. */
+      const mail = invitationEmail(confirmed ? 'existing' : 'new', {
+        studio: who.studio,
+        role: ROLE_WORD[String(row.role)] || String(row.role),
+        branch: bw || 'All branches',
+        inviter: who.inviter,
+        link,
+        expires: dayOf(String(row.expires_at)),
+      })
+      const sent = await sendViaResend(email, mail.subject, mail.html, mail.text)
+      if (!sent.ok) {
+        /* NOTHING IS DISCARDED HERE. The invitation was already sent once
+           and may already be in use; a failed resend must not take it
+           away. The owner is told, and can try again. */
+        return json({ error: 'Could not send it again: ' + sent.error, code: 'mail_failed' }, 502)
+      }
+      return json({ ok: true, invitation_id: invId, resent_to: email, link_type: via, confirmed })
     }
 
     // ---- update: name, role and linked staff. Never a password.
