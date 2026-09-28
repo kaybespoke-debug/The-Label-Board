@@ -1611,6 +1611,7 @@ body.modal-open{overflow:hidden}
     <div class="ms-item" data-view="settings" id="msSettings" onclick="go('settings');toggleMore()"><span>⚙</span> Settings</div>
     <div class="ms-item" onclick="openFeedback();toggleMore()"><span>✎</span> Help &amp; feedback</div>
     <div class="ms-item" onclick="openMyAccount();toggleMore()"><span>☺</span> My account</div>
+    <div class="ms-item" id="msStudios" onclick="openStudioSwitcher();toggleMore()" style="display:none"><span>⌂</span> Your studios</div>
     <div class="ms-item" id="msSwitch" onclick="switchAccount()"><span>⇄</span> Switch account</div>
     <div class="ms-item" onclick="logout()"><span>⏻</span> Sign out</div>
   </div>
@@ -2060,6 +2061,57 @@ function setUsers(v){save('layi_dash_users',v);}
    one studio and a tailor in another had one answer — whichever they
    joined last. It is a label now, and Phase 0 stopped a browser writing
    it at all. myRoleKey comes from the membership row for THIS studio. */
+/* ===== MOVING BETWEEN STUDIOS =====
+   Nothing here is trusted. The id is checked against the memberships this
+   session actually read, the studio is loaded from scratch — roles,
+   permissions, plan and data — and the server answers every one of those
+   for the business being asked about. A person with one studio never sees
+   any of it. */
+function canSwitchStudios(){return liveMode&&myMemberships.length>1;}
+async function switchStudio(id){
+  if(!canSwitchStudios())return false;
+  const m=myMemberships.find(function(x){return x.business_id===id;});
+  if(!m){toast&&toast('You are not a member of that studio.');return false;}
+  if(id===myBusinessId){closeModal&&closeModal();return true;}
+  rememberBusiness(id);
+  myBusinessId=id;myMembershipRole=m.role||'';
+  try{closeModal();}catch(e){}
+  try{toast('Opening '+(studioNameById(id)||'the studio')+'\u2026');}catch(e){}
+  /* Local data belongs to the studio it came from. Clearing it before the
+     pull is what stops one studio's orders appearing under another's name
+     for the second it takes to hydrate. */
+  try{STATE_KEYS.forEach(function(k){store.del(k);});store.del('layi_dash_customers');}catch(e){}
+  try{await loadCloudRoles();}catch(e){}
+  try{await hydrateFromCloud();}catch(e){}
+  try{await adoptPlan();}catch(e){}
+  try{reloadSettingsFromStorage();}catch(e){}
+  try{saveSession();}catch(e){}
+  enterApp();
+  return true;
+}
+function studioNameById(id){
+  const m=myMemberships.find(function(x){return x.business_id===id;});
+  return (m&&m.business_name)||'';
+}
+function openStudioSwitcher(){
+  if(!canSwitchStudios())return;
+  const rows=myMemberships.map(function(m){
+    const here=m.business_id===myBusinessId;
+    return '<div class="ms-item" style="padding:12px 14px;'+(here?'opacity:.6;':'cursor:pointer')+'"'
+      +(here?'':' onclick="switchStudio(\''+m.business_id+'\')"')+'>'
+      +'<b>'+esc(m.business_name||'Studio')+'</b>'
+      +'<div class="sd" style="color:var(--text-dim)">'+esc(roleWordFor(m))
+      +(m.branch_id?'':' \u00b7 all branches')+(here?' \u00b7 open now':'')+'</div></div>';
+  }).join('');
+  openModal('Your studios',
+    '<div class="sd" style="margin-bottom:10px;color:var(--text-dim)">'
+    +'You belong to more than one. What you can do is decided separately in each.</div>'
+    +rows+'<div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Close</button></div>');
+}
+function roleWordFor(m){
+  const r=(CLOUD_ROLES||[]).find(function(x){return x.rowId===m.role_id;});
+  return (r&&r.name)||(m.role||'member');
+}
 function currentRole(){
   if(!currentUser)return null;
   if(liveMode&&myRoleKey){const r=roleById(myRoleKey);if(r)return r;}
@@ -2396,12 +2448,23 @@ const setCustomers=v=>{save('layi_dash_customers',v);};
    read it yet — on a device that has never been online, for instance — and
    every reader has to decide what to do with blank rather than assume. */
 let liveMode=false, myBusinessId=null, myMembershipRole='';
+/* EVERY STUDIO THIS PERSON BELONGS TO, and which one they are looking at.
+   The choice is a PREFERENCE and nothing else: it decides what is drawn,
+   never what is allowed. Every protected action re-checks the membership
+   at the server, so a tampered preference buys a view of an empty studio
+   and no data at all. It is device-local and deliberately not synced —
+   looking at Adé on the laptop while looking at Ìfé on the phone is a
+   reasonable thing to want. */
+let myMemberships=[];
+const BIZ_PREF_KEY='layi_dash_current_biz';
+function preferredBusiness(){try{return store.get(BIZ_PREF_KEY)||'';}catch(e){return '';}}
+function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(e){}}
 /* The one release marker. It MUST equal CACHE in site/sw.js — audit_build_stamp.js
    fails the build if they drift, because a version that disagrees with the
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v53';
+const APP_VERSION='layi-v54';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3448,11 +3511,28 @@ async function enterLiveStudio(user,username,errEl){
          the membership list wins and they land somewhere they really are. */
       let mems=[];
       try{
+        /* The studio's NAME comes along, because a switcher that lists two
+           uuids is not a switcher. businesses is readable by any member, so
+           this is one round trip rather than two. */
         const {data:mrows}=await supa.from('memberships')
-          .select('business_id,role,branch_id').eq('user_id',user.id).eq('status','active');
-        mems=mrows||[];
+          .select('business_id,role,role_id,branch_id,businesses(name)')
+          .eq('user_id',user.id).eq('status','active');
+        mems=(mrows||[]).map(function(m){
+          return {business_id:m.business_id,role:m.role,role_id:m.role_id,
+                  branch_id:m.branch_id,
+                  business_name:(m.businesses&&m.businesses.name)||''};
+        });
       }catch(e){}
-      const mine=mems.find(function(m){return m.business_id===prof.business_id;})
+      myMemberships=mems;
+      /* The order matters and each step is a fact rather than a guess:
+         what they chose last, then what their profile points at, then the
+         only one they have. profiles.business_id is the weaker of the two
+         and is consulted ONLY as a tiebreak, never as authority — it is
+         overwritten by accept_invitation and names one studio for a person
+         who may be in several. */
+      const pref=preferredBusiness();
+      const mine=mems.find(function(m){return m.business_id===pref;})
+                 ||mems.find(function(m){return m.business_id===prof.business_id;})
                  ||mems[0]||null;
       currentUser={id:user.id,name:prof.name||'Owner',username:username,roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
       /* filled in by loadCloudRoles a moment later; the profile's value is
@@ -4151,6 +4231,7 @@ function enterApp(){
   show('navExpenses',can('expenses'));show('msExpenses',can('expenses'));document.getElementById('expLockIco').style.display='none';
   show('navAudit',can('audit'));show('msAudit',can('audit'));
   show('msSwitch',isOwner());
+  show('msStudios',canSwitchStudios());
   show('syncBtn',liveMode,'inline-flex');
   renderAll();updateNavGroups();go('activity');
   try{saveSession();}catch(e){}
@@ -4276,7 +4357,7 @@ function updateNavGroups(){
   });
   flush();
 }
-function logout(){CLOUD_ROLES=null;myRoleKey='';myPermissions=null;try{closeModal();}catch(e){}try{stopRealtime();}catch(e){}try{clearSession();}catch(e){}currentUser=null;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';const e=document.getElementById('loginUser');if(e)e.value='';const pe=document.getElementById('loginPass');if(pe)pe.value='';const er=document.getElementById('loginErr');if(er)er.textContent='';if(typeof refreshBiometricUI==='function')refreshBiometricUI();}
+function logout(){CLOUD_ROLES=null;myRoleKey='';myPermissions=null;myMemberships=[];try{closeModal();}catch(e){}try{stopRealtime();}catch(e){}try{clearSession();}catch(e){}currentUser=null;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';const e=document.getElementById('loginUser');if(e)e.value='';const pe=document.getElementById('loginPass');if(pe)pe.value='';const er=document.getElementById('loginErr');if(er)er.textContent='';if(typeof refreshBiometricUI==='function')refreshBiometricUI();}
 function switchAccount(){try{closeModal();}catch(e){}if(!isOwner())return;logout();}
 function isOwner(){return !!(currentUser&&currentUser.roleId==='owner');}
 function togglePwField(id,btn){const p=document.getElementById(id);if(!p)return;if(p.type==='password'){p.type='text';if(btn)btn.textContent='Hide';}else{p.type='password';if(btn)btn.textContent='Show';}}

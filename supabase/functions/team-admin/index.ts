@@ -216,36 +216,48 @@ Deno.serve(async (req) => {
        is a SELECTOR: it says which studio the caller means, and nothing
        more. The membership row says whether they may. */
 
-    /* What each action needs. Taken from the code this replaces, not
-       invented: `list` sat ABOVE the owner gate and everything else sat
-       below it. Manager is deliberately NOT granted anything new here
-       just because memberships.role has the word in it. */
-    const OWNER_ONLY = ['invite', 'resendInvitation', 'update', 'sendReset', 'delete']
-    const needsOwner = OWNER_ONLY.includes(action)
+    /* WHAT EACH ACTION NEEDS, as a permission rather than a tier.
+       It used to be an OWNER_ONLY array, which is the hidden rule Batch B
+       removed everywhere else: being called a manager must not bypass a
+       denied permission, and an owner who wants to delegate inviting must
+       be able to. sendReset stays owner-only and is not a permission,
+       because it is an account-recovery power rather than team work. */
+    const NEEDS: Record<string, string> = {
+      invite: 'team.invite',
+      resendInvitation: 'team.invite',
+      cancelInvitation: 'team.invite',
+      update: 'users',
+      delete: 'team.remove',
+      list: 'team.view',
+    }
+    const OWNER_ONLY_ACTIONS = ['sendReset']
+    const needsOwner = OWNER_ONLY_ACTIONS.includes(action)
 
     const eligible = async () => {
       const { data } = await admin
-        .from('memberships').select('business_id,role')
+        .from('memberships').select('business_id,role,role_id')
         .eq('user_id', user.id).eq('status', 'active')
       return (data ?? []).filter(m => !needsOwner || m.role === 'owner')
     }
 
     let biz: string
     let myRole: string
+    let myRoleId: string | null = null
 
     const wanted = str(payload.business_id) || str(body.business_id)
     if (wanted) {
       /* A selector, verified. Never taken on trust. */
       const { data: m } = await admin
-        .from('memberships').select('business_id,role')
+        .from('memberships').select('business_id,role,role_id')
         .eq('user_id', user.id).eq('business_id', wanted).eq('status', 'active')
         .maybeSingle()
       if (!m) return json({ error: 'You are not a member of that studio.' }, 403)
       if (needsOwner && m.role !== 'owner') {
-        return json({ error: 'Only the owner can add or change team accounts' }, 403)
+        return json({ error: 'Only the owner can do that' }, 403)
       }
       biz = m.business_id as string
       myRole = m.role as string
+      myRoleId = (m.role_id as string) ?? null
     } else {
       /* No selector. Fall back to the caller's memberships — never to
          profiles — and refuse rather than guess when there is a choice
@@ -266,8 +278,22 @@ Deno.serve(async (req) => {
       }
       biz = rows[0].business_id as string
       myRole = rows[0].role as string
+      myRoleId = (rows[0].role_id as string) ?? null
     }
     const isOwner = myRole === 'owner'
+
+    /* The same question app.can() answers inside the database, asked here
+       because the service role has no auth.uid() and so cannot ask it on
+       the caller's behalf. Owner short-circuits before the table is read,
+       exactly as it does in SQL. */
+    const callerCan = async (perm: string) => {
+      if (isOwner) return true
+      if (!myRoleId) return false
+      const { data } = await admin
+        .from('business_role_permissions').select('permission_key')
+        .eq('role_id', myRoleId).eq('permission_key', perm).maybeSingle()
+      return !!data
+    }
 
     /* ---- 3. THE ONLY ROUTE TO A PRIVILEGED CALL ----------------------
        Reads the row back and confirms it is in the caller's business. A
@@ -322,6 +348,9 @@ Deno.serve(async (req) => {
        would silently omit anybody who has since joined a second studio —
        they would vanish from a team they are still a member of. */
     if (action === 'list') {
+      if (!(await callerCan('team.view'))) {
+        return json({ error: 'You do not have permission to see the team.', code: 'forbidden' }, 403)
+      }
       const { data: mems } = await admin
         .from('memberships').select('user_id,role,status,branch_id')
         .eq('business_id', biz).in('status', ['active', 'invited'])
@@ -345,11 +374,35 @@ Deno.serve(async (req) => {
           accepted: !!au?.user?.last_sign_in_at,
         })
       }
-      return json({ rows, business_id: biz, your_role: myRole })
+      /* PENDING INVITATIONS COME BACK WITH THE TEAM.
+         team_invitations has RLS forced and no policies at all, on purpose:
+         nothing reaches it from a browser, ever. So this gateway is the only
+         way an owner can see who has been asked and not yet answered, and
+         the only way to get the id that cancelInvitation needs. Without it
+         a studio can send an invitation and then never look at it again. */
+      const { data: pending } = await admin
+        .from('team_invitations')
+        .select('id,email,role,role_id,branch_id,created_at,expires_at')
+        .eq('business_id', biz).eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+
+      return json({ rows, invitations: pending ?? [], business_id: biz, your_role: myRole })
     }
 
-    // ---- Everything below changes accounts — owner only.
-    if (!isOwner) return json({ error: 'Only the owner can add or change team accounts' }, 403)
+    // ---- Everything below changes accounts. Owner, or the permission.
+    {
+      const need = NEEDS[action]
+      if (need && !(await callerCan(need))) {
+        return json({
+          error: 'You do not have permission to do that in this studio.',
+          code: 'forbidden', needs: need,
+        }, 403)
+      }
+      if (needsOwner && !isOwner) {
+        return json({ error: 'Only the owner can do that' }, 403)
+      }
+    }
 
     /* ---- invite ------------------------------------------------------
        WHAT PHASE 1A TURNED OFF, AND WHAT REPLACED IT.
@@ -462,6 +515,23 @@ Deno.serve(async (req) => {
       const name = str(payload.name)
       const role = str(payload.role) || str(payload.membership_role) || 'staff'
       const branch = str(payload.branch_id) || null
+      /* WHICH BUSINESS ROLE, chosen once on the invitation rather than
+         twenty checkboxes per person. Defaults to the system role for the
+         tier, so an invite that says nothing still lands somewhere real —
+         which is what an invited staff member did NOT do before Batch A. */
+      let roleId = str(payload.role_id) || ''
+      if (roleId) {
+        const { data: r } = await admin.from('business_roles')
+          .select('id,tier').eq('id', roleId).eq('business_id', biz).maybeSingle()
+        if (!r) return json({ error: 'That role is not one of this studio\u2019s.' }, 400)
+        if (r.tier === 'owner' && !isOwner) {
+          return json({ error: 'Only the owner can invite another owner.' }, 403)
+        }
+      } else {
+        const { data: r } = await admin.from('business_roles')
+          .select('id').eq('business_id', biz).eq('key', role).maybeSingle()
+        roleId = str(r?.id)
+      }
       if (!email || !email.includes('@')) return json({ error: 'A valid email address is needed' }, 400)
       if (!name) return json({ error: 'A name is needed' }, 400)
       if (!['manager', 'staff', 'viewer'].includes(role)) {
@@ -497,6 +567,10 @@ Deno.serve(async (req) => {
       const inv = (Array.isArray(made) ? made[0] : made) as
         { invitation_id: string; nonce: string; expires_at: string } | undefined
       if (!inv?.invitation_id) return json({ error: 'The invitation could not be created.' }, 500)
+      if (roleId) {
+        await admin.from('team_invitations')
+          .update({ role_id: roleId }).eq('id', inv.invitation_id)
+      }
 
       /* 2. THE ACCOUNT SECOND, carrying the nonce so provision_studio can
             recognise its own invitation and write nothing. */
@@ -587,6 +661,7 @@ Deno.serve(async (req) => {
         role,
         branch_id: branch,
         expires_at: inv.expires_at,
+        role_id: roleId || null,
         account_created: !!createdUser,
         mail_id: sent.id || '',
         /* Where it points, not what it is. Enough to catch a staging build
@@ -686,6 +761,25 @@ Deno.serve(async (req) => {
         mail_id: sent.id || '',
         link_host: (function () { try { return new URL(link).host } catch { return '' } })(),
       })
+    }
+
+    /* ---- cancelInvitation: it was sent to the wrong address, or the
+       person is not coming. The seat is released by the status change
+       alone, because seats_used counts only pending invitations that have
+       not expired. */
+    if (action === 'cancelInvitation') {
+      const invId = str(payload.invitation_id)
+      if (!invId) return json({ error: 'Which invitation?' }, 400)
+      const { data: row } = await admin
+        .from('team_invitations').select('id,status,email')
+        .eq('id', invId).eq('business_id', biz).maybeSingle()
+      if (!row) return json({ error: 'That invitation is not in this studio.' }, 403)
+      if (row.status !== 'pending') {
+        return json({ error: 'That invitation is no longer pending.' }, 400)
+      }
+      const { error } = await admin.rpc('cancel_team_invitation', { p_invitation_id: invId })
+      if (error) return json({ error: error.message }, 400)
+      return json({ ok: true, cancelled: row.email })
     }
 
     // ---- update: name, role and linked staff. Never a password.

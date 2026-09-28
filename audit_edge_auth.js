@@ -135,15 +135,36 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      start letting managers administer team accounts. Before this change
      `list` sat above the owner gate and everything else sat below it, and
      that is exactly what must still be true. */
-  ok('only these four actions are owner-only, as before',
-     code.includes("const OWNER_ONLY = ['invite', 'resendInvitation', 'update', 'sendReset', 'delete']"),
-     'list was always open to any member; the rest never were');
+  ok('what each action needs is a PERMISSION, not a tier',
+     code.includes("const NEEDS: Record<string, string> = {")
+     && code.includes("invite: 'team.invite'")
+     && code.includes("delete: 'team.remove'")
+     && code.includes("update: 'users'")
+     && !code.includes('const OWNER_ONLY ='),
+     'an owner-only array is the hidden rule the rest of the system dropped: '
+     + 'being called a manager must not bypass a denied permission, and an '
+     + 'owner who delegates inviting must be able to');
+  ok('and sendReset is the one thing that stays a tier',
+     code.includes("const OWNER_ONLY_ACTIONS = ['sendReset']"),
+     'it is account recovery, not team work');
   ok('the owner gate tests for owner and nothing else',
      code.includes("if (needsOwner && m.role !== 'owner') {")
      && !code.includes("m.role !== 'owner' &&"),
      'memberships.role has the word manager in it; that is not a reason to start letting them');
-  ok('the owner gate still stands in front of the mutating actions',
-     /if \(!isOwner\) return json\(/.test(code));
+  ok('every mutating action is checked against the caller\u2019s permission',
+     /const need = NEEDS\[action\]/.test(code)
+     && /if \(need && !\(await callerCan\(need\)\)\)/.test(code),
+     'and the check sits above every one of them, not inside each');
+  ok('callerCan short-circuits on owner, exactly as app.can does in SQL',
+     code.indexOf('const callerCan') > 0
+     && code.indexOf('if (isOwner) return true') > 0
+     && code.indexOf('if (!myRoleId) return false') > 0,
+     'the service role has no auth.uid(), so it cannot ask the database on '
+     + 'the caller\u2019s behalf and has to ask the same question itself, the '
+     + 'same way round: owner first, then the table, and no role at all is false');
+  ok('a caller with no business role can do nothing',
+     /if \(!myRoleId\) return false/.test(code),
+     'a half-migrated membership must fail closed');
 
   /* ---- THE LIFECYCLE, once somebody can belong to two studios ----
      Removal and editing both used to assume one studio per person. They
@@ -304,8 +325,10 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      'silently picking one is how somebody edits the wrong team and never notices');
   ok('and never falls back to profiles',
      !/me\.business_id/.test(code));
-  ok('everything that changes an account is owner only',
-     /if \(!isOwner\) return json\(/.test(code));
+  ok('everything that changes an account needs a permission',
+     code.indexOf('const need = NEEDS[action]') > 0
+     && code.indexOf('if (!isOwner) return json(') < 0,
+     'the tier wall is gone and a permission check replaced it');
   ok('the error handler does not echo the thrown object',
      !/String\(\(e as Error\)\.message/.test(code),
      'in a service-role context the detail in a thrown error is privileged');
@@ -324,8 +347,10 @@ section('team-admin: the caller is still established the same way');
   ok('an unsigned caller is refused', /return json\(\{ error: 'Not signed in' \}, 401\)/.test(code));
   ok('the business comes from a verified membership, never from the body alone',
      /\.eq\('user_id', user\.id\)[\s\S]{0,80}\.eq\('business_id', wanted\)/.test(code));
-  ok('everything that changes an account is owner only',
-     /if \(!isOwner\) return json\(/.test(code));
+  ok('everything that changes an account needs a permission',
+     code.indexOf('const need = NEEDS[action]') > 0
+     && code.indexOf('if (!isOwner) return json(') < 0,
+     'the tier wall is gone and a permission check replaced it');
 }
 
 // =====================================================================

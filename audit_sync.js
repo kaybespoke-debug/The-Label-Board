@@ -27,7 +27,14 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    how full the studio is, as the upload policy computes it. Syncing a cache
    of a server value is how two devices end up arguing about it; each refreshes
    from my_storage_usage() instead. */
-const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls','layi_dash_storage_usage']);
+const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls',
+  'layi_dash_storage_usage','layi_dash_current_biz']);
+/* layi_dash_current_biz is which studio this device is looking at, for
+   somebody who belongs to more than one. Syncing it would mean opening the
+   laptop changed what the phone was showing, and looking at one studio on
+   each is a reasonable thing to want. It is a PREFERENCE and decides only
+   what is DRAWN: every protected action re-checks the membership at the
+   server, so a tampered value buys a view of an empty studio and no data. */
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const mkEl=()=>({innerHTML:'',value:'',checked:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
 const cache={};const _ls={};
