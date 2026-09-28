@@ -196,6 +196,9 @@ section('The studio\u2019s own settings are the owner\u2019s, everywhere');
     /* the branch switcher has its own editor, reachable from the header on
        every screen; gating the Settings panel alone would have left it open */
     'beAddType', 'beRemoveType', 'saveBranchEdit', 'deleteBranch',
+    /* Phase 0: the permission table itself. A manager with the users
+       permission could open this editor and be refused by the database. */
+    'saveRole', 'resetRoles', 'addRole', 'toggleRolePerm',
   ];
   SAVERS.forEach(fn => {
     const body = (function () {

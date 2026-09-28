@@ -2318,7 +2318,7 @@ let liveMode=false, myBusinessId=null, myMembershipRole='';
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v50';
+const APP_VERSION='layi-v51';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3649,6 +3649,9 @@ function ownsThisStudio(){
    screen is built from and what groupSettings() already reads. A group
    whose panels are all hidden hides itself. */
 const OWNER_ONLY_PANELS=['What your studio does','How the owner is paid',
+  /* Phase 0: the permission table is the owner's. The database refuses it to
+     everybody else whatever this list says. */
+  'Roles & permissions','Roles \u0026 permissions',
   'Company details','Branches & outlets','Production workflow',
   'Pay, allowances & deductions','Your plan'];
 function applyOwnerOnlyVisibility(){
@@ -13966,12 +13969,16 @@ function openRole(id){if(!can('users'))return;const r=id?getRoles().find(x=>x.id
     ${body}
     <div class="modal-foot">${r&&!r.builtin?`<button class="btn danger sm" onclick="delRole('${r.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveRole('${r?r.id:''}')">${r?'Update':'Create'}</button></div>`);}
 function togglePerm(k){if(!rolePermDraft)return;if(rolePermOwner&&(k==='users'||k==='settings'))return;rolePermDraft[k]=rolePermDraft[k]?0:1;const pill=document.getElementById('pmpill_'+k);if(pill){const on=!!rolePermDraft[k];pill.className='perm-pill'+(on?' on':'');pill.textContent=on?'On':'Off';}}
-function saveRole(id){const name=(fv('ro_name')||'').trim();if(!name){alert('Role name required.');return;}const perms={};PERM_KEYS.forEach(k=>{perms[k]=rolePermDraft&&rolePermDraft[k]?1:0;});
+function saveRole(id){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+const name=(fv('ro_name')||'').trim();if(!name){alert('Role name required.');return;}const perms={};PERM_KEYS.forEach(k=>{perms[k]=rolePermDraft&&rolePermDraft[k]?1:0;});
   const list=getRoles();
   if(id){const r=list.find(x=>x.id===id);if(r.id==='owner'){perms.users=1;perms.settings=1;perms.allOrders=1;}r.name=name;r.perms=perms;}
   else{list.push({id:uid('role'),name,perms,builtin:false});}
   logAudit('Role saved',name);setRoles(list);closeModal();renderRoles();if(currentUser){enterApp();go('settings');}}
-function resetRoles(){if(!can('users'))return;if(!confirm('Reset all roles and permissions back to the built-in defaults? Custom roles you added will be removed.'))return;logAudit('Roles reset to defaults','');setRoles(defaultRoles());renderRoles();if(currentUser){enterApp();go('settings');}}
+function resetRoles(){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+if(!can('users'))return;if(!confirm('Reset all roles and permissions back to the built-in defaults? Custom roles you added will be removed.'))return;logAudit('Roles reset to defaults','');setRoles(defaultRoles());renderRoles();if(currentUser){enterApp();go('settings');}}
 function delRole(id){const r=roleById(id);if(r&&r.builtin){alert('Built-in roles cannot be deleted.');return;}if(getUsers().some(u=>u.roleId===id)){alert('Some accounts use this role. Reassign them first.');return;}if(!confirm('Delete this role?'))return;setRoles(getRoles().filter(x=>x.id!==id));closeModal();renderRoles();}
 function permState(r,k){return permVal(r,k);}
 function permChip(r,p){const on=permState(r,p.k);return `<span class="perm-chip ${on?'on':''}" onclick="toggleRolePerm('${r.id}','${p.k}')"${p.hint?` title="${esc(p.hint)}"`:''}>${esc(p.l)}</span>`;}
@@ -13981,9 +13988,13 @@ function roleCard(r){const init=(r.name[0]||'?').toUpperCase();
     <div class="role-band">Pages this role can open</div><div class="perm-pills">${PERM_PAGES.map(p=>permChip(r,p)).join('')}</div>
     <div class="role-band">What this role can do</div><div class="perm-pills">${PERM_FUNCS.map(p=>permChip(r,p)).join('')}</div></div>`;}
 function renderRoles(){const el=document.getElementById('rolesList');if(!el)return;el.innerHTML=getRoles().map(roleCard).join('');}
-function toggleRolePerm(roleId,k){const list=getRoles();const r=list.find(x=>x.id===roleId);if(!r||r.id==='owner')return;if(!r.perms)r.perms={};const cur=permState(r,k);r.perms[k]=cur?0:1;setRoles(list);logAudit('Permission changed',r.name+' · '+(PERM_LABELS[k]||k)+' '+(r.perms[k]?'on':'off'));renderRoles();if(currentUser&&currentUser.roleId===roleId){enterApp();go('settings');}}
+function toggleRolePerm(roleId,k){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+const list=getRoles();const r=list.find(x=>x.id===roleId);if(!r||r.id==='owner')return;if(!r.perms)r.perms={};const cur=permState(r,k);r.perms[k]=cur?0:1;setRoles(list);logAudit('Permission changed',r.name+' · '+(PERM_LABELS[k]||k)+' '+(r.perms[k]?'on':'off'));renderRoles();if(currentUser&&currentUser.roleId===roleId){enterApp();go('settings');}}
 function renameRole(id){const r=getRoles().find(x=>x.id===id);if(!r||r.id==='owner')return;const name=(prompt('Role name:',r.name)||'').trim();if(!name)return;const list=getRoles();list.find(x=>x.id===id).name=name;setRoles(list);logAudit('Role renamed',name);renderRoles();}
-function addRole(){if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):','')||'').trim();if(!name)return;const list=getRoles();list.push({id:uid('role'),name:name,perms:Object.assign(allPerms(0),{allOrders:1}),builtin:false});setRoles(list);logAudit('Role created',name);renderRoles();}
+function addRole(){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):','')||'').trim();if(!name)return;const list=getRoles();list.push({id:uid('role'),name:name,perms:Object.assign(allPerms(0),{allOrders:1}),builtin:false});setRoles(list);logAudit('Role created',name);renderRoles();}
 
 (function init(){const s=load('layi_dash_settings',null);if(s)SETTINGS=Object.assign({},DEFAULTS,s);
   try{const bs=document.getElementById('buildStamp');if(bs)bs.textContent='Build '+APP_VERSION;}catch(e){}
