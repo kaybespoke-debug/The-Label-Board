@@ -5,7 +5,58 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 23 September 2026 (twentieth session)
+Last updated: 29 September 2026 (twenty-first session)
+
+## 28–29 September 2026 — the delivery programme, Phase 0 to G
+
+**`DELIVERY_STATUS.md` is the live document for this work.** It is written
+as DONE / IN PROGRESS / BLOCKED with no deferred bucket, on the instruction
+that nothing identified as necessary may be moved out of the release. This
+entry is the summary; that file is the detail.
+
+On `phase-1b-team-invitations`, not on `main` and not on `admin-deploy`.
+Two migrations are on production (the studio-settings guard and the Phase 0
+role-authority fix, both applied 28 September). **Everything else is on
+staging only and is waiting to be promoted as one release candidate.**
+
+- **Phase 0 + A–D**: business-scoped RBAC. Membership is who, a business
+  role is what, branch scope is where, and the owner is the only inherent
+  superuser. Team invitations carry a role and a branch. Password recovery
+  moved off the dead Supabase SMTP onto Resend.
+- **E**: orders are relational rows with cost and contact details in their
+  own tables, so `seeCost` and `seeContact` are refusals at the API rather
+  than fields the browser chose not to draw. A durable outbox with visible
+  failure, conflict detection, and an append-only audit trail.
+- **F**: it tells us when it breaks (`error_reports`, browser and Edge
+  Functions, source stamped by the database). A studio can close, reopen
+  within thirty days, and be purged without taking our books with it. A
+  person can delete their account. A server-side export of everything, and a
+  restore drilled on every test run. `RECOVERY.md` is the runbook.
+- **G**: Flutterwave. Code complete on staging, 92 assertions. Waiting on
+  two test-mode secrets, below.
+
+**The one that is worth remembering.** Sixteen database objects existed on
+staging and in no migration — including the column the whole
+audit-authenticity claim rests on. Found by counting both sides rather than
+by testing behaviour. `supabase/tests/schema_inventory.mjs` now makes that
+check one command each way, and the rule is: never apply SQL to a project
+except from a migration file.
+
+### Waiting on Kayode
+
+1. **Two Flutterwave TEST secrets on the STAGING Supabase project only**, so
+   a real test payment can be made end to end:
+   - `FLW_SECRET_KEY` — the **test** secret key from the Flutterwave
+     dashboard (`FLWSECK_TEST-…`). Not the live one.
+   - `FLW_SECRET_HASH` — any long random string, set to the *same* value in
+     Flutterwave’s dashboard under Settings → Webhooks → Secret hash.
+   And the webhook URL pasted into that same dashboard page:
+   `https://pakxhimjhrcpqvtsqwqz.supabase.co/functions/v1/billing-webhook`
+   Production keys only after the whole staging billing flow passes.
+2. **Whether the pilot starts on full scope or owner-only.**
+3. **Promotion approval for the release candidate**, which is Batch H.
+
+---
 
 ## Shipped 21 September 2026
 
@@ -740,7 +791,7 @@ quoted-printable name and a `TEL;TYPE=CELL` all parse, and that a file that is
 not a vCard is refused without throwing.
 
 
-## The free trial is SILENT until Flutterwave, 21 September
+## The free trial is SILENT until Flutterwave, 21 September — no longer silent; G took the payment path and a trial that ends now makes the studio read-only rather than leaving it fully working
 
 Kayode asked whether the trial, demo and partner buttons should all be
 active while the app opens in November and tests in October. Checked
@@ -1495,7 +1546,7 @@ longest at 5.1, and what is left of it is three stacked plan cards (1.9)
 and the table (1.7). Neither can shrink further without taking something
 out of the cards, which is a content decision.
 
-## Flutterwave billing: planned, not built
+## Flutterwave billing: planned, not built — SUPERSEDED 29 September, see the top of this file
 
 `BILLING.md` holds the plan. Seven phases, each ending in something
 demonstrable. It is waiting on five decisions and a test-mode account.
