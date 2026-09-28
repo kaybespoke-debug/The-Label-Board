@@ -98,8 +98,16 @@ section('Everything the code names actually exists');
 // Read the code rather than a hand-kept list, so a new table the app starts
 // using is checked the day it is used.
 const app   = readFileSync(join(repo, 'site', 'layi_dashboard.html'), 'utf8');
-const adminFn = readFileSync(join(repo, 'supabase', 'functions', 'admin-api', 'index.ts'), 'utf8');
-const teamFn  = readFileSync(join(repo, 'supabase', 'functions', 'team-admin', 'index.ts'), 'utf8');
+/* EVERY Edge Function, discovered rather than listed. Two were named here
+   by hand, and Batch G added two more that nothing would have read: a
+   hand-kept list of the things a gate reads is the same mistake as a
+   hand-kept list of the things it checks. */
+const edgeFns = readdirSync(join(repo, 'supabase', 'functions'), { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => ({ name: d.name,
+              src: (() => { try { return readFileSync(join(repo, 'supabase', 'functions', d.name, 'index.ts'), 'utf8'); }
+                            catch { return ''; } })() }))
+  .filter(f => f.src);
 
 /* All four apps, not just the customer one. The partner portal reaches the
    database by hand-built fetch rather than supabase-js, so it called
@@ -119,7 +127,7 @@ const webJs     = jsIn('web/js');
 
 const named = new Set();
 const rpcs  = new Set();
-[app, adminFn, teamFn, consoleJs, portalJs, webJs].forEach(src => {
+[app, ...edgeFns.map(f => f.src), consoleJs, portalJs, webJs].forEach(src => {
   (src.match(/from\('([a-z_]+)'\)/g) || []).forEach(m => named.add(m.slice(6, -2)));
   /* No closing paren in this pattern, and that is the fix rather than a
      looseness. It used to be /rpc\('([a-z_]+)'\)/, which only ever matched a
@@ -292,8 +300,7 @@ function insertsIn(src, label) {
 }
 
 const inserts = [
-  ...insertsIn(adminFn, 'admin-api'),
-  ...insertsIn(teamFn, 'team-admin'),
+  ...edgeFns.flatMap(f => insertsIn(f.src, f.name)),
 ];
 ok('the Edge Functions are being scanned for inserted columns too', inserts.length > 0,
    'found no from().insert({...}) — the scanner has stopped working');
@@ -318,8 +325,7 @@ for (const { table, keys, label } of upsertsIn(app, 'the app')) {
 }
 
 const selects = [
-  ...selectsIn(adminFn, 'admin-api'),
-  ...selectsIn(teamFn, 'team-admin'),
+  ...edgeFns.flatMap(f => selectsIn(f.src, f.name)),
 ];
 ok('the Edge Functions are actually being scanned for columns', selects.length > 0,
    'found no select() with an explicit column list — the scanner has stopped working');

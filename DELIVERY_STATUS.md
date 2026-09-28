@@ -254,26 +254,75 @@ and a tenant has none; and `outboxResult` computed `revoked` and then returned
 
 ---
 
+### Batch G, Flutterwave. Staging, 29 Sep — **code complete, waiting on two test keys**
+
+Everything is built, applied to staging and tested. What is left is the two
+secrets in the BLOCKED table below and then a real payment through
+Flutterwave’s test mode, which cannot be done without them.
+
+**The price is ours.** `plan_prices` is the only place an amount comes from.
+A browser names a plan and a cycle, and there is no amount argument for it to
+name — asserted by reading the function’s own signature, because an argument
+that does not exist cannot be abused. The four figures are exactly what
+`web/pricing.html` publishes, and the suite reads the page off disk and fails
+if the two stop matching. Changing a price is a migration.
+
+**The webhook is matched, not believed.** It carries a reference; the studio,
+the plan and the amount come from our own `billing_intents` row. Measured: a
+reference we never issued settles nothing, a late webhook for an abandoned
+checkout settles nothing, a successful payment for less than the price does
+not buy the plan, and neither does one in another currency — each recorded
+and each visible in the studio’s own history.
+
+**It happens once.** `payment_events` is keyed on the provider’s transaction
+id, and the redirect path and the webhook produce the *same* event id, so
+whichever arrives first applies and the other is recorded as already seen.
+Proved by sending the identical body twice and counting one payment.
+
+**The status, amount and currency come from Flutterwave’s verify endpoint,**
+never from the body posted to us, which is their guidance and ours.
+`verif-hash` is checked before the body is read, compared in constant time,
+and a wrong hash gets a 401 and an empty response. That function is the one
+public door in the project and has no CORS headers at all.
+
+**Not paying is read-only, not gone.** `expire_finished_trials` has set
+`businesses.status` to 'suspended' since September and nothing in the database
+read it, so a studio whose trial ended kept the product. One trigger on
+seventeen tables — rather than sixty policies rewritten — now refuses writes
+from a browser while every record stays readable, the export keeps working,
+the complaint channel stays open and paying stays possible. Paying brings it
+back in the same request.
+
+**Cancelling stops the renewal, not the month.** The term is kept, the date is
+shown rather than implied, and it can be resumed until the term runs out.
+After that, paying again is the way back and the message says so.
+
+**A downgrade that would not fit is refused with the numbers** — four outlets
+against a plan that allows one — because the limits are enforced by the
+database and a studio that paid and then could not work would be our fault.
+
+`subscription_harness.mjs`, 92 assertions, every one of them tried as the
+wrong caller first.
+
+Architecture confirmed against current documentation before anything was
+written. **The current API is v3; there is no v4.** No encryption key is
+needed: that is for direct card charges, and this uses the hosted checkout.
+
+---
+
 ## IN PROGRESS
 
-### Batch G, Flutterwave
-Architecture confirmed against current documentation before anything was
-written. **The current API is v3; there is no v4.** Checkout is the Standard
-API; payment plans are created server side and a checkout references the plan
-to start a subscription; Flutterwave sends `verif-hash` on every webhook and
-the value is the Secret Hash set in the dashboard. Their own guidance is to
-re-query the transaction before giving value rather than trusting the
-webhook body, which is what the implementation will do, with a processed-
-events table for idempotency.
+### Batch H, the release candidate
+One consolidated production candidate and a full staging regression, then a
+stop for promotion approval. Nothing is promoted to production without it
+being asked for.
 
-No encryption key is needed: that is for direct card charges, and this uses
-the hosted checkout.
 ## BLOCKED
 
 | item | blocked on | dependency |
 |---|---|---|
 | Pilot start date | **Kayode**: full scope first, or owner-only pilot first | the table above |
-| G, Flutterwave credentials | **Kayode**, when the code is ready: three secrets on the STAGING project only, named in the report. Test mode first; production after the whole staging billing flow passes | the code is being written now and does not need them yet |
+| G, Flutterwave TEST keys | **Kayode**: two secrets on the STAGING project only — `FLW_SECRET_KEY` (the test secret key, `FLWSECK_TEST-…`) and `FLW_SECRET_HASH` (any long random string, set to the same value as the Secret Hash in the Flutterwave dashboard). Plus the webhook URL pasted into that dashboard. Production keys only after the whole staging billing flow passes | **the code is done**; a real test payment cannot be made without them |
 
 ---
 
@@ -307,8 +356,15 @@ rewritten by anybody holding the key.
 **F. Operations.** Frontend error and unhandled rejection monitoring, Edge
 Function failure monitoring, backup verification, an actual restore drill,
 recovery procedure, tenant recovery, secure audit trail, export, account
-deletion, studio offboarding including the `partners` foreign key that
-currently makes a studio undeletable.
+deletion, studio offboarding.
+
+One correction to this line as written: the `partners` foreign key does not
+make a studio undeletable. Checked rather than assumed — every foreign key
+pointing at `businesses` either cascades or sets null, so a delete never
+fails. What it does is worse and quieter: `partner_referrals.business_id` and
+`tlb_customers.business_id` are ON DELETE SET NULL, so a purge severs a
+commission we owe from the studio it was earned on and nothing complains.
+That is what `tlb_closed_studios` is for.
 
 **G. Flutterwave.** Checkout, plans, trials, success, failure, renewal,
 cancellation, upgrade and downgrade, webhook verification, server-controlled
@@ -326,12 +382,13 @@ staging regression, then back for promotion approval.
   `o.whatsapp`. Fixed in E.
 - A viewer can currently write and delete every `app_state` key. Fixed in B.
 - The audit trail can be rewritten by anybody who can read it. Fixed in E.
-- A studio cannot be deleted: `provision_studio` writes a `partners` row of
-  kind `customer`, `partners.business_id` is ON DELETE SET NULL, and a check
-  constraint requires a business. Fixed in F.
+- ~~A studio cannot be deleted.~~ **Not true, and worth recording as wrong.**
+  Every foreign key to `businesses` cascades or sets null, so a delete always
+  succeeded. The real fault was that nothing offered it and a plain delete
+  would have quietly cut our own books loose. Closed properly in F.
 - The platform can leave a studio without an owner. Browsers cannot. Fixed in
   F with the offboarding flow.
 - `sendReset` still uses Supabase SMTP. Fixed in D.
-- Production serves `layi-v46`; the branch is on `layi-v52`. Resolved by H.
+- Production serves `layi-v46`; the branch is on `layi-v59`. Resolved by H.
 - Staging's migration history diverges from the repo because of earlier
   `staging_only_*` migrations. Production's does not. Cleaned up before H.

@@ -1109,6 +1109,7 @@ body.modal-open{overflow:hidden}
           <div id="globalPeriodPopup" class="gp-popup" style="display:none"></div>
         </div>
         <select id="branchSwitch" onchange="setBranchView(this.value)" title="View one branch or all branches" style="display:none;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;height:42px;padding:0 10px;cursor:pointer;font-family:inherit;font-size:13.5px;max-width:180px"></select>
+        <button id="unpaidPill" onclick="showUnpaidInfo()" title="Read only" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--red);color:var(--red);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span>Read only</span></button>
         <button id="syncPill" onclick="showSyncTrouble()" title="Saving" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span id="syncPillText">Saving…</span></button>
         <button id="connPill" onclick="showOfflineInfo()" title="Connection status" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;flex:none"></span><span id="connPillText">Offline</span></button>
         <button id="themeBtn" onclick="toggleTheme()" title="Switch theme" style="align-items:center;justify-content:center;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;width:42px;height:42px;cursor:pointer;font-size:16px;font-family:inherit;display:inline-flex;flex:none">◑</button>
@@ -1510,6 +1511,14 @@ body.modal-open{overflow:hidden}
         <div class="panel" data-setperm="setData" id="planPanel">
           <div class="panel-head"><h3>Your plan</h3></div>
           <div id="planBox"></div>
+        </div>
+        <!-- Separate from "Your plan" above, which is about limits and what is
+             included. This one is about money, and it is the owner’s alone: the
+             database refuses my_billing to everybody else, so the panel is hidden
+             rather than left to fail. -->
+        <div class="panel" data-setperm="setData" id="subscriptionPanel" style="display:none">
+          <div class="panel-head"><h3>Subscription</h3></div>
+          <div id="billingBox"><div class="kv" style="color:var(--text-faint)">Loading…</div></div>
         </div>
         <div class="panel" data-setperm="setWorkflow" id="payMethodPanel">
           <div class="panel-head"><h3>How you get paid</h3></div>
@@ -2497,7 +2506,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v58';
+const APP_VERSION='layi-v59';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4119,6 +4128,8 @@ async function enterLiveStudio(user,username,errEl){
       try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
       try{reportTenantPresence();}catch(e){}
       try{flushLocalFaults();}catch(e){}
+      try{await loadBilling();}catch(e){}
+      try{await finishBillingReturn();}catch(e){}
       startRealtime();
       /* Photos: find out how full they are, mint the URLs this screen needs,
          then move anything still held as bytes up to storage. The sweep runs
@@ -4808,7 +4819,7 @@ function enterApp(){
   show('navAttendance',can('attendance'));show('msAttendance',can('attendance'));
   show('navLeave',can('team'));show('msLeave',can('team'));
   show('navCompanylog',can('team'));show('msCompanylog',can('team'));
-  applyTeamVisibility();applyExampleVisibility();updateConnPill();updateSyncPill();refreshInstallUI();
+  applyTeamVisibility();applyExampleVisibility();updateConnPill();updateSyncPill();refreshUnpaidPill();refreshInstallUI();
   try{const cb=document.getElementById('closeStudioBtn');
     if(cb)cb.style.display=ownsThisStudio()?'':'none';}catch(e){}
   show('navExpenses',can('expenses'));show('msExpenses',can('expenses'));document.getElementById('expLockIco').style.display='none';
@@ -6707,10 +6718,10 @@ function buildOrderTimeline(o){
     const cls=(i===nowIdx)?'now':(e.kind==='money'?'green':'done');
     const ic=(i===nowIdx)?'●':(icon[e.kind]||'✓');
     const tag=(e.kind==='money'&&e.amt)?`<span class="otl-tag">+${cur(e.amt)}</span>`:((i===nowIdx)?'<span class="otl-tag now">current</span>':'');
-    return `<div class="otl-ev ${cls}"><span class="od">${ic}</span><div class="oda">${fmtDate(e.at)}</div><div class="ot">${esc(e.title)}${tag}</div>${e.det?`<div class="ox">${esc(e.det)}</div>`:''}${e.who?`<div class="ow">${esc(e.who)}</div>`:''}</div>`;
+    return `<div class="otl-ev ${cls}"><span class="od">${ic}</span><div class="oda">${fmtDateShort(e.at)}</div><div class="ot">${esc(e.title)}${tag}</div>${e.det?`<div class="ox">${esc(e.det)}</div>`:''}${e.who?`<div class="ow">${esc(e.who)}</div>`:''}</div>`;
   }).join('');
   if(o.stageIndex>=DELI){
-    rows+=`<div class="otl-ev green"><span class="od">✓</span><div class="oda">${o.deliveredAt?fmtDate(o.deliveredAt):''}</div><div class="ot">Delivered &amp; completed</div></div>`;
+    rows+=`<div class="otl-ev green"><span class="od">✓</span><div class="oda">${o.deliveredAt?fmtDateShort(o.deliveredAt):''}</div><div class="ot">Delivered &amp; completed</div></div>`;
   }else{
     const owed=orderNet(o)-(+o.paid||0);const dd=o.due?new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
     rows+=`<div class="otl-ev future"><span class="od">○</span><div class="oda">${dd?'Due '+dd:'No due date'}</div><div class="ot">${o.stageIndex>=RFD?'Ready for collection':'Delivered & collected'}</div>${(can('money')&&owed>0)?`<div class="ox">${curO(owed,o)} balance due on collection.</div>`:''}</div>`;
@@ -7715,8 +7726,200 @@ function renderPlanPanel(){
     +featRows
     +(next?'<div class="sd" style="color:var(--text-faint);margin-top:10px">'+esc(next.name)+' gives you '
       +(next.studios===PLAN_UNLIMITED?'as many studios as you need':next.studios+' studios')+' and '+seatsOf(next)
-      +', '+priceOf(next)+'. Talk to us when you are ready.</div>':'')
+      +', '+priceOf(next)+'. The Subscription panel below takes the payment.</div>':'')
     +'<div class="sd" style="color:var(--text-faint);margin-top:8px">Going over a limit never hides anything you already have. It only stops you adding more.</div>';
+}
+/* ===== THE SUBSCRIPTION =============================================
+   Everything about money that matters happens on the server. This screen
+   asks my_billing what is true, offers the plans it was given, and sends
+   somebody to Flutterwave. It never computes a price: the amount comes
+   back from open_checkout, which reads it from plan_prices, and there is
+   no argument through which a browser could suggest one.
+
+   A person who is not the owner never sees this panel, because
+   my_billing refuses them — and a panel that exists only to show an
+   error is worse than no panel. */
+let BILLING=null;let _billingBusy=false;
+function studioIsReadOnly(){return !!(BILLING&&BILLING.status&&BILLING.status!=='active');}
+function refreshUnpaidPill(){
+  try{const el=document.getElementById('unpaidPill');
+    if(el)el.style.display=studioIsReadOnly()?'inline-flex':'none';}catch(e){}
+}
+function showUnpaidInfo(){
+  alert('This studio is read only.\n\nEverything you have is still here and still readable, and you can download all of it from Settings. Writing starts again as soon as the subscription is paid.');
+  try{go('settings');}catch(e){}
+}
+async function loadBilling(){
+  if(!(supa&&liveMode&&myBusinessId&&ownsThisStudio()))return;
+  try{
+    const {data,error}=await supa.rpc('my_billing',{p_business:myBusinessId});
+    if(error)throw error;
+    BILLING=data||null;
+  }catch(e){BILLING=null;}
+  refreshUnpaidPill();renderBillingPanel();
+}
+function billingMoney(a,cur){
+  try{return (cur||'NGN')==='NGN'?cur2(a):((cur||'')+' '+Number(a).toLocaleString('en-GB'));}
+  catch(e){return String(a);}
+}
+function renderBillingPanel(){
+  const panel=document.getElementById('subscriptionPanel');
+  const box=document.getElementById('billingBox');
+  if(!panel||!box)return;
+  if(!(BILLING&&ownsThisStudio())){panel.style.display='none';return;}
+  panel.style.display='';
+  const sub=BILLING.subscription||null;
+  const label={starter:'Basic',pro:'Pro',trial:'Trial',premium:'Bespoke'};
+  const prices=(BILLING.prices||[]);
+  const lines=[];
+
+  /* WHAT IS TRUE NOW, before anything is offered. */
+  if(BILLING.status&&BILLING.status!=='active'){
+    lines.push('<div class="kv" style="border:1px solid var(--red);border-radius:10px;padding:12px;margin-bottom:12px">'
+      +'<b style="color:var(--red)">This studio is read only.</b>'
+      +'<div style="color:var(--text-dim);font-size:13px;margin-top:4px">Nothing has been deleted and nothing will be. Every record is still here, and you can download all of it below. Paying starts the studio again straight away.</div></div>');
+  }
+  if(sub){
+    lines.push('<div class="bd-row"><span class="bl">Plan</span><span class="bv">'
+      +esc(label[sub.plan]||sub.plan||'—')+(sub.is_trial?' <span style="color:var(--text-faint)">(trial)</span>':'')+'</span></div>');
+    if(!sub.is_trial){
+      lines.push('<div class="bd-row"><span class="bl">Billed</span><span class="bv">'
+        +esc(sub.cycle==='annual'?'once a year':'every month')+'</span></div>');
+      lines.push('<div class="bd-row"><span class="bl">Price</span><span class="bv">'+billingMoney(sub.price,'NGN')+'</span></div>');
+    }
+    if(sub.renews_on){
+      lines.push('<div class="bd-row"><span class="bl">'+(sub.cancelled_at?'Runs until':'Renews')+'</span><span class="bv"'
+        +(sub.cancelled_at?' style="color:var(--amber)"':'')+'>'+esc(fmtDateShort(sub.renews_on))+'</span></div>');
+    }
+    if(sub.cancelled_at){
+      lines.push('<div class="sd" style="color:var(--amber);margin-top:8px">Cancelled. Everything keeps working until that date.</div>');
+    }
+  }
+  if(BILLING.trial_ends_on&&(!sub||sub.is_trial)){
+    lines.push('<div class="bd-row"><span class="bl">Trial ends</span><span class="bv">'+esc(fmtDateShort(BILLING.trial_ends_on))+'</span></div>');
+  }
+
+  /* WHAT IT WOULD COST, from the server. A price this screen worked out
+     itself would be a price that can disagree with the one charged. */
+  if(prices.length){
+    const groups={};prices.forEach(function(p){(groups[p.plan]=groups[p.plan]||[]).push(p);});
+    lines.push('<div style="margin-top:14px;font-weight:600">'+((sub&&!sub.is_trial)?'Change plan':'Choose a plan')+'</div>');
+    Object.keys(groups).forEach(function(pl){
+      const opts=groups[pl].sort(function(a,b){return a.cycle<b.cycle?-1:1;});
+      const btns=opts.map(function(p){
+        const on=sub&&!sub.is_trial&&sub.plan===p.plan&&sub.cycle===p.cycle;
+        return '<button class="btn '+(on?'ghost':'')+'" '+(on?'disabled':'')
+          +' onclick="startCheckout(\''+p.plan+'\',\''+p.cycle+'\')">'
+          +(p.cycle==='annual'?'A year':'A month')+' · '+billingMoney(p.amount,p.currency)
+          +(on?' · current':'')+'</button>';
+      }).join('');
+      lines.push('<div class="srow"><div class="smain"><b>'+esc(label[pl]||pl)+'</b></div>'
+        +'<div class="sacts" style="display:flex;gap:8px;flex-wrap:wrap">'+btns+'</div></div>');
+    });
+  }
+
+  if(sub&&!sub.is_trial){
+    lines.push('<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+      +(sub.cancelled_at
+        ?'<button class="btn" onclick="resumeSubscription()">Keep my subscription</button>'
+        :'<button class="btn ghost" onclick="cancelSubscription()">Cancel subscription…</button>')
+      +'</div>');
+  }
+
+  /* WHAT HAS ACTUALLY BEEN PAID, which is the only figure worth showing. */
+  const paid=(BILLING.payments||[]);
+  if(paid.length){
+    lines.push('<div style="margin-top:16px;font-weight:600">Payments</div>');
+    lines.push(paid.slice(0,12).map(function(p){
+      return '<div class="bd-row"><span class="bl">'+esc(fmtDateShort(p.paid_on))
+        +(p.note?' <span style="color:var(--text-faint)">'+esc(p.note)+'</span>':'')+'</span>'
+        +'<span class="bv">'+billingMoney(p.amount,p.currency)
+        +(p.status==='completed'?'':' <span style="color:var(--amber)">'+esc(p.status||'')+'</span>')+'</span></div>';
+    }).join(''));
+  }else{
+    lines.push('<div class="sd" style="color:var(--text-faint);margin-top:14px">Nothing has been charged yet.</div>');
+  }
+  box.innerHTML=lines.join('');
+}
+
+async function startCheckout(plan,cycle){
+  if(_billingBusy)return;
+  if(!(supa&&liveMode&&myBusinessId)){alert('This needs a connection.');return;}
+  _billingBusy=true;
+  try{
+    const r=await supa.functions.invoke('billing',{body:{action:'checkout',
+      payload:{business:myBusinessId,plan:plan,cycle:cycle,name:((SETTINGS.company&&SETTINGS.company.name)||'')}}});
+    if(r.error)throw new Error(r.error.message||'Could not open the payment page');
+    const d=r.data||{};
+    if(d.error)throw new Error(d.error);
+    if(!d.link)throw new Error('The payment page could not be opened.');
+    logAudit('Started a checkout',plan+' '+cycle);
+    /* The provider’s own page, in this tab: a payment in a popup is a
+       payment a phone blocks. */
+    location.href=d.link;
+  }catch(e){
+    alert((e&&e.message)||'Could not open the payment page.');
+  }
+  _billingBusy=false;
+}
+
+async function cancelSubscription(){
+  const sub=(BILLING&&BILLING.subscription)||null;
+  const until=sub&&sub.renews_on?fmtDateShort(sub.renews_on):'the end of the term';
+  if(!confirm('Cancel the subscription?\n\nEverything keeps working until '+until+', and nothing is deleted after that either \u2014 the studio becomes read only until it is paid again.'))return;
+  try{
+    const {data,error}=await supa.rpc('cancel_subscription',{p_business:myBusinessId});
+    if(error)throw error;
+    logAudit('Cancelled the subscription','');
+    alert('Cancelled. Everything keeps working until '+(data&&data.runs_until?fmtDateShort(data.runs_until):until)+'.');
+    await loadBilling();
+  }catch(e){alert((e&&e.message)||'Could not cancel that.');}
+}
+
+async function resumeSubscription(){
+  try{
+    const {data,error}=await supa.rpc('resume_subscription',{p_business:myBusinessId});
+    if(error)throw error;
+    logAudit('Resumed the subscription','');
+    alert('Kept. It renews on '+((data&&data.renews_on)?fmtDateShort(data.renews_on):'the usual date')+'.');
+    await loadBilling();
+  }catch(e){alert((e&&e.message)||'Could not do that.');}
+}
+
+/* COMING BACK FROM THE PAYMENT PAGE.
+   The webhook will arrive on its own, and it may be a minute behind
+   somebody staring at the screen. So the app asks too, and both paths
+   produce the same event id at the server — whichever lands first applies
+   and the other is recorded as already seen. Nobody is charged twice and
+   nobody waits. */
+async function finishBillingReturn(){
+  try{
+    const q=new URLSearchParams(String(location.search||""));
+    if(q.get('billing')!=='return')return;
+    const txId=q.get('transaction_id')||'';
+    const ref=q.get('tx_ref')||'';
+    const status=(q.get('status')||'').toLowerCase();
+    /* Tidy the address bar first, so a refresh does not repeat any of this. */
+    try{history.replaceState(null,'',location.pathname+location.hash);}catch(e){}
+    if(!txId){
+      if(status==='cancelled')toast('Payment cancelled. Nothing has been charged.');
+      return;
+    }
+    toast('Checking that payment\u2026');
+    const r=await supa.functions.invoke('billing',{body:{action:'finish',
+      payload:{transaction_id:txId,tx_ref:ref}}});
+    const d=(r&&r.data)||{};
+    await loadBilling();
+    try{await adoptPlan();}catch(e){}
+    const res=d.result||{};
+    if(res.paid){
+      alert('Thank you \u2014 the payment went through and your plan is updated.');
+    }else if(d.settled&&res.reason){
+      alert('That payment was not applied: '+res.reason+'. Nothing has been charged twice.');
+    }else if(d.reason){
+      toast(d.reason);
+    }
+  }catch(e){}
 }
 function renderPayMethodSettings(){
   const box=document.getElementById('set_paymethods');
@@ -8967,7 +9170,7 @@ function askForMoreStorage(){
   }
   alert(body+'\n\nSend this to us and we will come back with a price.');
 }
-function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderBillingPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -9691,7 +9894,7 @@ async function exportStudioFromServer(){
 async function closeThisStudio(){
   if(!(supa&&liveMode&&myBusinessId)){alert('This needs a connection.');return;}
   if(!ownsThisStudio()){alert('Only the owner can close the studio.');return;}
-  const reason=prompt('Closing '+(SETTINGS.bizName||'this studio')+'.\n\nEverything is kept for 30 days and you can reopen it at any point in that time. Nobody will be able to sign in meanwhile.\n\nWhy are you closing? (optional)');
+  const reason=prompt('Closing '+((SETTINGS.company&&SETTINGS.company.name)||'this studio')+'.\n\nEverything is kept for 30 days and you can reopen it at any point in that time. Nobody will be able to sign in meanwhile.\n\nWhy are you closing? (optional)');
   if(reason===null)return;
   if(!confirm('Close the studio now? Everyone signed out, nothing deleted for 30 days.'))return;
   try{

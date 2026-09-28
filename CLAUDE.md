@@ -108,7 +108,7 @@ any more, and there is now a way to prove it rather than believe it. Five
 objects once were made by hand and were missing from the migrations entirely,
 so a fresh project would have run none of it. It happened again on 29
 September with sixteen more, including the two columns the whole
-audit-authenticity claim rests on. Sixteen suites guard it:
+audit-authenticity claim rests on. Seventeen suites guard it:
 
 ```bash
 node supabase/tests/app_schema_harness.mjs     # a fresh DB actually runs the app
@@ -127,6 +127,7 @@ node supabase/tests/account_directory_harness.mjs # which app each account belon
 node supabase/tests/storage_rls_harness.mjs    # a studio reaches its own photos and nobody else's
 node supabase/tests/lifecycle_harness.mjs       # a studio can close, come back, and be purged without taking our books with it
 node supabase/tests/restore_harness.mjs         # a studio exported, purged, and put back from the file alone
+node supabase/tests/subscription_harness.mjs    # the price is ours, a retry is not a second payment, and not paying costs writing not work
 ```
 
 And one check that is not a suite, because it compares the repo with a real
@@ -159,7 +160,7 @@ authenticated` on every project, so a table in `public` is reachable with
 the public anon key from the moment it exists. `tlb_policy_harness` sets
 that default first, so the policies are actually reached and tested.
 
-Four of the sixteen are different in kind. Every other suite proves something is
+Four of the seventeen are different in kind. Every other suite proves something is
 walled off; `plan_limits_harness`, `partner_commission_harness` and
 `referral_fraud_harness` and `plan_feature_harness` prove something is REFUSED, and both show the refusal and then the same operation
 succeeding once it is allowed. A check that only ever sees the refusal cannot

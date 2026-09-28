@@ -34,6 +34,19 @@ col audit_log.entity_id
 col audit_log.entity_label
 col audit_log.id
 col audit_log.source
+col billing_intents.amount
+col billing_intents.business_id
+col billing_intents.created_at
+col billing_intents.created_by
+col billing_intents.currency
+col billing_intents.cycle
+col billing_intents.fw_tx_id
+col billing_intents.id
+col billing_intents.note
+col billing_intents.plan
+col billing_intents.settled_at
+col billing_intents.status
+col billing_intents.tx_ref
 col branches.business_id
 col branches.created_at
 col branches.id
@@ -285,6 +298,14 @@ col partners.status
 col partners.tax_id
 col partners.tier
 col partners.user_id
+col payment_events.at
+col payment_events.event_id
+col payment_events.id
+col payment_events.kind
+col payment_events.outcome
+col payment_events.payload
+col payment_events.provider
+col payment_events.tx_ref
 col payment_methods.added_at
 col payment_methods.business_id
 col payment_methods.fingerprint
@@ -307,6 +328,11 @@ col plan_limits.label
 col plan_limits.max_seats
 col plan_limits.max_studios
 col plan_limits.plan
+col plan_prices.active
+col plan_prices.amount
+col plan_prices.currency
+col plan_prices.cycle
+col plan_prices.plan
 col plan_state_keys.feature
 col plan_state_keys.state_key
 col platform_admins.active
@@ -452,6 +478,7 @@ col tlb_staff.phone
 col tlb_staff.role
 col tlb_staff.updated_at
 col tlb_subscriptions.billing_cycle
+col tlb_subscriptions.cancel_requested_at
 col tlb_subscriptions.created_at
 col tlb_subscriptions.customer_id
 col tlb_subscriptions.end_date
@@ -507,6 +534,7 @@ fn app.audit_permissions()
 fn app.bump_order_rev()
 fn app.can(p_business uuid, p_perm text)
 fn app.can_here(p_business uuid, p_perm text, p_branch uuid)
+fn app.cancel_subscription(p_business uuid)
 fn app.cancel_team_invitation(p_invitation_id uuid)
 fn app.claim_referral_code(p_code text)
 fn app.close_studio(p_business uuid, p_reason text)
@@ -548,9 +576,11 @@ fn app.may_write_key(p_business uuid, p_key text)
 fn app.media_business_of(p_name text)
 fn app.media_usage_sync()
 fn app.migrate_orders_to_rows(p_business uuid)
+fn app.my_billing(p_business uuid)
 fn app.my_staff_id()
 fn app.no_commission_before_payment()
 fn app.on_trial(p_business uuid)
+fn app.open_checkout(p_business uuid, p_plan text, p_cycle text)
 fn app.partner_account_reverify()
 fn app.partner_me()
 fn app.perm_for_key(p_key text)
@@ -561,12 +591,15 @@ fn app.provision_studio()
 fn app.purge_studio(p_business uuid)
 fn app.recheck_referral_on_payment_method()
 fn app.referral_code_for(p_name text)
+fn app.refuse_write_when_unpaid()
 fn app.reopen_studio(p_business uuid)
+fn app.resume_subscription(p_business uuid)
 fn app.seats_used(p_business uuid, p_exclude_membership uuid)
 fn app.seed_business_roles()
 fn app.self_referral_reason(p_partner uuid, p_business uuid)
 fn app.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
 fn app.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric)
+fn app.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb)
 fn app.slugify(p text)
 fn app.stamp_audit_actor()
 fn app.stamp_error_report()
@@ -580,6 +613,7 @@ fn app.write_perm_for_key(p_key text)
 fn public.accept_invitation(p_invitation_id uuid)
 fn public.account_for_recovery(p_email text)
 fn public.can(p_business uuid, p_perm text)
+fn public.cancel_subscription(p_business uuid)
 fn public.cancel_team_invitation(p_invitation_id uuid)
 fn public.cancel_trial(p_business uuid)
 fn public.claim_referral_code(p_code text)
@@ -589,10 +623,12 @@ fn public.convert_trial_to_paid(p_business uuid, p_plan text, p_cycle text, p_pr
 fn public.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval)
 fn public.delete_my_account(p_close_solely_owned boolean)
 fn public.discard_invitation(p_invitation_id uuid, p_reason text)
+fn public.expire_finished_terms(p_on date)
 fn public.expire_finished_trials(p_on date)
 fn public.export_studio(p_business uuid)
 fn public.import_studio(p_json jsonb)
 fn public.migrate_my_orders(p_business uuid)
+fn public.my_billing(p_business uuid)
 fn public.my_commission_summary()
 fn public.my_membership(p_business uuid)
 fn public.my_permissions(p_business uuid)
@@ -600,6 +636,7 @@ fn public.my_plan_features()
 fn public.my_plan_usage()
 fn public.my_storage_usage()
 fn public.my_trial()
+fn public.open_checkout(p_business uuid, p_plan text, p_cycle text)
 fn public.partner_accrue_month(p_month date, p_partner uuid)
 fn public.partner_active_paying(p_partner uuid, p_on date)
 fn public.partner_clear_ledger(p_on date)
@@ -619,11 +656,13 @@ fn public.purge_studio(p_business uuid)
 fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text)
 fn public.recount_storage_usage()
 fn public.reopen_studio(p_business uuid)
+fn public.resume_subscription(p_business uuid)
 fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text)
 fn public.set_partner_payout_frozen(p_partner uuid, p_frozen boolean, p_reason text)
 fn public.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
 fn public.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric)
 fn public.set_studio_storage_cap(p_business uuid, p_gb numeric, p_note text)
+fn public.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb)
 fn public.start_free_trial(p_business uuid, p_days integer)
 fn public.studio_payments(p_business uuid)
 fn public.submit_enquiry(p_kind text, p_name text, p_email text, p_phone text, p_business text, p_message text, p_source_page text, p_extra jsonb, p_trap text)
@@ -637,6 +676,7 @@ pol attendance.attendance_select
 pol attendance.attendance_update
 pol audit_log.audit_log_insert
 pol audit_log.audit_log_select
+pol billing_intents.billing_intents_select
 pol branches.branches_delete
 pol branches.branches_insert
 pol branches.branches_select
@@ -695,10 +735,12 @@ pol partner_rate_bands.partner_rate_bands_read
 pol partner_referrals.partner_referrals_select
 pol partners.partners_select
 pol partners.partners_update
+pol payment_events.payment_events_select
 pol permission_catalogue.permission_catalogue_read
 pol plan_feature_catalogue.plan_feature_catalogue_read
 pol plan_features.plan_features_read
 pol plan_limits.plan_limits_read
+pol plan_prices.plan_prices_read
 pol products.products_delete
 pol products.products_insert
 pol products.products_select
@@ -743,29 +785,46 @@ pol transactions.transactions_select
 pol transactions.transactions_update
 trg app_state.app_state_plan_feature
 trg app_state.app_state_studio_settings_guard
+trg app_state.app_state_unpaid_guard
 trg attendance.attendance_plan_feature
+trg attendance.attendance_unpaid_guard
 trg audit_log.audit_log_actor
 trg branches.audit_branches_t
 trg branches.branches_plan_limit
+trg branches.branches_unpaid_guard
 trg business_role_permissions.audit_role_permissions
 trg business_role_permissions.business_role_permissions_guard
+trg business_role_permissions.business_role_permissions_unpaid_guard
 trg business_roles.business_roles_guard
+trg business_roles.business_roles_unpaid_guard
 trg businesses.audit_businesses
 trg businesses.businesses_identity_guard
 trg businesses.businesses_referral_is_permanent
 trg businesses.businesses_seed_roles
+trg customer_contacts.customer_contacts_unpaid_guard
+trg customers.customers_unpaid_guard
 trg error_reports.error_reports_stamp
 trg memberships.audit_memberships
 trg memberships.memberships_default_role
 trg memberships.memberships_last_owner_guard
 trg memberships.memberships_plan_limit
+trg memberships.memberships_unpaid_guard
+trg order_costs.order_costs_unpaid_guard
+trg order_items.order_items_unpaid_guard
 trg orders.orders_rev
+trg orders.orders_unpaid_guard
 trg partner_accounts.partner_accounts_reverify
 trg partner_ledger.partner_ledger_no_commission_before_payment
 trg partner_referrals.partner_referrals_void_on_churn
 trg payment_methods.payment_methods_one_business
 trg payment_methods.payment_methods_recheck_referral
+trg payment_methods.payment_methods_unpaid_guard
+trg products.products_unpaid_guard
 trg profiles.profiles_authority_guard
 trg staff.staff_plan_feature
+trg staff.staff_unpaid_guard
 trg suppliers.suppliers_plan_feature
+trg suppliers.suppliers_unpaid_guard
 trg team_invitations.audit_invitations
+trg team_invitations.team_invitations_unpaid_guard
+trg transactions.transactions_unpaid_guard
