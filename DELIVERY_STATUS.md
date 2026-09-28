@@ -97,20 +97,57 @@ Batch B probe 68 of 68. Release `layi-v53`.
 
 ---
 
-## IN PROGRESS
+### Batch C, invitations against RBAC. Staging, 29 Sep
+team-admin’s gate is a permission rather than a tier: invite needs
+`team.invite`, delete needs `team.remove`, update needs `users`, list needs
+`team.view`, and the refusal names the missing one. `sendReset` stays
+owner-only because it is account recovery, not team work. An owner can now
+delegate inviting and take it back, proved both ways.
 
-### Batch C, team invitations against RBAC
-Role and branch chosen at invite, permissions inherited, and a business
-switcher so a multi-business person is never stranded on a 409.
+The invitation carries the business role, so permissions are chosen once on
+the role rather than per person. Cancel added, and the seat returns with it.
+Pending invitations come back with the team list, because `team_invitations`
+has RLS forced and no policies at all and nothing reaches it from a browser.
+
+Studio switching: which studio a device is looking at is a device-local
+preference that decides what is drawn and never what is allowed. Local data
+is cleared before the new studio is pulled. `profiles.business_id` is now
+only a tiebreak between real memberships.
+
+**The Ìfé Leather existing-user test is done.** The same person is staff in
+one studio and manager in the other at the same moment: two memberships, two
+roles, one profile, and the database answers per studio rather than per
+person. 24 of 24.
+
+### Batch D, password recovery. Staging, 29 Sep
+Every "Forgot password?" in the product handed the message to Supabase SMTP,
+broken since 13 September, so for two and a half weeks the only route back
+into a studio told people to check an inbox nothing was sent to.
+
+`auth-recover` mints the link with generateLink and Resend delivers it.
+Unauthenticated, so: known, unknown, malformed and empty addresses all
+return the same object byte for byte, including when the function throws;
+it only ever sends to the address in the request; and one send per address
+per minute. Somebody invited who never chose a password gets an invite link
+rather than a recovery one, because GoTrue refuses recovery for an address
+that has never confirmed, and without that they would get a 200 and no email
+for ever. 16 of 16, including a grep that stops the dead call coming back.
 
 ---
 
+## IN PROGRESS
+
+### Batch E, the relational move and sync reliability
+One piece of work because both rewrite the same persistence layer. Cost and
+contact fields out of the orders blob so `seeCost` and `seeContact` become
+real, orders into rows so assigned-only and branch filtering become real, an
+append-only audit table, and the durable outbox with visible failure state.
 ## BLOCKED
 
 | item | blocked on | dependency |
 |---|---|---|
 | Pilot start date | **Kayode**: full scope first, or owner-only pilot first | the table above |
-| G, Flutterwave | nothing technical. Needs live and test API keys on the staging and production projects | after the checkout flow is built |
+| G, Flutterwave | **Kayode**: test and live API keys, and the webhook secret hash, set as secrets on the staging and production projects | needed before the checkout flow can be exercised end to end; the code can be written without them |
 
 ---
 
