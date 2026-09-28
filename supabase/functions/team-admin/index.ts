@@ -333,8 +333,13 @@ Deno.serve(async (req) => {
        VerifiedTarget, so they cannot be called with an id straight off the
        wire — that is a type error, caught on deploy. */
     const removeAccount = (t: VerifiedTarget) => admin.auth.admin.deleteUser(t)
-    const who0 = await studioAndInviter()
     const emailPasswordReset = async (t: VerifiedTarget) => {
+      /* Resolved HERE, not above. studioAndInviter is a const arrow defined
+         further down, so calling it at this point is a temporal dead zone
+         and threw for EVERY action, list included — the whole gateway 500d.
+         Batch D added it; the Batch D probe greps the source and did not see
+         it; the Batch C probe calls the thing and did. */
+      const who0 = await studioAndInviter()
       const { data: au } = await admin.auth.admin.getUserById(t)
       const email = au?.user?.email
       if (!email) return { error: { message: 'That account has no email address.' } }
