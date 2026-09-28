@@ -1,126 +1,158 @@
 # Delivery status
 
-**Pilot target: 7–10 October 2026. Broad rollout: November 2026.**
-Updated at the end of each batch. Everything below is staging unless it says
-PRODUCTION.
+Full required scope. Nothing is deferred to a later release. Work is sequenced
+for speed, not moved out of the programme.
+
+**Updated 29 September 2026.**
+
+---
+
+## The date, reported immediately as asked
+
+**7 to 10 October is not achievable with the required scope.**
+
+The reason is one specific decision in the correction: sensitive data must not
+remain a UI-only boundary while real studio staff have access. That converts
+the `app_state` blob from a January problem into current scope, and it is the
+largest single change this app has had.
+
+Measured rather than estimated: `layi_dash_orders` is referenced in 43 places,
+`rawOrders()` in 33, and an order record carries `o.cost`, `o.email`,
+`o.phone` and `o.whatsapp` inline. Those four fields are exactly what
+`seeCost` and `seeContact` claim to hide.
+
+| work | days |
+|---|---|
+| B, RBAC enforcement including per-key `app_state` RLS | 2 |
+| C, invitations against RBAC and multi-business switching | 2 |
+| D, password recovery through Resend | 1 |
+| Sensitive fields out of the orders blob, plus E sync hardening | 8 to 10 |
+| F, monitoring, backup, restore drill, export, deletion, audit integrity | 3 |
+| G, Flutterwave end to end | 4 |
+| H, consolidated release candidate and full regression | 2 |
+| **total** | **22 to 24 working days** |
+
+That puts full pilot readiness at roughly **27 to 31 October**, with November
+rollout intact but without much slack. The estimate assumes no further
+discoveries, and the record this month says that is optimistic.
+
+### There is a second shape, and it defers nothing
+
+A studio with **one person in it has no permission surface at all**. Every gap
+above is about what a second person can reach. So the pilot could start with
+owner-only studios while the team-facing work completes, and nothing leaves the
+programme.
+
+| | full scope first | owner-only pilot first |
+|---|---|---|
+| pilot starts | 27 to 31 Oct | **13 to 15 Oct** |
+| needs first | everything | D, E, F core, H release |
+| studios can invite staff | day one | when C and the orders move land, late Oct |
+| anything deferred | no | no |
+| November rollout | tight | comfortable |
+
+**This is a product decision and it is the only thing I am waiting on.** Work
+continues on B in the meantime, because B is required in both shapes.
 
 ---
 
 ## DONE
 
-### Phase 0 — a studio cannot promote itself · **PRODUCTION**, 28 Sep
-Preflight was read-only and clean: nine studios, nine memberships, **every one
-an owner**, no profile disagreeing with its membership, no unknown role. So the
-guards cannot refuse anything live today. `layi_dash_roles` is owner-only in
-full; `profiles.role_id`, `business_id` and `staff_id` are not writable from a
-browser. Also deployed: the studio-settings field guard and the business
-identity guard, because the Phase 0 function replaces theirs.
+### Phase 0, a studio cannot promote itself. **PRODUCTION**, 28 Sep
+Preflight clean: nine studios, nine memberships, every one an owner, no profile
+disagreeing with its membership. `layi_dash_roles` is owner-only in full;
+`profiles.role_id`, `business_id` and `staff_id` are not writable from a
+browser. Deployed with the studio-settings field guard and the business
+identity guard. Tests written first and failing: a manager, a staff member and
+a viewer each rewrote the permission table and got 200. Now 16 of 16 green.
 
-Tests first, and they failed: a manager, a staff member **and a viewer** each
-rewrote the studio's permission table and got 200. Now 16/16 green.
+### Batch A, RBAC foundation. Staging, 29 Sep
+`permission_catalogue` (45 keys, 32 database-enforceable, 13 marked `ui_only`),
+`business_roles`, `business_role_permissions`, `memberships.role_id`,
+`team_invitations.role_id`, `app.can` / `can_here` / `has_all_branches` /
+`is_owner`. 40 system roles, 6 custom roles imported, 978 grants, all 19
+memberships resolving to a real role.
 
-*One behaviour change in production:* the plan in a studio's settings blob is
-stamped from `businesses.plan` on the next save. Two studios differ — **LAYI**
-(billing pro, app said trial: the stamp fixes it) and a seed studio (billing
-trial, app said pro: trial carries every Pro feature).
-
-### Batch A — RBAC foundation · staging, 29 Sep
-`permission_catalogue` (45 keys, 32 database-enforceable, **13 honestly marked
-`ui_only`**), `business_roles`, `business_role_permissions`,
-`memberships.role_id`, `team_invitations.role_id`, and
-`app.can` / `can_here` / `has_all_branches` / `is_owner`.
-
-Seeded 40 system roles, 6 custom roles imported from studios that had built
-their own, 978 grants. **All 19 memberships resolve to a real role** — owners
-44 permissions, managers 27, staff 14.
-
-The app takes its roles from the database and the person's role from their
-**membership**. The existing Roles & Permissions screen is unchanged and writes
-through as a diff. Release `layi-v52`.
-
-**Fixed on the way:** an invited staff member had *no permissions at all*.
-`accept_invitation` wrote `profiles.role_id` as the tier (`staff`), which
-matches no role in the app's table. Kayode's own invited manager account had
-zero; it now has 27. Verified end to end in a browser: an invited staff member
-lands in Adé Bespoke with orders, customers and production, and without
-finance, payroll, settings, delete or roles.
-
-**Found by the probe, fixed in the batch:** a manager pointed their own
-membership at the owner role and got 44 permissions. Membership writes are now
-owner-only and never your own row.
-
-Probes: Batch A 51/51, Phase 0 16/16. Harnesses: 8 green. Gates: `verify.js` 23,
-safearea 66, edge-auth 61.
+The app takes roles from the database and the person's role from their
+membership. Fixed on the way: an invited staff member previously had zero
+permissions. Found by the probe and fixed in the batch: a manager could point
+their own membership at the owner role. Batch A probe 51 of 51.
 
 ---
 
 ## IN PROGRESS
 
-Nothing. Batch B is next.
+### Batch B, RBAC enforcement
+Per-key RLS on `app_state` so a permission refuses a request that skips the
+app; the nine `is_business_admin` replacements; custom roles connected to the
+secure model so the existing screen is honest about what it offers.
 
 ---
 
 ## BLOCKED
 
-| what | on | since |
+| item | blocked on | dependency |
 |---|---|---|
-| Batch G — billing | a payment provider decision (Paystack / Flutterwave / Stripe) | not yet asked |
+| Pilot start date | **Kayode**: full scope first, or owner-only pilot first | the table above |
+| G, Flutterwave | nothing technical. Needs live and test API keys on the staging and production projects | after the checkout flow is built |
 
 ---
 
-## PILOT BLOCKER — must be true before a real studio starts
+## The required programme, in sequence
 
-| # | item | state |
-|---|---|---|
-| P1 | RBAC enforced at the database, not only in the UI | **Batch B**, next |
-| P2 | Team invitations working end to end against RBAC | Batch C |
-| P3 | Forgot-password working (Supabase SMTP has been dead since 13 Sep) | Batch D |
-| P4 | No silent data loss on save; failed saves visible | Batch E |
-| P5 | Backup verified and a restore actually performed once | Batch F |
-| P6 | Error and Edge Function monitoring | Batch F |
-| P7 | Data export for a studio | Batch F |
-| P8 | The customer app released to `main` — production still serves `layi-v46`, eleven versions behind | not scheduled |
-| P9 | Production invitations switched on (`TEAM_INVITES_ENABLED` is project-scoped and off) | after C |
+Every item below is current scope.
 
-## NOVEMBER BLOCKER — needed for broad rollout, not for one pilot studio
+**B. RBAC enforcement.** Per-key `app_state` RLS separating read from write, so
+a viewer is genuinely read-only and a tailor cannot fetch the transactions key.
+The nine `is_business_admin` policies replaced by named capabilities. Custom
+roles wired to `business_roles`. Bypass test per capability.
 
-| # | item |
-|---|---|
-| N1 | Payment provider, subscription lifecycle, webhook-driven plan state |
-| N2 | Trial, failed and cancelled subscription behaviour |
-| N3 | Invoices and receipts |
-| N4 | Account and business deletion workflow — **note: a studio currently cannot be deleted at all**, see below |
-| N5 | Privacy and data-handling statement |
-| N6 | Custom-role builder exposed in the UI (schema already supports it) |
+**C. Team invitations against RBAC.** Role and branch chosen at invite,
+permissions inherited, new user and existing user, resend, cancel, expiry,
+acceptance, seat accounting, and a business switcher so a multi-business person
+is never stranded on a 409.
 
-## NON-BLOCKER — known, written down, not in the way
+**D. Password recovery through Resend.** Supabase SMTP has been dead since 13
+September. Owner recovery, staff recovery, multi-business recovery, link reuse
+and expiry, no duplicate accounts.
 
-- **Field-level permissions are UI-only.** `seeCost`, `seeProfit`,
-  `seeContact`, `allOrders` and every order-level operation hide things on a
-  screen inside a blob the reader may fetch. There is **no customers key** —
-  clients are derived from the orders blob, so contact details are fields
-  inside an order. Salaries live in the same key as the team list. The
-  catalogue marks all of these `ui_only` and the Roles screen will say so.
-  Real fix: move orders, transactions and staff into the relational tables
-  that already have the right policies. Its own piece of work.
-- **A studio cannot be deleted.** `provision_studio` writes a `partners` row
-  of kind `customer` beside the business; `partners.business_id` is ON DELETE
-  SET NULL and a check constraint requires a business, so the delete fails on
-  `partners_kind_matches_business`. Becomes N4.
-- **The platform can leave a studio without an owner.** Browsers cannot; the
-  service role is not stopped. No console screen offers it and every admin-api
-  call is written to `tlb_audit_log`.
-- `sendReset` still uses Supabase SMTP — becomes Batch D.
-- Staging's migration history diverges from the repo (many `staging_only_*`
-  rows). Production's does not. A future `db push` against staging will
-  complain; production is the one that matters.
+**E. Sync and the orders move, together.** They are one piece of work because
+both rewrite the same persistence layer. Durable outbox, retry, visible sync
+state, failure visibility, conflict detection, two devices, reconnect, offline
+changes, membership revoked while offline. Alongside it: cost and contact
+fields out of the orders blob into relational rows so `seeCost` and
+`seeContact` become real, orders into rows so assigned-only and branch
+filtering become real, and an append-only audit table so history cannot be
+rewritten by anybody holding the key.
+
+**F. Operations.** Frontend error and unhandled rejection monitoring, Edge
+Function failure monitoring, backup verification, an actual restore drill,
+recovery procedure, tenant recovery, secure audit trail, export, account
+deletion, studio offboarding including the `partners` foreign key that
+currently makes a studio undeletable.
+
+**G. Flutterwave.** Checkout, plans, trials, success, failure, renewal,
+cancellation, upgrade and downgrade, webhook verification, server-controlled
+subscription state, `businesses.plan` written only by trusted server paths,
+plan limits, billing history, customer billing management.
+
+**H. One consolidated release candidate.** No dripping into production. Full
+staging regression, then back for promotion approval.
 
 ---
 
-## Projected pilot readiness
+## Known issues, all inside the programme
 
-**On track for 7–10 October.** Batches B, C and D are the critical path; E and
-F can run alongside. The one item outside the batches is **P8** — the customer
-app on `main` is eleven releases behind and the pilot needs the current build,
-which is a merge with the `netlify.toml` recipe and a full regression, not a
-push.
+- Sensitive fields inline in the orders blob: `o.cost`, `o.email`, `o.phone`,
+  `o.whatsapp`. Fixed in E.
+- A viewer can currently write and delete every `app_state` key. Fixed in B.
+- The audit trail can be rewritten by anybody who can read it. Fixed in E.
+- A studio cannot be deleted: `provision_studio` writes a `partners` row of
+  kind `customer`, `partners.business_id` is ON DELETE SET NULL, and a check
+  constraint requires a business. Fixed in F.
+- The platform can leave a studio without an owner. Browsers cannot. Fixed in
+  F with the offboarding flow.
+- `sendReset` still uses Supabase SMTP. Fixed in D.
+- Production serves `layi-v46`; the branch is on `layi-v52`. Resolved by H.
+- Staging's migration history diverges from the repo because of earlier
+  `staging_only_*` migrations. Production's does not. Cleaned up before H.
