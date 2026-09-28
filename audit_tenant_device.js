@@ -246,10 +246,34 @@ section('A signed-in studio cannot fill itself from our example');
   run("save('layi_dash_orders',[{id:'o1',client:'Real Client',garment:'Brogue',outfits:[]}]);");
   run("save('layi_dash_products',[{id:'p1',name:'Oxford'}]);");
 
+  /* A SAVE IS QUEUED NOW, NOT FIRED. Every write goes into the outbox
+     first and the drain loop is what reaches the server, which is the
+     whole point of Batch E: a request that fails is retried and shown
+     rather than logged to a console nobody has open. So the invariant
+     has two halves now — the save is recorded as owed to the server, and
+     draining sends it as THIS studio and no other. */
+  const queued = new Set(JSON.parse(run('store.get(OUTBOX_KEY)') || '[]').map(e => e.key));
+  ok('the orders it writes are owed to the cloud, not just written locally',
+     queued.has('layi_dash_orders'), [...queued].join(', ') || 'nothing queued');
+  ok('and so are the products', queued.has('layi_dash_products'), [...queued].join(', '));
+
+  /* Twice, and it is not superstition: the sandbox runs setTimeout
+     synchronously, so a drain is already in flight by the time the test asks
+     for one. The first call leaves a note and returns; the second is the
+     pass that finishes the queue. */
+  await sb.drainOutbox();
+  await sb.drainOutbox();
+  await new Promise(r => setTimeout(r, 0));
+  await sb.drainOutbox();
   const pushed = new Set(writes.filter(w => w.table === 'app_state').flatMap(w => (w.rows || []).map(r => r.key)));
-  ok('the orders it writes are pushed to the cloud, not just written locally',
-     pushed.has('layi_dash_orders'), [...pushed].join(', ') || 'nothing pushed');
-  ok('and so are the products', pushed.has('layi_dash_products'), [...pushed].join(', '));
+  /* Orders are rows now, so they are NOT among the app_state writes. What
+     app_state still carries is everything else, and the orders going up as
+     rows is proved by the relational write below. */
+  ok('and draining actually sends the app_state ones', pushed.has('layi_dash_products'),
+     [...pushed].join(', ') || 'nothing pushed');
+  ok('while the orders go up as rows instead',
+     writes.some(w => w.table === 'orders'),
+     'tables written: ' + [...new Set(writes.map(w => w.table))].join(', '));
   ok('every push carries this studio\'s business id and no other',
      writes.filter(w => w.table === 'app_state')
            .every(w => (w.rows || []).every(r => r.business_id === B)),

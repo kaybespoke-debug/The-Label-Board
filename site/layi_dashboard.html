@@ -1109,6 +1109,7 @@ body.modal-open{overflow:hidden}
           <div id="globalPeriodPopup" class="gp-popup" style="display:none"></div>
         </div>
         <select id="branchSwitch" onchange="setBranchView(this.value)" title="View one branch or all branches" style="display:none;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;height:42px;padding:0 10px;cursor:pointer;font-family:inherit;font-size:13.5px;max-width:180px"></select>
+        <button id="syncPill" onclick="showSyncTrouble()" title="Saving" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span id="syncPillText">Saving…</span></button>
         <button id="connPill" onclick="showOfflineInfo()" title="Connection status" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;flex:none"></span><span id="connPillText">Offline</span></button>
         <button id="themeBtn" onclick="toggleTheme()" title="Switch theme" style="align-items:center;justify-content:center;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;width:42px;height:42px;cursor:pointer;font-size:16px;font-family:inherit;display:inline-flex;flex:none">◑</button>
         </div>
@@ -2080,7 +2081,7 @@ async function switchStudio(id){
   /* Local data belongs to the studio it came from. Clearing it before the
      pull is what stops one studio's orders appearing under another's name
      for the second it takes to hydrate. */
-  try{STATE_KEYS.forEach(function(k){store.del(k);});store.del('layi_dash_customers');}catch(e){}
+  try{TENANT_KEYS.forEach(function(k){store.del(k);});}catch(e){}
   try{await loadCloudRoles();}catch(e){}
   try{await hydrateFromCloud();}catch(e){}
   try{await adoptPlan();}catch(e){}
@@ -2464,7 +2465,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v55';
+const APP_VERSION='layi-v56';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -2529,14 +2530,39 @@ async function syncCustomersNow(){await syncNow();}
 let _hydrating=false;
 const SYNC_PUSHERS={
   'layi_dash_customers':()=>pushCustomers(getCustomers()),
+  /* ORDERS DO NOT GO INTO app_state ANY MORE. One source of truth: the
+     rows. The blob keys stay as the device’s local copy and are never
+     pushed, which is what stops two stores disagreeing. */
+  'layi_dash_orders':()=>outboxQueue({kind:'orders',key:'layi_dash_orders',payload:1}),
+  'layi_dash_orders_done':()=>outboxQueue({kind:'orders',key:'layi_dash_orders',payload:1}),
   'layi_dash_suppliers':()=>pushSuppliers(getSuppliers()),
   'layi_dash_feedback':()=>pushFeedback(getFeedback())
 };
 // Every other data key syncs as a JSON blob in the generic `app_state` table (one row per business + key).
 // Customers & suppliers keep their own relational tables above; everything else rides this generic path.
-const STATE_KEYS=['layi_dash_orders','layi_dash_orders_done','layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
+/* ORDERS ARE NOT IN HERE ANY MORE. They are rows, pushed and pulled by
+   their own pair of functions, and a key that is wired both ways is two
+   sources of truth arguing. The audit_sync gate refuses it outright,
+   which is how this was caught within a minute of the change.
+
+   The two keys remain as the device’s local copy and appear in
+   LOCAL_ONLY_KEYS below, so anything that clears a device still clears
+   them. */
+const ORDER_KEYS=['layi_dash_orders','layi_dash_orders_done'];
+const STATE_KEYS=['layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
 const _statePushTimers={};
+/* THE QUEUE, NOT THE WIRE. pushState used to fire a request and swallow
+   the answer; now it records what has to reach the server and the drain
+   loop is responsible for it. The 400ms pause stays, because a person
+   typing into a form should not produce a request per keystroke. */
 function pushState(key){
+  if(!supa||!liveMode)return;
+  clearTimeout(_statePushTimers[key]);
+  _statePushTimers[key]=setTimeout(function(){
+    outboxQueue({kind:"state",key:key,payload:load(key,null)});
+  },400);
+}
+function _pushStateDirect(key){
   if(!supa||!liveMode)return;
   clearTimeout(_statePushTimers[key]);
   _statePushTimers[key]=setTimeout(async()=>{
@@ -2549,6 +2575,380 @@ async function pushAllState(){ // seed an empty cloud from this device's local d
   try{const rows=STATE_KEYS.map(k=>({business_id:myBusinessId||LAYI_BIZ,key:k,data:load(k,null),updated_at:new Date().toISOString()})).filter(r=>r.data!=null);
     if(rows.length){const {error}=await supa.from('app_state').upsert(rows,{onConflict:'business_id,key'});if(error)console.warn('seed state:',error.message);}
   }catch(e){console.warn('seed state:',e);}
+}
+/* ===== THE OUTBOX ====================================================
+   Every write that has to reach the server goes in here first, and the
+   queue lives in localStorage, so it survives the tab being closed, the
+   phone running out of battery, and the train going into a tunnel.
+
+   WHAT THIS REPLACES. pushState() fired a request 400ms after a save and
+   logged console.warn if it failed. Nothing retried it. Nothing told the
+   person. A studio could work all afternoon on a bad connection, see
+   every save land locally, and have none of it on the server — and the
+   only trace was a browser console nobody has open. That is the silent
+   data loss this batch exists to remove.
+
+   COLLAPSED PER KEY. A blob key is whole-value: queueing twenty versions
+   of the orders list would send nineteen stale ones. One entry per key,
+   replaced in place, so the queue stays the size of the app rather than
+   the size of the day.
+
+   IT NEVER DROPS WORK SILENTLY. An entry leaves the queue when the server
+   accepted it, or when the person is told. Those are the only two ways. */
+const OUTBOX_KEY='layi_dash_outbox';
+const OUTBOX_MAX_TRIES=8;
+let _drainTimer=null,_draining=false,_drainAgain=false;
+function outbox(){try{const v=JSON.parse(store.get(OUTBOX_KEY)||"[]");return Array.isArray(v)?v:[];}catch(e){return [];}}
+function setOutbox(v){try{store.set(OUTBOX_KEY,JSON.stringify(v));}catch(e){}updateSyncPill();}
+function outboxQueue(entry){
+  const q=outbox();
+  /* one per (kind,key): the latest value is the only one worth sending */
+  const i=q.findIndex(function(x){return x.kind===entry.kind&&x.key===entry.key;});
+  const row=Object.assign({id:uid("ob"),tries:0,lastError:"",at:new Date().toISOString()},entry);
+  if(i>=0){row.id=q[i].id;row.tries=0;row.lastError="";q[i]=row;}else{q.push(row);}
+  setOutbox(q);
+  scheduleDrain(150);
+}
+function outboxDrop(id){setOutbox(outbox().filter(function(x){return x.id!==id;}));}
+function outboxFailures(){return outbox().filter(function(x){return x.tries>=OUTBOX_MAX_TRIES;});}
+function outboxPending(){return outbox().filter(function(x){return x.tries<OUTBOX_MAX_TRIES;});}
+
+/* Backoff, so a server that is down is asked politely rather than by
+   every tab at once: 1s, 2s, 4s, up to a minute. */
+function scheduleDrain(ms){
+  clearTimeout(_drainTimer);
+  _drainTimer=setTimeout(function(){drainOutbox();},Math.max(50,ms||400));
+}
+async function drainOutbox(){
+  /* A save that arrives WHILE a drain is running must not wait for the next
+     backoff. The second caller does not queue up behind the first — that is
+     how you get a pile of overlapping passes — it leaves a note, and the
+     pass in flight does one more round before it finishes. */
+  if(_draining){_drainAgain=true;return false;}
+  if(!supa||!liveMode){updateSyncPill();return false;}
+  if(("onLine" in navigator)&&!navigator.onLine){updateSyncPill();return false;}
+  _draining=true;
+  try{
+    let q=outbox();
+    for(const entry of q.slice()){
+      if(entry.tries>=OUTBOX_MAX_TRIES)continue;
+      let res;
+      try{res=await sendOutboxEntry(entry);}
+      catch(e){res={ok:false,fatal:false,error:String(e&&e.message||e)};}
+      const cur=outbox();
+      const i=cur.findIndex(function(x){return x.id===entry.id;});
+      if(i<0)continue;               // replaced by a newer value while in flight
+      if(res.ok){cur.splice(i,1);setOutbox(cur);continue;}
+      cur[i].tries=(cur[i].tries||0)+1;
+      cur[i].lastError=res.error||"";
+      cur[i].fatal=!!res.fatal;
+      if(res.fatal)cur[i].tries=OUTBOX_MAX_TRIES;   // retrying a refusal is noise
+      setOutbox(cur);
+      if(res.revoked){onMembershipRevoked();break;}
+    }
+  }finally{_draining=false;}
+  if(_drainAgain){_drainAgain=false;return await drainOutbox();}
+  const left=outboxPending();
+  if(left.length){
+    const worst=Math.min.apply(null,left.map(function(x){return x.tries||0;}));
+    scheduleDrain(Math.min(60000,1000*Math.pow(2,worst)));
+  }
+  updateSyncPill();
+  return true;
+}
+
+/* One entry, one request. Every branch answers the same three questions:
+   did it land, is it worth trying again, and has this person lost access. */
+async function sendOutboxEntry(e){
+  if(e.kind==="state"){
+    const {error}=await supa.from("app_state").upsert(
+      {business_id:myBusinessId,key:e.key,data:e.payload,updated_at:new Date().toISOString()},
+      {onConflict:"business_id,key"});
+    return outboxResult(error);
+  }
+  if(e.kind==="audit"){
+    /* No return=representation: that needs the SELECT policy too, and
+       somebody may be allowed to be recorded without being allowed to read
+       the record. */
+    const {error}=await supa.from("audit_log").insert(e.payload);
+    return outboxResult(error);
+  }
+  if(e.kind==="orders"){return await pushOrderRows(e.payload);}
+  return {ok:true};
+}
+function outboxResult(error){
+  if(!error)return {ok:true};
+  const code=String(error.code||"");
+  const msg=String(error.message||"");
+  /* 42501 is a refusal: the person may not do this. Retrying it forever
+     is how a queue fills with things that will never be accepted. */
+  const fatal=code==="42501"||/permission denied|row-level security/i.test(msg);
+  const revoked=/JWT|not a member|row-level security/i.test(msg)&&code==="42501";
+  return {ok:false,fatal:fatal,revoked:false,error:msg||code};
+}
+
+/* Access taken away while this device was elsewhere. Not an error to
+   retry: the work in the queue belongs to a studio this person is no
+   longer in, and pretending otherwise loses it quietly. */
+function onMembershipRevoked(){
+  try{toast("Your access to this studio has changed. Sign in again.");}catch(e){}
+  liveMode=false;
+  try{stopRealtime();}catch(e){}
+  updateSyncPill();
+}
+
+/* ===== WHAT THE PERSON SEES =====
+   Three states and no jargon: everything saved, still sending, or
+   something did not send. The third one is a button, because a failure
+   nobody can act on is just an apology. */
+function syncState(){
+  const failed=outboxFailures().length,pending=outboxPending().length;
+  if(failed)return {kind:"failed",n:failed};
+  if(pending)return {kind:"pending",n:pending};
+  return {kind:"ok",n:0};
+}
+function updateSyncPill(){
+  const el=document.getElementById("syncPill");if(!el)return;
+  const st=syncState();
+  const offline=("onLine" in navigator)&&!navigator.onLine;
+  if(st.kind==="ok"&&!offline){el.style.display="none";return;}
+  el.style.display="inline-flex";
+  const t=document.getElementById("syncPillText");
+  if(st.kind==="failed"){
+    el.style.borderColor="var(--red)";el.style.color="var(--red)";
+    if(t)t.textContent=st.n+(st.n===1?" change not saved":" changes not saved");
+  }else{
+    el.style.borderColor="var(--amber)";el.style.color="var(--amber)";
+    if(t)t.textContent=offline?("Offline"+(st.n?" \u00b7 "+st.n+" waiting":"")):(st.n+" saving\u2026");
+  }
+}
+function showSyncTrouble(){
+  const failed=outboxFailures();
+  if(!failed.length){
+    const p=outboxPending().length;
+    openModal("Saving","<div class=\"sd\">"+(p?p+" change"+(p===1?"":"s")+" still going up. This screen is safe to close; they will finish on their own.":"Everything on this device is saved.")+"</div><div class=\"modal-foot\"><button class=\"btn\" onclick=\"closeModal()\">Close</button></div>");
+    return;
+  }
+  const rows=failed.map(function(f){
+    return "<div style=\"padding:10px 0;border-bottom:1px solid var(--line)\"><b>"+esc(outboxLabel(f))+"</b>"
+      +"<div class=\"sd\" style=\"color:var(--text-dim)\">"+esc(f.lastError||"Could not reach the server")+"</div></div>";
+  }).join("");
+  openModal("Some changes did not save",
+    "<div class=\"sd\" style=\"margin-bottom:8px\">These are still on this device and nothing has been lost. "
+    +"They stopped being retried because the server refused them or could not be reached.</div>"
+    +rows
+    +"<div class=\"modal-foot\"><button class=\"btn ghost\" onclick=\"closeModal()\">Close</button>"
+    +"<span style=\"flex:1\"></span><button class=\"btn\" onclick=\"retryOutbox()\">Try again</button></div>");
+}
+function outboxLabel(f){
+  const names={layi_dash_orders:"Orders",layi_dash_txns:"Payments",layi_dash_settings:"Settings",
+    layi_dash_staff:"Team records",layi_dash_supplies:"Stock",layi_dash_products:"Shop items",
+    layi_dash_appts:"Appointments",layi_dash_audit:"Audit trail"};
+  if(f.kind==="orders")return "Orders";
+  if(f.kind==="audit")return "Audit trail";
+  return names[f.key]||f.key||"Changes";
+}
+function retryOutbox(){
+  setOutbox(outbox().map(function(x){return Object.assign({},x,{tries:0,lastError:"",fatal:false});}));
+  closeModal();scheduleDrain(50);
+}
+
+/* Reconnect, and the tab coming back to the front, are both reasons to
+   try again immediately rather than waiting out a backoff. */
+try{
+  window.addEventListener("online",function(){scheduleDrain(200);updateSyncPill();});
+  window.addEventListener("offline",function(){updateSyncPill();});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)scheduleDrain(300);});
+}catch(e){}
+/* ===== ORDERS, AS ROWS ==============================================
+   The device still holds one array and every reader and writer in this
+   file is untouched. What changed is the shape on the server: one row per
+   order, with the branch on the row and the cost in a table of its own.
+
+   That is what makes seeCost, seeContact and branch scope into refusals
+   instead of hidden fields. A tailor’s device receives rows for their
+   branch, without costs, and assembles the same array from them, so the
+   local copy can only ever contain what the server was willing to send.
+
+   CONFLICT IS DETECTED, NEVER GUESSED. Every row carries a rev that only
+   the database increments. A write says which rev it was based on; if the
+   row has moved on, the write matches nothing and the local version is
+   kept aside rather than thrown away or silently forced over the other
+   device’s. Last-write-wins is the behaviour this batch exists to remove. */
+let CLOUD_BRANCHES=[];
+let ORDER_CONFLICTS=[];
+async function loadCloudBranches(){
+  if(!supa||!liveMode||!myBusinessId){CLOUD_BRANCHES=[];return false;}
+  try{
+    const {data}=await supa.from('branches').select('id,name').eq('business_id',myBusinessId);
+    CLOUD_BRANCHES=data||[];return true;
+  }catch(e){return false;}
+}
+function branchIdForName(name){
+  const n=String(name||"").trim().toLowerCase();
+  if(!n)return null;
+  const b=CLOUD_BRANCHES.find(function(x){return String(x.name||"").trim().toLowerCase()===n;});
+  return b?b.id:null;
+}
+function branchNameForId(id){
+  const b=CLOUD_BRANCHES.find(function(x){return x.id===id;});
+  return b?b.name:"";
+}
+
+/* What leaves the device. The three protected fields are stripped here
+   rather than anywhere else, so there is one place to check. */
+const ORDER_PROTECTED=["cost","email","phone","whatsapp"];
+function orderDoc(o){
+  const d=Object.assign({},o);
+  ORDER_PROTECTED.forEach(function(k){delete d[k];});
+  delete d._rev;
+  return d;
+}
+
+async function pushOrderRows(){
+  if(!supa||!liveMode||!myBusinessId)return {ok:true};
+  const list=rawOrders();
+  let firstError="",fatal=false,conflicts=0;
+  for(const o of list){
+    if(!o||!o.id)continue;
+    const row={
+      business_id:myBusinessId,app_id:String(o.id),
+      branch_id:branchIdForName(o.branch),
+      total:Number(o.total||0),
+      status:String(o.status||"open"),
+      doc:orderDoc(o)
+    };
+    try{
+      if(o._rev){
+        /* An edit, based on a revision. eq(rev) is the concurrency control:
+           zero rows means somebody else moved it on. */
+        const {data,error}=await supa.from('orders').update(row)
+          .eq('business_id',myBusinessId).eq('app_id',String(o.id)).eq('rev',o._rev)
+          .select('rev').maybeSingle();
+        if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;continue;}
+        if(!data){conflicts++;await noteOrderConflict(o);continue;}
+        o._rev=data.rev;
+      }else{
+        const {data,error}=await supa.from('orders').upsert(row,{onConflict:'business_id,app_id'})
+          .select('rev').maybeSingle();
+        if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;continue;}
+        if(data)o._rev=data.rev;
+      }
+      /* The cost only travels if this device HAS one, which it only does
+         if the person was allowed to read it in the first place. */
+      if(o.cost!==undefined&&o.cost!==null&&o.cost!==""){
+        const {data:got}=await supa.from('orders').select('id')
+          .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
+        if(got){
+          await supa.from('order_costs').upsert({order_id:got.id,business_id:myBusinessId,
+            branch_id:row.branch_id,cost:Number(o.cost)||0},{onConflict:'order_id'});
+        }
+      }
+    }catch(e){if(!firstError)firstError=String(e&&e.message||e);}
+  }
+  /* Orders removed on this device are removed there too, but only ones
+     this person could see: a delete is scoped by the same policy as the
+     read, so nothing another branch holds can be swept up by it. */
+  try{
+    const ids=list.map(function(o){return String(o.id);}).filter(Boolean);
+    let q=supa.from('orders').delete().eq('business_id',myBusinessId);
+    if(ids.length)q=q.not('app_id','in','("'+ids.join('","')+'")');
+    await q;
+  }catch(e){}
+  try{saveLocal(ORDERS_KEY,splitOrders(list).live);saveLocal(ORDERS_DONE_KEY,splitOrders(list).done);}catch(e){}
+  if(conflicts)renderSyncConflicts();
+  if(firstError)return {ok:false,fatal:fatal,error:firstError};
+  return {ok:true};
+}
+
+/* The other device won, because it got there first. Nothing is discarded:
+   the version from this device is kept and the person is asked. */
+async function noteOrderConflict(o){
+  try{
+    const {data}=await supa.from('orders').select('doc,rev')
+      .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
+    ORDER_CONFLICTS=ORDER_CONFLICTS.filter(function(c){return c.id!==o.id;});
+    ORDER_CONFLICTS.push({id:o.id,mine:o,theirs:data?data.doc:null,at:new Date().toISOString()});
+  }catch(e){}
+}
+function renderSyncConflicts(){
+  if(!ORDER_CONFLICTS.length)return;
+  try{toast(ORDER_CONFLICTS.length+" order"+(ORDER_CONFLICTS.length===1?"":"s")+" changed on another device");}catch(e){}
+  updateSyncPill();
+}
+function openConflicts(){
+  if(!ORDER_CONFLICTS.length){openModal("Nothing to sort out","<div class=\"sd\">No order has been changed in two places.</div><div class=\"modal-foot\"><button class=\"btn\" onclick=\"closeModal()\">Close</button></div>");return;}
+  const rows=ORDER_CONFLICTS.map(function(c){
+    const t=(c.theirs&&(c.theirs.client||c.theirs.id))||c.id;
+    return "<div style=\"padding:10px 0;border-bottom:1px solid var(--line)\"><b>"+esc(String(t))+"</b>"
+      +"<div class=\"sd\" style=\"color:var(--text-dim)\">Changed here and on another device.</div>"
+      +"<div style=\"margin-top:6px;display:flex;gap:8px\">"
+      +"<button class=\"btn ghost\" onclick=\"resolveConflict('"+esc(c.id)+"','theirs')\">Keep the other one</button>"
+      +"<button class=\"btn\" onclick=\"resolveConflict('"+esc(c.id)+"','mine')\">Keep mine</button>"
+      +"</div></div>";
+  }).join("");
+  openModal("Changed in two places",
+    "<div class=\"sd\" style=\"margin-bottom:8px\">Both versions are safe. Choose which one this studio keeps.</div>"
+    +rows+"<div class=\"modal-foot\"><button class=\"btn ghost\" onclick=\"closeModal()\">Later</button></div>");
+}
+async function resolveConflict(id,which){
+  const c=ORDER_CONFLICTS.find(function(x){return x.id===id;});if(!c)return;
+  const list=rawOrders();const i=list.findIndex(function(o){return String(o.id)===String(id);});
+  if(which==="theirs"&&c.theirs){
+    const {data}=await supa.from('orders').select('rev').eq('business_id',myBusinessId).eq('app_id',String(id)).maybeSingle();
+    const keep=Object.assign({},c.theirs);if(data)keep._rev=data.rev;
+    if(i>=0)list[i]=keep;else list.push(keep);
+  }else{
+    const {data}=await supa.from('orders').select('rev').eq('business_id',myBusinessId).eq('app_id',String(id)).maybeSingle();
+    if(i>=0&&data)list[i]._rev=data.rev;   // rebase mine onto theirs and send it
+  }
+  save(ORDERS_KEY,list);
+  ORDER_CONFLICTS=ORDER_CONFLICTS.filter(function(x){return x.id!==id;});
+  closeModal();renderAll();updateSyncPill();
+}
+
+/* Reading them back. Costs arrive only for somebody the database is
+   willing to give them to, so an absent cost is a refusal and is left
+   absent rather than defaulted to zero, which would read as free. */
+async function pullOrders(){
+  if(!supa||!liveMode||!myBusinessId)return false;
+  try{
+    const {data:rows,error}=await supa.from('orders')
+      .select('id,app_id,branch_id,doc,rev').eq('business_id',myBusinessId);
+    if(error)return false;
+    if(!rows)return false;
+    let costs={};
+    try{
+      const {data:cs}=await supa.from('order_costs').select('order_id,cost').eq('business_id',myBusinessId);
+      (cs||[]).forEach(function(c){costs[c.order_id]=c.cost;});
+    }catch(e){}
+    const list=rows.map(function(r){
+      const o=Object.assign({},r.doc||{});
+      o.id=r.app_id||o.id;
+      o._rev=r.rev;
+      if(r.branch_id)o.branch=branchNameForId(r.branch_id)||o.branch;
+      if(costs[r.id]!==undefined)o.cost=Number(costs[r.id]);
+      return o;
+    });
+    /* NOTHING ON THE SERVER IS NOT THE SAME AS NOTHING.
+       A studio whose orders have not been moved into rows yet, or a
+       person whose branch holds none, both come back with an empty list.
+       Overwriting a device that has work on it with that empty list is
+       precisely the silent data loss this batch exists to remove, and it
+       is what the tenant gate caught: 28 orders became 0.
+
+       So an empty answer leaves the device alone and sends what the
+       device has instead, which is also how a studio migrates without
+       anybody pressing anything. */
+    if(!list.length){
+      const here=rawOrders();
+      if(here.length){outboxQueue({kind:"orders",key:"layi_dash_orders",payload:1});return false;}
+      return true;
+    }
+    const parts=splitOrders(list);
+    saveLocal(ORDERS_KEY,parts.live);saveLocal(ORDERS_DONE_KEY,parts.done);
+    return true;
+  }catch(e){return false;}
 }
 function syncPush(key){
   if(!supa||!liveMode||_hydrating||!key)return;
@@ -2641,7 +3041,7 @@ async function reportTenantPresence(){
    themselves, so nobody is locked out of a device by this.
    ================================================================================ */
 const BIZ_OWNER_KEY='layi_dash_biz_owner';
-const TENANT_KEYS=STATE_KEYS.concat(['layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
+const TENANT_KEYS=STATE_KEYS.concat(ORDER_KEYS,['layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
 let _deviceWiped=false;   // this device held another studio, so it may not seed the cloud
 function deviceOwner(){try{return store.get(BIZ_OWNER_KEY)||'';}catch(e){return '';}}
 function wipeTenantData(){TENANT_KEYS.forEach(function(k){try{store.del(k);}catch(e){}});}
@@ -2684,8 +3084,17 @@ async function hydrateFromCloud(){
     claimDeviceFor(myBusinessId, rows.length>0 || !!error);
     const a=await pullCustomers();const b=await pullSuppliers();
     if(!error){
-      rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key))saveLocal(r.key,r.data);}); // cloud → local
-      if(!rows.length&&maySeedCloudFromDevice())await pushAllState();
+      /* Orders are rows now and are pulled separately, so an old blob
+         left behind by a studio that has not been migrated yet must not
+         overwrite what the rows just said. */
+      const fromRows=['layi_dash_orders','layi_dash_orders_done'];
+      rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key)&&fromRows.indexOf(r.key)<0)saveLocal(r.key,r.data);}); // cloud → local
+      try{await loadCloudBranches();}catch(e){}
+      try{await pullOrders();}catch(e){}
+      if(!rows.length&&maySeedCloudFromDevice()){
+        await pushAllState();
+        outboxQueue({kind:"orders",key:"layi_dash_orders",payload:1});
+      }
     }
     reloadSettingsFromStorage();
     ok=ok&&(a!==false&&b!==false);
@@ -4240,7 +4649,7 @@ function enterApp(){
   show('navAttendance',can('attendance'));show('msAttendance',can('attendance'));
   show('navLeave',can('team'));show('msLeave',can('team'));
   show('navCompanylog',can('team'));show('msCompanylog',can('team'));
-  applyTeamVisibility();applyExampleVisibility();updateConnPill();refreshInstallUI();
+  applyTeamVisibility();applyExampleVisibility();updateConnPill();updateSyncPill();refreshInstallUI();
   show('navExpenses',can('expenses'));show('msExpenses',can('expenses'));document.getElementById('expLockIco').style.display='none';
   show('navAudit',can('audit'));show('msAudit',can('audit'));
   show('msSwitch',isOwner());
@@ -12226,7 +12635,34 @@ function getLog(){return load('layi_dash_log',[]);}
 function setLog(v){save('layi_dash_log',v);}
 function getAudit(){return load('layi_dash_audit',[]);}
 function setAudit(v){save('layi_dash_audit',v);}
-function logAudit(action,detail){try{const list=getAudit();list.push({id:uid('au'),at:new Date().toISOString(),by:(currentUser?currentUser.name:'System'),role:(currentRole()?currentRole().name:''),action:action,detail:detail||'',branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:''});if(list.length>600)list.splice(0,list.length-600);setAudit(list);}catch(e){}}
+/* THE TRAIL GOES SOMEWHERE NOBODY CAN EDIT.
+   It still writes the local list, because the Audit screen reads it and
+   because a phone with no signal must still record what happened. But the
+   copy that matters goes to public.audit_log, which has an INSERT policy
+   and no UPDATE or DELETE policy at all: not for a manager, not for the
+   owner, not for us. A history the people in it can rewrite is a
+   decoration.
+
+   The row names no actor: the database stamps auth.uid() itself, so a
+   client claiming to be somebody else is overruled rather than believed. */
+function logAudit(action,detail){
+  try{
+    const list=getAudit();
+    list.push({id:uid('au'),at:new Date().toISOString(),by:(currentUser?currentUser.name:'System'),role:(currentRole()?currentRole().name:''),action:action,detail:detail||'',branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:''});
+    if(list.length>600)list.splice(0,list.length-600);
+    setAudit(list);
+  }catch(e){}
+  try{
+    if(supa&&liveMode&&myBusinessId){
+      outboxQueue({kind:'audit',key:'audit:'+uid('a'),payload:{
+        business_id:myBusinessId,
+        action:String(action||''),
+        detail:String(detail||''),
+        actor_label:(currentUser&&currentUser.name)||''
+      }});
+    }
+  }catch(e){}
+}
 function openLogEntry(id){if(!can('team'))return;const e=id?getLog().find(x=>x.id===id):null;
   openModal(`<h3>${e?'Edit entry':'New log entry'}</h3><div class="msub">Note something worth remembering about the business</div>
     <div class="row2">

@@ -28,7 +28,10 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    of a server value is how two devices end up arguing about it; each refreshes
    from my_storage_usage() instead. */
 const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls',
-  'layi_dash_storage_usage','layi_dash_current_biz']);
+  'layi_dash_storage_usage','layi_dash_current_biz','layi_dash_outbox']);
+/* layi_dash_outbox is THIS DEVICE's queue of writes that have not reached
+   the server yet. Syncing a queue of unsent writes would be a contradiction:
+   the whole point is that it is the part the server has not seen. */
 /* layi_dash_current_biz is which studio this device is looking at, for
    somebody who belongs to more than one. Syncing it would mean opening the
    laptop changed what the phone was showing, and looking at one studio on
