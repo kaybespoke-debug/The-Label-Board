@@ -3011,3 +3011,49 @@ in.
   through Resend. It is the last thing in the app that does not.
 - An expired or cancelled invitation is invisible to the owner. It releases its
   seat with no action, which is right, but there is no screen that says so.
+
+### The invitee’s half, walked by a person — 28 September
+
+It worked, and it found two things a harness would not have.
+
+**The set-password screen was a one-shot with a trap in it.** The link is
+single use and confirming it spends it. If the password step then fails for
+any reason the person is stranded, and "Forgot password?" goes through
+Supabase’s own SMTP, broken since 13 September. The trap: a phone that offers
+to invent a strong password fills the first box and leaves the confirm box
+empty, the app called that a mismatch, and neither box had a way to reveal
+what was in it. Fixed: the confirm box has its own Show, an empty second box
+gets its own sentence, and a refused password says the screen is still open.
+Recovery from that state needs no new invitation — resending the existing one
+falls through to a `recovery` link, which is a password link.
+
+**An invited MANAGER was handed the owner’s studio questionnaire.** The test
+was three conditions and all three were about the business: live, not set up,
+no orders. Nothing asked who was looking, so an unfinished studio asked
+whoever walked in. Fixed by `ownsThisStudio()`, which reads the MEMBERSHIP;
+the app now takes its business context from memberships rather than from
+`profiles`, which accept_invitation overwrites. Twelve checks in
+`audit_first_run.js` across manager, staff, viewer and both halves of the
+offline fallback.
+
+**Also learned, and worth writing down:**
+
+- Confirming an invitation makes GoTrue write a 60-character bcrypt into
+  `encrypted_password` even though nobody chose one. `email_confirmed_at` is
+  therefore NOT a proxy for "can sign in", and neither is the presence of a
+  password hash. Measured on two accounts.
+- Any resend invalidates the link in the previous email. Generating a link of
+  any type rotates the token.
+- `invite` is refused for an address GoTrue already holds as confirmed;
+  `recovery` and `magiclink` are issued. That is what makes resend work as a
+  recovery path.
+- **A studio cannot be deleted.** `provision_studio` writes a `partners` row of
+  kind `customer` beside the business; `partners.business_id` is ON DELETE SET
+  NULL and a check constraint says a customer-kind partner must have a
+  business, so the delete fails on `partners_kind_matches_business` — naming
+  neither the studio nor the reason. Nobody has needed to offboard a studio
+  yet. Somebody will.
+- `app_state` is governed by `in_scope`, not `is_business_admin`, so **any
+  active member of any role can write the whole settings blob** — the studio’s
+  name, trade, production stages and plan. The questionnaire was one way in;
+  Settings is another. Worth deciding on its own, separately from this fix.
