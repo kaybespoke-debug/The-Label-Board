@@ -248,6 +248,12 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      resendBlock.length > 0 && resendBlock.indexOf("rpc('create_team_invitation'") < 0,
      'a second invitation row would hold a second seat and leave two live '
      + 'links for one person');
+  ok('the resend wording follows the LINK, not the account',
+     code.includes("invitationEmail(via === 'magiclink' ? 'existing' : 'new'")
+     && code.indexOf("invitationEmail(confirmed ?") < 0,
+     'GoTrue writes a placeholder password at confirmation, so confirmed does '
+     + 'not mean they can sign in; somebody who opened an invitation and never '
+     + 'finished would be told there is nothing to set up');
   ok('and never re-issues the nonce',
      /No `data` on any of these/.test(code),
      'it was single-use and is already spent; the INSERT it identified '

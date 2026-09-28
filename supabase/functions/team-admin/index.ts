@@ -651,11 +651,22 @@ Deno.serve(async (req) => {
         }
       }
 
-      /* Somebody who has never confirmed needs the 'new' wording, because
-         they still have no password. Somebody confirmed gets 'existing',
-         because telling them to set a password is how a working login gets
-         reset. */
-      const mail = invitationEmail(confirmed ? 'existing' : 'new', {
+      /* THE WORDING FOLLOWS THE LINK, NOT THE ACCOUNT.
+
+         It used to follow email_confirmed_at, and that was wrong in the one
+         case that matters. Somebody who opened an invitation, confirmed their
+         address and then failed to finish choosing a password is CONFIRMED and
+         has no usable password: GoTrue writes a placeholder into
+         encrypted_password at confirmation whether or not anybody chose one.
+         Measured on staging, 28 September, on two accounts. Telling that person
+         “you already have an account, there is nothing to set up” sends them to
+         a sign-in form with nothing to type, which is the 13 September bug
+         again in different clothes.
+
+         The link knows what the account needs. invite and recovery both land on
+         the choose-a-password screen; magiclink signs them straight in. So the
+         link decides the words. */
+      const mail = invitationEmail(via === 'magiclink' ? 'existing' : 'new', {
         studio: who.studio,
         role: ROLE_WORD[String(row.role)] || String(row.role),
         branch: bw || 'All branches',

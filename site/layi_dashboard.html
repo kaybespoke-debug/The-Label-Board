@@ -2313,7 +2313,7 @@ let liveMode=false, myBusinessId=null;
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v47';
+const APP_VERSION='layi-v48';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3376,8 +3376,15 @@ function showSetPassword(){
   /* A second box, because a password nobody can see is a password somebody
      mistypes once and then cannot get back into their studio with. */
   if(!document.getElementById('loginPass2')&&pwField&&pwField.parentElement){
-    const wrap=document.createElement('div');wrap.className='field';
-    wrap.innerHTML='<input type="password" class="fld" id="loginPass2" placeholder="Repeat the password" autocomplete="new-password">';
+    const wrap=document.createElement('div');wrap.className='field';wrap.style.position='relative';
+    /* ITS OWN SHOW, and it is not decoration. A phone that offers to invent a
+       strong password fills THIS kind of field and leaves the confirm box
+       empty, and the invented password is dots in a box nobody can read. With
+       no way to reveal either one, the only honest thing left to try is
+       guessing what the phone put there. That is a person stuck on the one
+       screen where the link they arrived on has already been spent. */
+    wrap.innerHTML='<input type="password" class="fld" id="loginPass2" placeholder="Repeat the password" autocomplete="new-password" style="padding-right:52px">'
+      +'<span onclick="togglePwField(\'loginPass2\',this)" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-dim);font-size:13px;user-select:none">Show</span>';
     pwField.parentElement.insertAdjacentElement('afterend',wrap);
   }
   const btn=card.querySelector('button.btn');
@@ -3396,12 +3403,22 @@ async function setMyPassword(){
   const a=(document.getElementById('loginPass')||{}).value||'';
   const b=(document.getElementById('loginPass2')||{}).value||'';
   if(a.length<8){errEl.textContent='Use at least 8 characters.';return;}
-  if(a!==b){errEl.textContent='Those two do not match.';return;}
+  /* An EMPTY second box is its own thing and must not be reported as a
+     mismatch. It is what an autofilled password looks like from here — the
+     phone fills the first box and stops — and “those two do not match” sends
+     somebody back to retype a password they were never shown. */
+  if(!b){errEl.textContent='Type the password once more in the second box. If your phone filled the first one for you, tap “Show” to read it.';return;}
+  if(a!==b){errEl.textContent='Those two do not match. Tap “Show” on either box to check what is in it.';return;}
   if(!supa){errEl.textContent='This needs the live server.';return;}
   errEl.textContent='Saving…';
   try{
     const {error}=await supa.auth.updateUser({password:a});
-    if(error){errEl.textContent='Could not set the password: '+error.message;return;}
+    /* The session from the link is good for an hour and is NOT spent by a
+       refusal, so the way out is to try again on this screen. Saying so
+       matters: the link itself is single use, and somebody who closes the
+       tab believing they have burnt it has to ask the studio to send
+       another. */
+    if(error){errEl.textContent='Could not set the password: '+error.message+' You can try a different one here — this screen is still open.';return;}
     const {data:{user}}=await supa.auth.getUser();
     if(!user){errEl.textContent='That link has expired. Use “Forgot password?” to get a new one.';return;}
     /* Clear the token out of the address bar before anything else renders, so a
