@@ -1,388 +1,396 @@
 # Business-scoped role based access control — audit and design
 
-**28 September 2026. Design and audit only. Nothing here is implemented.**
+**Version 2, 28 September 2026.** Phase 0 is implemented and on staging.
+Phases 1–5 are design only; nothing else here is built.
+
+Changes from v1, all four requested: the owner is the **only** inherent
+superuser and `is_business_admin` is retired policy by policy (§4);
+permissions are **normalised rows**, not another JSON blob (§5); branch scope
+has explicit semantics and cannot be widened by omitting an argument (§6); and
+the `app_state` limits are classified permission by permission rather than
+described (§10).
 
 ---
 
-## The headline, before the detail
+## Contents
 
-**The Label Board already has a permission system.** Thirty-four named
-permissions, five built-in roles, custom roles, a Roles & Permissions screen the
-owner can already open, and `can('finance')` guarding two hundred places in the
-app. It is not missing. It is *not security*, and it is assigned to the wrong
-thing.
-
-Three facts, all measured on staging today rather than reasoned about:
-
-1. **A staff member can grant themselves every permission in the studio.** The
-   permission table lives in `app_state` under `layi_dash_roles`, whose RLS is
-   `in_scope` — any active member may write it. Signed in as a staff member,
-   straight to the API: rewrote the workroom role to include finance, payroll,
-   profit, the audit trail and *Accounts & roles*. **HTTP 200.**
-
-2. **The assignment is global, not per business.** Which role a person holds is
-   `profiles.role_id`, and `profiles` has one row per person for the whole
-   platform. `accept_invitation` overwrites it. Somebody who is an accountant in
-   one studio and a tailor in another has one answer, and it is whichever they
-   joined last.
-
-3. **The database knows two permission levels.** Every policy on every tenant
-   table resolves to either `app.in_scope` (any active member) or
-   `app.is_business_admin` (owner **or manager**). Staff and viewer are
-   indistinguishable from each other at the data layer, and a manager is
-   indistinguishable from an owner except on nine policies.
-
-So the work is not "build RBAC". It is: **take the vocabulary that exists, move
-the assignment onto the membership, move the table out of reach, and teach the
-database to read it.**
-
-And one thing that cannot be fixed by this design, stated up front rather than
-discovered later: **§9**. All real data lives in one JSON blob per business. A
-permission that hides a *field* — cost price, profit, a customer's phone number
-— cannot be enforced against somebody who is allowed to read the blob those
-fields are inside. Those permissions are honest UI and dishonest security, and
-they stay that way until orders move into rows.
+0. [Phase 0 — done, and what it found](#0)
+1. [Current authorization architecture](#1)
+2. [Problems in the current architecture](#2)
+3. [Recommended architecture](#3)
+4. [Owner versus manager, and every `is_business_admin`](#4)
+5. [Data model — normalised, and why](#5)
+6. [Branch scope semantics](#6)
+7. [`app.can()` design](#7)
+8. [Permission catalogue](#8)
+9. [Default role matrix](#9)
+10. [Enforceable today versus UI-only](#10)
+11. [Migration](#11)
+12. [App and Edge Function changes](#12)
+13. [Security test matrix](#13)
+14. [Implementation phases](#14)
 
 ---
 
+<a name="0"></a>
+## 0. Phase 0 — done, and what it found
+
+**Implemented, staging only.** `supabase/migrations/20260928160000_phase0_role_authority.sql`,
+`tools/rbac_phase0_probe.js`, app release `layi-v51`.
+
+### The tests came first, and they failed
+
+Real sessions for real members, straight to PostgREST, no app in the path:
+
+```
+a manager  rewrote the studio's permission table   200, landed
+a staff    rewrote the studio's permission table   200, landed
+a VIEWER   rewrote the studio's permission table   200, landed
+a viewer   set their own profiles.role_id='owner'  200, accepted
+                                                  8 failing assertions
+```
+
+The elevation gave the caller's own role `finance`, `payroll`, `seeProfit`,
+`seeCost`, `users`, `settings`, `team`, `audit`, `setCompany` and `setData`.
+
+### After
+
+```
+16 passed, 0 failed
+```
+
+Manager, staff and viewer each refused with **403** and a sentence naming the
+reason; the owner can still manage roles; a viewer setting their own
+`profiles.role_id` is now refused outright; and ordinary work — saving an order
+— still succeeds for all four roles.
+
+### What was built
+
+| | |
+|---|---|
+| `layi_dash_roles` | owner-only **in full**, on insert and update. Every byte of that key is an authorization decision and no part of it is written during ordinary work, so there is no partial edit to argue about. |
+| `profiles.role_id`, `business_id`, `staff_id` | not writable from a browser. The app has never written any of the three — only `name`, from two places. |
+| the app | the role editor's four writers ask first, and the panel is not drawn for anybody but the owner |
+
+### The mistake worth recording
+
+**The first version of the guard did nothing at all.** It asked
+`current_user in ('authenticated','anon')`, and inside a `SECURITY DEFINER`
+function `current_user` is the function's *owner* — `postgres` on every call.
+The trigger was installed, running, and returning early every time. The probe
+still reported eight failures, which is the only reason it was caught.
+
+A probe function settled it rather than reasoning: for an ordinary member's
+request, `current_user=postgres`, `session_user=authenticator`,
+`request.jwt.claims->>'role'=authenticated`.
+
+So the two guards ask different questions because they stand in different
+places:
+
+- **`app_state`** is `SECURITY DEFINER` and asks the **JWT role claim**.
+  Nothing but a browser writes `app_state`, so `authenticated` and `anon` are
+  held to the rule and `service_role` is not.
+- **`profiles`** is `SECURITY INVOKER` and asks **`current_user`**. It has to
+  be: `public.accept_invitation` is a definer function that writes `role_id`
+  and `business_id` *while running as the invitee, with that person's own JWT*.
+  Asking the JWT would refuse a legitimate acceptance. It reads no tables, so
+  invoker costs nothing.
+
+### Staging regression
+
+| | |
+|---|---|
+| settings guard matrix | unchanged across owner / manager / staff / viewer |
+| **new user accepts** (profile INSERT) | 200 |
+| **existing user accepts a second invitation** (profile UPDATE — the path that could have broken) | 200 |
+| `team-admin` writing profiles with the service role | 200 |
+| ordinary work, all four roles | saves |
+| harnesses | `app_schema`, `rls`, `onboarding`, `team_invite`, `plan_limits`, `billing`, `tlb_policy`, `storage_rls` — all pass |
+| app gates | `verify.js` 23 green (`audit_first_run.js` 139 checks), `audit_safearea` 66, `audit_edge_auth` 61 |
+
+### Production recommendation
+
+**Recommended, with one pre-flight.** The change is additive, refuses only
+writes nothing in the shipped app performs, and every operational path was
+re-proved after it. The pre-flight is the one thing staging cannot tell us:
+
+> Run the two guard conditions as a **read-only query** against production
+> first — does any live studio have a `profiles` row whose `role_id` or
+> `business_id` disagrees with its membership, and has any live studio's
+> `layi_dash_roles` been written by a non-owner? If the answer is yes anywhere,
+> those studios need a look before the trigger starts refusing.
+
+There is also a live **product** bug that Phase 0 does not fix and that
+production should be checked for: `accept_invitation` writes
+`profiles.role_id` as the membership tier (`staff`, `viewer`), and **no such
+role exists in the app's role table** (`owner`, `manager`, `cre`, `tailor`,
+`accountant`). Measured in the browser: with `role_id='staff'`, `currentRole()`
+is undefined and `can('orders')`, `can('customers')`, `can('update')` are all
+**false**. An invited staff member lands in an app where nothing is permitted.
+A manager works only because the string `manager` happens to exist in both
+vocabularies. §11 reconciles them; until then, an invitee needs their role set
+by hand.
+
+---
+
+<a name="1"></a>
 ## 1. Current authorization architecture
 
-There are **three** role systems. None of them is both business-scoped and
-enforceable, and they disagree with each other.
+Three role systems. None is both business-scoped and enforceable.
 
-### System A — `memberships.role`, the only one the database believes
+### A — `memberships.role`, the only one the database believes
 
-```
-memberships(business_id, user_id, branch_id, role, status)
-role in ('owner','manager','staff','viewer')
-```
+`owner | manager | staff | viewer`, read by two `SECURITY DEFINER` functions:
 
-Read by exactly two functions, both `SECURITY DEFINER` with a pinned
-`search_path`:
-
-| function | true for | used by |
+| function | true for | policies |
 |---|---|---|
-| `app.in_scope(business, branch)` | any **active** member, branch-aware | 44 policies |
-| `app.is_business_admin(business)` | **owner or manager** | 9 policies |
+| `app.in_scope(business, branch)` | any **active** member, branch-aware | 44 |
+| `app.is_business_admin(business)` | **owner or manager** | 9 |
 
-Policy census, staging, all 43 public tables:
+Everything except `branches`, `businesses` and `memberships` is `in_scope`:
+**all four roles, identical rights.**
 
-| decided by | SELECT | INSERT | UPDATE | DELETE |
-|---|---|---|---|---|
-| `in_scope` | 14 | 11 | 10 | 9 |
-| `is_business_admin` | 1 | 3 | 3 | 2 |
-| `platform_admins` | 6 | 5 | 3 | — |
-| `auth.uid()` directly | 2 | — | 1 | — |
+### B — `profiles.role_id`, which drives the entire app
 
-`is_business_admin` covers `branches`, `businesses` and `memberships`.
-Everything else — app_state, orders, customers, transactions, staff, products,
-suppliers, attendance, profiles, feedback — is `in_scope`: **all four roles, same
-rights.**
+One row per person **for the whole platform**, overwritten by
+`accept_invitation`. Not security anywhere; the source of every UI decision.
+Locked against browser writes as of Phase 0.
 
-**Branch scope is real** on the five relational tables that carry a
-`branch_id`: `orders`, `customers`, `transactions`, `staff`, `attendance`. Their
-policies pass the row's branch into `in_scope`, which returns true when the
-membership's `branch_id` is null (whole business) or matches. That part of the
-model is sound and should be kept exactly as it is.
+### C — `layi_dash_roles`, the permission table
 
-### System B — `profiles.role_id`, which drives the entire app
+Per business, five built-ins plus custom roles, thirty-four permission keys, a
+Settings screen the owner already uses. Owner-only as of Phase 0.
 
-```
-profiles(id, name, role_id, business_id, staff_id)
-role_id in ('owner','manager','cre','tailor','accountant', <custom>)
-```
+### Edge Functions and triggers
 
-`currentUser.roleId` comes from here, `currentRole()` looks it up in the roles
-table, and `can(k)` reads that role's permissions. **Every UI decision in the
-customer app runs through it.**
-
-It is not security anywhere — no policy, no function and no Edge Function reads
-it since the multi-business fix of 26 September — but it is also **one row per
-person for the whole platform**, and `accept_invitation` overwrites
-`business_id` and `role_id` on acceptance. A person in two studios has one
-role_id.
-
-### System C — `layi_dash_roles`, the permission table
-
-An `app_state` row per business holding an array of role objects:
-
-```json
-[{ "id":"manager", "name":"Manager", "builtin":true,
-   "perms": { "orders":1, "finance":1, "payroll":1, "seeProfit":1, … } }]
-```
-
-Per business — which is right — with five built-ins (`owner`, `manager`, `cre`
-“Client Relations”, `tailor` “Tailor / Workroom”, `accountant`), custom roles,
-a migration routine that back-fills new keys onto existing roles, and a Settings
-screen where the owner ticks boxes.
-
-Governed by `app_state`'s RLS: **`in_scope`. Any active member may rewrite it.**
-
-### The fourth thing: `ownsThisStudio()`
-
-Added 28 September. Reads `myMembershipRole` — System A — and gates the studio's
-own settings in the app, backed by a database trigger that refuses protected
-JSON fields to non-owners. It is the only place in the app where an
-authorization decision is made from the membership, and it is the pattern the
-rest of this design follows.
-
-### Edge Functions
-
-| function | how it decides |
-|---|---|
-| `team-admin` | `OWNER_ONLY = ['invite','resendInvitation','update','sendReset','delete']`, checked against an **active membership** for the named business. `list` is any member. |
-| `admin-api` | Platform operators only (`tlb_staff` roles), every action checked against that role's own list, every call written to `tlb_audit_log`. Out of scope for tenant RBAC, except that it holds the service role and therefore bypasses all of it by design. |
-
-### Triggers
-
-| trigger | decides |
-|---|---|
-| `app.guard_studio_settings` | protected keys in `layi_dash_settings` are owner-only; `plan` is stamped from `businesses.plan` |
-| `app.guard_business_identity` | `businesses.name` / `contact_email` are owner-only |
-| `app.enforce_seat_limit` | plan ceiling on memberships |
-| `app.provision_studio` | creates a studio, or abstains for an invitation |
+`team-admin` checks an **active membership** for the named business, with
+`OWNER_ONLY = [invite, resendInvitation, update, sendReset, delete]`.
+`admin-api` is platform operators only and holds the service role, so it
+bypasses tenant permissions by design.
+Triggers: `guard_studio_settings`, `guard_business_identity`,
+`guard_profile_authority`, `enforce_seat_limit`, `provision_studio`.
 
 ---
 
-## 2. Problems in the current architecture
+<a name="2"></a>
+## 2. Problems
 
-**P1 — The permission table is writable by the people it restricts.**
-Measured, not inferred: a staff member granted their own role `finance`,
-`payroll`, `seeProfit`, `users` and `audit` with one PATCH. 200 OK. This is a
-privilege-escalation path that exists in production today. It is the single
-most urgent item in this document and it is fixable on its own, before any of
-the rest.
-
-**P2 — Role assignment is global.** `profiles.role_id` is one value per person.
-Multi-business membership already exists and is tested; the role model has not
-caught up.
-
-**P3 — The database has two levels where the product needs a dozen.** A
-manager is an admin of the business row and the branch list. A viewer can
-write every order, customer and transaction the studio has. "Read-only viewer"
-is a UI convention with nothing under it.
-
-**P4 — `is_business_admin` conflates owner and manager.** It is what lets a
-manager rename the studio and edit memberships. Correct for "can administer the
-branch list", wrong for "is the owner".
-
-**P5 — Nothing the owner ticks reaches the database.** Turning off `finance`
-for a role changes what the app draws. It does not change one byte of what that
-person can fetch.
-
-**P6 — Field-level permissions are unenforceable by construction.** See §9.
-
-**P7 — No vocabulary for billing or ownership.** There is no permission for
-"view subscription", "manage subscription" or "transfer ownership", because
-there is no transfer-ownership feature. It needs to exist before the first
-studio has an argument.
+| | |
+|---|---|
+| **P1** | ~~The permission table is writable by the people it restricts~~ — **closed, Phase 0** |
+| **P2** | Role assignment is global, not per membership |
+| **P3** | The database has two levels where the product needs a dozen |
+| **P4** | `is_business_admin` conflates owner and manager — §4 |
+| **P5** | Nothing the owner ticks reaches the database |
+| **P6** | Field- and row-level permissions are unenforceable by construction — §10 |
+| **P7** | No vocabulary for billing or ownership |
+| **P8** | **The two role vocabularies do not match**, so invited staff and viewers have no permissions at all — §0 |
+| **P9** | **A "viewer" can delete every order in the studio.** `app_state` writes are `in_scope`, so read-only is a UI convention with nothing under it. Proved: a viewer's `POST` to `layi_dash_orders` returns 200. |
 
 ---
 
+<a name="3"></a>
 ## 3. Recommended architecture
 
-> **Keep the vocabulary. Move the assignment. Move the table. Teach the database.**
+> **Keep the vocabulary. Move the assignment. Normalise the table. Teach the
+> database. Never let a capability answer a question about place.**
 
 ```
-                          ┌──────────────────────────────┐
-  what may be done  ───►  │ business_roles               │  one row per role
-                          │  business_id, key, name,     │  PER BUSINESS
-                          │  tier, is_system,            │
-                          │  permissions jsonb           │
-                          └──────────────┬───────────────┘
-                                         │ role_id
-                          ┌──────────────┴───────────────┐
-  who may do it     ───►  │ memberships                  │  one row per
-                          │  business_id, user_id,       │  (person, business)
-                          │  role_id, branch_id,         │
-                          │  role (tier), status         │
-                          └──────────────┬───────────────┘
-                                         │
-        ┌────────────────────────────────┴───────────────────────────┐
-        │  app.can(business, 'finance')     app.in_scope(biz,branch) │
-        │  ── WHAT ──                       ── WHERE ──              │
-        └────────────────────────────────────────────────────────────┘
-                 both consulted, independently, by RLS · RPC · triggers · app
+   business_roles ──┬── business_role_permissions ──── permission_catalogue
+   (per business)   │   (one ROW per grant)            (valid keys + labels)
+                    │
+                    │ role_id
+             memberships ── branch_id ─────────────── branches
+             (per person, per business)
+                    │
+        ┌───────────┴────────────┐
+        │  app.can(biz, perm)    │  WHAT   — capability only
+        │  app.can_here(biz,     │  WHAT + WHERE — for any row with a branch
+        │      perm, branch)     │
+        │  app.has_all_branches  │  for anything that aggregates
+        └────────────────────────┘
 ```
 
-**Four decisions.**
+Four decisions carried from v1, one of them now sharper:
 
-1. **`memberships.role` stays** as the *tier*: `owner | manager | staff |
-   viewer`. It is load-bearing in nine policies and in `team-admin`, and it
-   answers the one question permissions must never be able to answer — *is this
-   the owner*. An owner cannot tick away their own ownership because ownership
-   is not a tick.
+1. **`memberships.role` stays as the tier** — `owner | manager | staff |
+   viewer`. It answers the one question permissions must never answer: *is this
+   the owner*. Ownership is not a tick, so it cannot be ticked away.
+2. **`memberships.role_id`** points at a `business_roles` row in the same
+   business, via a composite foreign key so a role from another studio is
+   unstorable.
+3. **`business_roles` + `business_role_permissions`** — normalised, §5.
+4. **`app.can()` never implies a place** — §6, §7. This is the correction the
+   brief asked for and it changes the function signature.
 
-2. **`memberships.role_id` is added**, pointing at a `business_roles` row in
-   the same business. That is the capability set. A composite foreign key
-   `(role_id, business_id)` makes a role from another studio unstorable, the
-   same trick the branch columns already use.
+### Custom roles
 
-3. **`business_roles` is a real table with owner-only writes.** The permission
-   table stops being a document inside the data it governs.
-
-4. **`app.can(p_business, p_perm)`** becomes the third `SECURITY DEFINER`
-   function beside `in_scope` and `is_business_admin`, and every layer calls it:
-   RLS, RPCs, triggers, Edge Functions and the app.
-
-### Custom roles: yes, but the table gets them for free
-
-`business_roles` is a table, not an enum, so *Production Manager*, *Accounts
-Manager*, *Sales Assistant*, *Tailor* and *Inventory Officer* are rows. Nothing
-in the design has to change to support them.
-
-**The recommendation is to ship the four system roles first and hold the
-custom-role UI for a later phase.** The tradeoff, honestly:
-
-| | ship templates only | ship custom roles too |
-|---|---|---|
-| owner's first experience | four names they already understand | a blank role builder |
-| support load | "make Tunde a manager" | "what did you call that role again" |
-| data model work | identical | identical |
-| UI work | one screen of checkboxes | plus create, rename, delete, reassign, and what happens to members of a deleted role |
-| risk | a studio wants something in between and waits | a studio builds a role with `users` ticked and does not realise |
-
-The app's Settings screen **already has** create-and-rename for custom roles, so
-this is not a feature to build; it is a feature to keep switched off for one
-release while the enforcement underneath is proved. The five app-level built-ins
-(`cre`, `tailor`, `accountant`) map onto the four tiers and become *starting
-templates* rather than a parallel system.
+The data model supports them from day one because a role is a row. **Ship the
+four templates first; leave the custom-role builder switched off for one
+release.** The app's Settings screen already has create-and-rename, so this is
+not a feature to build — it is a feature to keep dark while the enforcement
+underneath is proved. Tradeoff table in v1 stands; the deciding factor is that
+a studio building its own role with `users` ticked, on a release where
+enforcement is new, is a bad first week for everybody.
 
 ---
 
-## 4. Permission catalogue
+<a name="4"></a>
+## 4. Owner versus manager — every `is_business_admin`, and its replacement
 
-Thirty-four keys exist. The catalogue below keeps every one of them — renaming
-them would invalidate every existing custom role — and adds the eleven the brief
-asks for that have no key today.
+**The rule.** Under RBAC, *being called a manager must not bypass a denied
+permission.* Authority comes from the role's permissions for every tier except
+owner. Owner is fixed system authority and short-circuits before the permission
+table is read, so an owner cannot lock themselves out and a corrupted or empty
+role cannot strand a studio.
 
-**E** = enforceable in the database under this design.
-**UI** = UI-only until orders move out of `app_state` (§9).
+**`is_business_admin` is not deleted.** It is used in exactly nine policies and
+no functions — the full census — and each is replaced individually, each with
+its own before-and-after probe run. When the last one is gone the helper is
+dropped in a separate migration.
 
-### Orders
+| # | policy | today | proposed | default holder |
+|---|---|---|---|---|
+| 1 | `branches_insert` | owner+manager | `app.can(b,'branches.manage')` | owner |
+| 2 | `branches_update` | owner+manager | `app.can(b,'branches.manage')` | owner |
+| 3 | `branches_delete` | owner+manager | `app.can(b,'branches.manage')` **and** no rows reference it | owner |
+| 4 | `businesses_insert` | owner+manager | **revoked from browsers entirely.** Studios are created by `provision_studio` and the console, never by a signed-in member. The policy is currently unreachable in practice (`is_business_admin` is false for an id you are not already in) — making that explicit removes a class of question. | nobody |
+| 5 | `businesses_update` | owner+manager, plus the identity trigger | `app.can(b,'business.edit')` for `contact_email`; **`name` stays owner tier** via the existing trigger; `last_seen_at` / `app_version` need no permission at all (presence is not an edit) | owner |
+| 6 | `memberships_select` | own row **or** owner+manager | own row **or** `app.can(b,'team.view')` | owner, manager, staff, viewer |
+| 7 | `memberships_insert` | owner+manager | `app.can(b,'team.invite')` — and in practice service-role only, because acceptance goes through `accept_invitation` | owner |
+| 8 | `memberships_update` | owner+manager | `app.can(b,'team.manage')` **and** `user_id <> auth.uid()` **and** the target's tier is not `owner` | owner |
+| 9 | `memberships_delete` | owner+manager | `app.can(b,'team.remove')` **and** `user_id <> auth.uid()` | owner |
 
-| permission | key | today | notes |
-|---|---|---|---|
-| open Orders / Production | `orders` | E | per-key `app_state` gate |
-| see all orders vs own only | `allOrders` | UI | rows inside one blob |
-| create an order | **new** `orders.create` | UI | |
-| edit an order | **new** `orders.edit` | UI | `orders` currently means all three |
-| delete / cancel | `del` | UI | |
-| assign a team member | **new** `orders.assign` | UI | |
-| change status / post updates | `update` | UI | |
-| quality check | `canQC` | UI | |
-| dispatch | `canDispatch` | UI | |
-| quote → confirm | **new** `orders.confirm` | UI | quoted work is a distinct act |
+Three invariants fall out of rows 8 and 9 and they are worth naming, because
+each is a way a permission system eats itself:
 
-### Clients
+- **Nobody edits their own membership.** Not the owner either — an owner
+  transferring ownership does it through a deliberate flow, not by editing a row.
+- **Nobody edits an owner's membership but an owner.** Otherwise `team.manage`
+  is a route to demoting the owner and taking the studio.
+- **A studio always has at least one active owner.** A trigger refuses the last
+  one being demoted, deleted or suspended, whoever is asking.
 
-| permission | key | today |
-|---|---|---|
-| open Customers | `customers` | E |
-| see contact details | `seeContact` | **UI only — see §9** |
-| create / edit | covered by `customers` | UI |
-| delete | **new** `customers.delete` | UI |
-
-### Finance
-
-| permission | key | today |
-|---|---|---|
-| open Finance | `finance` | E |
-| see prices and amounts | `money` | UI |
-| see balances owed and money in | `receivables` | UI |
-| see profit and margin | `seeProfit` | **UI only — see §9** |
-| see cost prices | `seeCost` | **UI only — see §9** |
-| expenses | `expenses` | E |
-| funds and reserves | `funds` | E |
-| retail sales | `sales` | E |
-| payroll and salaries | `payroll` | E |
-| record a payment | **new** `finance.record_payment` | UI |
-| create / edit an invoice | **new** `finance.invoice` | UI |
-| refund or credit note | **new** `finance.refund` | UI — feature does not exist yet |
-| export financial data | **new** `finance.export` | E |
-
-### Production, inventory, suppliers
-
-| permission | key | today |
-|---|---|---|
-| supplies and suppliers | `supplies` | E — **one key for two things; split** |
-| — open inventory | **new** `inventory.view` | E |
-| — add stock | **new** `inventory.add` | UI |
-| — adjust or write off | **new** `inventory.adjust` | UI |
-| — suppliers | **new** `suppliers.manage` | E |
-| shop / retail catalogue | `products` | E |
-
-### Team
-
-| permission | key | today |
-|---|---|---|
-| open Team | `team` | E |
-| edit staff records | `editStaff` | UI |
-| accounts and roles | `users` | E — **and gates the role editor itself** |
-| invite a member | **new** `team.invite` | E — `team-admin` reads it |
-| remove a member | **new** `team.remove` | E — `team-admin` reads it |
-| attendance | `attendance` | E |
-
-### Branches
-
-| permission | key | today |
-|---|---|---|
-| switch branches | `branchSwitch` | E |
-| manage branches | `setBranches` | E — owner-only today |
-| *which* branch | **not a permission** — `memberships.branch_id`, §5 | E |
-
-### Studio settings
-
-`settings`, `setCatalog`, `setCompany`, `setWorkflow`, `setBranches`, `setData`
-— all **E**, and the protected subset is already owner-only by trigger as of
-28 September.
-
-### Billing and ownership — entirely new
-
-| permission | key |
-|---|---|
-| view the subscription | **new** `billing.view` |
-| manage the subscription | **new** `billing.manage` — owner tier only, never tickable |
-| transfer ownership | **new** `ownership.transfer` — owner tier only, and it is a *flow*, not a checkbox |
-
-### Audit and data
-
-| permission | key | today |
-|---|---|---|
-| audit trail | `audit` | E |
-| import, backup, wipe | `setData` | E |
-| export business data | **new** `data.export` | E |
-
-### Things the brief missed that already exist
-
-`appts` (appointments and fittings), `marketing` (segments and campaigns),
-`logistics` (deliveries and couriers), `tasks`, `ownTasksOnly` (the workroom
-restriction that makes the Tailor role work), the staff portal (`mywork`), the
-feedback channel, photo storage and its quota, the planner, and import/migrate.
-All keep their keys.
+`team-admin`'s `OWNER_ONLY` array becomes permission-driven in the same step:
+`invite → team.invite`, `delete → team.remove`, `update → users`, with owner
+tier always true. `sendReset` stays owner-only — it is an account-recovery
+power, not a team operation.
 
 ---
 
-## 5. Branch scope
+<a name="5"></a>
+## 5. Data model — normalised, and why
 
-**Branch scope stays exactly where it is and is never folded into permissions.**
-They answer different questions and multiplying them together is how a model
-becomes impossible to explain:
-
-```
-   app.can(business, 'finance')        WHAT   — from business_roles.permissions
-   app.in_scope(business, branch_id)   WHERE  — from memberships.branch_id
-```
-
-A row is reachable when **both** are true. Neither can substitute for the other,
-and neither needs to know the other exists.
+**Recommendation: normalised rows.** The preference in the brief is the right
+one, and the reasons are not aesthetic.
 
 ```sql
--- the shape every permission-bearing policy takes
-using ( app.can(business_id, 'finance') and app.in_scope(business_id, branch_id) )
+permission_catalogue                      -- global, seeded, not per business
+  key            text primary key         -- 'finance', 'orders.edit'
+  label          text not null            -- 'Finance'
+  grp            text not null            -- 'Money'
+  sort           int  not null
+  tier_min       text                     -- null, or 'owner' for untickable powers
+  enforceable    text not null            -- 'database' | 'ui_only'   (§10)
+
+business_roles
+  id             uuid pk
+  business_id    uuid not null references businesses(id) on delete cascade
+  key            text not null            -- 'manager', 'accountant', 'front-of-house'
+  name           text not null            -- what the owner calls it
+  tier           text not null            -- owner|manager|staff|viewer
+  is_system      boolean not null default false
+  created_at     timestamptz not null default now()
+  updated_at     timestamptz not null default now()
+  unique (business_id, key)
+  unique (id, business_id)                -- so memberships can key on both
+
+business_role_permissions
+  role_id        uuid not null references business_roles(id) on delete cascade
+  permission_key text not null references permission_catalogue(key)
+  granted_at     timestamptz not null default now()
+  granted_by     uuid
+  primary key (role_id, permission_key)
+
+memberships
+  + role_id      uuid
+  + foreign key (role_id, business_id) references business_roles(id, business_id)
 ```
 
-The two worked examples from the brief:
+### Rows versus a JSON blob, point by point
+
+| | normalised rows | `permissions jsonb` |
+|---|---|---|
+| **RLS checks** | `exists (… where permission_key = $1)` on the composite primary key — an index lookup with a plan you can read | `->> 'finance'` on one small row; fast too, but the plan is opaque and a GIN index is overkill |
+| **indexes** | the primary key *is* the index | needs a GIN index or nothing |
+| **constraints** | `references permission_catalogue(key)` — **a typo is rejected at write time** | `{"finanace":1}` is accepted silently and denies silently. This is the argument. A permission that fails closed because of a spelling mistake is the hardest bug in this class to find |
+| **audit** | a row per grant carries `granted_at` and `granted_by`; a revocation is a `DELETE` you can log | you diff two blobs and guess |
+| **revocation** | `delete … where role_id = x and permission_key = y` — precise, and concurrent edits to different permissions both land | read-modify-write: two owners ticking different boxes at once, one loses, silently |
+| **custom roles** | identical | identical |
+| **migrations** | a new permission is one catalogue row | a new permission is a back-fill across every role of every business. **The app already carries a 40-line `migrateRoles()` whose entire job is this back-fill, with a comment explaining how reading the live object instead of a snapshot made the result depend on the order of the Settings screen.** That function is the evidence |
+
+**The one real argument for JSON** is that the app reads a role as an object and
+would need an aggregate. That is one view:
+
+```sql
+create view app.role_permissions_v as
+  select r.id as role_id, r.business_id,
+         coalesce(array_agg(p.permission_key) filter (where p.permission_key is not null), '{}') as keys
+  from business_roles r
+  left join business_role_permissions p on p.role_id = r.id
+  group by r.id, r.business_id;
+```
+
+Not enough to give up constraints and precise revocation.
+
+### The catalogue is global, the grants are not
+
+`permission_catalogue` is platform-wide: it defines which keys *exist* and what
+they are called, so the Roles screen is data-driven and a new permission does
+not need an app release. **No business's grants are global** — every grant is a
+row pointing at a role that points at one business. A person's permissions in
+Business A are reachable only through their membership of A.
+
+---
+
+<a name="6"></a>
+## 6. Branch scope semantics
+
+Permission and branch are **separate dimensions**, and the failure the brief
+names — *turning a branch permission into business-wide access by omitting an
+argument* — is prevented by making the omission impossible rather than
+discouraged.
+
+### The four cases, defined
+
+| case | meaning | check |
+|---|---|---|
+| **membership with a branch** | `memberships.branch_id = X` — this person works at X and nowhere else | `in_scope` is true only for rows at X, or rows with no branch |
+| **membership with NULL branch** | whole business | `in_scope` is true everywhere in that business |
+| **branch-specific resource** | the row has a `branch_id` — orders, customers, transactions, staff, attendance | **`app.can_here(business, perm, row.branch_id)`**, and the branch argument is the *row's column*, never a value from the request |
+| **business-wide resource** | no branch column — settings, roles, suppliers, products, the business row | `app.can(business, perm)` to **read**; to **write**, `app.can(...)` and `app.has_all_branches(business)` |
+| **reports across branches** | an aggregate that spans more than one branch | `app.can(business,'reports.financial')` **and** `app.has_all_branches(business)`; a branch-pinned member gets their own branch's figures or nothing, never a total |
+
+### Why the two-argument form is not enough, and how that is enforced
+
+`app.can(business, perm)` deliberately **answers only WHAT**. It has no branch
+parameter with a `null` default, because a default is exactly the trap: a policy
+author writes `app.can(biz,'finance')` on a table that has a `branch_id`, and a
+member pinned to Ibadan reads Lagos.
+
+So:
+
+1. **There is no optional branch argument anywhere.** Branch-bearing tables use
+   `can_here`, which requires three arguments.
+2. **A static gate asserts it.** A harness walks `pg_policies`, and for every
+   table with a `branch_id` column asserts that every policy's expression
+   contains `can_here(` and the literal `branch_id`. A policy that forgets is a
+   red gate, not a discovered incident. This is cheap and it is the only
+   mechanical defence against a whole class of mistake.
+3. **`has_all_branches` is separate** so "may see the whole business" is a
+   distinct, greppable fact rather than an accident of a null.
+
+### Worked examples
 
 | | Production Manager | Accounts Manager |
 |---|---|---|
@@ -390,380 +398,364 @@ The two worked examples from the brief:
 | `orders.edit` | ✓ | ✗ |
 | `finance.view` | ✗ | ✓ |
 | `finance.record_payment` | ✗ | ✓ |
-| branch | Ibadan only — `branch_id = <Ibadan>` | all — `branch_id is null` |
+| branch | Ibadan — `branch_id = <Ibadan>` | all — `branch_id is null` |
+| an Ibadan order | `can_here` ✓✓ → allowed | `can` ✗ → denied |
+| a Lagos order | `can` ✓, `in_scope` ✗ → denied | `can` ✗ → denied |
+| a Lagos payment | denied twice over | allowed |
+| the monthly P&L | `has_all_branches` false → **Ibadan only** | full |
 
-The Production Manager fetching an Ibadan order passes both. Fetching a Lagos
-order passes `can` and fails `in_scope`. The Accounts Manager fetching any
-branch's transactions passes both; touching a production stage fails `can`
-everywhere. **Nothing in the role mentions a branch and nothing in the branch
-mentions a permission.**
+### Adversarial tests (also in §13)
 
-`branchSwitch` is a permission about the *switcher control*, not about scope: it
-decides whether somebody with whole-business scope may change what they are
-looking at. Somebody pinned to one branch never sees it whatever the tick says.
+| | attack |
+|---|---|
+| **B1** | Ibadan-pinned member `PATCH`es a Lagos row → denied |
+| **B2** | Ibadan-pinned member inserts a row *with `branch_id = Lagos`* → denied by `with check`, not only by `using` |
+| **B3** | Ibadan-pinned member inserts a row with `branch_id = null` on a branch-bearing table, hoping to make it business-wide → denied; `branch_id` is `not null` on those tables and the policy requires a match |
+| **B4** | Ibadan-pinned member calls a report RPC with no branch argument → returns Ibadan only, never a total |
+| **B5** | Ibadan-pinned member with `finance.record_payment` records a Lagos payment → denied |
+| **B6** | Ibadan-pinned member updates a row's `branch_id` from Ibadan to Lagos → denied (the `with check` fails on the new value even though `using` passed on the old) |
+| **B7** | Ibadan-pinned member writes a **business-wide** resource that aggregates — the settings blob, the supplier list → denied without `has_all_branches` |
+
+B6 is the one most systems miss: `using` guards the row you can see, `with
+check` guards the row you leave behind, and a move between branches needs both.
 
 ---
 
-## 6. Database and API enforcement
-
-### The new function
+<a name="7"></a>
+## 7. `app.can()` design
 
 ```sql
+-- WHAT. Capability only. Never a place.
 create or replace function app.can(p_business uuid, p_perm text)
 returns boolean language sql stable security definer
 set search_path = public, pg_temp as $$
-  select coalesce((
-    select case
-             when m.role = 'owner' then true          -- the tier, not a tick
-             else coalesce((r.permissions ->> p_perm) in ('1','true'), false)
-           end
-    from public.memberships m
-    left join public.business_roles r
-      on r.id = m.role_id and r.business_id = m.business_id
+  select exists (
+    select 1 from public.memberships m
     where m.user_id = auth.uid()
       and m.business_id = p_business
       and m.status = 'active'
-  ), false);
+      and ( m.role = 'owner'                       -- the tier, never a tick
+            or exists ( select 1
+                        from public.business_role_permissions p
+                        where p.role_id = m.role_id
+                          and p.permission_key = p_perm ) )
+  );
+$$;
+
+-- WHAT and WHERE. For every row that carries a branch.
+create or replace function app.can_here(p_business uuid, p_perm text, p_branch uuid)
+returns boolean language sql stable security definer
+set search_path = public, pg_temp as $$
+  select app.can(p_business, p_perm) and app.in_scope(p_business, p_branch);
+$$;
+
+-- Whether this member speaks for the whole business.
+create or replace function app.has_all_branches(p_business uuid)
+returns boolean language sql stable security definer
+set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from public.memberships m
+    where m.user_id = auth.uid() and m.business_id = p_business
+      and m.status = 'active' and m.branch_id is null
+  );
 $$;
 ```
 
-Three properties worth stating: an **owner is true for everything without
-consulting the table**, so no edit to a role can lock the owner out; a member
-with **no role_id is false for everything**, so a half-finished migration fails
-closed; and the function is `stable`, so Postgres calls it once per query rather
-than once per row.
+Properties, each chosen rather than fallen into:
 
-### Where it is called
-
-| layer | change |
-|---|---|
-| **RLS, relational tables** | add `app.can(business_id, '<perm>')` beside the existing `in_scope` on `transactions` (finance), `staff` (team), `attendance`, `products`, `suppliers`. `orders` and `customers` keep `in_scope` — see §9. |
-| **RLS, `app_state`** | SELECT, INSERT, UPDATE and DELETE become per-key: `app.can(business_id, app.perm_for_key(key))`. `app.perm_for_key` is a small immutable mapping — `layi_dash_txns → 'finance'`, `layi_dash_staff → 'team'`, `layi_dash_audit → 'audit'`, and so on. **This is the single highest-value change in the document**: it turns "Finance is hidden from a tailor" from a UI claim into a fetch that returns nothing. |
-| **`business_roles`** | SELECT to any member (the app must draw what it may do); INSERT, UPDATE and DELETE to **owner tier only**, by policy *and* by a trigger that refuses a write touching a system role's `tier`. |
-| **`memberships.role_id`** | already `is_business_admin` for UPDATE — **tighten to owner tier**, otherwise a manager assigns themselves a better role, which is P1 with extra steps. |
-| **RPCs** | `accept_invitation` sets `role_id` from the invitation; `create_team_invitation` gains a `p_role_id` and validates it belongs to the business. |
-| **Triggers** | `guard_studio_settings` keeps its owner-only field list, and its escape hatch becomes `app.can(business,'setCompany')` for the non-protected remainder. A new trigger refuses any change to a **system** role's tier or to the owner role's permissions. |
-| **`team-admin`** | `OWNER_ONLY` becomes permission-driven: `invite` requires `team.invite`, `delete` requires `team.remove`, `update` requires `users`, with the **owner tier always true**. `sendReset` stays owner-only. |
-| **`admin-api`** | unchanged. It holds the service role and is meant to bypass tenant permissions; its own operator roles are a separate model and stay that way. |
-
-### The rule that makes it testable
-
-> Every permission must be provable by a request that does not go through the
-> app. If the only thing stopping an action is a hidden button, the permission
-> does not exist.
+- **Owner short-circuits before the permission table is read.** No edit to any
+  role can lock an owner out, and an empty or half-migrated table leaves the
+  owner working.
+- **A member with no `role_id` is false for everything.** A half-finished
+  migration fails closed, loudly, for the people it has not reached.
+- **`stable`**, so Postgres calls it once per query rather than once per row.
+- **No `security definer` reads of anything the caller chose.** Both arguments
+  are either a literal in a policy or a column of the row being tested.
+- **`can_here` cannot be short-circuited** by passing `null` for the branch:
+  `in_scope(business, null)` is true only when the *row* has no branch, and
+  branch-bearing tables have `branch_id not null`.
 
 ---
 
-## 7. App changes
+<a name="8"></a>
+## 8. Permission catalogue
 
-Small, because `can()` already exists and is already called everywhere.
+Thirty-four keys exist and every one is kept — renaming them would invalidate
+every custom role a studio has already built. Fifteen are added. The full
+table, with the §10 classification, is:
 
-1. `getRoles()` reads `business_roles` over the API instead of
-   `layi_dash_roles` from the blob, cached in memory for the session.
-2. `currentRole()` resolves from **`memberships.role_id`**, not
-   `profiles.role_id`. `enterLiveStudio` already fetches the membership; it
-   gains one join.
-3. `profiles.role_id` becomes a **display label only**, and a comment says so.
-   It is already not security; this makes it not authority either.
-4. The Roles & Permissions screen writes to `business_roles` and is gated on
-   `users` **and** owner tier for the first release.
-5. Every `can()` call site is unchanged. That is the point of keeping the
-   vocabulary.
-6. A refused write must **say so**. A permission failure returns 403 from the
-   database; the app must surface it rather than showing a silent no-op, which
-   is the shape of the B1 bug.
+**Orders** — `orders` (A) · `allOrders` (B) · `orders.create` (B) ·
+`orders.edit` (B) · `del` (B) · `orders.assign` (B) · `update` (B) ·
+`canQC` (B) · `canDispatch` (B) · `orders.confirm` (B)
 
-### The owner's screen
+**Clients** — `customers` (A) · `seeContact` (B) · `customers.delete` (B)
 
-Not an IAM console. The four roles, a short line each, and the checkboxes
-already grouped the way the Settings screen groups them.
+**Money** — `finance` (A) · `money` (B) · `receivables` (B) · `seeProfit` (B) ·
+`seeCost` (B) · `expenses` (A) · `funds` (A) · `sales` (A) · `payroll` (B, see
+§10) · `finance.record_payment` (B) · `finance.invoice` (B) · `finance.refund`
+(B, feature does not exist) · `finance.export` (A)
 
-```
-Settings › Team › Roles & permissions
+**Stock and suppliers** — `supplies` (A) · `inventory.adjust` (B) ·
+`suppliers.manage` (A) · `products` (A)
 
-  MANAGER                    Runs the studio when you are not there.   3 people
-  ┌────────────────────────────────────────────────────────────────┐
-  │ Orders & production                                            │
-  │   ✓ Manage orders        ✓ Update production   ✓ Quality checks│
-  │ Clients                                                        │
-  │   ✓ Manage clients       ✓ See contact details                 │
-  │ Money                                                          │
-  │   ✓ Record payments      ☐ See profit & margins                │
-  │   ☐ See cost prices      ☐ Payroll & salaries                  │
-  │ Team & studio                                                  │
-  │   ✓ View team            ☐ Invite people                       │
-  │   ☐ Change studio settings                                     │
-  └────────────────────────────────────────────────────────────────┘
-        Reset to our defaults                              Save
+**Team** — `team` (A) · `editStaff` (B) · `users` (A) · `team.invite` (A) ·
+`team.remove` (A) · `team.view` (A) · `attendance` (A)
 
-  STAFF                      Does the work, sees what they need.      6 people
-  VIEWER                     Can look, cannot change anything.        0 people
-  OWNER                      You. Everything, always.                 locked
-```
+**Branches** — `branchSwitch` (A) · `setBranches` → `branches.manage` (A)
 
-Three things that matter more than the layout:
+**Studio** — `settings` (A) · `setCatalog` (A) · `setCompany` → `business.edit`
+(A) · `setWorkflow` (A) · `setData` (A)
 
-- **The owner row is locked** and says so. Not disabled-looking; absent. There is
-  no path in the UI to a studio with no owner.
-- **"3 people"** — the count. A permission changed in the abstract is a
-  permission changed for Tunde, and the owner should see that before saving.
-- **Money is its own group with nothing pre-ticked beyond recording payments.**
-  §8.
+**Billing and ownership** — `billing.view` (A) · `billing.manage` (owner tier,
+untickable) · `ownership.transfer` (owner tier, untickable)
 
-### Invite Member
+**Audit and data** — `audit` (A) · `data.export` (A)
 
-```
-  Invite someone to Adé Bespoke
-
-  Email        tunde@…
-  Role         ( ) Manager   (•) Staff   ( ) Viewer
-  Branch       [ The workroom      ▾ ]   or   ( ) All branches
-
-  Staff can: open orders, update production, see appointments, see their own pay.
-  Staff cannot: see profit, run payroll, change studio settings.
-                                              Change what Staff can do →
-
-                                                   Cancel   Send invitation
-```
-
-Two fields and a sentence. The permissions come from the role; the link goes to
-the screen above; **nobody ticks twenty boxes to hire a tailor.** The invitation
-row stores `role_id` alongside the role tier, so an invitation accepted three
-days later grants what the owner chose, not what the template says today.
+**Already there and not in the brief** — `appts`, `marketing`, `logistics`,
+`tasks`, `ownTasksOnly`, `mywork` (staff portal), `companylog`, `leave`,
+`rota`, the feedback channel, photo storage, the planner, import/migrate.
 
 ---
 
-## 8. Default role matrix
+<a name="9"></a>
+## 9. Default role matrix
 
-Defaults only. Every one is a tick the owner can change, except the owner row.
+Defaults only, all tickable except the locked rows.
 
 | | Owner | Manager | Staff | Viewer |
 |---|---|---|---|---|
-| **Orders** open / create / edit | ✓ | ✓ | ✓ | view only |
+| Orders — open / create / edit | ✓ | ✓ | ✓ | **read** |
 | delete or cancel | ✓ | ✓ | ✗ | ✗ |
-| see all orders (vs assigned) | ✓ | ✓ | ✓ | ✓ |
-| **Production** update, QC, dispatch | ✓ | ✓ | ✓ | ✗ |
-| **Clients** open / create / edit | ✓ | ✓ | ✓ | view only |
+| Production — update, QC, dispatch | ✓ | ✓ | ✓ | ✗ |
+| Clients — open / create / edit | ✓ | ✓ | ✓ | **read** |
 | see contact details | ✓ | ✓ | ✓ | ✗ |
-| delete a client | ✓ | ✓ | ✗ | ✗ |
-| **Money** see prices | ✓ | ✓ | ✓ | ✓ |
-| balances owed & money in | ✓ | ✓ | ✗ | ✗ |
+| Money — see prices | ✓ | ✓ | ✓ | ✓ |
+| balances owed, money in | ✓ | ✓ | ✗ | ✗ |
 | record a payment | ✓ | ✓ | ✗ | ✗ |
-| **see profit & margin** | ✓ | **✗** | ✗ | ✗ |
-| **see cost prices** | ✓ | **✗** | ✗ | ✗ |
+| **profit & margin** | ✓ | **✗** | ✗ | ✗ |
+| **cost prices** | ✓ | **✗** | ✗ | ✗ |
 | expenses | ✓ | ✓ | ✗ | ✗ |
 | funds & reserves | ✓ | ✗ | ✗ | ✗ |
 | **payroll & salaries** | ✓ | **✗** | ✗ | ✗ |
 | export financial data | ✓ | ✗ | ✗ | ✗ |
-| **Inventory** view / add | ✓ | ✓ | ✓ | view only |
+| Stock — view / add | ✓ | ✓ | ✓ | read |
 | adjust or write off | ✓ | ✓ | ✗ | ✗ |
 | suppliers | ✓ | ✓ | ✗ | ✗ |
-| **Team** view | ✓ | ✓ | ✓ | ✓ |
+| Team — view | ✓ | ✓ | ✓ | ✓ |
 | edit staff records | ✓ | ✓ | ✗ | ✗ |
 | **invite / remove people** | ✓ | **✗** | ✗ | ✗ |
 | **accounts & roles** | ✓ | **✗** | ✗ | ✗ |
-| attendance | ✓ | ✓ | own only | ✗ |
-| **Settings** operational (catalogue, workflow, tiers) | ✓ | ✓ | ✗ | ✗ |
+| attendance | ✓ | ✓ | own | ✗ |
+| Settings — operational | ✓ | ✓ | ✗ | ✗ |
 | **company, branches, plan, import/wipe** | ✓ | **locked** | locked | locked |
-| **Audit** trail | ✓ | ✓ | ✗ | ✗ |
+| Audit trail | ✓ | ✓ | ✗ | ✗ |
 | export business data | ✓ | ✗ | ✗ | ✗ |
-| **Billing** view | ✓ | ✗ | ✗ | ✗ |
-| manage subscription | ✓ | **locked** | locked | locked |
-| transfer ownership | ✓ | **locked** | locked | locked |
+| Billing — view | ✓ | ✗ | ✗ | ✗ |
+| **manage subscription, transfer ownership** | ✓ | **locked** | locked | locked |
 
-**Where this differs from today, and why.**
+Where this differs from today's built-in Manager — which has `seeProfit`,
+`seeCost` and `payroll` all on — the reason is in the brief and it is right:
+what a garment costs and what everyone earns are the owner's business until the
+owner says otherwise. Four seconds to tick; nobody can un-see them.
 
-- **A manager does not see profit, cost or payroll by default.** Today's
-  built-in Manager role has `seeProfit:1`, `seeCost:1` and `payroll:1`. The
-  brief is explicit and it is right: what a garment costs to make and what
-  everyone earns are the owner's business until the owner says otherwise. The
-  owner can tick all three in four seconds; nobody can un-see them.
-- **A manager cannot invite or remove people by default**, because the seat
-  count is money and the team list is who can read the studio. It is one tick
-  away.
-- **Funds & reserves is owner-only.** Money set aside is a decision, not an
-  operation.
-- **Locked rows are tier, not permission.** Billing, ownership and the studio's
-  own identity are not tickable at all, so an owner cannot hand them over by
-  accident and a manager cannot be given them by a tired owner at 11pm.
-- **Viewer becomes real.** Today it is a word; here it is read-only everywhere
-  and enforced per key at the database.
+**Viewer becomes real**, which today it is not: a viewer can currently write
+every `app_state` key, including deleting the orders blob. Phase 2 gives viewer
+`select` and nothing else.
 
 ---
 
-## 9. What `app_state` makes impossible — stated plainly
+<a name="10"></a>
+## 10. Enforceable today versus UI-only
 
-The customer app's real data does not live in the relational tables. Measured on
-staging: `orders`, `customers`, `transactions`, `staff`, `attendance`,
-`products`, `suppliers` hold **zero rows**. Every one of them has careful,
-branch-scoped RLS, and the app has never written to them. The data is in
-`app_state`: one row per `(business_id, key)`, one JSON blob, twenty-one keys.
+The customer app's data is not in the relational tables. Measured on staging:
+`orders`, `customers`, `transactions`, `staff`, `attendance`, `products`,
+`suppliers` hold **zero rows** between them. Every one has careful
+branch-scoped RLS and the app has never written to any of them. Everything is
+in `app_state`: one row per `(business_id, key)`, one JSON blob, 21 keys.
 
-This has two consequences and they are different sizes.
+### A — enforceable at the database, per key
 
-### What IS enforceable — per key
+RLS on `app_state` can be per key, because the key is a column. This is real,
+cheap, and delivers most of what an owner thinks they are buying: **pages and
+features, genuinely closed**, and separately for reading and writing.
 
-RLS on `app_state` can be made per key, because the key is a column. A tailor
-denied `finance` can be denied `select` on `layi_dash_txns` outright. That is
-real, it is cheap, and it delivers most of what the owner thinks they are
-buying: **pages and features, genuinely closed.**
+| permission | key it gates | read | write |
+|---|---|---|---|
+| `finance` | `layi_dash_txns`, `layi_dash_bills`, `layi_dash_pots` | ✓ | ✓ |
+| `audit` | `layi_dash_audit` | ✓ | ✓ |
+| `marketing` | `layi_dash_campaigns` | ✓ | ✓ |
+| `attendance` | `layi_dash_attendance` | ✓ | ✓ |
+| `supplies` | `layi_dash_supplies` | ✓ | ✓ |
+| `products` / `sales` | `layi_dash_products` | ✓ | ✓ |
+| `team` | `layi_dash_staff` | ✓ | ✓ |
+| `users` | `layi_dash_roles` | ✓ | ✓ (owner, Phase 0) |
+| `settings` | `layi_dash_settings` | ✓ | field-level (done) |
+| `tasks`, `appts`, `leave`, `rota`, `companylog` | their own keys | ✓ | ✓ |
+| `orders` | `layi_dash_orders`, `_done` | ✓ | ✓ |
 
-Roughly: `layi_dash_txns → finance`, `layi_dash_staff → team`,
-`layi_dash_audit → audit`, `layi_dash_campaigns → marketing`,
-`layi_dash_supplies → supplies`, `layi_dash_attendance → attendance`,
-`layi_dash_roles → users`, `layi_dash_settings → settings`.
+Plus everything on the relational tables once they are used, and everything on
+`businesses`, `branches` and `memberships` today.
 
-### What is NOT enforceable — per field, and per row
+### B — UI-only, and it must say so on the screen
 
-`layi_dash_orders` is one blob containing every order, and inside each order:
-the price, the deposit, the cost of materials, the margin, and the customer's
-phone number. Anybody who may open Orders at all must be able to `select` that
-blob. Therefore:
+| permission | why it cannot be enforced |
+|---|---|
+| **`seeProfit`, `seeCost`, `money`, `receivables`** | the numbers are fields inside `layi_dash_orders` and `layi_dash_txns`. Anybody allowed to open Orders must be able to fetch the blob those fields are in |
+| **`seeContact`** | there is **no customers key** — clients are derived from the orders blob, so a contact detail is a field inside an order. Anyone who can open Orders can read every phone number |
+| **`allOrders`, `orders.assign`** | "only the orders assigned to you" is row-level scope inside a single value |
+| **`del`, `update`, `canQC`, `canDispatch`, `orders.create`, `orders.edit`** | all of these are operations on rows inside one blob. **A member who may write `layi_dash_orders` at all may rewrite or empty the whole thing**, whatever these say |
+| **salaries** | pay lives inside `layi_dash_staff`, the same key `team` opens. A manager with `team` but not `payroll` can read every salary |
+| **`editStaff`** | same blob as viewing staff |
+| **branch filtering of anything in `app_state`** | the blob is per business. **A branch-pinned member's scope is enforced by the app, not the database**, for all 21 keys |
+| **audit-log integrity** | `layi_dash_audit` is readable and writable as one value, so an entry can be removed by anybody with the key. Reading is enforceable; *not tampering* is not |
 
-> **`seeCost`, `seeProfit`, `seeContact`, `allOrders`, `money` and every
-> order-level or client-level permission are UI conventions. They hide fields on
-> a screen. They do not stop the person fetching the blob those fields are in.**
+### The rule this imposes on the product
 
-The same is true of row-level scope inside a blob: "only the orders assigned to
-you" cannot be enforced while all orders are one value. And **branch scope does
-not apply inside a blob either** — the branch-aware policies protect the empty
-relational tables, not the JSON the app actually reads. A member pinned to one
-branch is pinned by the app, not by the database.
+> **A permission is only called secure if a request that skips the app is
+> refused.** Everything in B is labelled on the Roles screen — *"Hides this on
+> screen. Anyone who can open Orders can still reach the underlying data until
+> orders move into the database."* An owner who knows that will not put a
+> competitor's cousin on Staff and assume the margins are safe.
 
-This is finding B3 of the September audit, and this design does not fix it. It
-is honest about it instead:
+`permission_catalogue.enforceable` carries this, so the label is data and cannot
+drift from the truth.
 
-- **Tier 1 permissions** (pages, features, whole keys) — enforced everywhere.
-- **Tier 2 permissions** (fields and rows inside a blob) — UI only, and the
-  Roles screen should **say so**: *"Hides this on screen. Anyone who can open
-  Orders can still reach the underlying data until we finish moving orders into
-  the database."* An owner who knows that will not put a competitor's cousin on
-  Staff and assume the margins are safe.
-
-The permanent fix is moving `layi_dash_orders`, `layi_dash_txns` and
-`layi_dash_customers` into the relational tables that are already sitting there
-with the right policies. That is a large, separate piece of work with its own
-migration, sync rewrite and offline story. **It should be scheduled, not bundled
-into this.**
+The permanent fix is moving `layi_dash_orders`, `layi_dash_txns` and the staff
+records into the relational tables already waiting with the right policies. It
+is a large, separate piece of work — migration, sync rewrite, offline story —
+and it should be **scheduled, not bundled**.
 
 ---
 
-## 10. Migration and backwards compatibility
+<a name="11"></a>
+## 11. Migration
 
-Additive throughout. No existing column changes meaning, and every step is
-inert until the one after it.
+Additive. No column changes meaning; each step inert until the next.
 
-**M1 — `business_roles`.** New table. For every existing business, seed rows
-from that business's `layi_dash_roles` blob if it has one, otherwise from the
-five built-in defaults. Keys preserved, so a studio that renamed *Client
-Relations* to *Front of house* keeps it.
+**M1** `permission_catalogue` seeded from `PERM_GROUPS` in the app, with
+`enforceable` set per §10.
 
-**M2 — `memberships.role_id`.** Nullable at first. Back-fill per membership:
+**M2** `business_roles` + `business_role_permissions`. For each business: seed
+from that studio's `layi_dash_roles` blob if it has one, else from the five
+built-ins. Keys preserved, so a studio that renamed *Client Relations* keeps it.
+Unknown keys in a blob are dropped **and reported**, not silently kept.
+
+**M3** `memberships.role_id`, nullable, back-filled:
 
 ```
 role_id := the business_roles row whose key = profiles.role_id
-           for that person, IF that person's profile points at THIS business
+           IF that profile points at THIS business AND such a role exists
        else the system role matching memberships.role (the tier)
 ```
 
-The fallback is the important half: a multi-business member whose profile points
-elsewhere gets their tier's template in the other studio rather than a wrong
-role or a null. Nobody loses access; some people gain a slightly more
-conservative set, which is the correct direction for an error.
+The fallback carries the weight. It also **fixes P8**: everybody whose
+`profiles.role_id` is `staff` or `viewer` — a value matching no role, leaving
+them with no permissions at all — lands on the tier template and can work.
 
-**M3 — `app.can()`.** Created, granted, read by nothing yet.
+**M4** `app.can`, `app.can_here`, `app.has_all_branches`. Read by nothing.
 
-**M4 — enforcement, one surface at a time**, each with its own gate run before
-and after: `business_roles` policies → `memberships.role_id` owner-only →
-`app_state` per-key → relational tables → `team-admin`.
+**M5** Enforcement, one surface at a time, each with a before-and-after probe:
+`business_roles` policies → `memberships` (the nine in §4) → `app_state` per
+key → relational tables → `team-admin`.
 
-**M5 — the app** switches `getRoles()` and `currentRole()` over. Deployed after
-M4, so a stale app is over-permissive in its drawing and still refused by the
-database.
+**M6** App switches `getRoles()` and `currentRole()` to the table and the
+membership.
 
-**M6 — `layi_dash_roles`** stops being written, is left in place for one
-release, then deleted.
+**M7** `layi_dash_roles` stops being written, stays one release, then goes.
 
-**Specific commitments:**
-
-- **The LAYI owner keeps everything.** `memberships.role = 'owner'` short-
-  circuits `app.can()` before the table is consulted.
-- **The staging invitation tests stay recoverable.** `team_invitations` gains a
-  nullable `role_id`; existing pending invitations have none and fall back to
-  the tier template on acceptance.
-- **Every member of every studio keeps working through M1–M3**, because nothing
-  reads the new columns until M4.
-- **Roll back** by reverting the policy migration alone. The columns are inert.
+**Commitments.** The LAYI owner keeps everything (owner tier short-circuits).
+Pending staging invitations keep working (`team_invitations.role_id` is
+nullable and falls back to the tier). Every member keeps working through M1–M4
+because nothing reads the new columns. Rollback is reverting the policy
+migration alone.
 
 ---
 
-## 11. Test plan
+<a name="12"></a>
+## 12. App and Edge Function changes
 
-Every row is a **direct API request with a real session, no app in the path** —
-the harness built on 28 September (`as-user`) already does exactly this, and the
-28-attempt matrix that opened this document is the template.
+**App.** `getRoles()` reads `business_roles` + the permissions view, cached for
+the session. `currentRole()` resolves from `memberships.role_id`, not
+`profiles.role_id`. Every one of the ~200 `can()` call sites is unchanged —
+that is the point of keeping the vocabulary. The Roles screen writes rows,
+renders from `permission_catalogue` so a new permission needs no release, and
+**labels every `ui_only` permission**. A refused write surfaces the 403 rather
+than showing a silent no-op.
 
-### The matrix
+**Invite Member** stays two fields and a sentence:
 
-| # | proves | how |
+```
+  Email        tunde@…
+  Role         ( ) Manager   (•) Staff   ( ) Viewer
+  Branch       [ The workroom ▾ ]   or   ( ) All branches
+
+  Staff can: open orders, update production, see appointments, see their own pay.
+  Staff cannot: see profit, run payroll, change studio settings.
+                                              Change what Staff can do →
+```
+
+The invitation stores `role_id`, so an invitation accepted three days later
+grants what the owner chose, not what the template says by then. **A role in
+Business A has no effect in Business B**, because a grant is a row under a role
+under one business.
+
+**`team-admin`** takes its gate from permissions rather than an array, owner
+tier always true. **`admin-api`** unchanged.
+
+---
+
+<a name="13"></a>
+## 13. Security test matrix
+
+Every row is a direct API request with a real session — the `as-user` harness
+built on 28 September, the same one that produced the Phase 0 numbers.
+
+| # | proves |
+|---|---|
+| T1 | UI controls follow permission |
+| T2 | **direct API requests follow permission**, every role × every permission |
+| T3 | wrong branch denied — §6 B1 |
+| T4 | wrong business denied, including with a valid role_id from another business |
+| T5 | one person, two studios, opposite permission sets, both asserted in one run |
+| T6 | a role change takes effect without re-signing in |
+| T7 | **removing a permission removes access immediately** |
+| T8 | adding a permission grants **only** that capability |
+| T9 | an owner stripped of every permission still passes everything |
+| T10 | **staff cannot elevate themselves** — *written and green, Phase 0* |
+| T11 | a manager cannot edit their own role |
+| T12 | a manager cannot reassign their own membership |
+| T13 | the client cannot forge permissions: fabricated role_id, a role from another business, a permissions object in the body |
+| T14 | **`profiles.role_id` grants nothing** — *written and green, Phase 0* |
+| T15 | the last owner cannot be demoted, deleted or suspended |
+| T16 | a `ui_only` permission is declared as such in the catalogue and labelled on screen |
+| T17 | **every policy on a branch-bearing table uses `can_here` with that table's `branch_id`** — static, over `pg_policies` |
+| T18 | §6 B2–B7, the branch adversarial set |
+| T19 | the fourteen existing harnesses stay green |
+
+Every new gate is run against a deliberately broken copy before it is trusted.
+Three gates were found lying this week by exactly that discipline, and Phase 0's
+first guard was found doing nothing at all because the probe was written first.
+
+---
+
+<a name="14"></a>
+## 14. Implementation phases
+
+| phase | what | state |
 |---|---|---|
-| T1 | UI follows permission | each role, each gated screen, computed display |
-| T2 | **the API follows permission** | each role × each permission × PATCH/GET, direct |
-| T3 | wrong branch denied | branch-pinned member fetches another branch's rows |
-| T4 | wrong business denied | member of A fetches B, with and without a valid role_id from A |
-| T5 | different permissions per business | one person, two studios, opposite permission sets, both asserted in one run |
-| T6 | role change takes effect | flip a permission, re-request without re-signing in |
-| T7 | removing a permission removes access **immediately** | same, in the deny direction; no cached session survives it |
-| T8 | adding a permission grants **only** that one | grant `finance`, assert `payroll` still 403 |
-| T9 | owner cannot lock themselves out | strip every permission from the owner role, owner still passes |
-| T10 | **staff cannot elevate themselves** | the exact PATCH that returned 200 today must return 403 |
-| T11 | manager cannot edit their own role | PATCH `business_roles` as manager → 403 |
-| T12 | manager cannot reassign their own membership | PATCH `memberships.role_id` as manager → 403 |
-| T13 | the client cannot forge permissions | send a fabricated role_id, a role from another business, a permissions object in the request body |
-| T14 | **`profiles.role_id` grants nothing** | set it to `owner` by hand for a viewer, assert every refusal still holds |
-| T15 | seats, invitations, RLS isolation unchanged | the existing fourteen harnesses, green |
-| T16 | a UI-only permission is **declared** as UI-only | assert the Roles screen labels Tier 2 permissions; the one test that protects an owner from a wrong assumption |
+| **0** | `layi_dash_roles` owner-only; `profiles` authority columns locked; probe written first | **done, staging** |
+| **1** | catalogue, `business_roles`, `business_role_permissions`, `memberships.role_id`, `app.can` / `can_here` / `has_all_branches` — seeded, back-filled, **read by nothing** | design |
+| **2** | enforcement: `business_roles` policies, the nine `is_business_admin` replacements, per-key `app_state` RLS with read and write separated | design |
+| **3** | app reads the membership and the table; Roles screen writes rows; `ui_only` labelled | design |
+| **4** | `team-admin` permission-driven; `team.invite` / `team.remove` real; invitations carry `role_id` | design |
+| **5** | relational-table policies gain `app.can_here`; `is_business_admin` dropped | design |
+| **later** | **orders, transactions and staff move out of `app_state`** — the only thing that makes the B list real. Its own document | not scheduled |
 
-T10 and T14 are regression tests for holes that exist **today**. They should be
-written first and should fail before anything is built.
-
-### Mutation discipline
-
-Every new gate is run against a deliberately broken copy before it is trusted —
-the standing rule in this repo, and the reason three gates were found lying this
-week.
+Phases 1–2 make "permissions are enforced" true. Phase 3–4 make it usable.
+Phase 5 and the move make it complete.
 
 ---
 
-## 12. Implementation phases
+**PHASE 0 READY FOR PRODUCTION REVIEW**
 
-| phase | what | why in this order |
-|---|---|---|
-| **0 — today, standalone** | Move `layi_dash_roles` out of reach: either add it to the protected-key trigger or move it to `business_roles` immediately. **A studio can currently promote itself.** | It is a live escalation path and does not need the rest of this design. Half a day. |
-| **1** | `business_roles` + `memberships.role_id` + `app.can()`, seeded and back-filled, **read by nothing** | reversible; proves the migration on real data |
-| **2** | per-key `app_state` RLS + `business_roles` policies + `memberships.role_id` owner-only | the highest-value enforcement, and where T2, T10, T11, T12 go green |
-| **3** | app switches to `memberships.role_id`; Roles screen writes the table; Tier 2 permissions labelled | the owner sees a screen that tells the truth |
-| **4** | `team-admin` permission-driven; `team.invite` / `team.remove` real | unblocks delegating invitations, which is where this started |
-| **5** | relational-table policies gain `app.can()` | free once the tables are used |
-| **later, separately** | **orders, transactions and customers move out of `app_state`** | the only thing that makes Tier 2 real. Its own design document. |
-
-Phases 0–2 are what make the claim "permissions are enforced" true. Phases 3–4
-are what make it usable. Phase 5 and the move are what make it complete.
-
----
-
-## What I recommend, in one paragraph
-
-Do **Phase 0 this week** regardless of what happens to the rest: a member of any
-studio can currently rewrite that studio's permission table and grant themselves
-finance, payroll and the audit trail, and it takes one request. Then do Phases
-1–4 before team invitations go live, because the product principle in the brief
-— *the owner will not always be there* — is exactly the situation where somebody
-holds a permission they were never meant to have and nobody is watching. Accept
-that Tier 2 permissions are cosmetic for now, **say so on the screen**, and
-schedule the move out of `app_state` as its own piece of work rather than
-letting it hold this up.
-
----
-
-**RBAC DESIGN READY FOR REVIEW**
+**RBAC DESIGN V2 READY FOR REVIEW**
