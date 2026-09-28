@@ -1943,7 +1943,9 @@ function canSeeProfit(){const r=currentRole();if(!r||!r.perms)return false;retur
 function canSeeCost(){const r=currentRole();if(!r||!r.perms)return false;return r.perms.seeCost!==undefined?!!r.perms.seeCost:can('money');}
 // Receivables = who owes, what's paid in, who to chase. Anyone with full finance sees it; CRE-type roles get it on its own.
 function canReceivables(){return can('finance')||canSeeProfit()||can('receivables');}
-function getRoles(){let r=load('layi_dash_roles',null);if(!r||!Array.isArray(r)||!r.length){r=defaultRoles();save('layi_dash_roles',r);}return r;}
+function getRoles(){
+  if(liveMode&&CLOUD_ROLES&&CLOUD_ROLES.length)return CLOUD_ROLES;
+  let r=load('layi_dash_roles',null);if(!r||!Array.isArray(r)||!r.length){r=defaultRoles();save('layi_dash_roles',r);}return r;}
 function migrateRoles(){
   const defs=defaultRoles();const byId={};defs.forEach(d=>byId[d.id]=d);
   const list=getRoles();let changed=false;
@@ -1976,12 +1978,93 @@ function migrateRoles(){
   });
   if(changed)setRoles(list);
 }
-function setRoles(v){save('layi_dash_roles',v);}
+/* ===== ROLES, FROM THE DATABASE =====================================
+   A live studio's roles are rows in business_roles and
+   business_role_permissions, and which role a person holds is their
+   MEMBERSHIP. Both are per business, both are owner-only to write, and
+   neither can be edited by the people they restrict — which the blob
+   they replace could be, by anybody, until Phase 0.
+
+   A device that is not live keeps the blob. Nobody is billing a device
+   and nothing is at stake on one. */
+let CLOUD_ROLES=null, myRoleKey='', myPermissions=null;
+async function loadCloudRoles(){
+  if(!supa||!liveMode||!myBusinessId){CLOUD_ROLES=null;return false;}
+  try{
+    const mine=await supa.rpc('my_membership',{p_business:myBusinessId});
+    const me=(mine&&mine.data&&mine.data[0])||null;
+    myRoleKey=(me&&me.role_key)||'';
+    const {data,error}=await supa
+      .from('business_roles')
+      .select('id,key,name,tier,is_system,business_role_permissions(permission_key)')
+      .eq('business_id',myBusinessId);
+    if(error||!data||!data.length)return false;
+    /* Shaped exactly like the blob it replaces, so every one of the two
+       hundred can() call sites and the whole Roles screen are unchanged. */
+    CLOUD_ROLES=data.map(function(r){
+      const perms={};
+      (r.business_role_permissions||[]).forEach(function(p){perms[p.permission_key]=1;});
+      return {id:r.key,name:r.name,builtin:!!r.is_system,tier:r.tier,rowId:r.id,perms:perms};
+    });
+    return true;
+  }catch(e){CLOUD_ROLES=null;return false;}
+}
+/* Writing them back. The owner is the only one the database will accept,
+   and the screen already refuses everybody else, so this is the third
+   line rather than the first. A diff, not a replace: two owners editing
+   different checkboxes both land, which a blob could not manage. */
+async function pushRoleChanges(next){
+  if(!supa||!liveMode||!CLOUD_ROLES)return false;
+  const byKey={};CLOUD_ROLES.forEach(function(r){byKey[r.id]=r;});
+  for(const r of (next||[])){
+    const was=byKey[r.id];
+    if(!was){
+      const ins=await supa.from('business_roles')
+        .insert({business_id:myBusinessId,key:r.id,name:r.name||r.id,tier:'staff'})
+        .select('id').maybeSingle();
+      if(ins.error||!ins.data)continue;
+      const keys=Object.keys(r.perms||{}).filter(function(k){return r.perms[k];});
+      if(keys.length)await supa.from('business_role_permissions')
+        .insert(keys.map(function(k){return {role_id:ins.data.id,permission_key:k};}));
+      continue;
+    }
+    if((r.name||'')!==(was.name||'')){
+      await supa.from('business_roles').update({name:r.name}).eq('id',was.rowId);
+    }
+    const add=[],drop=[];
+    Object.keys(r.perms||{}).forEach(function(k){
+      if(r.perms[k]&&!was.perms[k])add.push(k);
+      if(!r.perms[k]&&was.perms[k])drop.push(k);
+    });
+    if(add.length)await supa.from('business_role_permissions')
+      .insert(add.map(function(k){return {role_id:was.rowId,permission_key:k};}));
+    for(const k of drop){
+      await supa.from('business_role_permissions').delete()
+        .eq('role_id',was.rowId).eq('permission_key',k);
+    }
+  }
+  await loadCloudRoles();
+  return true;
+}
+function setRoles(v){
+  if(liveMode&&CLOUD_ROLES){CLOUD_ROLES=v;pushRoleChanges(v);return;}
+  save('layi_dash_roles',v);
+}
 function roleById(id){return getRoles().find(r=>r.id===id);}
 function roleName(id){const r=roleById(id);return r?r.name:'—';}
 function getUsers(){let u=load('layi_dash_users',null);if(!u||!Array.isArray(u)||!u.length){u=[{id:'u-owner',name:'Owner',username:'owner',pin:(SETTINGS.ownerPassword||'layi2025'),roleId:'owner',staffId:'',active:true,createdAt:new Date().toISOString()}];save('layi_dash_users',u);}return u;}
 function setUsers(v){save('layi_dash_users',v);}
-function currentRole(){return currentUser?roleById(currentUser.roleId):null;}
+/* THE MEMBERSHIP DECIDES, not profiles.role_id.
+   profiles holds one row per person for the whole platform and
+   accept_invitation overwrites it, so somebody who is an accountant in
+   one studio and a tailor in another had one answer — whichever they
+   joined last. It is a label now, and Phase 0 stopped a browser writing
+   it at all. myRoleKey comes from the membership row for THIS studio. */
+function currentRole(){
+  if(!currentUser)return null;
+  if(liveMode&&myRoleKey){const r=roleById(myRoleKey);if(r)return r;}
+  return roleById(currentUser.roleId);
+}
 // New permissions fall back to their historical coupling when a role hasn't set them explicitly.
 // This keeps every existing account working exactly as before until an owner toggles the new switch.
 /* What a permission used to ride on, for roles saved before it existed. Every one of these
@@ -2318,7 +2401,7 @@ let liveMode=false, myBusinessId=null, myMembershipRole='';
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v51';
+const APP_VERSION='layi-v52';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3372,6 +3455,8 @@ async function enterLiveStudio(user,username,errEl){
       const mine=mems.find(function(m){return m.business_id===prof.business_id;})
                  ||mems[0]||null;
       currentUser={id:user.id,name:prof.name||'Owner',username:username,roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
+      /* filled in by loadCloudRoles a moment later; the profile's value is
+         only a starting point for a device that cannot reach the server. */
       liveMode=true;
       myBusinessId=(mine&&mine.business_id)||prof.business_id||LAYI_BIZ;
       /* Blank when the read failed or returned nothing. Deliberately not
@@ -3379,6 +3464,10 @@ async function enterLiveStudio(user,username,errEl){
       myMembershipRole=(mine&&mine.role)||'';
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
+      /* Before the studio is drawn, because every screen asks can() and a
+         screen drawn from the wrong role is a screen somebody has already
+         read. */
+      try{await loadCloudRoles();}catch(e){}
       try{await adoptPlan();}catch(e){}       // billing decides, not this device
       try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
       try{reportTenantPresence();}catch(e){}
@@ -4187,7 +4276,7 @@ function updateNavGroups(){
   });
   flush();
 }
-function logout(){try{closeModal();}catch(e){}try{stopRealtime();}catch(e){}try{clearSession();}catch(e){}currentUser=null;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';const e=document.getElementById('loginUser');if(e)e.value='';const pe=document.getElementById('loginPass');if(pe)pe.value='';const er=document.getElementById('loginErr');if(er)er.textContent='';if(typeof refreshBiometricUI==='function')refreshBiometricUI();}
+function logout(){CLOUD_ROLES=null;myRoleKey='';myPermissions=null;try{closeModal();}catch(e){}try{stopRealtime();}catch(e){}try{clearSession();}catch(e){}currentUser=null;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';const e=document.getElementById('loginUser');if(e)e.value='';const pe=document.getElementById('loginPass');if(pe)pe.value='';const er=document.getElementById('loginErr');if(er)er.textContent='';if(typeof refreshBiometricUI==='function')refreshBiometricUI();}
 function switchAccount(){try{closeModal();}catch(e){}if(!isOwner())return;logout();}
 function isOwner(){return !!(currentUser&&currentUser.roleId==='owner');}
 function togglePwField(id,btn){const p=document.getElementById(id);if(!p)return;if(p.type==='password'){p.type='text';if(btn)btn.textContent='Hide';}else{p.type='password';if(btn)btn.textContent='Show';}}
