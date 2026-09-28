@@ -81,7 +81,13 @@ async function sendViaResend(to: string, subject: string, html: string, text: st
     const body = await res.text().catch(() => '')
     return { ok: false, error: 'The mail provider refused it (' + res.status + '): ' + body.slice(0, 200) }
   }
-  return { ok: true }
+  /* The provider's own id for the message. Not a secret and not a link: it is
+     what turns "they say they never got it" into something answerable, and it
+     is the only part of a send that can be shown to the person who asked for
+     it. The LINK is never returned to the inviter under any circumstances —
+     whoever holds it can finish signing in as the invitee. */
+  const ok = await res.json().catch(() => null) as { id?: string } | null
+  return { ok: true, id: ok?.id || '' }
 }
 
 const esc = (s: string) =>
@@ -582,6 +588,10 @@ Deno.serve(async (req) => {
         branch_id: branch,
         expires_at: inv.expires_at,
         account_created: !!createdUser,
+        mail_id: sent.id || '',
+        /* Where it points, not what it is. Enough to catch a staging build
+           emailing a production link, which is the mistake worth catching. */
+        link_host: (function () { try { return new URL(link).host } catch { return '' } })(),
       })
     }
 
@@ -660,7 +670,11 @@ Deno.serve(async (req) => {
            away. The owner is told, and can try again. */
         return json({ error: 'Could not send it again: ' + sent.error, code: 'mail_failed' }, 502)
       }
-      return json({ ok: true, invitation_id: invId, resent_to: email, link_type: via, confirmed })
+      return json({
+        ok: true, invitation_id: invId, resent_to: email, link_type: via, confirmed,
+        mail_id: sent.id || '',
+        link_host: (function () { try { return new URL(link).host } catch { return '' } })(),
+      })
     }
 
     // ---- update: name, role and linked staff. Never a password.
