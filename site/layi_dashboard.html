@@ -2307,13 +2307,18 @@ const getCustomers=()=>load('layi_dash_customers',{});
 const setCustomers=v=>{save('layi_dash_customers',v);};
 
 /* ===== LIVE SYNC: customers (first connected table) ===== */
-let liveMode=false, myBusinessId=null;
+/* WHAT THIS PERSON IS IN THIS STUDIO, taken from their membership row.
+   Not from profiles.role_id, which is the app's own label and says nothing
+   about who owns the place, and not from a guess. Blank means we have not
+   read it yet — on a device that has never been online, for instance — and
+   every reader has to decide what to do with blank rather than assume. */
+let liveMode=false, myBusinessId=null, myMembershipRole='';
 /* The one release marker. It MUST equal CACHE in site/sw.js — audit_build_stamp.js
    fails the build if they drift, because a version that disagrees with the
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v48';
+const APP_VERSION='layi-v49';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3337,8 +3342,34 @@ async function enterLiveStudio(user,username,errEl){
             +'it has not been set up yet.</span>';
         return;
       }
+      /* ===== WHICH STUDIO, AND WHAT THEY ARE IN IT =====
+         MEMBERSHIPS, not profiles. profiles holds ONE business and
+         accept_invitation overwrites it, so it is a preference — the last
+         studio this person joined or chose. The membership is the row every
+         RLS policy in this system already reads, and it is the only one that
+         says whether somebody owns the place or merely works there.
+
+         Read as themselves: the memberships policy allows user_id =
+         auth.uid(), so this returns their own rows and nobody else's.
+
+         profiles.business_id still chooses WHICH membership when there is
+         more than one, because that is what it now means. It cannot grant
+         anything: if it names a studio they hold no active membership in,
+         the membership list wins and they land somewhere they really are. */
+      let mems=[];
+      try{
+        const {data:mrows}=await supa.from('memberships')
+          .select('business_id,role,branch_id').eq('user_id',user.id).eq('status','active');
+        mems=mrows||[];
+      }catch(e){}
+      const mine=mems.find(function(m){return m.business_id===prof.business_id;})
+                 ||mems[0]||null;
       currentUser={id:user.id,name:prof.name||'Owner',username:username,roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
-      liveMode=true; myBusinessId=prof.business_id||LAYI_BIZ;
+      liveMode=true;
+      myBusinessId=(mine&&mine.business_id)||prof.business_id||LAYI_BIZ;
+      /* Blank when the read failed or returned nothing. Deliberately not
+         defaulted to 'owner': the whole point is to stop assuming that. */
+      myMembershipRole=(mine&&mine.role)||'';
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
       try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
@@ -3585,8 +3616,33 @@ let setupDraft=null;
 /* Only for a real studio, on its first run. Never for the demo — somebody
    exploring the example already has a studio in front of them — and a device
    with orders on it has plainly been set up whatever the marker says. */
+/* Owning the studio is a fact about the membership, not about the app's
+   permission label. A manager has role_id 'mgr' and can do a great deal; they
+   still did not create this business and are not the person to be asked what
+   it is called.
+
+   The fallback is for a device that has not read a membership — offline, or a
+   session restored before the network answered. It uses the app's own label,
+   which is what this code did everywhere before, so nothing gets stricter
+   while we are guessing. */
+function ownsThisStudio(){
+  if(myMembershipRole)return myMembershipRole==='owner';
+  return !!(currentUser&&currentUser.roleId==='owner');
+}
 function needsStudioSetup(){
   if(!liveMode)return false;
+  /* THE STUDIO'S STATE IS NOT A REASON TO ASK THIS PERSON.
+     These three conditions used to be the whole test, and every one of them
+     is about the BUSINESS: live, not set up, no orders yet. Nothing asked
+     who was looking. So an invited manager joining a studio whose owner had
+     not finished setting it up was handed the owner's questionnaire — asked
+     to name a business that already has a name, pick its trade, and choose
+     its plan. Found on staging, 28 September, by the first real invitee.
+
+     An incomplete studio stays incomplete until its owner finishes it. That
+     is the owner's job and nobody else's, and it is a far smaller problem
+     than a teammate quietly reconfiguring the place on their first morning. */
+  if(!ownsThisStudio())return false;
   if(SETTINGS.setupDone)return false;
   try{ if(rawOrders().length)return false; }catch(e){}
   return true;
@@ -3792,10 +3848,20 @@ function renderStudioSetup(keepScroll){
    never again — a setup screen that reappears every morning is worse than no
    setup screen at all. */
 function skipStudioSetup(){
+  /* Skipping WRITES setupDone. A teammate who reached this screen some other
+     way must not be able to mark the owner's studio as set up and have it
+     never asked again. */
+  if(!ownsThisStudio()){setupDraft=null;closeModal();return;}
   SETTINGS.setupDone=true;save('layi_dash_settings',SETTINGS);
   setupDraft=null;closeModal();
 }
 function saveStudioSetup(){
+  /* The last line of defence, and it is not theatre. This writes the studio's
+     name, its trade, its production stages and its PLAN, and app_state's RLS
+     lets any active member write — in_scope, not is_business_admin — so the
+     database would have accepted every one of those from a viewer. The screen
+     no longer opens for them; this is what holds if it ever does again. */
+  if(!ownsThisStudio()){setupDraft=null;closeModal();return;}
   setupSync();
   const d=setupDraft;if(!d)return;
   const name=(d.name||'').trim();
@@ -3969,7 +4035,7 @@ function saveSession(){
     if(!currentUser||!currentUser.id)return;
     const u=currentUser;
     localStorage.setItem(SESSION_KEY,JSON.stringify({id:u.id,at:Date.now(),
-      live:!!liveMode,biz:myBusinessId||'',
+      live:!!liveMode,biz:myBusinessId||'',mrole:myMembershipRole||'',
       user:{id:u.id,name:u.name||'',username:u.username||'',roleId:u.roleId||'owner',
             staffId:u.staffId||'',active:u.active!==false,branch:u.branch||''}}));
   }catch(e){}
@@ -3986,7 +4052,9 @@ function restoreSession(){
     if(u&&u.active===false){clearSession();return false;}
     if(!u&&!(sess.user&&sess.user.id)){clearSession();return false;}
     currentUser=u||sess.user;
-    if(!u){liveMode=!!sess.live;myBusinessId=sess.biz||null;}
+    /* mrole with it, or a restored session would forget what this person is
+       and fall back to the app's label until the network answers. */
+    if(!u){liveMode=!!sess.live;myBusinessId=sess.biz||null;myMembershipRole=sess.mrole||'';}
     const lg=document.getElementById('login');if(lg)lg.style.display='none';
     enterApp();
     /* Straight in, then check with the server. Going in first is the point: the studio

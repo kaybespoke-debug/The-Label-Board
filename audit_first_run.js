@@ -68,7 +68,8 @@ function boot() {
 /* A studio as it arrives: signed in, nothing of its own yet. */
 function freshStudio() {
   const b = boot();
-  b.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";');
+  b.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="owner";');
   b.run('SETTINGS=Object.assign({},DEFAULTS);');
   b.run('save("layi_dash_orders",[]);');
   return b;
@@ -116,6 +117,66 @@ section('A new studio is asked, an existing one is not');
      'liveMode is false, so there is no tenant to set up');
 }
 
+// ---------------------------------------------------------------------
+section('The questionnaire belongs to the owner, and to nobody else');
+// ---------------------------------------------------------------------
+/* FOUND ON STAGING, 28 September, by the first person ever invited into a
+   studio. The three original conditions were all about the BUSINESS — live,
+   not set up, no orders — and none of them asked who was looking. A manager
+   joining a studio whose owner had not finished setting it up was handed the
+   owner's questionnaire: name the business, pick its trade, choose its plan.
+
+   The database would have taken every one of those answers. app_state's RLS
+   is in_scope, not is_business_admin, so an active member of any role can
+   write the settings blob; and is_business_admin counts managers, so the
+   studio's name would have been pushed to the operator console too. */
+{
+  ['manager', 'staff', 'viewer'].forEach(role => {
+    const b = boot();
+    b.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="' + role + '";');
+    b.run('SETTINGS=Object.assign({},DEFAULTS);');
+    b.run('save("layi_dash_orders",[]);');
+    ok('a ' + role + ' joining an unfinished studio is not asked to set it up',
+       b.run('needsStudioSetup()') === false,
+       'they are joining a business that already exists; it is not theirs to name');
+
+    /* And if the screen were reached some other way, it still writes nothing. */
+    b.run('setupDraft={name:"Renamed By A Teammate",you:"X",location:"",does:[],channels:[],team:"",outlets:"",studios:[]};');
+    b.run('saveStudioSetup();');
+    ok('and a ' + role + ' cannot answer it anyway',
+       b.run('SETTINGS.setupDone') !== true
+       && b.run('(SETTINGS.company&&SETTINGS.company.name)||""') !== 'Renamed By A Teammate',
+       'the screen not opening is a UI decision; this is the one that holds');
+
+    b.run('skipStudioSetup();');
+    ok('nor mark it done by skipping', b.run('SETTINGS.setupDone') !== true,
+       'skipping writes setupDone, so the owner would never be asked again');
+  });
+
+  /* The owner of that same unfinished studio is still asked. */
+  const own = freshStudio();
+  ok('the owner of the same studio is still asked', own.run('needsStudioSetup()') === true);
+
+  /* And a device that has not read a membership yet falls back to the app's
+     own label rather than getting stricter while it is guessing. */
+  const off = boot();
+  off.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole=""; currentUser={id:"u1",roleId:"owner"};');
+  off.run('SETTINGS=Object.assign({},DEFAULTS);');
+  off.run('save("layi_dash_orders",[]);');
+  ok('an owner whose membership has not been read is still asked',
+     off.run('needsStudioSetup()') === true,
+     'offline, or a session restored before the network answered');
+
+  const off2 = boot();
+  off2.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+         + ' myMembershipRole=""; currentUser={id:"u2",roleId:"mgr"};');
+  off2.run('SETTINGS=Object.assign({},DEFAULTS);');
+  off2.run('save("layi_dash_orders",[]);');
+  ok('and a manager in the same position is not',
+     off2.run('needsStudioSetup()') === false);
+}
 // ---------------------------------------------------------------------
 section('The answers become the studio');
 // ---------------------------------------------------------------------
