@@ -2001,10 +2001,26 @@ async function loadCloudRoles(){
       .select('id,key,name,tier,is_system,business_role_permissions(permission_key)')
       .eq('business_id',myBusinessId);
     if(error||!data||!data.length)return false;
-    /* Shaped exactly like the blob it replaces, so every one of the two
-       hundred can() call sites and the whole Roles screen are unchanged. */
+    /* EVERY KEY GETS A VALUE, and it is not tidiness.
+       permVal() falls back when a key is UNDEFINED on a role: seeCost falls
+       back to money, funds falls back to finance, and so on. Those fallbacks
+       exist so an old locally-stored role does not lose a permission it used
+       to exercise. A role built from granted rows alone has every ungranted
+       key undefined, so the fallbacks fire and a staff member with `money`
+       silently gains seeCost and seeProfit. Measured in the browser on
+       staging: can('seeCost') came back true for Staff.
+
+       So the catalogue is read too and every key is written as 0 or 1. What
+       is not granted is DENIED, not unanswered. */
+    let allKeys=[];
+    try{
+      const cat=await supa.from('permission_catalogue').select('key');
+      allKeys=((cat&&cat.data)||[]).map(function(c){return c.key;});
+    }catch(e){}
+    if(!allKeys.length)allKeys=(typeof PERM_KEYS!=='undefined'?PERM_KEYS:[]).slice();
     CLOUD_ROLES=data.map(function(r){
       const perms={};
+      allKeys.forEach(function(k){perms[k]=0;});
       (r.business_role_permissions||[]).forEach(function(p){perms[p.permission_key]=1;});
       return {id:r.key,name:r.name,builtin:!!r.is_system,tier:r.tier,rowId:r.id,perms:perms};
     });
@@ -2465,7 +2481,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v56';
+const APP_VERSION='layi-v57';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
