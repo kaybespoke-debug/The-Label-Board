@@ -2318,7 +2318,7 @@ let liveMode=false, myBusinessId=null, myMembershipRole='';
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v49';
+const APP_VERSION='layi-v50';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -2439,7 +2439,10 @@ async function adoptStudioName(){
     const {data,error}=await supa.from('businesses').select('name').eq('id',myBusinessId).maybeSingle();
     if(error||!data||!data.name)return false;
     SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:String(data.name)});
-    save('layi_dash_settings',SETTINGS);
+    /* Only the owner writes the studio’s own description, and this name
+       came from the server in the first place: for everybody else it is
+       held in memory for this session and there is nothing to push. */
+    if(ownsThisStudio())save('layi_dash_settings',SETTINGS);
     return true;
   }catch(e){return false;}
 }
@@ -2960,7 +2963,9 @@ function payrollSetup(){
     lines:Array.isArray(p.lines)?p.lines:[]
   };
 }
-function savePayrollSetup(next){SETTINGS.payroll=next;save('layi_dash_settings',SETTINGS);}
+function savePayrollSetup(next){
+  if(!ownerOnlySetting('how the studio pays people'))return;
+SETTINGS.payroll=next;save('layi_dash_settings',SETTINGS);}
 /* Is this studio running anything beyond basic + commission? Drives whether the
    payslip grows a deductions section at all. */
 function payrollInUse(){
@@ -3176,7 +3181,9 @@ function onOwnerPayBasis(){const b=(document.getElementById('op_basis')||{}).val
   if(inp)inp.value=isPct?(op.pct||''):(op.amount?fmtNum(op.amount):'');
   if(hint)hint.textContent=({pctProfit:'You keep this percentage of each order profit.',pctValue:'You keep this percentage of each order total value.',perOrder:'You take this fixed amount from every order.',perOutfit:'You take this fixed amount for each piece in an order.',salary:'A fixed monthly draw, posted as a cost each month. Orders carry no owner cut.'})[b]||'';
 }
-function saveOwnerPay(){const b=(document.getElementById('op_basis')||{}).value||'pctProfit';const isPct=(b==='pctProfit'||b==='pctValue');const raw=(document.getElementById('op_val')||{}).value||'';
+function saveOwnerPay(){
+  if(!ownerOnlySetting('how the owner is paid'))return;
+const b=(document.getElementById('op_basis')||{}).value||'pctProfit';const isPct=(b==='pctProfit'||b==='pctValue');const raw=(document.getElementById('op_val')||{}).value||'';
   const num=isPct?Math.max(0,Math.min(100,+String(raw).replace(/[^0-9.]/g,'')||0)):Math.max(0,parseAmt(raw));const cur0=ownerPay();
   SETTINGS.ownerPay={basis:b,pct:isPct?num:cur0.pct,amount:isPct?cur0.amount:num};save('layi_dash_settings',SETTINGS);ensureOwnerSalary();renderAll();flashSaved('opSaveBtn','Save owner pay');}
 // what pots draw from: operating profit after the director's allocation
@@ -3372,6 +3379,7 @@ async function enterLiveStudio(user,username,errEl){
       myMembershipRole=(mine&&mine.role)||'';
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
+      try{await adoptPlan();}catch(e){}       // billing decides, not this device
       try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
       try{reportTenantPresence();}catch(e){}
       startRealtime();
@@ -3628,6 +3636,38 @@ let setupDraft=null;
 function ownsThisStudio(){
   if(myMembershipRole)return myMembershipRole==='owner';
   return !!(currentUser&&currentUser.roleId==='owner');
+}
+/* ===== WHAT BELONGS TO THE STUDIO RATHER THAN TO THE DAY =====
+   The database refuses these for anybody who is not the owner, field by
+   field, and that is the protection. This is the app agreeing with it,
+   which matters for a different reason: a control that is offered and then
+   refused is worse than one that was never offered, and somebody who edits
+   a form for two minutes before being told no has been lied to by the
+   screen.
+
+   Panels listed by their own heading, because that is what the settings
+   screen is built from and what groupSettings() already reads. A group
+   whose panels are all hidden hides itself. */
+const OWNER_ONLY_PANELS=['What your studio does','How the owner is paid',
+  'Company details','Branches & outlets','Production workflow',
+  'Pay, allowances & deductions','Your plan'];
+function applyOwnerOnlyVisibility(){
+  const sec=document.getElementById('view-settings');if(!sec)return;
+  const owner=ownsThisStudio();
+  [].slice.call(sec.querySelectorAll('.panel')).forEach(function(p){
+    const h=p.querySelector('.panel-head h3');if(!h)return;
+    const t=(h.textContent||'').replace(/\s+/g,' ').trim();
+    if(OWNER_ONLY_PANELS.some(function(x){return t.toLowerCase().indexOf(x.toLowerCase())===0;})){
+      if(!owner)p.style.display='none';
+    }
+  });
+}
+/* Said once, in one voice, so no caller invents its own wording. Returns a
+   boolean so it reads as a guard at the top of the function it protects. */
+function ownerOnlySetting(what){
+  if(ownsThisStudio())return true;
+  alert('Only the studio owner can change '+what+'.\n\nThis is part of the studio\u2019s own setup, not your own settings. Nothing you have done is affected.');
+  return false;
 }
 function needsStudioSetup(){
   if(!liveMode)return false;
@@ -3953,7 +3993,18 @@ function saveStudioSetup(){
   if(teamN>1||outletsN>1)SETTINGS.teamTools='on';
   /* Start them on a plan that fits what they just described, instead of
      inferring one from a device with a single account and one branch on it. */
-  if(typeof smallestPlanFitting==='function')SETTINGS.plan=smallestPlanFitting(outletsN,teamN).id;
+  /* THE PLAN IS NOT SET HERE ANY MORE, and there is nothing left to guard
+     with a liveMode check: this screen only ever opens on a live studio, so
+     every plan it ever chose was a plan the customer wrote for themselves.
+     Starting somebody on "a plan that fits what they just described" is a
+     pleasant touch on a device and a subscription upgrade on a tenant.
+     Billing decides now, adoptPlan() reads it back at sign-in, and the
+     database stamps the copy in this blob from businesses.plan on every
+     write. ensurePlan() still guesses for a device that is not live, which
+     is nobody’s subscription.
+
+     The two counts are not wasted: they still decide the tabs, which is the
+     part of the answer that was always ours to act on. */
   SETTINGS.setupDone=true;
   save('layi_dash_settings',SETTINGS);
   if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+normaliseDoes(d.does).map(doesLabel).join(', ')+(d.team?' · team '+d.team:'')+(d.outlets?' · outlets '+d.outlets:''));
@@ -3992,6 +4043,7 @@ function enterApp(){
   show('navMarketing',can('marketing'));
   show('navSuppliers',can('supplies'));show('msSuppliers',can('supplies'));
   applyBizVisibility();
+  try{applyOwnerOnlyVisibility();}catch(e){}
   show('navSales',can('sales')&&salesVisible());show('msSales',can('sales')&&salesVisible());
   show('navMywork',!!(myStaff()&&staffPortalOn()));
   show('newSupBtn',can('supplies'),'inline-block');show('logStockBtn',can('money'),'inline-block');
@@ -4598,6 +4650,8 @@ function applyTeamVisibility(){
   const cb=document.getElementById('set_teamtools');if(cb)cb.checked=on;
 }
 function toggleTeamTools(on){
+  if(!ownerOnlySetting('whether the team tools are shown'))return;
+
   SETTINGS.teamTools=on?'on':'off';save('layi_dash_settings',SETTINGS);
   applyTeamVisibility();
   if(on){if(typeof toast==='function')toast('Team & HR tools are on.');}
@@ -4617,6 +4671,8 @@ function renderBizDoes(){
   box.innerHTML=b?craftPickerHtml(branchDoes(b),'bizToggleCraft','bizToggleMode',''):'';
 }
 function bizApplyDoes(next){
+  if(!ownerOnlySetting('what the studio does'))return;
+
   const b=bizBranch();if(!b)return;
   if(!next.length||!next.some(k=>modeOf(k))){
     if(typeof toast==='function')toast('A studio has to do at least one thing, one way or another.');
@@ -7425,6 +7481,7 @@ const SET_GROUPS=[
   {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Plan, storage, backup, reset',heads:['Your plan','Storage','Backup','Import old data','Data']}
 ];
 function groupSettings(){
+  try{applyOwnerOnlyVisibility();}catch(e){}
   const sec=document.getElementById('view-settings');if(!sec)return;
   const headOf=p=>{const h=p.querySelector('.panel-head h3');return h?h.textContent.trim():'';};
   let host=document.getElementById('setGroups');
@@ -7644,11 +7701,34 @@ function smallestPlanFitting(studios,seats){
 /* Runs once. After that the plan is whatever the studio is actually paying
    for, and only billing changes it. */
 function ensurePlan(){
+  /* LIVE STUDIOS DO NOT GUESS. This was written when the app was the only
+     thing that knew anything, and it decided a plan from the number of
+     branches and logins on the device. A live studio has a subscription and
+     the server knows what it is; adoptPlan() brings it back. Guessing here
+     would also mean writing a plan the database now refuses to accept, so
+     the save would be stamped straight back. */
+  if(liveMode)return;
   if(SETTINGS.plan)return;
   const studios=getBranches().filter(b=>b.active!==false).length;
   const seats=getUsers().length;
   SETTINGS.plan=smallestPlanFitting(studios,seats).id;
   save('layi_dash_settings',SETTINGS);
+}
+/* What billing says, read back into the app. The blob carries a copy so the
+   app can gate features offline, and the database stamps that copy from
+   businesses.plan on every write, so the copy cannot drift upward. This is
+   the read that makes it current at sign-in rather than at the next save. */
+async function adoptPlan(){
+  if(!supa||!liveMode||!myBusinessId)return false;
+  try{
+    const {data,error}=await supa.from('businesses').select('plan').eq('id',myBusinessId).maybeSingle();
+    if(error||!data||!data.plan)return false;
+    if(SETTINGS.plan!==data.plan){
+      SETTINGS.plan=data.plan;   // in memory: the row is the server’s to write
+      if(typeof renderAll==='function')try{renderAll();}catch(e){}
+    }
+    return true;
+  }catch(e){return false;}
 }
 function currentPlan(){
   const id=SETTINGS.plan||'trial';
@@ -8403,6 +8483,8 @@ function sendFeedback(){
 }
 function renderFeedbackList(){if(document.getElementById('modal')&&feedbackTab==='sent')renderFeedbackModal();}
 function saveItemWord(){
+  if(!ownerOnlySetting('what the studio calls a piece of work'))return;
+
   const el=document.getElementById('set_itemword');if(!el)return;
   const v=(el.value||'').trim().replace(/[^A-Za-z -]/g,'').slice(0,24);
   SETTINGS.itemWord=v;save('layi_dash_settings',SETTINGS);
@@ -8413,6 +8495,8 @@ function applyStagePreset(key){const el=document.getElementById('set_stages');if
 function renderStagePreview(){const el=document.getElementById('stagePreview');if(!el)return;const mid=(fv('set_stages')||'').split('\n').map(s=>s.trim()).filter(Boolean);const full=buildStages(mid.length?mid:null);el.innerHTML='<b>Full pipeline:</b> '+full.map(s=>esc(s)).join(' \u2192 ');}
 function renderStagesSettings(){const el=document.getElementById('set_stages');if(!el)return;const mid=(SETTINGS.productionStages&&SETTINGS.productionStages.length)?SETTINGS.productionStages:DEFAULT_MIDDLE;el.value=mid.join('\n');renderStagePreview();}
 function saveStages(){
+  if(!ownerOnlySetting('the production workflow'))return;
+
   const mid=(fv('set_stages')||'').split('\n').map(s=>s.trim()).filter(Boolean);
   if(!mid.length){alert('Add at least one making stage.');return;}
   const reserved=[STAGE_HEAD].concat(STAGE_TAIL).map(s=>s.toLowerCase());const seen={};const cleaned=[];
@@ -8463,6 +8547,8 @@ function bsToggleMode(i,c,m){syncBranchDraft();const b=branchDraft[i];if(!b)retu
 /* Adding your own type asks both halves now, and both can be true — a studio that
    makes uniforms and also sells them off a rail is one type, not two. */
 function bsAddType(i){
+  if(!ownerOnlySetting('what the studio does'))return;
+
   const label=(prompt('New type name (e.g. Alterations, Uniforms, Rentals):','')||'').trim();if(!label)return;
   const ans=(prompt('Do you MAKE these, SELL them ready made, or BOTH?\n\nType M, S or B \u2014 or L for just a label with no tabs of its own:','B')||'B').trim().toUpperCase().charAt(0);
   const modes=ans==='M'?['make']:ans==='S'?['stock']:ans==='L'?[]:['make','stock'];
@@ -8476,7 +8562,7 @@ function bsAddType(i){
   logAudit('Studio activity added',label+(modes.length?' ('+modes.map(modeLabel).join(' + ')+')':' (label only)'));
   renderBranchesSettings();
 }
-function bsRemoveType(key){if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>craftOf(k)!==key);});renderBranchesSettings();}
+function bsRemoveType(key){if(!ownerOnlySetting('what the studio does'))return;if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>craftOf(k)!==key);});renderBranchesSettings();}
 function syncBranchDraft(){if(!branchDraft)return;branchDraft.forEach((b,i)=>{const n=document.getElementById('br_name_'+i),l=document.getElementById('br_loc_'+i);if(n)b.name=n.value;if(l)b.location=l.value;const sh=document.getElementById('br_ch_show_'+i),on=document.getElementById('br_ch_onl_'+i);if(sh||on){const cs=[];if(sh&&sh.checked)cs.push('showroom');if(on&&on.checked)cs.push('online');b.channels=cs.length?cs:['showroom'];}});}
 function addBranchRow(){
   syncBranchDraft();branchDraft=branchDraft||[];
@@ -8487,7 +8573,9 @@ function addBranchRow(){
   if(lim!==PLAN_UNLIMITED&&Math.max(drafted,planUsage().studios)>=lim){if(planStop('studios','studios'))return;}
   branchDraft.push({id:uid('br'),name:'',location:'',does:[],channels:['showroom']});renderBranchesSettings();}
 function removeBranchRow(i){syncBranchDraft();branchDraft.splice(i,1);renderBranchesSettings();}
-function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim());
+function saveBranches(){
+  if(!ownerOnlySetting('the branches'))return;
+syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim());
   const missing=named.find(b=>!(b.does&&b.does.length));
   if(missing){alert('Tick what \u201c'+missing.name.trim()+'\u201d does before saving.');return;}
   const modeless=named.find(b=>!normaliseDoes(b.does).some(k=>modeOf(k)));
@@ -8501,18 +8589,24 @@ function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b
 function flashSaved(id,base){const el=document.getElementById(id);if(!el)return;el.textContent='✓ Saved';el.disabled=true;setTimeout(()=>{el.disabled=false;el.textContent=base;},1500);}
 function toast(msg){var t=document.getElementById('layiToast');if(!t){t=document.createElement('div');t.id='layiToast';t.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,.28);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:80vw;text-align:center';document.body.appendChild(t);}t.textContent=msg;requestAnimationFrame(function(){t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});clearTimeout(t._h);t._h=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(8px)';},2300);}
 function renderLogoPreview(){const el=document.getElementById('logoPreview');if(!el)return;const logo=(SETTINGS.company||{}).logo;el.innerHTML=logo?`<img src="${logo}" style="width:100%;height:100%;object-fit:contain">`:'none';}
-async function uploadLogo(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
-function clearLogo(){SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
+async function uploadLogo(input){if(!ownerOnlySetting('the company logo')){input.value='';return;}const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
+function clearLogo(){
+  if(!ownerOnlySetting('the company logo'))return;
+SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
 /* A signature is an image he uploads once, not a typed name. The box is wider and shorter
    than the logo's because that is the shape a signature actually is. */
 function renderSigPreview(){const el=document.getElementById('sigPreview');if(!el)return;const sig=(SETTINGS.company||{}).signature;el.innerHTML=sig?`<img src="${sig}" style="width:100%;height:100%;object-fit:contain">`:'none';}
-async function uploadSignature(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,600,0.9);SETTINGS.company=Object.assign({},SETTINGS.company,{signature:data});save('layi_dash_settings',SETTINGS);renderSigPreview();}catch(e){alert('Could not load that image.');}input.value='';}
-function clearSignature(){SETTINGS.company=Object.assign({},SETTINGS.company,{signature:''});save('layi_dash_settings',SETTINGS);renderSigPreview();}
+async function uploadSignature(input){if(!ownerOnlySetting('the signature on invoices')){input.value='';return;}const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,600,0.9);SETTINGS.company=Object.assign({},SETTINGS.company,{signature:data});save('layi_dash_settings',SETTINGS);renderSigPreview();}catch(e){alert('Could not load that image.');}input.value='';}
+function clearSignature(){
+  if(!ownerOnlySetting('the signature on invoices'))return;
+SETTINGS.company=Object.assign({},SETTINGS.company,{signature:''});save('layi_dash_settings',SETTINGS);renderSigPreview();}
 /* Puts the general wording in the box so it can be edited into theirs. It does not save;
    nothing here is theirs until they press the button that says so. */
 function useStandardTerms(){const e=document.getElementById('co_pay');if(!e)return;e.value=DEFAULT_PAY_TERMS;e.focus();}
 function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one '+tradeWord()+' type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit(tradeWordCap()+' types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save '+tradeWord()+' types');}
-function saveCompany(){syncBanks();
+function saveCompany(){
+  if(!ownerOnlySetting('the company details'))return;
+syncBanks();
   const _tb=document.getElementById('co_taxon');const _ton=_tb?_tb.checked:!!(SETTINGS.company||{}).taxOn;
   const _trate=(fv('co_taxrate')!==undefined)?(+fv('co_taxrate')||0):(+(SETTINGS.company||{}).taxRate||0);
   SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,
@@ -8738,7 +8832,7 @@ function impRun(key){var im=impById(key),st=_impState[key];if(!im||!st||!st.rows
   _impState[key]={result:res||{added:0}};logAudit('Imported '+im.title.toLowerCase(),((res&&res.added)||0)+' added'+((res&&res.updated)?', '+res.updated+' updated':''));renderImpCards();}
 function saveTiers(){const T=[{name:(fv('tier_n0')||'Starter').trim()||'Starter',min:0}];[['tier_n1','tier_m1','Bronze'],['tier_n2','tier_m2','Silver'],['tier_n3','tier_m3','Gold'],['tier_n4','tier_m4','Platinum']].forEach(([nk,mk,def])=>{T.push({name:(fv(nk)||def).trim()||def,min:amt(mk)});});SETTINGS.tiers=T;var le=document.getElementById('set_loyalty');if(le)SETTINGS.loyaltyEnabled=le.checked;save('layi_dash_settings',SETTINGS);renderCustomers();flashSaved('tierSaveBtn','Save tiers');}
 function syncOwnerPin(){const list=getUsers();const o=list.find(u=>u.roleId==='owner');if(o){o.pin=SETTINGS.ownerPassword;setUsers(list);if(currentUser&&currentUser.id===o.id)currentUser=o;}}
-function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();flashSaved('setSaveBtn','Save settings');}
+function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';if(ownsThisStudio())SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();flashSaved('setSaveBtn','Save settings');}
 let invCatDraft=null;
 function renderInvCatsSettings(){const box=document.getElementById('invCatList');if(!box)return;if(!invCatDraft)invCatDraft=invCats().map(c=>({name:c.name,prod:c.prod}));
   box.innerHTML=invCatDraft.length?invCatDraft.map((c,i)=>`<div class="srow"><div class="smain" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><input class="fld" style="max-width:240px" value="${esc(c.name)}" oninput="invCatDraft[${i}].name=this.value" placeholder="Category name"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer"><input type="checkbox" ${c.prod?'checked':''} onchange="invCatDraft[${i}].prod=this.checked"> production material</label></div><div class="sacts"><button class="btn sm ghost" onclick="invCatDraft.splice(${i},1);renderInvCatsSettings()">Remove</button></div></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No categories yet. Add one.</div>';}
@@ -8748,7 +8842,7 @@ function saveInvCats(){const cats=(invCatDraft||[]).map(c=>({name:(c.name||'').t
   const old=invCats();cats.forEach(c=>{const o=old.find(x=>x.name===c.name);c.sub=o?o.sub:[];});
   SETTINGS.invCats=cats;save('layi_dash_settings',SETTINGS);invCatDraft=null;renderInvCatsSettings();renderSupplies();flashSaved('invCatSaveBtn','Save categories');}
 
-function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();alert('Settings saved.');}
+function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';if(ownsThisStudio())SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();alert('Settings saved.');}
 /* True when the studio has put anything of its own in. Used to decide whether a
    destructive action needs a real warning. */
 function hasOwnData(){
@@ -10779,7 +10873,9 @@ function beCancelAdd(){beSync();beDraft.adding=false;beDraft._newlabel='';render
    off a rail is one type doing two things, not two types. */
 function beToggleNewMode(m){beSync();const a=beDraft._newmodes=beDraft._newmodes||[];const i=a.indexOf(m);if(i>=0)a.splice(i,1);else a.push(m);renderBranchEdit();}
 function beSetNewCraft(c){beSync();beDraft._newcraft=(beDraft._newcraft===c?'':c);renderBranchEdit();}
-function beAddType(){beSync();const label=(beDraft._newlabel||'').trim();if(!label){alert('Give the new type a name.');return;}
+function beAddType(){
+  if(!ownerOnlySetting('what the studio does'))return;
+beSync();const label=(beDraft._newlabel||'').trim();if(!label){alert('Give the new type a name.');return;}
   const modes=(beDraft._newmodes||[]).slice();
   const key=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('type-'+Date.now());
   const acts=branchActivities().slice();
@@ -10796,7 +10892,7 @@ function beAddType(){beSync();const label=(beDraft._newlabel||'').trim();if(!lab
   beDraft.does=doesToggleCraft((beDraft.does||[]).filter(k=>craftOf(k)!==key),key);
   logAudit('Studio activity added',label+(modes.length?' ('+modes.map(modeLabel).join(' + ')+')':' (label only)')+(base?' · like '+base.label:''));
   beDraft.adding=false;beDraft._newlabel='';beDraft._newcraft='';renderBranchEdit();}
-function beRemoveType(key){beSync();if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;
+function beRemoveType(key){if(!ownerOnlySetting('what the studio does'))return;beSync();if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;
   const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));
   beDraft.does=beDraft.does.filter(k=>craftOf(k)!==key);renderBranchEdit();}
 function renderBranchEdit(){
@@ -10826,6 +10922,8 @@ function renderBranchEdit(){
     <div class="modal-foot">${(b.id&&getBranches().length>1)?`<button class="btn danger sm" onclick="deleteBranch('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="${b.id?`openBranchPreview('${String(b.name).replace(/'/g,"\\'")}')`:'closeModal()'}">Cancel</button><button class="btn" onclick="saveBranchEdit()">${b.id?'Save changes':'Add branch'}</button></div>`);
 }
 function saveBranchEdit(){
+  if(!ownerOnlySetting('the branches'))return;
+
   if(!can('setBranches')||!beDraft)return;beSync();
   const id=beDraft.id;const name=(beDraft.name||'').trim();if(!name){alert('Give the branch a name.');return;}
   if(!beDraft.does.length){alert('Tick at least one thing this studio does.');return;}
@@ -10839,6 +10937,7 @@ function saveBranchEdit(){
   beDraft=null;branchDraft=null;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();renderAll();closeModal();openBranchReport();
 }
 function deleteBranch(id){
+  if(!ownerOnlySetting('the branches'))return;
   if(!can('setBranches'))return;const branches=getBranches();if(branches.length<=1){alert('Keep at least one branch.');return;}
   const b=branches.find(x=>x.id===id);if(!b)return;
   if(!confirm('Delete '+b.name+'? Its orders, sales, stock and staff will move to '+(branches.find(x=>x.id!==id)||{}).name+'.'))return;

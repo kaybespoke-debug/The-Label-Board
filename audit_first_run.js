@@ -178,6 +178,70 @@ section('The questionnaire belongs to the owner, and to nobody else');
      off2.run('needsStudioSetup()') === false);
 }
 // ---------------------------------------------------------------------
+section('The studio\u2019s own settings are the owner\u2019s, everywhere');
+// ---------------------------------------------------------------------
+/* The database refuses these field by field, which is the protection.
+   Measured on staging on 28 September, before that guard existed: a VIEWER
+   could rename the studio, reset setupDone, rewrite the production board,
+   redefine the outlets and set the plan to premium, and PostgREST returned
+   200 to all five.
+
+   These checks are the app agreeing with the database. A control that is
+   offered and then refused is worse than one that was never offered. */
+{
+  const SAVERS = [
+    'savePayrollSetup', 'saveOwnerPay', 'toggleTeamTools', 'bizApplyDoes',
+    'saveItemWord', 'saveStages', 'bsAddType', 'bsRemoveType', 'saveBranches',
+    'uploadLogo', 'clearLogo', 'uploadSignature', 'clearSignature', 'saveCompany',
+    /* the branch switcher has its own editor, reachable from the header on
+       every screen; gating the Settings panel alone would have left it open */
+    'beAddType', 'beRemoveType', 'saveBranchEdit', 'deleteBranch',
+  ];
+  SAVERS.forEach(fn => {
+    const body = (function () {
+      const i = code.indexOf('function ' + fn + '(');
+      return i < 0 ? '' : code.slice(i, i + 420);
+    })();
+    ok(fn + ' asks whether this is the owner\u2019s studio',
+       body.indexOf('ownerOnlySetting(') > 0,
+       'it writes part of what the studio IS, not what it did today');
+  });
+
+  /* And it is not only a message: nothing is written. */
+  const mgr = boot();
+  mgr.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="manager"; currentUser={id:"m1",roleId:"mgr"};');
+  mgr.run('SETTINGS=Object.assign({},DEFAULTS); SETTINGS.teamTools="off";'
+        + ' SETTINGS.productionStages=["A","B"]; SETTINGS.company={name:"Adé Bespoke"};');
+  mgr.run('toggleTeamTools(true);');
+  ok('a manager cannot switch the team tools on', mgr.run('SETTINGS.teamTools') === 'off');
+  mgr.run('saveCompany();');
+  ok('nor rewrite the company details', mgr.run('SETTINGS.company.name') === 'Adé Bespoke');
+  mgr.run('saveStages();');
+  ok('nor the production board', mgr.run('SETTINGS.productionStages.join("|")') === 'A|B');
+  mgr.run('saveBranches();');
+  ok('nor the outlets', mgr.run('JSON.stringify(SETTINGS.branches||null)') === 'null');
+
+  /* The owner of the same studio is unaffected. */
+  const own = boot();
+  own.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="owner"; currentUser={id:"o1",roleId:"owner"};');
+  own.run('SETTINGS=Object.assign({},DEFAULTS); SETTINGS.teamTools="off";');
+  own.run('toggleTeamTools(true);');
+  ok('the owner still can', own.run('SETTINGS.teamTools') === 'on');
+
+  /* And the panels that carry those controls are not drawn for them. */
+  ok('the owner-only panels are named in one list',
+     /const OWNER_ONLY_PANELS=\[/.test(code)
+     && code.indexOf("'Company details'") > 0
+     && code.indexOf("'Production workflow'") > 0
+     && code.indexOf("'Your plan'") > 0,
+     'so the settings screen and the savers cannot drift apart');
+  ok('and the settings screen applies it every time it groups itself',
+     /function groupSettings\(\)\{\n?\s*try\{applyOwnerOnlyVisibility\(\);\}/.test(code),
+     'a panel hidden once and redrawn later is a control that comes back');
+}
+// ---------------------------------------------------------------------
 section('The answers become the studio');
 // ---------------------------------------------------------------------
 {
@@ -362,11 +426,38 @@ section('How many of you, and how many outlets');
     b.run("getBranches().map(function(x){return x.name;}).join('|')"));
   ok('which is what makes the app open on the all-studios view',
     b.run('multiBranch()') === true);
-  ok('the plan starts as one that fits what they described',
-    b.run("SETTINGS.plan") === b.run("smallestPlanFitting(3,8).id"),
-    'got ' + b.run('SETTINGS.plan'));
-  ok('which for six people is not the three-seat plan',
-    b.run("SETTINGS.plan") !== 'starter' && b.run("SETTINGS.plan") !== 'trial');
+  /* THIS USED TO ASSERT THE OPPOSITE, and asserting it was the bug.
+     The questionnaire chose a plan from the two counts — "six of us, three
+     outlets" became Pro — and wrote it into a blob the customer controls.
+     On a device that is a nice touch. On a tenant it is the customer
+     writing their own subscription, and it was reachable by every member of
+     the studio, not only the owner: measured on staging, a VIEWER could
+     PATCH plan to premium and the API returned 200.
+
+     So the plan is billing’s answer now. The questionnaire does not write
+     one, adoptPlan() reads businesses.plan at sign-in, and the database
+     stamps this field from that column on every write. */
+  ok('the questionnaire does not decide the plan',
+    b.run("SETTINGS.plan") === undefined,
+    'it is a subscription, not an answer to a form: got ' + b.run('SETTINGS.plan'));
+  ok('and a live studio never guesses one either',
+    (function () {
+      const g = freshStudio();
+      g.run('ensurePlan();');
+      return g.run('SETTINGS.plan') === undefined;
+    })(),
+    'ensurePlan is for a device with no subscription behind it');
+  ok('a device that is not live still gets a sensible default',
+    (function () {
+      const d = boot();
+      d.run('liveMode=false; SETTINGS=Object.assign({},DEFAULTS); delete SETTINGS.plan;');
+      d.run('ensurePlan();');
+      return typeof d.run('SETTINGS.plan') === 'string';
+    })(),
+    'nobody is billing a device');
+  ok('and the app can read the plan back from billing',
+    /adoptPlan/.test(code) && /from\('businesses'\)\.select\('plan'\)/.test(code),
+    'otherwise the copy in the blob is whatever was there last');
 
   // a solo studio is left exactly as it was
   const s = freshStudio();
