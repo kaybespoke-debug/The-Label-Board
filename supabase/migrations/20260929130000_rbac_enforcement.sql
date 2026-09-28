@@ -89,7 +89,11 @@ returns text language sql immutable as $$
     when 'layi_dash_planner'     then 'appts'
     when 'layi_dash_staff'       then 'editStaff'
     when 'layi_dash_users'       then 'users'
-    when 'layi_dash_roles'       then 'users'
+    /* NOT layi_dash_roles. Its guard is the Phase 0 trigger, which is
+       owner-only and says so. A key-level rule here would match zero rows
+       for a non-owner instead, and PostgREST answers a zero-row write with
+       200 and no message — the B1 shape, and caught by the Phase 0 probe
+       the moment Batch B shadowed it. */
     when 'layi_dash_anns'        then 'team'
     when 'layi_dash_leave'       then 'team'
     when 'layi_dash_shifts'      then 'team'
