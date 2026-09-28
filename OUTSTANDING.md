@@ -2945,3 +2945,69 @@ Kayode gave, which is time, not space.
   app cheap to ship. Four taps is not worth either. The Android picker that
   already works stays. Worth re-raising only if we go native for a reason that
   is not contacts, or if Apple ever switches on the API it has had since 2021.
+
+---
+
+## Team invitations, 28 September 2026 — the path exists and staging sent a real one
+
+Phase 1B had a database, two email templates and no wire between them. The
+`invite` action was still the pre-Phase-1A body behind its 503, so there was no
+route from "owner invites somebody" to "an email arrives". Built on
+`phase-1b-team-invitations`, deployed to STAGING only, and exercised against
+real GoTrue and real Resend.
+
+**The order, which is the whole fix.** Invitation row first, carrying a
+one-time nonce; account second, carrying that nonce; `provision_studio`
+recognises its own invitation and writes nothing. Nine businesses became ten in
+September because it happened the other way round. Measured today: an auth user
+was created three separate times during the failure tests and the business count
+never moved off 10.
+
+**Nothing is granted at invite time.** No membership, no profile. The seat is
+held by the pending invitation, which `app.seats_used` already counts, so
+Adé Bespoke read 9 active + 1 pending = 10 of 50 with nobody yet able to sign
+in.
+
+**Proved on staging, not argued:**
+
+- `generateLink` creates exactly one auth user and the metadata that reaches the
+  invitee is `{"name": "Tola Adisa"}` — the nonce pair deleted by sending each
+  key as `null`, because `updateUserById` merges, and the name kept because
+  `accept_invitation` reads it to write their profile.
+- A failed send keeps nothing: invitation `cancelled` with the reason recorded,
+  nonce cleared, and the account deleted. Three separate failures, three clean
+  rollbacks, `auth.users` back to its starting count each time.
+- Resend on an unconfirmed invited account re-issues a **type `invite`** link.
+  PHASE_1B_DESIGN.md recorded that as unproven; it is proven, and the recovery
+  and magiclink fallbacks below it were never reached.
+- One invitation, one account, no duplicates after a resend.
+
+**Two deviations from the design, both deliberate:**
+
+1. **The invitation id travels in the query string, not the fragment.** GoTrue
+   appends its own fragment to `redirect_to`, so an id in the fragment arrives
+   as `#invitation=…#access_token=…` and the app's arrival parser finds no
+   access token at all. The cost is that a pointer reaches a web server log,
+   and it is only a pointer: `accept_invitation` needs a session whose
+   confirmed email matches the address the invitation names.
+2. **The feature switch asks which database it is**, rather than being a
+   constant to flip per deployment or a variable to set per project. Staging's
+   ref turns it on; production cannot be turned on by any setting.
+
+**Still to do before production invitations:**
+
+- The invitee half has not been walked by a human yet: acceptance, the profile
+  and membership it writes, and the seat converting rather than doubling. One
+  invitation is pending in staging for exactly that.
+- The existing-user path has been read and gated but not sent to a real
+  mailbox that already has an account.
+- **The app has no invite UI on the new shape.** `TEAM_INVITES_ENABLED` is
+  still `false` in `site/layi_dashboard.html`, and the old team form sends
+  `role_id`/`staff_id` rather than `role`/`branch_id`, so it would produce a
+  staff invite with no branch. The server takes both; the form needs the two
+  fields.
+- `sendReset` still goes through `resetPasswordForEmail`, which is Supabase's
+  own SMTP and has been broken since 13 September. Everything else now sends
+  through Resend. It is the last thing in the app that does not.
+- An expired or cancelled invitation is invisible to the owner. It releases its
+  seat with no action, which is right, but there is no screen that says so.
