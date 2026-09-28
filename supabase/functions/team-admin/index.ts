@@ -382,7 +382,20 @@ Deno.serve(async (req) => {
        wording is ours, the sender is ours, and we are not behind
        Supabase's own mailer, which ACCOUNTS.md records as broken since
        13 September and which rate limits to a handful an hour. */
-    const TEAM_INVITES_ENABLED = false
+    /* ON IN STAGING, OFF IN PRODUCTION, DECIDED BY WHICH DATABASE THIS IS.
+
+       Not an environment variable. A variable has to be set correctly on
+       two projects and nothing stops it being set on the wrong one; this
+       cannot be turned on in production by a settings change, because
+       production is not that project and never will be. Same reasoning as
+       the app choosing its backend by hostname: the safe state is the one
+       you get by default, and turning it on is an edit somebody has to
+       make on purpose and explain in a commit.
+
+       Phase 1C flips this to a plain `true` once the flow has been run
+       end to end against a real mailbox and a real person. */
+    const STAGING_REF = 'pakxhimjhrcpqvtsqwqz'
+    const TEAM_INVITES_ENABLED = (Deno.env.get('SUPABASE_URL') || '').includes(STAGING_REF)
 
     if (action === 'invite' || action === 'resendInvitation') {
       if (!TEAM_INVITES_ENABLED) {

@@ -183,6 +183,24 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      + 'posting it, so the wording and the sender are ours and Supabase\u2019s own '
      + 'mailer, broken since 13 September, is not in the path');
 
+  /* ---- WHERE THE FEATURE SWITCH LIVES -------------------------------
+     Production must not be one settings change away from sending live
+     invitations. So the switch is not a variable at all: it asks which
+     database it is talking to, and staging is the only answer that turns
+     it on. There is nothing to set on the wrong project. */
+  ok('invitations are on in staging and off everywhere else',
+     code.includes("const TEAM_INVITES_ENABLED = (Deno.env.get('SUPABASE_URL') || '').includes(STAGING_REF)")
+     && code.includes("const STAGING_REF = 'pakxhimjhrcpqvtsqwqz'"),
+     'an env var can be set on the wrong project; a project ref cannot be');
+  ok('and production is not that project',
+     !/includes('eskubrbgbcbaejynjxvh')/.test(code)
+     && code.indexOf('eskubrbgbcbaejynjxvh') < 0,
+     'the live ref appearing anywhere near this switch is the one way it '
+     + 'could be on in production');
+  ok('and the switch is read before anything the invite does',
+     code.indexOf('TEAM_INVITES_ENABLED') < code.indexOf("rpc('create_team_invitation'"),
+     'a 503 that arrives after the row is written is not a disabled feature');
+
   /* ---- THE ORDER OF THE TWO WRITES ----------------------------------
      This is the whole Phase 1A bug in one property. The account INSERT
      fires provision_studio; if no invitation exists yet for that address
