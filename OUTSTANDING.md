@@ -3057,3 +3057,54 @@ offline fallback.
   active member of any role can write the whole settings blob** — the studio’s
   name, trade, production stages and plan. The questionnaire was one way in;
   Settings is another. Worth deciding on its own, separately from this fix.
+
+### Studio settings, and who owns them — 28 September
+
+Measured on staging before anything was built. A real session for a real
+member, straight to PostgREST with no app in the path: **every role, down to a
+VIEWER, could rename the studio, reset setupDone, rewrite the production
+board, redefine the outlets, switch the team tools on and set the plan to
+premium.** Twenty-eight attempts, twenty-eight 200s.
+
+Closed with a field-level trigger on the settings blob rather than a policy,
+because `layi_dash_settings` holds what the studio IS next to what it did
+today — the next invoice number, inventory categories, message templates — and
+47 places in the app write that row. Issuing an invoice bumps invoiceNo and
+saves the whole blob, so an owner-only UPDATE policy would have stopped a
+manager issuing an invoice. RLS cannot see fields; a trigger can.
+
+**Owner only:** company, branches, branchActivities, productionStages,
+stagesV2, setupDone, setupTeamBand, setupOutletsBand, itemWord, teamTools,
+ownerPassword, ownerPay, payroll.
+
+**Deliberately left operational**, and it is a judgement call rather than an
+oversight: currency, tiers, templates, the product catalogue, inventory
+categories, defaults, the QC checklist, suppliers. A manager changing one of
+those is doing their job. Any of them can move up on request.
+
+**The plan is stamped, not rejected.** `businesses.plan` is written into the
+blob on every browser write, so a blob claiming premium is corrected by the
+next save and no request shape can set it. Rejecting would have meant every
+ordinary save failing for a studio whose copy had drifted. The app stopped
+guessing to match: the questionnaire no longer chooses a plan at all and
+`adoptPlan()` reads billing’s answer at sign-in.
+
+**What was already right, checked rather than assumed:** `authenticated` holds
+column-level UPDATE on `businesses` for exactly four columns — name,
+contact_email, last_seen_at, app_version. Plan, seats, branches, storage caps
+and trial dates were never reachable from a browser. What was reachable was
+the studio’s name, by any `is_business_admin`, which counts managers; a second
+trigger now requires an owner for the two identity columns and leaves presence
+alone.
+
+**Two things worth knowing for later:**
+
+- For staff and viewers, a refused write to `businesses` returns **200 with no
+  rows changed** — the policy matches nothing rather than raising. It is safe,
+  and it is the same shape as the B1 bug: a scoped write that reports success
+  when it matched nothing. Anything that ever needs to KNOW a write landed must
+  read it back.
+- `SETTINGS.accent` lives in the studio-wide blob, so the accent colour is
+  shared by everyone in the studio rather than being a personal preference.
+  Nobody has complained. It is the only genuinely personal setting that is not
+  device-local.
