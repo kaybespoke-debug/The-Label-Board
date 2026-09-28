@@ -2487,14 +2487,43 @@ const APP_VERSION='layi-v57';
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
 const CONSOLE_URL='https://admin.thelabelboard.com';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
-function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
-function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
+/* A CLIENT RECORD IS TWO THINGS NOW, and they are not the same secret.
+   The operational half — name, note, measurements — is what a workroom
+   needs to cut a garment. The personal half — phone, email, whatsapp,
+   address — is what seeContact is about. They used to be one row, so
+   refusing the phone number also refused the measurements, and a studio
+   that wants a tailor to have one and not the other could not say so. */
+function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
+function custToContactRow(c,id){return {customer_id:id,business_id:myBusinessId||LAYI_BIZ,email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',phone:c.phone||''};}
+/* The contact half arrives embedded when the database is willing to send
+   it and is simply absent when it is not. Absent is left absent rather
+   than filled with empty strings: a blank phone number on screen says
+   "this client has none", and that is a different sentence from "you may
+   not see it". */
+function rowToCust(r){
+  const m=r.measurements||{};
+  const k=(r.customer_contacts&&(Array.isArray(r.customer_contacts)?r.customer_contacts[0]:r.customer_contacts))||null;
+  const out={name:r.name||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};
+  if(k){out.email=k.email||'';out.whatsapp=k.whatsapp||'';out.address=k.address||'';out.phone=k.phone||'';}
+  return out;
+}
 async function pullCustomers(){
   if(!supa)return false;
   try{
-    const {data,error}=await supa.from('customers').select('*').order('created_at',{ascending:true});
+    const {data,error}=await supa.from('customers').select('*,customer_contacts(*)').order('created_at',{ascending:true});
     if(error){console.warn('pullCustomers:',error.message);return false;}
-    if(!(data||[]).length){const localObj=getCustomers();if(Object.keys(localObj).length&&maySeedCloudFromDevice()){await _pushCustomersNow(localObj);}else{saveLocal('layi_dash_customers',{});}return true;}
+    /* NOTHING ON THE SERVER IS NOT THE SAME AS NOTHING, the same lesson
+       the orders pull learned: a studio not yet synced and a person whose
+       branch holds no clients look identical from here, and wiping a
+       device that has work on it is the loss this batch removed. */
+    if(!(data||[]).length){
+      const localObj=getCustomers();
+      if(Object.keys(localObj).length){
+        if(maySeedCloudFromDevice())await _pushCustomersNow(localObj);
+        return false;
+      }
+      saveLocal('layi_dash_customers',{});return true;
+    }
     const obj={};(data||[]).forEach(r=>{obj[nameKey(r.name)]=rowToCust(r);});
     saveLocal('layi_dash_customers',obj);return true;
   }catch(e){console.warn('pullCustomers:',e);return false;}
@@ -2530,8 +2559,17 @@ async function _pushCustomersNow(obj){
     const list=Object.keys(obj).map(k=>obj[k]);let changed=false;
     for(const c of list){
       const row=custToRow(c);
-      if(c.dbId){const {error}=await supa.from('customers').update(row).eq('id',c.dbId);if(error)console.warn('cust update:',error.message);}
-      else{const {data,error}=await supa.from('customers').insert(row).select('id').single();if(error){console.warn('cust insert:',error.message);}else if(data){c.dbId=data.id;changed=true;}}
+      let id=c.dbId;
+      if(id){const {error}=await supa.from('customers').update(row).eq('id',id);if(error)console.warn('cust update:',error.message);}
+      else{const {data,error}=await supa.from('customers').insert(row).select('id').single();if(error){console.warn('cust insert:',error.message);}else if(data){id=c.dbId=data.id;changed=true;}}
+      /* Only if this device HAS contact details, which it only does if the
+         person was allowed to read them. A device that was refused them
+         must not write blanks over what is there. */
+      if(id&&(c.phone||c.email||c.whatsapp||c.address)){
+        const {error:ke}=await supa.from('customer_contacts')
+          .upsert(custToContactRow(c,id),{onConflict:'customer_id'});
+        if(ke)console.warn('contact save:',ke.message);
+      }
     }
     if(changed)save('layi_dash_customers',obj);
     if(list.length){const keep=list.map(c=>c.dbId).filter(Boolean);await reconcileDeletes('customers',keep);}

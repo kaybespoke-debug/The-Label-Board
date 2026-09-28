@@ -301,3 +301,73 @@ update public.memberships m
 set role_id = (select r.id from public.business_roles r
                where r.business_id = m.business_id and r.key = m.role)
 where m.role_id is null;
+
+-- ---------------------------------------------------------------------
+-- 6. A phone number and a chest measurement are not the same secret
+-- ---------------------------------------------------------------------
+-- public.customers held both, so gating the row on seeContact protected the
+-- contact details and took the measurements with them. A workroom role a
+-- studio deliberately keeps away from client phone numbers still has to be
+-- able to cut a garment. Copy first, drop second, one transaction.
+create table if not exists public.customer_contacts (
+  customer_id uuid primary key references public.customers(id) on delete cascade,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  branch_id   uuid,
+  phone       text,
+  email       text,
+  whatsapp    text,
+  address     text,
+  updated_at  timestamptz not null default now(),
+  constraint customer_contacts_branch_in_business
+    foreign key (branch_id, business_id)
+    references public.branches(id, business_id) on delete restrict
+);
+create index if not exists customer_contacts_business_idx on public.customer_contacts(business_id);
+
+insert into public.customer_contacts (customer_id, business_id, branch_id, phone, email, whatsapp, address)
+select c.id, c.business_id, c.branch_id, c.phone, c.email, c.whatsapp, c.address
+from public.customers c
+where coalesce(c.phone,'') <> '' or coalesce(c.email,'') <> ''
+   or coalesce(c.whatsapp,'') <> '' or coalesce(c.address,'') <> ''
+on conflict (customer_id) do update
+  set phone = excluded.phone, email = excluded.email,
+      whatsapp = excluded.whatsapp, address = excluded.address, updated_at = now();
+
+alter table public.customers
+  drop column if exists phone,
+  drop column if exists email,
+  drop column if exists whatsapp,
+  drop column if exists address;
+
+alter table public.customer_contacts enable row level security;
+alter table public.customer_contacts force row level security;
+grant select, insert, update, delete on public.customer_contacts to authenticated;
+
+drop policy if exists customer_contacts_select on public.customer_contacts;
+create policy customer_contacts_select on public.customer_contacts
+  for select using (app.can_here(business_id, 'seeContact', branch_id));
+
+drop policy if exists customer_contacts_insert on public.customer_contacts;
+create policy customer_contacts_insert on public.customer_contacts
+  for insert with check (
+    app.can_here(business_id, 'seeContact', branch_id)
+    and app.can(business_id, 'customers.manage')
+    and (branch_id is not null or app.has_all_branches(business_id)));
+
+drop policy if exists customer_contacts_update on public.customer_contacts;
+create policy customer_contacts_update on public.customer_contacts
+  for update using (app.can_here(business_id, 'seeContact', branch_id))
+  with check (
+    app.can_here(business_id, 'seeContact', branch_id)
+    and app.can(business_id, 'customers.manage')
+    and (branch_id is not null or app.has_all_branches(business_id)));
+
+drop policy if exists customer_contacts_delete on public.customer_contacts;
+create policy customer_contacts_delete on public.customer_contacts
+  for delete using (app.can_here(business_id, 'seeContact', branch_id)
+                    and app.can(business_id, 'customers.manage'));
+
+-- customers is the operational half now, gated on the operational permission.
+drop policy if exists customers_select on public.customers;
+create policy customers_select on public.customers
+  for select using (app.can_here(business_id, 'customers', branch_id));

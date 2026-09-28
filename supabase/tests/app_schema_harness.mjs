@@ -399,12 +399,31 @@ await asAdmin(`insert into memberships(user_id,business_id,role,status) values (
 await asAdmin(`insert into memberships(user_id,business_id,role,status) values ($1,$2,'owner','active')`, [U.bola, ids.bizB]);
 
 {
-  // exactly the shape custToRow() produces
+  /* A CLIENT IS TWO ROWS NOW. custToRow() writes the operational half and
+     custToContactRow() writes the personal half, because a workroom role a
+     studio keeps away from phone numbers still has to cut a garment, and
+     one row could not say that. Both halves are asserted here, in the
+     order and the shape the app actually sends them. */
   const r = await asUser(U.ada,
-    `insert into customers(business_id,name,email,whatsapp,address,note,measurements)
-     values ($1,'Mrs Oladuja','o@example.com','+234 802 000 0000','Lekki','Prefers emerald',$2) returning id`,
+    `insert into customers(business_id,name,note,measurements)
+     values ($1,'Mrs Oladuja','Prefers emerald',$2) returning id`,
     [ids.bizA, JSON.stringify({ meas: { Waist: '32' }, history: [] })]);
   ok('the app can save a customer as it actually builds one', !r.error, r.error);
+
+  const k = await asUser(U.ada,
+    `insert into customer_contacts(customer_id,business_id,phone,email,whatsapp,address)
+     values ($1,$2,'+234 802 000 0000','o@example.com','+234 802 000 0000','Lekki') returning customer_id`,
+    [r.rows[0] && r.rows[0].id, ids.bizA]);
+  ok('the contact half saves as its own row', !k.error, k.error);
+
+  /* and the app reads them back together, which is the one join it makes */
+  const both = await asUser(U.ada,
+    `select c.name, k.phone from customers c
+     left join customer_contacts k on k.customer_id = c.id
+     where c.name = 'Mrs Oladuja'`);
+  ok('a client comes back with both halves in one read',
+     both.rows.length === 1 && both.rows[0].phone === '+234 802 000 0000',
+     both.error || JSON.stringify(both.rows));
 
   // and a customer with nothing but a name, which the app also allows
   const bare = await asUser(U.ada,
