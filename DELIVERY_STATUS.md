@@ -135,19 +135,80 @@ for ever. 16 of 16, including a grep that stops the dead call coming back.
 
 ---
 
+### Batch E, relational orders and sync reliability. Staging, 29 Sep
+
+**Orders are rows.** `public.orders` has existed since August with
+branch-scoped RLS and had never held a row; it now carries `app_id`, `doc`,
+`assigned_to` and `rev`, with cost in `order_costs` and contact in
+`public.customers`. The device still holds one array and all thirty three
+readers are untouched; what changed is the shape on the server and therefore
+what the server is willing to send.
+
+Measured in a browser on staging: an owner signs in and gets two orders with
+costs; a staff member signs in and gets the same two orders **with no cost
+and no contact detail on the device at all**, and cannot read the
+transactions key. `seeCost` and `seeContact` are refusals now.
+
+**Migration** is repeatable, owner-only, and returns the count and the money
+total on both sides so a caller can compare rather than hope. It deletes
+nothing: the blob stays until rows have been read back. It caught its own
+bug, because returning both sides is what made a silent zero visible.
+
+**The audit trail cannot be rewritten.** `public.audit_log` has an INSERT
+policy, a SELECT policy behind the `audit` permission, and no UPDATE or
+DELETE policy at all, so history is closed to everyone including the owner.
+The actor is stamped from `auth.uid()`.
+
+**The outbox.** Every write is recorded in localStorage before it is sent,
+one entry per key, exponential backoff to a minute, and an entry leaves the
+queue only when the server accepted it or the person has been told. Reconnect
+and the tab returning to the front both trigger an immediate pass. A refusal
+is not retried for ever. A pill shows what is still going up and what did
+not, with a panel and a retry.
+
+**Conflict is detected, never guessed.** Proved on staging with two writers:
+device A edits, device B edits the same order, device A saves on a stale rev,
+the write matches nothing, both versions are kept and the person is asked.
+Resolving to either one lands correctly with the new revision.
+
+Branch scope is adversarial-tested on a four-outlet studio: 23 assertions,
+including moving a row between branches, which needs USING and WITH CHECK
+both.
+
+Found by these tests rather than by luck: a studio created after the RBAC
+migration had no roles at all; a key wired both as a row and as a blob; an
+empty pull emptying a device of 28 orders; and a permission that was not
+granted reading as *unanswered* rather than *denied*, so a staff member
+holding `money` came back with `seeCost` true.
+
+---
+
 ## IN PROGRESS
 
-### Batch E, the relational move and sync reliability
-One piece of work because both rewrite the same persistence layer. Cost and
-contact fields out of the orders blob so `seeCost` and `seeContact` become
-real, orders into rows so assigned-only and branch filtering become real, an
-append-only audit table, and the durable outbox with visible failure state.
+### Batch F, operations
+Error and unhandled-rejection monitoring, Edge Function failure monitoring,
+backup verification and a real restore drill, export, account and studio
+deletion including the `partners` foreign key that makes a studio
+undeletable, and tenant recovery.
+
+### Batch G, Flutterwave
+Architecture confirmed against current documentation before anything was
+written. **The current API is v3; there is no v4.** Checkout is the Standard
+API; payment plans are created server side and a checkout references the plan
+to start a subscription; Flutterwave sends `verif-hash` on every webhook and
+the value is the Secret Hash set in the dashboard. Their own guidance is to
+re-query the transaction before giving value rather than trusting the
+webhook body, which is what the implementation will do, with a processed-
+events table for idempotency.
+
+No encryption key is needed: that is for direct card charges, and this uses
+the hosted checkout.
 ## BLOCKED
 
 | item | blocked on | dependency |
 |---|---|---|
 | Pilot start date | **Kayode**: full scope first, or owner-only pilot first | the table above |
-| G, Flutterwave | **Kayode**: test and live API keys, and the webhook secret hash, set as secrets on the staging and production projects | needed before the checkout flow can be exercised end to end; the code can be written without them |
+| G, Flutterwave credentials | **Kayode**, when the code is ready: three secrets on the STAGING project only, named in the report. Test mode first; production after the whole staging billing flow passes | the code is being written now and does not need them yet |
 
 ---
 
