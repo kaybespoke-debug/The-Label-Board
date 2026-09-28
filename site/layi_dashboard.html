@@ -2464,7 +2464,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v54';
+const APP_VERSION='layi-v55';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3662,8 +3662,21 @@ async function forgotPassword(){
   if(raw.indexOf('@')<0){errEl.textContent='Enter your email address above first, then tap “Forgot password?”.';return;}
   if(!supa){errEl.textContent='Password reset needs the live server (email accounts only).';return;}
   errEl.textContent='Sending reset link…';
-  try{const {error}=await supa.auth.resetPasswordForEmail(raw.toLowerCase(),{redirectTo:location.href});
-    errEl.textContent=error?('Could not send reset: '+error.message):'Check your email for a link to set a new password.';
+  /* OUR FUNCTION, NOT SUPABASE'S MAILER. resetPasswordForEmail hands the
+     message to Supabase SMTP, which ACCOUNTS.md records as broken since 13
+     September — so this button has been telling people to check an inbox
+     nothing was ever sent to.
+
+     The answer is the same whatever happens, deliberately, including for an
+     address that has no account: telling somebody “no account with that
+     email” hands anybody who asks a list of who banks here. */
+  try{
+    await fetch(SUPA_URL+'/functions/v1/auth-recover',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email:raw.toLowerCase()})
+    });
+    errEl.textContent='If that address has an account, a link is on its way. It can be used once and expires in an hour.';
   }catch(e){errEl.textContent='Could not reach the server. Check your connection.';}
 }
 function show(id,on,disp){const el=document.getElementById(id);if(el)el.style.display=on?(disp||'flex'):'none';}

@@ -333,13 +333,52 @@ Deno.serve(async (req) => {
        VerifiedTarget, so they cannot be called with an id straight off the
        wire — that is a type error, caught on deploy. */
     const removeAccount = (t: VerifiedTarget) => admin.auth.admin.deleteUser(t)
+    const who0 = await studioAndInviter()
     const emailPasswordReset = async (t: VerifiedTarget) => {
       const { data: au } = await admin.auth.admin.getUserById(t)
       const email = au?.user?.email
       if (!email) return { error: { message: 'That account has no email address.' } }
-      /* The link goes to THEM, by email, from Supabase. The owner never sees
-         it and never learns the password. */
-      return await admin.auth.resetPasswordForEmail(email, { redirectTo: APP_URL })
+      /* The link goes to THEM, by email. The owner never sees it and never
+         learns the password.
+
+         It used to go through resetPasswordForEmail, which hands the message
+         to Supabase's own mailer — broken since 13 September, so this button
+         has been doing nothing at all for anybody who pressed it. Same
+         architecture as the invitation now: generateLink makes the link,
+         Resend delivers it.
+
+         Somebody who has never confirmed cannot be sent a recovery link, so
+         they get an invite link, which is what they actually need: they never
+         chose a password in the first place. */
+      const confirmed = !!au?.user?.email_confirmed_at
+      const { data: gl, error: gerr } = await admin.auth.admin.generateLink({
+        type: confirmed ? 'recovery' : 'invite',
+        email,
+        options: { redirectTo: APP_URL },
+      })
+      if (gerr || !gl?.properties?.action_link) {
+        return { error: { message: gerr?.message || 'Could not make a link for that account.' } }
+      }
+      const title = confirmed ? 'Choose a new password' : 'Finish setting up your account'
+      const lead = confirmed
+        ? `${esc(who0.studio)} has sent you a link to choose a new password for The Label Board.`
+        : `${esc(who0.studio)} has sent you a link to finish setting up your account on The Label Board.`
+      const link = String(gl.properties.action_link)
+      const html = `<!doctype html><html><body style="margin:0;background:#f4f5f7;padding:24px 12px;font-family:ui-sans-serif,system-ui,'Segoe UI',Helvetica,Arial,sans-serif;color:#111827">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:14px;padding:32px" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#17385c;padding-bottom:22px">The Label Board</td></tr>
+<tr><td style="font-size:21px;font-weight:700;line-height:1.35;padding-bottom:14px">${esc(title)}</td></tr>
+<tr><td style="font-size:15px;line-height:1.65;color:#3f4a5a;padding-bottom:22px">${lead}</td></tr>
+<tr><td style="padding-bottom:18px"><a href="${esc(link)}" style="display:inline-block;background:#17385c;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:10px">${esc(title)}</a></td></tr>
+<tr><td style="font-size:13px;line-height:1.6;color:#6b7280;padding-bottom:22px">This link can be used once and expires in an hour. Nobody at the studio can see your password.</td></tr>
+<tr><td style="border-top:1px solid #e5e7eb;padding-top:18px;font-size:12px;line-height:1.6;color:#9ca3af">Need a hand? Reply to this email and a person will read it.</td></tr>
+</table></td></tr></table></body></html>`
+      const text = ['THE LABEL BOARD', '', title, '', link, '',
+        'This link can be used once and expires in an hour.'].join('\n')
+      const sent = await sendViaResend(email, title + ' \u2014 The Label Board', html, text)
+      if (!sent.ok) return { error: { message: sent.error } }
+      return { error: null }
     }
 
     /* ---- list: this business's team, and nobody else's.

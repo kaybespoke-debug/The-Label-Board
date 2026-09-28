@@ -228,11 +228,19 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      the trigger invents a studio named after the invitee. So the
      invitation must be written first, and the nonce it mints is what the
      trigger recognises. */
+  const inviteBlock = (function () {
+    const from = code.indexOf("if (action === 'invite') {");
+    if (from < 0) return '';
+    const to = code.indexOf("if (action === 'resendInvitation')", from);
+    return code.slice(from, to > 0 ? to : code.length);
+  })();
   ok('the invitation is created BEFORE the account',
-     code.indexOf("rpc('create_team_invitation'") > 0
-     && code.indexOf("rpc('create_team_invitation'") < code.indexOf('auth.admin.generateLink({'),
+     inviteBlock.indexOf("rpc('create_team_invitation'") > 0
+     && inviteBlock.indexOf("rpc('create_team_invitation'") < inviteBlock.indexOf('auth.admin.generateLink({'),
      'the other way round and the trigger invents a studio, which is what 9 '
-     + 'businesses becoming 10 looked like');
+     + 'businesses becoming 10 looked like. Scoped to the invite block: there '
+     + 'is a second generateLink in emailPasswordReset now, and a password '
+     + 'reset is not an invitation');
   ok('and the account carries the nonce so the trigger can abstain',
      code.includes('team_invitation_id: inv.invitation_id')
      && code.includes('team_invitation_nonce: inv.nonce'),
