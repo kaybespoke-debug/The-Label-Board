@@ -80,12 +80,28 @@ their own membership at the owner role. Batch A probe 51 of 51.
 
 ---
 
+### Batch B, RBAC enforcement. Staging, 29 Sep
+Per-key RLS on `app_state`, read and write answered separately, so a viewer is
+genuinely read-only and a tailor cannot fetch the transactions key. Four new
+permissions where a viewer would otherwise have written everything they could
+see, plus `tasks`, which the app was already asking for and the catalogue did
+not have. The five remaining `is_business_admin` policies replaced. Custom
+roles proved end to end: an owner creates one, a staff member cannot add to
+it, the owner assigns it, and the database honours exactly its permissions.
+
+Two regressions caught by older probes rather than by luck: the roles key went
+quiet (zero-row write, 200, no message, the B1 shape) and the invoice counter
+depended on writing settings, which a staff member no longer may. Both fixed.
+
+Batch B probe 68 of 68. Release `layi-v53`.
+
+---
+
 ## IN PROGRESS
 
-### Batch B, RBAC enforcement
-Per-key RLS on `app_state` so a permission refuses a request that skips the
-app; the nine `is_business_admin` replacements; custom roles connected to the
-secure model so the existing screen is honest about what it offers.
+### Batch C, team invitations against RBAC
+Role and branch chosen at invite, permissions inherited, and a business
+switcher so a multi-business person is never stranded on a 409.
 
 ---
 
