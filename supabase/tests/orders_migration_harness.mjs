@@ -363,6 +363,78 @@ section('8. And the old key is not a way back in');
 /* =====================================================================
    */
 console.log('\n' + '='.repeat(62));
+section('9. Retiring the source, which refuses unless the copy is proven');
+{
+  /* A stale client first: the studio HAS rows now, so the old key is refused
+     rather than quietly accepted and dropped. Refused, not stripped —
+     silently dropping an order write would tell a studio their morning's
+     work had saved when it had not. */
+  const stale = await asMember(U.owner,
+    `insert into public.app_state (business_id,key,data) values ($1,'layi_dash_orders','[]'::jsonb)
+     on conflict (business_id,key) do update set data = excluded.data`, [BIZ]);
+  ok('an out-of-date app is refused, and told why',
+     /out of date/.test(stale.error || ''), stale.error || 'IT WAS ACCEPTED');
+
+  /* An unmigrated studio must NOT be refused, or this release breaks every
+     studio that has not moved yet. */
+  const FRESH = '44444444-4444-4444-4444-444444444444';
+  const fuser = '22222222-0000-0000-0000-000000000009';
+  await db.query(`insert into auth.users (id,email) values ($1,'fresh@p2.test')`, [fuser]);
+  await db.query(`insert into public.businesses (id,name,slug,plan,status)
+    values ($1,'Not Moved Yet','not-moved-yet','pro','active')`, [FRESH]);
+  await db.query(`insert into public.memberships (business_id,user_id,role,status)
+    values ($1,$2,'owner','active') on conflict do nothing`, [FRESH, fuser]);
+  const fresh = await asMember(fuser,
+    `insert into public.app_state (business_id,key,data) values ($1,'layi_dash_orders','[]'::jsonb)`, [FRESH]);
+  ok('a studio that has not moved yet still writes its blob exactly as before',
+     !fresh.error, fresh.error || '');
+
+  /* The refusal shown before the acceptance. The reconciliation is broken
+     the way it would really break — a source order with no destination row —
+     by removing one that was migrated. Adding a ghost to the blob is not
+     possible any more, because the trigger two checks up refuses it, which
+     is that trigger doing its job. */
+  await db.query(`delete from public.orders where business_id=$1 and app_id='O-1002'`, [BIZ]);
+  const refused = await (async () => {
+    try { await db.query(`select app.retire_order_blob($1)`, [BIZ]); return null; }
+    catch (e) { return String(e.message).split(String.fromCharCode(10))[0]; }
+  })();
+  ok('retiring is REFUSED while one order is unaccounted for',
+     /does not reconcile/.test(refused || ''), refused || 'IT WAS ALLOWED');
+  ok('  and the blob is still there', (await one(
+     `select count(*)::int from public.app_state where business_id=$1 and key like 'layi_dash_orders%'`, [BIZ])) === 2);
+
+  /* Now migrate the straggler and try again. */
+  await q(`select * from app.migrate_orders_to_rows($1)`, [BIZ]);
+  const out = await one(`select app.retire_order_blob($1)`, [BIZ]);
+  const O = typeof out === 'string' ? JSON.parse(out) : out;
+  ok('once every order is accounted for, it is allowed', O && O.retired === true, JSON.stringify(O && O.green));
+  ok('  and both keys are gone', (await one(
+     `select count(*)::int from public.app_state where business_id=$1 and key like 'layi_dash_orders%'`, [BIZ])) === 0);
+  ok('  and the orders are all still there as rows', (await one(
+     `select count(*)::int from public.orders where business_id=$1`, [BIZ])) === 5);
+  ok('  and it was recorded in the studio history', (await one(
+     `select count(*)::int from public.audit_log where business_id=$1 and action='Legacy order store retired'`, [BIZ])) === 1);
+
+  /* And with the blob gone the bypass is gone: the read this harness opened
+     with now returns nothing at all. */
+  const gone = await asMember(U.viewer,
+    `select data from public.app_state where business_id=$1 and key='layi_dash_orders'`, [BIZ]);
+  ok('the read that handed a viewer every cost now returns nothing',
+     gone.rows.length === 0, gone.error || (gone.rows.length + ' rows'));
+}
+
+section('10. And the catalogue stops overstating itself');
+{
+  const rows = await q(`select key, enforceable from public.permission_catalogue
+    where key in ('seeCost','seeContact','money','receivables') order by key`);
+  const by = Object.fromEntries(rows.map(r => [r.key, r.enforceable]));
+  ok('seeCost is enforced by the database now', by.seeCost === 'database', JSON.stringify(by));
+  ok('and seeContact', by.seeContact === 'database', JSON.stringify(by));
+  ok('money is still honestly marked ui_only, because it still is',
+     by.money === 'ui_only', JSON.stringify(by));
+  ok('and so is receivables', by.receivables === 'ui_only', JSON.stringify(by));
+}
 console.log(pass + ' passed, ' + failures.length + ' failed');
 for (const f of failures) console.log('  - ' + f);
 if (!failures.length) {

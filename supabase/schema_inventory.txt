@@ -614,9 +614,11 @@ fn app.recheck_referral_on_payment_method()
 fn app.reconcile_orders(p_business uuid)
 fn app.referral_code_for(p_name text)
 fn app.referral_follows_studio()
+fn app.refuse_retired_order_blob()
 fn app.refuse_write_when_unpaid()
 fn app.reopen_studio(p_business uuid)
 fn app.resume_subscription(p_business uuid)
+fn app.retire_order_blob(p_business uuid)
 fn app.seats_used(p_business uuid, p_exclude_membership uuid)
 fn app.seed_business_roles()
 fn app.self_referral_reason(p_partner uuid, p_business uuid)
@@ -682,6 +684,7 @@ fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text
 fn public.recount_storage_usage()
 fn public.reopen_studio(p_business uuid)
 fn public.resume_subscription(p_business uuid)
+fn public.retire_my_order_blob(p_business uuid)
 fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text)
 fn public.set_partner_payout_frozen(p_partner uuid, p_frozen boolean, p_reason text)
 fn public.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
@@ -818,6 +821,7 @@ pol transactions.transactions_insert
 pol transactions.transactions_select
 pol transactions.transactions_update
 trg app_state.app_state_no_credentials
+trg app_state.app_state_no_retired_orders
 trg app_state.app_state_plan_feature
 trg app_state.app_state_studio_settings_guard
 trg app_state.app_state_unpaid_guard
