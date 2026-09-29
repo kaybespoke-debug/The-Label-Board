@@ -34,9 +34,9 @@ const snapshot = join(repo, 'supabase/schema_inventory.txt');
 
 const LIVE_SQL = `with l as (
   select 'col ' || table_name || '.' || column_name as t from information_schema.columns where table_schema='public'
-  union all select 'fn app.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+  union all select 'fn app.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') -> ' || pg_get_function_result(p.oid)
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app'
-  union all select 'fn public.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+  union all select 'fn public.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') -> ' || pg_get_function_result(p.oid)
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'
   union all select 'pol ' || tablename || '.' || policyname from pg_policies where schemaname='public'
   union all select 'trg ' || c.relname || '.' || t.tgname from pg_trigger t join pg_class c on c.oid=t.tgrelid
@@ -61,12 +61,20 @@ const lines = [];
 const add = (rows, fn) => { for (const r of rows) lines.push(fn(r)); };
 add((await db.query(`select table_name t, column_name c from information_schema.columns
   where table_schema='public'`)).rows, r => 'col ' + r.t + '.' + r.c);
-add((await db.query(`select p.proname p, pg_get_function_identity_arguments(p.oid) a
+/* THE RETURN TYPE IS PART OF A FUNCTION'S IDENTITY, and leaving it out cost
+   the partner portal. public.partner_me() was declared to return eleven
+   columns while the function it selected from returned fourteen; every
+   partner login failed with 42P13, and this fingerprint could not see it,
+   because the name and the arguments had not changed. A drift check that
+   cannot detect the drift that actually happened is worth correcting. */
+add((await db.query(`select p.proname p, pg_get_function_identity_arguments(p.oid) a,
+  pg_get_function_result(p.oid) r
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app'`)).rows,
-  r => 'fn app.' + r.p + '(' + r.a + ')');
-add((await db.query(`select p.proname p, pg_get_function_identity_arguments(p.oid) a
+  r => 'fn app.' + r.p + '(' + r.a + ') -> ' + r.r);
+add((await db.query(`select p.proname p, pg_get_function_identity_arguments(p.oid) a,
+  pg_get_function_result(p.oid) r
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'`)).rows,
-  r => 'fn public.' + r.p + '(' + r.a + ')');
+  r => 'fn public.' + r.p + '(' + r.a + ') -> ' + r.r);
 add((await db.query(`select tablename t, policyname p from pg_policies where schemaname='public'`)).rows,
   r => 'pol ' + r.t + '.' + r.p);
 add((await db.query(`select c.relname t, g.tgname g from pg_trigger g join pg_class c on c.oid=g.tgrelid

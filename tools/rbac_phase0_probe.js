@@ -190,15 +190,24 @@ const grantsMoney = roles => {
   // -------------------------------------------------------------------
   section('Ordinary work is untouched');
   // -------------------------------------------------------------------
+  /* ORDERS ARE ROWS NOW. This used to save through layi_dash_orders, the
+     app_state key, which P2 retired: for a studio whose orders have moved,
+     writing that key is refused with 42501 and "this app is out of date".
+     The assertion is unchanged in spirit — everybody who can work on orders
+     still can, and Phase 0 did not take that away — but it has to be made
+     against the store the app actually uses, or it is testing whether a
+     retired key is still retired. */
   for (const role of ['owner', 'manager', 'staff', 'viewer']) {
     const stamp = 'phase0-' + Date.now() + '-' + role;
     const res = await one(WHO[role].id, {
-      method: 'POST', path: '/rest/v1/app_state?on_conflict=business_id,key',
+      method: 'POST', path: '/rest/v1/orders?on_conflict=business_id,app_id',
       prefer: 'resolution=merge-duplicates,return=representation',
-      body: { business_id: BIZ, key: 'layi_dash_orders', data: [{ id: stamp, client: 'Phase 0 probe' }] },
+      body: { business_id: BIZ, app_id: stamp, total: 0, status: 'open',
+              doc: { id: stamp, client: 'Phase 0 probe' } },
     });
-    const back = (await one(WHO.owner.id, { method: 'GET', path: ORDERS_PATH + '&select=data' })).body[0];
-    ok('a ' + role + ' can still save an order', !!back && JSON.stringify(back.data).includes(stamp),
+    const back = (await one(WHO.owner.id, {
+      method: 'GET', path: '/rest/v1/orders?business_id=eq.' + BIZ + '&app_id=eq.' + stamp + '&select=app_id' })).body;
+    ok('a ' + role + ' can still save an order', Array.isArray(back) && back.length === 1,
        'status ' + res.status);
   }
   await one(WHO.owner.id, { method: 'DELETE', path: ORDERS_PATH });

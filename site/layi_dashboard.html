@@ -2146,6 +2146,10 @@ async function switchStudio(id){
          !(x.payload&&x.payload.orders)){
         try{x.payload={orders:rawOrders()};changed=true;}catch(e){}
       }
+      if(x.kind==="txns"&&x.business_id&&x.business_id!==id&&
+         !(x.payload&&x.payload.txns)){
+        try{x.payload={txns:getTxns()};changed=true;}catch(e){}
+      }
     });
     if(changed)setOutbox(q);
   }catch(e){}
@@ -2648,6 +2652,7 @@ const SYNC_PUSHERS={
   /* ORDERS DO NOT GO INTO app_state ANY MORE. One source of truth: the
      rows. The blob keys stay as the device’s local copy and are never
      pushed, which is what stops two stores disagreeing. */
+  'layi_dash_txns':()=>outboxQueue({kind:'txns',key:'layi_dash_txns',payload:1}),
   'layi_dash_orders':()=>outboxQueue({kind:'orders',key:'layi_dash_orders',payload:1}),
   'layi_dash_orders_done':()=>outboxQueue({kind:'orders',key:'layi_dash_orders',payload:1}),
   'layi_dash_suppliers':()=>pushSuppliers(getSuppliers()),
@@ -2671,7 +2676,16 @@ const ORDER_KEYS=['layi_dash_orders','layi_dash_orders_done'];
    studio’s team comes from memberships and team-admin; this list only ever
    described the device. It is in DEVICE_LOCAL in audit_sync.js with the same
    reasoning, and the migration deletes the rows already up there. */
-const STATE_KEYS=['layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
+/* layi_dash_txns LEFT THIS LIST. Money was one jsonb array per business,
+   read whole and written whole, so two devices that both recorded a payment
+   produced one payment: the second write carried a copy of the array from
+   before the first, and no error was raised because nothing was wrong with
+   the request. money_concurrency_harness demonstrates it — 125,000 taken,
+   75,000 stored — before it tests the fix.
+
+   Payments are rows now, one per payment, each with the id the device chose
+   before sending, so a retry is the same payment and two devices are two. */
+const STATE_KEYS=['layi_dash_appts','layi_dash_staff','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
 const _statePushTimers={};
 /* THE QUEUE, NOT THE WIRE. pushState used to fire a request and swallow
    the answer; now it records what has to reach the server and the drain
@@ -2876,6 +2890,15 @@ async function sendOutboxEntry(e){
        the record. */
     const {error}=await supa.from("audit_log").insert(e.payload);
     return outboxResult(error);
+  }
+  if(e.kind==="txns"){
+    /* Same rule as orders: the payload is the device's array, so either this
+       studio is the one on screen or the entry carries a snapshot. */
+    if(e.payload&&typeof e.payload==="object"&&Array.isArray(e.payload.txns)){
+      return await pushTxnRows(biz,e.payload.txns);
+    }
+    if(biz!==myBusinessId)return {ok:false,fatal:false,defer:true,error:""};
+    return await pushTxnRows(biz,null);
   }
   if(e.kind==="orders"){
     /* ORDERS ARE THE ONE KIND WHOSE PAYLOAD IS NOT IN THE ENTRY. It reads
@@ -3340,6 +3363,80 @@ async function resolveConflict(id,which){
   closeModal();renderAll();updateSyncPill();
 }
 
+/* ===== MONEY, ONE ROW PER PAYMENT =====================================
+   A payment carries the id the device gave it, so sending it twice is the
+   same payment and sending two is two. Nothing is read-modify-written: the
+   array is never sent, only the rows that are in it. */
+async function pushTxnRows(p_business,p_list){
+  const biz=p_business||myBusinessId;
+  if(!supa||!liveMode||!biz)return {ok:true};
+  const list=Array.isArray(p_list)?p_list:getTxns();
+  let firstError="",fatal=false;
+  /* the orders this studio has, so a payment can name the one it belongs to */
+  let orderIds={};
+  try{
+    const {data}=await supa.from('orders').select('id,app_id').eq('business_id',biz);
+    (data||[]).forEach(function(o){if(o.app_id)orderIds[o.app_id]=o.id;});
+  }catch(e){}
+  for(const t of list){
+    if(!t||!t.id)continue;
+    const row={business_id:biz,app_id:String(t.id),
+      branch_id:branchIdForName(t.branch),
+      order_id:(t.orderId&&orderIds[t.orderId])||null,
+      kind:(String(t.dir||"in").toLowerCase()==="out")?"expense":"sale",
+      amount:Number(t.amount||0),
+      at:t.at?new Date(t.at).toISOString():new Date().toISOString(),
+      method:t.method||null,
+      note:t.label||null,
+      detail:(function(){const d=Object.assign({},t);
+        ["id","amount","at","method","label","branch","orderId","dir"].forEach(function(k){delete d[k];});
+        return d;})()};
+    try{
+      /* merge-duplicates on (business_id, app_id): a resend is an update of
+         the same payment, never a second one. */
+      const {error}=await supa.from('transactions').upsert(row,{onConflict:'business_id,app_id'});
+      if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;}
+    }catch(e){if(!firstError)firstError=String(e&&e.message||e);}
+  }
+  if(firstError)return {ok:false,fatal:fatal,error:firstError};
+  return {ok:true};
+}
+
+async function pullTxns(){
+  if(!supa||!liveMode||!myBusinessId)return false;
+  try{
+    const {data:rows,error}=await supa.from('transactions')
+      .select('app_id,branch_id,order_id,kind,amount,at,method,note,detail')
+      .eq('business_id',myBusinessId);
+    /* A REFUSAL IS NOT AN EMPTY LEDGER. Somebody without receivables reads
+       no payments at all, and overwriting their device with that would
+       delete the studio's money from it. */
+    if(error)return false;
+    if(!rows||!rows.length){
+      const here=getTxns();
+      if(here.length){outboxQueue({kind:"txns",key:"layi_dash_txns",payload:1});return false;}
+      return true;
+    }
+    let orderApp={};
+    try{
+      const {data}=await supa.from('orders').select('id,app_id').eq('business_id',myBusinessId);
+      (data||[]).forEach(function(o){orderApp[o.id]=o.app_id;});
+    }catch(e){}
+    const list=rows.map(function(r){
+      const t=Object.assign({},r.detail||{});
+      t.id=r.app_id;t.amount=Number(r.amount);t.at=r.at;
+      t.dir=(r.kind==='expense')?'out':'in';
+      if(r.method)t.method=r.method;
+      if(r.note)t.label=r.note;
+      if(r.branch_id)t.branch=branchNameForId(r.branch_id)||t.branch;
+      if(r.order_id&&orderApp[r.order_id])t.orderId=orderApp[r.order_id];
+      return t;
+    });
+    saveLocal('layi_dash_txns',list);
+    return true;
+  }catch(e){return false;}
+}
+
 /* Reading them back. Costs arrive only for somebody the database is
    willing to give them to, so an absent cost is a refusal and is left
    absent rather than defaulted to zero, which would read as free. */
@@ -3520,7 +3617,15 @@ async function reportTenantPresence(){
    themselves, so nobody is locked out of a device by this.
    ================================================================================ */
 const BIZ_OWNER_KEY='layi_dash_biz_owner';
-const TENANT_KEYS=STATE_KEYS.concat(ORDER_KEYS,['layi_dash_users','layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
+/* A KEY THAT LEAVES STATE_KEYS MUST BE NAMED HERE, or it stops being
+   cleared when the studio changes. layi_dash_txns left STATE_KEYS to become
+   rows and silently left this list with it, so one studio's payments stayed
+   on the device and were pushed into the next studio opened. The tenant-
+   device gate caught it on the first run, which is the only reason this
+   comment is here rather than a studio's money being in somebody else's
+   books. TENANT_KEYS is the list of what belongs to a studio, not a
+   by-product of how it happens to sync. */
+const TENANT_KEYS=STATE_KEYS.concat(ORDER_KEYS,['layi_dash_txns','layi_dash_users','layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
 let _deviceWiped=false;   // this device held another studio, so it may not seed the cloud
 function deviceOwner(){try{return store.get(BIZ_OWNER_KEY)||'';}catch(e){return '';}}
 function wipeTenantData(){TENANT_KEYS.forEach(function(k){try{store.del(k);}catch(e){}});}
@@ -3566,13 +3671,15 @@ async function hydrateFromCloud(){
       /* Orders are rows now and are pulled separately, so an old blob
          left behind by a studio that has not been migrated yet must not
          overwrite what the rows just said. */
-      const fromRows=['layi_dash_orders','layi_dash_orders_done'];
+      const fromRows=['layi_dash_orders','layi_dash_orders_done','layi_dash_txns'];
       rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key)&&fromRows.indexOf(r.key)<0)saveLocal(r.key,r.data);}); // cloud → local
       try{await loadCloudBranches();}catch(e){}
       try{await pullOrders();}catch(e){}
+      try{await pullTxns();}catch(e){}
       if(!rows.length&&maySeedCloudFromDevice()){
         await pushAllState();
         outboxQueue({kind:"orders",key:"layi_dash_orders",payload:1});
+        outboxQueue({kind:"txns",key:"layi_dash_txns",payload:1});
       }
     }
     reloadSettingsFromStorage();

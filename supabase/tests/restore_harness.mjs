@@ -103,9 +103,14 @@ await admin(`insert into public.customer_contacts (customer_id,business_id,branc
   values ($1,$2,$3,'+234 802 000 0000','o@drill.test')`, [cust[0].id, BIZ, BR]);
 await admin(`insert into public.transactions (business_id,branch_id,kind,amount,at) values
   ($1,$2,'sale',45000,now()),($1,$2,'sale',120000,now()),($1,$2,'expense',30000,now())`, [BIZ, BR]);
+/* THE MONEY IS THE THREE TRANSACTIONS ABOVE, not a layi_dash_txns blob.
+   This used to seed both, which is a state no studio can be in any more:
+   once a studio's payments are rows, writing that key is refused with "this
+   app is out of date". The suite was asserting that an export carries a
+   legacy blob it will never see again; what matters is that it carries the
+   rows, which section 3 checks. */
 await admin(`insert into public.app_state (business_id,key,data) values
-  ($1,'layi_dash_settings','{"biz":"Drill Studio","currency":"NGN"}'::jsonb),
-  ($1,'layi_dash_txns','[{"id":"t1"}]'::jsonb)`, [BIZ]);
+  ($1,'layi_dash_settings','{"biz":"Drill Studio","currency":"NGN"}'::jsonb)`, [BIZ]);
 await admin(`insert into public.suppliers (business_id,name,type) values ($1,'Aso-oke House','Fabric Supplier')`, [BIZ]);
 await admin(`insert into public.products (business_id,name,price) values ($1,'Agbada',85000)`, [BIZ]);
 await admin(`insert into public.staff (business_id,branch_id,name,job_title) values ($1,$2,'Chidi','Tailor')`, [BIZ, BR]);
@@ -317,8 +322,10 @@ section('And the studio works again');
   const k = await asUser(U.ada, `select phone from public.customer_contacts where business_id=$1`, [BIZ]);
   ok('and the client contact details', k.rows.length === 1 && /802 000 0000/.test(k.rows[0].phone),
      JSON.stringify(k.rows));
+  /* one app_state key now, not two: the money moved out of app_state and
+     into transactions, which the manager reads above */
   const staff = await asUser(U.tunde, `select key from public.app_state where business_id=$1`, [BIZ]);
-  ok('and the manager can work', staff.rows.length === 2, 'saw ' + staff.rows.length);
+  ok('and the manager can work', staff.rows.length === 1, 'saw ' + staff.rows.length);
   const suspended = await asUser(U.chidi, `select id from public.orders where business_id=$1`, [BIZ]);
   ok('while the suspended member still cannot', suspended.rows.length === 0,
      'saw ' + suspended.rows.length + ' orders');

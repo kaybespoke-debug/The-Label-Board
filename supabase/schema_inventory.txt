@@ -533,167 +533,179 @@ col tlb_trial_history.ip_address
 col tlb_trial_history.trial_end_date
 col tlb_trial_history.trial_start_date
 col transactions.amount
+col transactions.app_id
 col transactions.at
 col transactions.branch_id
 col transactions.business_id
+col transactions.created_at
+col transactions.detail
 col transactions.id
 col transactions.kind
+col transactions.method
+col transactions.note
 col transactions.order_id
-fn app.attach_referral(p_business uuid, p_code text)
-fn app.audit(p_business uuid, p_action text, p_detail text, p_entity text, p_entity_id text, p_entity_label text, p_branch uuid)
-fn app.audit_branches()
-fn app.audit_business()
-fn app.audit_invitation()
-fn app.audit_membership()
-fn app.audit_permissions()
-fn app.bump_order_rev()
-fn app.can(p_business uuid, p_perm text)
-fn app.can_here(p_business uuid, p_perm text, p_branch uuid)
-fn app.cancel_subscription(p_business uuid)
-fn app.cancel_team_invitation(p_invitation_id uuid)
-fn app.claim_referral_code(p_code text)
-fn app.close_studio(p_business uuid, p_reason text)
-fn app.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval)
-fn app.current_partner()
-fn app.default_membership_role()
-fn app.default_permissions(p_tier text)
-fn app.delete_my_account(p_close_solely_owned boolean)
-fn app.discard_invitation(p_invitation_id uuid, p_reason text)
-fn app.enforce_branch_limit()
-fn app.enforce_one_business_per_method()
-fn app.enforce_payroll_feature()
-fn app.enforce_seat_limit()
-fn app.enforce_state_feature()
-fn app.enforce_table_feature()
-fn app.ensure_billing_record(p_business uuid)
-fn app.error_reports_recently(p_business uuid)
-fn app.export_studio(p_business uuid)
-fn app.feature_refusal(p_feature text)
-fn app.flag(p_key text)
-fn app.guard_business_identity()
-fn app.guard_business_role()
-fn app.guard_last_owner()
-fn app.guard_owner_permissions()
-fn app.guard_profile_authority()
-fn app.guard_studio_settings()
-fn app.has_all_branches(p_business uuid)
-fn app.has_paid(p_business uuid)
-fn app.import_studio(p_json jsonb)
-fn app.in_scope(p_business uuid, p_branch uuid)
-fn app.is_business_admin(p_business uuid)
-fn app.is_owner(p_business uuid)
-fn app.is_partner(p_partner uuid)
-fn app.is_platform_admin()
-fn app.is_tlb_owner()
-fn app.limits_for(p_business uuid)
-fn app.lock_business_seats(p_business uuid)
-fn app.may_read_key(p_business uuid, p_key text)
-fn app.may_write_key(p_business uuid, p_key text)
-fn app.media_business_of(p_name text)
-fn app.media_usage_sync()
-fn app.migrate_orders_to_rows(p_business uuid)
-fn app.my_billing(p_business uuid)
-fn app.my_staff_id()
-fn app.no_commission_before_payment()
-fn app.on_trial(p_business uuid)
-fn app.open_checkout(p_business uuid, p_plan text, p_cycle text)
-fn app.order_commission_total(p_order jsonb)
-fn app.order_cost_total(p_order jsonb)
-fn app.order_doc_carries_no_secrets()
-fn app.order_doc_without_secrets(p_order jsonb)
-fn app.order_item_cost_total(p_order jsonb)
-fn app.partner_account_reverify()
-fn app.partner_me()
-fn app.perm_for_key(p_key text)
-fn app.pin_referral()
-fn app.plan_allows(p_business uuid, p_feature text)
-fn app.plan_storage_bytes(p_plan text)
-fn app.provision_studio()
-fn app.purge_studio(p_business uuid)
-fn app.recheck_referral_on_payment_method()
-fn app.reconcile_orders(p_business uuid)
-fn app.referral_code_for(p_name text)
-fn app.referral_follows_studio()
-fn app.refuse_retired_order_blob()
-fn app.refuse_write_when_unpaid()
-fn app.reopen_studio(p_business uuid)
-fn app.resume_subscription(p_business uuid)
-fn app.retire_order_blob(p_business uuid)
-fn app.seats_used(p_business uuid, p_exclude_membership uuid)
-fn app.seed_business_roles()
-fn app.self_referral_reason(p_partner uuid, p_business uuid)
-fn app.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
-fn app.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric)
-fn app.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb)
-fn app.slugify(p text)
-fn app.stamp_audit_actor()
-fn app.stamp_error_report()
-fn app.storage_cap_for(p_business uuid)
-fn app.storage_has_room(p_business uuid)
-fn app.strip_credentials_from_state()
-fn app.tlb_staff_id()
-fn app.trial_days()
-fn app.usage_for(p_business uuid)
-fn app.void_pending_on_churn()
-fn app.write_perm_for_key(p_key text)
-fn public.accept_invitation(p_invitation_id uuid)
-fn public.account_for_recovery(p_email text)
-fn public.can(p_business uuid, p_perm text)
-fn public.cancel_subscription(p_business uuid)
-fn public.cancel_team_invitation(p_invitation_id uuid)
-fn public.cancel_trial(p_business uuid)
-fn public.claim_referral_code(p_code text)
-fn public.close_studio(p_business uuid, p_reason text)
-fn public.cohort_taken(p_cohort text)
-fn public.convert_trial_to_paid(p_business uuid, p_plan text, p_cycle text, p_price numeric, p_paid_on date, p_reference text)
-fn public.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval)
-fn public.delete_my_account(p_close_solely_owned boolean)
-fn public.discard_invitation(p_invitation_id uuid, p_reason text)
-fn public.expire_finished_terms(p_on date)
-fn public.expire_finished_trials(p_on date)
-fn public.export_studio(p_business uuid)
-fn public.import_studio(p_json jsonb)
-fn public.migrate_my_orders(p_business uuid)
-fn public.my_billing(p_business uuid)
-fn public.my_commission_summary()
-fn public.my_membership(p_business uuid)
-fn public.my_permissions(p_business uuid)
-fn public.my_plan_features()
-fn public.my_plan_usage()
-fn public.my_storage_usage()
-fn public.my_trial()
-fn public.open_checkout(p_business uuid, p_plan text, p_cycle text)
-fn public.partner_accrue_month(p_month date, p_partner uuid)
-fn public.partner_active_paying(p_partner uuid, p_on date)
-fn public.partner_clear_ledger(p_on date)
-fn public.partner_commission_summary(p_partner uuid)
-fn public.partner_me()
-fn public.partner_payout_run(p_partner uuid, p_on date)
-fn public.partner_referral_rate(p_referral uuid, p_on date)
-fn public.partner_referral_term_end(p_referral uuid)
-fn public.partner_tier_rate(p_active integer)
-fn public.partner_void_on_refund(p_business uuid, p_reason text)
-fn public.platform_billing_summary()
-fn public.platform_enquiries(p_state text)
-fn public.platform_partner_summary()
-fn public.platform_referral_risk()
-fn public.platform_tenant_summary()
-fn public.purge_studio(p_business uuid)
-fn public.reconcile_my_orders(p_business uuid)
-fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text)
-fn public.recount_storage_usage()
-fn public.reopen_studio(p_business uuid)
-fn public.resume_subscription(p_business uuid)
-fn public.retire_my_order_blob(p_business uuid)
-fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text)
-fn public.set_partner_payout_frozen(p_partner uuid, p_frozen boolean, p_reason text)
-fn public.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
-fn public.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric)
-fn public.set_studio_storage_cap(p_business uuid, p_gb numeric, p_note text)
-fn public.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb)
-fn public.start_free_trial(p_business uuid, p_days integer)
-fn public.studio_payments(p_business uuid)
-fn public.submit_enquiry(p_kind text, p_name text, p_email text, p_phone text, p_business text, p_message text, p_source_page text, p_extra jsonb, p_trap text)
+col transactions.recorded_by
+fn app.attach_referral(p_business uuid, p_code text) -> text
+fn app.audit(p_business uuid, p_action text, p_detail text, p_entity text, p_entity_id text, p_entity_label text, p_branch uuid) -> void
+fn app.audit_branches() -> trigger
+fn app.audit_business() -> trigger
+fn app.audit_invitation() -> trigger
+fn app.audit_membership() -> trigger
+fn app.audit_permissions() -> trigger
+fn app.bump_order_rev() -> trigger
+fn app.can(p_business uuid, p_perm text) -> boolean
+fn app.can_here(p_business uuid, p_perm text, p_branch uuid) -> boolean
+fn app.cancel_subscription(p_business uuid) -> jsonb
+fn app.cancel_team_invitation(p_invitation_id uuid) -> boolean
+fn app.claim_referral_code(p_code text) -> uuid
+fn app.close_studio(p_business uuid, p_reason text) -> jsonb
+fn app.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval) -> TABLE(invitation_id uuid, nonce text, expires_at timestamp with time zone)
+fn app.current_partner() -> uuid
+fn app.default_membership_role() -> trigger
+fn app.default_permissions(p_tier text) -> text[]
+fn app.delete_my_account(p_close_solely_owned boolean) -> jsonb
+fn app.discard_invitation(p_invitation_id uuid, p_reason text) -> TABLE(outcome text, seat_released boolean)
+fn app.enforce_branch_limit() -> trigger
+fn app.enforce_one_business_per_method() -> trigger
+fn app.enforce_payroll_feature() -> trigger
+fn app.enforce_seat_limit() -> trigger
+fn app.enforce_state_feature() -> trigger
+fn app.enforce_table_feature() -> trigger
+fn app.ensure_billing_record(p_business uuid) -> uuid
+fn app.error_reports_recently(p_business uuid) -> integer
+fn app.export_studio(p_business uuid) -> jsonb
+fn app.feature_refusal(p_feature text) -> text
+fn app.flag(p_key text) -> boolean
+fn app.guard_business_identity() -> trigger
+fn app.guard_business_role() -> trigger
+fn app.guard_last_owner() -> trigger
+fn app.guard_owner_permissions() -> trigger
+fn app.guard_profile_authority() -> trigger
+fn app.guard_studio_settings() -> trigger
+fn app.has_all_branches(p_business uuid) -> boolean
+fn app.has_paid(p_business uuid) -> boolean
+fn app.import_studio(p_json jsonb) -> jsonb
+fn app.in_scope(p_business uuid, p_branch uuid) -> boolean
+fn app.is_business_admin(p_business uuid) -> boolean
+fn app.is_owner(p_business uuid) -> boolean
+fn app.is_partner(p_partner uuid) -> boolean
+fn app.is_platform_admin() -> boolean
+fn app.is_tlb_owner() -> boolean
+fn app.limits_for(p_business uuid) -> TABLE(max_studios integer, max_seats integer)
+fn app.lock_business_seats(p_business uuid) -> void
+fn app.may_read_key(p_business uuid, p_key text) -> boolean
+fn app.may_write_key(p_business uuid, p_key text) -> boolean
+fn app.media_business_of(p_name text) -> uuid
+fn app.media_usage_sync() -> trigger
+fn app.migrate_orders_to_rows(p_business uuid) -> TABLE(blob_orders integer, rows_before integer, rows_after integer, blob_total numeric, rows_total numeric, costs_written integer, matched boolean)
+fn app.migrate_payments_to_rows(p_business uuid) -> TABLE(blob_payments integer, rows_before integer, rows_after integer, blob_total numeric, rows_total numeric, matched boolean)
+fn app.my_billing(p_business uuid) -> jsonb
+fn app.my_staff_id() -> text
+fn app.no_commission_before_payment() -> trigger
+fn app.on_trial(p_business uuid) -> boolean
+fn app.open_checkout(p_business uuid, p_plan text, p_cycle text) -> jsonb
+fn app.order_commission_total(p_order jsonb) -> numeric
+fn app.order_cost_total(p_order jsonb) -> numeric
+fn app.order_doc_carries_no_secrets() -> trigger
+fn app.order_doc_without_secrets(p_order jsonb) -> jsonb
+fn app.order_item_cost_total(p_order jsonb) -> numeric
+fn app.partner_account_reverify() -> trigger
+fn app.partner_me() -> TABLE(id uuid, code text, name text, business_name text, email text, phone text, city text, tax_id text, tier text, status text, joined_on date, kind text, business_id uuid, payout_frozen boolean)
+fn app.perm_for_key(p_key text) -> text
+fn app.pin_referral() -> trigger
+fn app.plan_allows(p_business uuid, p_feature text) -> boolean
+fn app.plan_storage_bytes(p_plan text) -> bigint
+fn app.provision_studio() -> trigger
+fn app.purge_studio(p_business uuid) -> jsonb
+fn app.recheck_referral_on_payment_method() -> trigger
+fn app.reconcile_orders(p_business uuid) -> jsonb
+fn app.reconcile_payments(p_business uuid) -> jsonb
+fn app.referral_code_for(p_name text) -> text
+fn app.referral_follows_studio() -> trigger
+fn app.refuse_retired_order_blob() -> trigger
+fn app.refuse_retired_payment_blob() -> trigger
+fn app.refuse_write_when_unpaid() -> trigger
+fn app.reopen_studio(p_business uuid) -> jsonb
+fn app.resume_subscription(p_business uuid) -> jsonb
+fn app.retire_order_blob(p_business uuid) -> jsonb
+fn app.retire_payment_blob(p_business uuid) -> jsonb
+fn app.seats_used(p_business uuid, p_exclude_membership uuid) -> integer
+fn app.seed_business_roles() -> trigger
+fn app.self_referral_reason(p_partner uuid, p_business uuid) -> text
+fn app.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer) -> void
+fn app.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric) -> void
+fn app.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb) -> jsonb
+fn app.slugify(p text) -> text
+fn app.stamp_audit_actor() -> trigger
+fn app.stamp_error_report() -> trigger
+fn app.stamp_transaction() -> trigger
+fn app.storage_cap_for(p_business uuid) -> bigint
+fn app.storage_has_room(p_business uuid) -> boolean
+fn app.strip_credentials_from_state() -> trigger
+fn app.tlb_staff_id() -> uuid
+fn app.trial_days() -> integer
+fn app.usage_for(p_business uuid) -> TABLE(studios integer, seats integer, max_studios integer, max_seats integer)
+fn app.void_pending_on_churn() -> trigger
+fn app.write_perm_for_key(p_key text) -> text
+fn public.accept_invitation(p_invitation_id uuid) -> TABLE(joined_business uuid, joined_name text, joined_role text)
+fn public.account_for_recovery(p_email text) -> TABLE(confirmed boolean, recently_sent boolean)
+fn public.can(p_business uuid, p_perm text) -> boolean
+fn public.cancel_subscription(p_business uuid) -> jsonb
+fn public.cancel_team_invitation(p_invitation_id uuid) -> boolean
+fn public.cancel_trial(p_business uuid) -> date
+fn public.claim_referral_code(p_code text) -> uuid
+fn public.close_studio(p_business uuid, p_reason text) -> jsonb
+fn public.cohort_taken(p_cohort text) -> integer
+fn public.convert_trial_to_paid(p_business uuid, p_plan text, p_cycle text, p_price numeric, p_paid_on date, p_reference text) -> uuid
+fn public.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval) -> TABLE(invitation_id uuid, nonce text, expires_at timestamp with time zone)
+fn public.delete_my_account(p_close_solely_owned boolean) -> jsonb
+fn public.discard_invitation(p_invitation_id uuid, p_reason text) -> TABLE(outcome text, seat_released boolean)
+fn public.expire_finished_terms(p_on date) -> integer
+fn public.expire_finished_trials(p_on date) -> integer
+fn public.export_studio(p_business uuid) -> jsonb
+fn public.import_studio(p_json jsonb) -> jsonb
+fn public.migrate_my_orders(p_business uuid) -> TABLE(blob_orders integer, rows_before integer, rows_after integer, blob_total numeric, rows_total numeric, costs_written integer, matched boolean)
+fn public.my_billing(p_business uuid) -> jsonb
+fn public.my_commission_summary() -> TABLE(referral_id uuid, business_name text, plan text, cycle text, subscribed_on date, lapsed_on date, is_active boolean, rate_pct numeric, months_credited integer, term_ends_on date, earned_total numeric, earned_cleared numeric, earned_paid numeric)
+fn public.my_membership(p_business uuid) -> TABLE(role_id uuid, role_key text, role_name text, tier text, branch_id uuid)
+fn public.my_permissions(p_business uuid) -> TABLE(permission_key text)
+fn public.my_plan_features() -> TABLE(business_id uuid, plan text, feature text, label text, blurb text, allowed boolean)
+fn public.my_plan_usage() -> TABLE(business_id uuid, plan text, studios integer, seats integer, max_studios integer, max_seats integer)
+fn public.my_storage_usage() -> TABLE(business_id uuid, used_bytes bigint, cap_bytes bigint, pct numeric)
+fn public.my_trial() -> TABLE(business_id uuid, plan text, on_trial boolean, trial_started_on date, trial_ends_on date, days_left integer, cancelled boolean)
+fn public.open_checkout(p_business uuid, p_plan text, p_cycle text) -> jsonb
+fn public.partner_accrue_month(p_month date, p_partner uuid) -> integer
+fn public.partner_active_paying(p_partner uuid, p_on date) -> integer
+fn public.partner_clear_ledger(p_on date) -> integer
+fn public.partner_commission_summary(p_partner uuid) -> TABLE(referral_id uuid, business_name text, plan text, cycle text, subscribed_on date, lapsed_on date, is_active boolean, rate_pct numeric, months_credited integer, term_ends_on date, earned_total numeric, earned_cleared numeric, earned_paid numeric)
+fn public.partner_me() -> TABLE(id uuid, code text, name text, business_name text, email text, phone text, city text, tax_id text, tier text, status text, joined_on date, kind text, business_id uuid, payout_frozen boolean)
+fn public.partner_payout_run(p_partner uuid, p_on date) -> uuid
+fn public.partner_referral_rate(p_referral uuid, p_on date) -> numeric
+fn public.partner_referral_term_end(p_referral uuid) -> date
+fn public.partner_tier_rate(p_active integer) -> numeric
+fn public.partner_void_on_refund(p_business uuid, p_reason text) -> integer
+fn public.platform_billing_summary() -> TABLE(business_id uuid, business_name text, customer_id uuid, plan text, billing_cycle text, monthly_price numeric, is_trial boolean, trial_ends_on date, renews_on date, started_on date, paid_to_date numeric, last_paid_on timestamp with time zone, payments_count bigint)
+fn public.platform_enquiries(p_state text) -> SETOF enquiries
+fn public.platform_partner_summary() -> TABLE(id uuid, code text, name text, business_name text, email text, phone text, city text, status text, joined_on date, user_id uuid, pending_email text, referrals bigint, referrals_paying bigint, referrals_lapsed bigint, rate_pct numeric, earned_total numeric, pending_amount numeric, owed_amount numeric, paid_amount numeric, last_payout_on date, last_payout_ref text)
+fn public.platform_referral_risk() -> TABLE(partner_id uuid, partner_name text, partner_code text, business_id uuid, business_name text, kind text, detail text, at timestamp with time zone)
+fn public.platform_tenant_summary() -> TABLE(id uuid, name text, slug text, plan text, status text, created_at timestamp with time zone, members bigint, branches bigint, orders bigint, orders_30d bigint, cohort text, last_active_at timestamp with time zone, seats_used bigint, max_studios integer, max_seats integer, closed_at timestamp with time zone, purge_after timestamp with time zone)
+fn public.purge_studio(p_business uuid) -> jsonb
+fn public.reconcile_my_orders(p_business uuid) -> jsonb
+fn public.reconcile_my_payments(p_business uuid) -> jsonb
+fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text) -> uuid
+fn public.recount_storage_usage() -> void
+fn public.reopen_studio(p_business uuid) -> jsonb
+fn public.resume_subscription(p_business uuid) -> jsonb
+fn public.retire_my_order_blob(p_business uuid) -> jsonb
+fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text) -> void
+fn public.set_partner_payout_frozen(p_partner uuid, p_frozen boolean, p_reason text) -> void
+fn public.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer) -> void
+fn public.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric) -> void
+fn public.set_studio_storage_cap(p_business uuid, p_gb numeric, p_note text) -> void
+fn public.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb) -> jsonb
+fn public.start_free_trial(p_business uuid, p_days integer) -> date
+fn public.studio_payments(p_business uuid) -> TABLE(id uuid, business_id uuid, business_name text, amount numeric, currency text, status text, payment_method text, reference text, paid_on timestamp with time zone, notes text)
+fn public.submit_enquiry(p_kind text, p_name text, p_email text, p_phone text, p_business text, p_message text, p_source_page text, p_extra jsonb, p_trap text) -> boolean
 pol app_state.app_state_delete
 pol app_state.app_state_insert
 pol app_state.app_state_select
@@ -822,6 +834,7 @@ pol transactions.transactions_select
 pol transactions.transactions_update
 trg app_state.app_state_no_credentials
 trg app_state.app_state_no_retired_orders
+trg app_state.app_state_no_retired_payments
 trg app_state.app_state_plan_feature
 trg app_state.app_state_studio_settings_guard
 trg app_state.app_state_unpaid_guard
@@ -868,4 +881,5 @@ trg suppliers.suppliers_plan_feature
 trg suppliers.suppliers_unpaid_guard
 trg team_invitations.audit_invitations
 trg team_invitations.team_invitations_unpaid_guard
+trg transactions.transactions_stamp
 trg transactions.transactions_unpaid_guard
