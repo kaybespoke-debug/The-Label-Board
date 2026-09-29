@@ -39,9 +39,18 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    within a single update, and it describes a device rather than a studio:
    syncing it would tell a phone that a laptop had updated, which is nothing
    the phone can act on. */
+/* layi_dash_users is the list of accounts that can sign in ON THIS DEVICE
+   with a username and a PIN, and every row carries that PIN in plain text. It
+   used to sync. The audit signed in as an ordinary staff member, asked the API
+   for it, and was handed the owner's PIN — and then the owner's password out
+   of the settings blob next to it — so a staff member could sign in as the
+   owner on the studio tablet and see every screen their role hides. It left
+   STATE_KEYS on 29 September and the database now refuses the key outright.
+   A live studio's team is memberships and team-admin, which is server-side and
+   has no credential in it; this list only ever described one device. */
 const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls',
   'layi_dash_storage_usage','layi_dash_current_biz','layi_dash_outbox',
-  'layi_dash_faults','layi_dash_updated_from']);
+  'layi_dash_faults','layi_dash_updated_from','layi_dash_users']);
 /* layi_dash_outbox is THIS DEVICE's queue of writes that have not reached
    the server yet. Syncing a queue of unsent writes would be a contradiction:
    the whole point is that it is the part the server has not seen. */
