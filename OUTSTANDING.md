@@ -42,21 +42,31 @@ by testing behaviour. `supabase/tests/schema_inventory.mjs` now makes that
 check one command each way, and the rule is: never apply SQL to a project
 except from a migration file.
 
-### Found in the layi-v60 release verification, not yet fixed
+### Fixed in layi-v61, 29 September
 
-**The Subscription panel says "Loading…" for ever when my_billing has not
-returned.** Seen on the live production build in demo mode; it would also show
-for a signed-in owner whose my_billing call failed.
+**The Subscription panel no longer sits on "Loading…".** BILLING was null for
+three different reasons and the panel could not tell them apart: nobody had
+asked yet, somebody asked and it failed, and this person has no subscription to
+look at. All three drew the same word, which is true of exactly one of them.
+The state is now named, and the panel draws each one: hidden when there is
+nothing to show, "Loading…" only while it genuinely is, and a neutral "not
+available just now" with a Try again button when the call failed. No state but
+a configured card payment shows anything to press.
 
-The cause is one line of ordering in fillSettings(). renderBillingPanel() hides
-the panel when there is nothing to show, and the visibility sweep three lines
-later sets display on every settings panel that carries a setperm from
-can(perm), which puts it straight back. Fix: call renderBillingPanel() again after that
-sweep, or give the panel a marker the sweep respects.
+Underneath it was the fault worth the gate: fillSettings() hid the panel and a
+visibility sweep three lines later put it back. Two pieces of code deciding one
+thing. The sweep now skips it the way it already skipped the users and roles
+panels, and there is deliberately no second render afterwards — that would make
+the panel right by letting the last writer win, and would stop
+audit_billing_panel.js from ever being able to fail.
 
-Cosmetic and contained: **no checkout buttons are exposed** in that state, so
-there is no Flutterwave surface. Goes out in the next release through staging
-rather than being rushed into production.
+Found on the way: **switching studios carried the first one’s money into the
+second one’s Settings.** Somebody who owns one studio and manages another would
+have seen the wrong subscription. Dropped with the rest of the tenant data now,
+and asked for again.
+
+audit_billing_panel.js, 24 checks, wired into verify.js. Proved by putting the
+v60 bug back and watching two of them go red.
 
 ### Waiting on Kayode
 
