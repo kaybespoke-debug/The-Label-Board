@@ -42,6 +42,22 @@ by testing behaviour. `supabase/tests/schema_inventory.mjs` now makes that
 check one command each way, and the rule is: never apply SQL to a project
 except from a migration file.
 
+### Found in the layi-v60 release verification, not yet fixed
+
+**The Subscription panel says "Loading…" for ever when my_billing has not
+returned.** Seen on the live production build in demo mode; it would also show
+for a signed-in owner whose my_billing call failed.
+
+The cause is one line of ordering in fillSettings(). renderBillingPanel() hides
+the panel when there is nothing to show, and the visibility sweep three lines
+later sets display on every settings panel that carries a setperm from
+can(perm), which puts it straight back. Fix: call renderBillingPanel() again after that
+sweep, or give the panel a marker the sweep respects.
+
+Cosmetic and contained: **no checkout buttons are exposed** in that state, so
+there is no Flutterwave surface. Goes out in the next release through staging
+rather than being rushed into production.
+
 ### Waiting on Kayode
 
 1. **Two Flutterwave TEST secrets on the STAGING Supabase project only**, so
