@@ -1519,7 +1519,7 @@ body.modal-open{overflow:hidden}
              rather than left to fail. -->
         <div class="panel" data-setperm="setData" id="subscriptionPanel" style="display:none">
           <div class="panel-head"><h3>Subscription</h3></div>
-          <div id="billingBox"><div class="kv" style="color:var(--text-faint)">Loading…</div></div>
+          <div id="billingBox"></div>
         </div>
         <div class="panel" data-setperm="setWorkflow" id="payMethodPanel">
           <div class="panel-head"><h3>How you get paid</h3></div>
@@ -2131,9 +2131,15 @@ async function switchStudio(id){
      pull is what stops one studio's orders appearing under another's name
      for the second it takes to hydrate. */
   try{TENANT_KEYS.forEach(function(k){store.del(k);});}catch(e){}
+  /* THE SUBSCRIPTION BELONGS TO THE STUDIO TOO, and it was not being cleared:
+     somebody who owns one studio and manages another would have carried the
+     first one's money across to the second one's Settings. Dropped here with
+     everything else, and asked for again below. */
+  try{BILLING=null;BILLING_STATE='idle';renderBillingPanel();refreshUnpaidPill();}catch(e){}
   try{await loadCloudRoles();}catch(e){}
   try{await hydrateFromCloud();}catch(e){}
   try{await adoptPlan();}catch(e){}
+  try{await loadBilling();}catch(e){}
   try{reloadSettingsFromStorage();}catch(e){}
   try{saveSession();}catch(e){}
   enterApp();
@@ -2514,7 +2520,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v60';
+const APP_VERSION='layi-v61';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -7755,7 +7761,15 @@ function renderPlanPanel(){
    read the apology. The billing function answers `configured` on its own,
    before any key is needed, so the answer is the environment’s and not a
    flag in the page that could disagree with it. */
-let BILLING=null;let _billingBusy=false;let CHECKOUT_LIVE=null;
+/* BILLING WAS NULL FOR THREE DIFFERENT REASONS and the panel could not tell
+   them apart: nobody had asked yet, somebody asked and it failed, and this
+   person has no subscription to see. All three drew "Loading…", which is
+   true of exactly one of them and a lie that never resolves in the other
+   two. Found on the live v60 build.
+
+   So the state is named. The panel renders from the name, and nothing else
+   decides whether it is on screen — see the note in fillSettings. */
+let BILLING=null;let BILLING_STATE='idle';let _billingBusy=false;let CHECKOUT_LIVE=null;
 async function loadCheckoutAvailability(){
   if(CHECKOUT_LIVE!==null)return CHECKOUT_LIVE;
   CHECKOUT_LIVE=false;
@@ -7775,13 +7789,28 @@ function showUnpaidInfo(){
   try{go('settings');}catch(e){}
 }
 async function loadBilling(){
-  if(!(supa&&liveMode&&myBusinessId&&ownsThisStudio()))return;
+  /* Not signed in, offline, or not the owner: there is no subscription to
+     show and there is nothing wrong. 'idle' draws no panel at all. */
+  if(!(supa&&liveMode&&myBusinessId&&ownsThisStudio())){
+    BILLING=null;BILLING_STATE='idle';
+    refreshUnpaidPill();renderBillingPanel();return;
+  }
+  BILLING_STATE='loading';renderBillingPanel();
   try{
     const {data,error}=await supa.rpc('my_billing',{p_business:myBusinessId});
     if(error)throw error;
-    BILLING=data||null;
+    BILLING=data||null;BILLING_STATE=BILLING?'ready':'unavailable';
     await loadCheckoutAvailability();
-  }catch(e){BILLING=null;}
+  }catch(e){
+    BILLING=null;
+    /* A REFUSAL IS NOT A FAULT. my_billing is owner-only, so 42501 means
+       this is not your subscription to look at, and the honest answer is
+       no panel rather than an apology. Anything else did go wrong. */
+    const code=String((e&&e.code)||'');
+    const msg=String((e&&e.message)||'');
+    BILLING_STATE=(code==='42501'||/only the owner|permission denied/i.test(msg))
+      ?'idle':'unavailable';
+  }
   refreshUnpaidPill();renderBillingPanel();
 }
 function billingMoney(a,cur){
@@ -7792,8 +7821,30 @@ function renderBillingPanel(){
   const panel=document.getElementById('subscriptionPanel');
   const box=document.getElementById('billingBox');
   if(!panel||!box)return;
-  if(!(BILLING&&ownsThisStudio())){panel.style.display='none';return;}
+
+  /* NOT APPLICABLE. No session, no studio, or not the owner. Hidden, and
+     hidden is not an error message. */
+  if(BILLING_STATE==='idle'||!ownsThisStudio()){
+    panel.style.display='none';box.innerHTML='';return;
+  }
+
   panel.style.display='';
+
+  /* GENUINELY LOADING, and only then. */
+  if(BILLING_STATE==='loading'){
+    box.innerHTML='<div class="kv" style="color:var(--text-faint)">Loading\u2026</div>';
+    return;
+  }
+
+  /* WE ASKED AND COULD NOT GET AN ANSWER. Says so, offers to try again, and
+     offers nothing to buy: a payment button on a panel that does not know
+     what you are paying for is worse than no panel. */
+  if(BILLING_STATE!=='ready'||!BILLING){
+    box.innerHTML='<div class="kv" style="color:var(--text-dim)">Your subscription details are not available just now.</div>'
+      +'<div class="sd" style="color:var(--text-faint);margin:6px 0 12px">Nothing is wrong with your studio and nothing has changed. This panel needs a connection to us.</div>'
+      +'<button class="btn ghost" onclick="loadBilling()">Try again</button>';
+    return;
+  }
   const sub=BILLING.subscription||null;
   const label={starter:'Basic',pro:'Pro',trial:'Trial',premium:'Bespoke'};
   const prices=(BILLING.prices||[]);
@@ -9207,10 +9258,23 @@ function askForMoreStorage(){
   }
   alert(body+'\n\nSend this to us and we will come back with a price.');
 }
-function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderBillingPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
-  document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
+  /* subscriptionPanel joins usersPanel and rolesPanel in being decided by
+     its own renderer rather than by this sweep. It was not, and that was the
+     v60 bug: renderBillingPanel() hid it three lines above and this line put
+     it straight back, so a panel with nothing to say sat on "Loading…"
+     for ever. Two places deciding one thing is the shape of the fault, not
+     the ordering, so the fix is to stop the second one deciding.
+
+     There is deliberately no renderBillingPanel() call after this line either.
+     Adding one would put the panel right by letting the LAST writer win, which
+     is the same two-writer arrangement with a tidier outcome — and it would
+     stop audit_billing_panel.js being able to fail, because the end state
+     would be correct whether or not the sweep behaved. A check that cannot
+     fail is not a check. */
+  document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel'||p.id==='subscriptionPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
   document.getElementById('setCurrency').value=SETTINGS.currency;const st=document.getElementById('setTheme');if(st)st.value=effectiveTheme();const T=tierList();const setv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};const defN=['Starter','Bronze','Silver','Gold','Platinum'];setv('tier_n0',(T[0]&&T[0].name)||'Starter');for(let i=1;i<=4;i++){setv('tier_n'+i,(T[i]&&T[i].name)||defN[i]);setv('tier_m'+i,T[i]?fmtNum(T[i].min):'');}var le=document.getElementById('set_loyalty');if(le)le.checked=loyaltyOn();renderBizDoes();invCatDraft=null;renderInvCatsSettings();
   var bdp=document.getElementById('bizDoesPanel');if(bdp)bdp.style.display=multiBranch()?'none':'';
   const co=SETTINGS.company||{};const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};

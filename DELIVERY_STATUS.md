@@ -56,6 +56,30 @@ continues on B in the meantime, because B is required in both shapes.
 
 ---
 
+## RELEASED
+
+### layi-v60 — PRODUCTION, 29 September 2026
+
+Phase 0 and Batches A to G are live. Twelve migrations applied to
+eskubrbgbcbaejynjxvh; production schema fingerprint
+93ddbbc0ecceaea7e41e1b937e836ffc over 838 objects, identical to the repo and
+to staging. team-admin v5, auth-recover v1 and admin-api v12 deployed. main is
+1ab5397 and admin-deploy is d730aa3.
+
+Every production row count before and after is unchanged: 9 studios, 10
+accounts, 9 profiles, 9 memberships, 12 branches, 20 clients, 53 synced keys,
+22 vendors, 12 partners, 2 referrals, 2 ledger rows, 68 orders still in the
+blob. Added by the backfills: 62 business roles, 1,263 permission grants and 20
+contact rows. Nothing lost, nothing doubled.
+
+Flutterwave is not in it: no billing Edge Functions, no secrets, no checkout
+buttons, and enforce_unpaid_readonly is off.
+
+PROMOTION.md is the plan this followed. The next change goes staging first,
+then main, and the gap between them stays small.
+
+---
+
 ## DONE
 
 ### Phase 0, a studio cannot promote itself. **PRODUCTION**, 28 Sep

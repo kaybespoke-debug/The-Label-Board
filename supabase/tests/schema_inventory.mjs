@@ -87,13 +87,20 @@ if (process.argv.includes('--check')) {
     console.error('No snapshot yet. Run without --check to write one.');
     process.exit(1);
   }
-  const was = readFileSync(snapshot, 'utf8');
-  if (was === text) {
+  /* NORMALISED, BECAUSE GIT REWRITES THIS FILE. The snapshot is written with
+     LF and checked out with CRLF on Windows, so a straight comparison found
+     every single line different and reported all 838 objects as newly added —
+     a gate failing loudly for a reason that has nothing to do with the schema
+     it is guarding. It went red the first time this ran after a branch
+     switch, which is the only reason anybody noticed. */
+  const norm = t => t.split('\r\n').join('\n');
+  const was = norm(readFileSync(snapshot, 'utf8'));
+  if (was === norm(text)) {
     console.log(lines.length + ' objects, unchanged.');
     process.exit(0);
   }
   const a = new Set(was.trim().split('\n'));
-  const b = new Set(text.trim().split('\n'));
+  const b = new Set(norm(text).trim().split('\n'));
   const gone = [...a].filter(x => !b.has(x));
   const added = [...b].filter(x => !a.has(x));
   console.log('The migrations no longer produce what the snapshot records.');
