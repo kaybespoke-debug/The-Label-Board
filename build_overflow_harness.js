@@ -98,12 +98,12 @@ const pages = [];
      Kayode's own console, long unbreakable addresses included, because the
      address is what refuses to wrap. */
   b.sb.__partners = [
-    { id: 'p1', name: 'R2W Apparels', business: '', code: 'R2WAPPARELS', tier: 'bronze',
-      email: 'r2wapparels@gmail.com', status: 'active', pending: false, joined: '2026-09-15' },
-    { id: 'p2', name: 'Layiwola Ojomo', business: '', code: 'KUNLE', tier: 'bronze',
-      email: 'layiojomo@gmail.com', status: 'active', pending: true, joined: '2026-09-14' },
-    { id: 'p3', name: 'S Xtraordinaire', business: 'Xtraordinaire Studio', code: 'SXTRA', tier: 'bronze',
-      email: 's.xtraordinaire@gmail.com', status: 'active', pending: false, joined: '2026-09-14' },
+    { id: 'p1', name: 'Adire Studio', business: '', code: 'ADIRESTUDIO', tier: 'bronze',
+      email: 'adirestudio@gmail.com', status: 'active', pending: false, joined: '2026-09-15' },
+    { id: 'p2', name: 'Folasade Bello', business: '', code: 'BELLO', tier: 'bronze',
+      email: 'folasadeb@gmail.com', status: 'active', pending: true, joined: '2026-09-14' },
+    { id: 'p3', name: 'T Remarkable Co', business: 'Remarkable Workrooms', code: 'TREMA', tier: 'bronze',
+      email: 't.remarkablecos@gmail.com', status: 'active', pending: false, joined: '2026-09-14' },
     { id: 'p4', name: 'Test Partner', business: '', code: 'TEST-PARTNER', tier: 'silver',
       email: 'test.partner@thelabelboard.com', status: 'active', pending: false, joined: '2026-05-07' },
   ];

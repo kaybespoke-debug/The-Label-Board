@@ -666,7 +666,7 @@ and finding it wrong.**
 ## The correction that changes everything
 
 Part One said the trigger fires when an invited person **accepts**. That is
-false, and your own database proves it. `r2wapparels@gmail.com` is the one
+false, and your own database proves it. The one real partner is the one
 genuine invitation this project has ever sent:
 
 ```

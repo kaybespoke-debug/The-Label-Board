@@ -18,3 +18,4 @@ _overflow_tmp/
 # The independent audit describes findings that are not fixed yet, and this
 # repository is public. It stays on disk and out of git until they are closed.
 PRODUCT_AUDIT.md
+P2_FIELD_INVENTORY.md

@@ -5,7 +5,50 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 29 September 2026 (twenty-first session)
+Last updated: 29 September 2026 (twenty-second session)
+
+## 29 September 2026 — the independent audit, and P1 on production
+
+An independent adversarial audit was run against the product as it stood at
+layi-v61. Tenant isolation, storage, partner isolation, RPC authorisation and
+export correctness came out genuinely strong. Four blockers did not. The report
+is `PRODUCT_AUDIT.md`, which is **deliberately not in git** — see below.
+
+**P1 is DONE and on production as layi-v63.** Every member of a studio could
+read the owner's password out of `layi_dash_settings` and everybody's PIN out
+of `layi_dash_users` beside it, and the local login accepted them, so a staff
+member could sign in as the owner on the studio's tablet. Measured on staging
+as a viewer — the lowest role there is — not inferred. Fixed in the app and in
+the database, because a phone still on the old build would otherwise put both
+straight back. Four production studios had the password and four had the PIN
+list; all eight are gone and every settings row is byte-identical minus that
+one field. `tools/credential_probe.js` went 12 failed to 18 passed.
+
+**Still open, and the reason multi-user external studios are NOT ready:**
+
+- **P2 — the legacy order blob.** Orders still live in a jsonb blob that
+  defeats `seeCost` and `seeContact`. Production has 68 blob orders and 0
+  relational rows, so **no destructive cleanup is permitted** until the
+  relational copy is proven complete per studio.
+- **P3 — the outbox is not tenant-bound.** A queued write can be sent to
+  whichever studio the UI is showing when it drains. Confirmed by direct
+  experiment. Legacy entries with no `business_id` must be quarantined, never
+  guessed at.
+- **P4 — `public.partner_me` is broken on production** (42P13, 11 columns
+  against 14). The partner portal cannot be signed into.
+- **P5 — the security gates are not load-bearing.** Five of ten deliberate
+  security mutations were caught by nothing.
+
+**Two things found while promoting P1:**
+
+- **The GitHub repository is public.** `PRODUCT_AUDIT.md` describes P2, P3 and
+  P4, which are live and unfixed, in enough detail to act on. It is in
+  `.gitignore` and stays on disk only until those are closed. Worth a wider
+  look at what else the repo says that it should not while it is public.
+- **`team_admin_harness` is 45 passed / 4 failed, and has been.** The four are
+  the Phase 1B invitation switch, which is deliberately off. It is a known
+  expected condition, not a regression, and the test must not be weakened to
+  make the number green.
 
 ## 28–29 September 2026 — the delivery programme, Phase 0 to G
 
@@ -219,7 +262,9 @@ Kayode confirmed sign-in afterwards. `layiojomo@gmail.com` is now free.
 Every one of the six seeded test studios is ALSO a partner, which is the seed
 data rather than a bug, but it means `is_partner` is noisy until the test rows
 are cleared. There is also a real partner signup nobody had mentioned,
-`r2wapparels@gmail.com`, last seen 15 September.
+the one real partner signup, last seen 15 September. (Their address was
+here until 29 September; this repository is public and it was not ours to
+publish.)
 
 **Two orphan memberships are invisible to it and should not be.** Test Studio
 and Test Studio Two have owner rows pointing at auth users that do not exist,
