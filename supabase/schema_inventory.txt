@@ -348,6 +348,10 @@ col platform_audit.at
 col platform_audit.business_id
 col platform_audit.detail
 col platform_audit.id
+col platform_flags.changed_at
+col platform_flags.key
+col platform_flags.note
+col platform_flags.on_off
 col products.business_id
 col products.created_at
 col products.id
@@ -554,6 +558,7 @@ fn app.ensure_billing_record(p_business uuid)
 fn app.error_reports_recently(p_business uuid)
 fn app.export_studio(p_business uuid)
 fn app.feature_refusal(p_feature text)
+fn app.flag(p_key text)
 fn app.guard_business_identity()
 fn app.guard_business_role()
 fn app.guard_last_owner()
@@ -591,6 +596,7 @@ fn app.provision_studio()
 fn app.purge_studio(p_business uuid)
 fn app.recheck_referral_on_payment_method()
 fn app.referral_code_for(p_name text)
+fn app.referral_follows_studio()
 fn app.refuse_write_when_unpaid()
 fn app.reopen_studio(p_business uuid)
 fn app.resume_subscription(p_business uuid)
@@ -741,6 +747,7 @@ pol plan_feature_catalogue.plan_feature_catalogue_read
 pol plan_features.plan_features_read
 pol plan_limits.plan_limits_read
 pol plan_prices.plan_prices_read
+pol platform_flags.platform_flags_read
 pol products.products_delete
 pol products.products_insert
 pol products.products_select
@@ -799,6 +806,7 @@ trg business_roles.business_roles_guard
 trg business_roles.business_roles_unpaid_guard
 trg businesses.audit_businesses
 trg businesses.businesses_identity_guard
+trg businesses.businesses_referral_follows
 trg businesses.businesses_referral_is_permanent
 trg businesses.businesses_seed_roles
 trg customer_contacts.customer_contacts_unpaid_guard

@@ -21,8 +21,8 @@
  * there and compare its md5 with --fingerprint: one number, and if it differs,
  * diff the two lists to see which objects. That is the whole drift check.
  *
- * Staging and the migrations agreed on 4839a6f993b9ba2415da3f07c40cd874 over
- * 830 objects on 29 September 2026, which is the first time anybody had
+ * Staging and the migrations agreed on 93ddbbc0ecceaea7e41e1b937e836ffc over
+ * 838 objects on 29 September 2026, which is the first time anybody had
  * checked.
  */
 import { PGlite } from '@electric-sql/pglite';

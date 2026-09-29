@@ -33,9 +33,15 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    They go up the moment a session arrives and the key is deleted, so it is a
    staging post rather than a store. It is also ours rather than the studio's,
    which is why it stays out of the backup as well. */
+/* layi_dash_updated_from is which build THIS device was running when it asked
+   the service worker to swap, so that after the reload the app can say
+   "Updated to layi-v60" once and then forget. It is written and deleted
+   within a single update, and it describes a device rather than a studio:
+   syncing it would tell a phone that a laptop had updated, which is nothing
+   the phone can act on. */
 const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls',
   'layi_dash_storage_usage','layi_dash_current_biz','layi_dash_outbox',
-  'layi_dash_faults']);
+  'layi_dash_faults','layi_dash_updated_from']);
 /* layi_dash_outbox is THIS DEVICE's queue of writes that have not reached
    the server yet. Syncing a queue of unsent writes would be a contradiction:
    the whole point is that it is the part the server has not seen. */

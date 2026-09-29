@@ -1109,6 +1109,7 @@ body.modal-open{overflow:hidden}
           <div id="globalPeriodPopup" class="gp-popup" style="display:none"></div>
         </div>
         <select id="branchSwitch" onchange="setBranchView(this.value)" title="View one branch or all branches" style="display:none;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;height:42px;padding:0 10px;cursor:pointer;font-family:inherit;font-size:13.5px;max-width:180px"></select>
+        <button id="updatePill" onclick="applyUpdate()" title="A new version is ready" style="display:none;align-items:center;gap:7px;background:var(--accent);border:1px solid var(--accent);color:#fff;border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span>Update</span></button>
         <button id="unpaidPill" onclick="showUnpaidInfo()" title="Read only" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--red);color:var(--red);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span>Read only</span></button>
         <button id="syncPill" onclick="showSyncTrouble()" title="Saving" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span id="syncPillText">Saving…</span></button>
         <button id="connPill" onclick="showOfflineInfo()" title="Connection status" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;flex:none"></span><span id="connPillText">Offline</span></button>
@@ -1614,6 +1615,13 @@ body.modal-open{overflow:hidden}
           <div class="panel-head"><h3>About</h3></div>
           <p class="page-sub" style="margin-bottom:10px">If you ever report a problem, this is the one thing worth telling us. It says exactly which version your device is running.</p>
           <div id="buildStamp" style="color:var(--text-dim);font-size:13px;letter-spacing:.04em"></div>
+          <!-- Two lines, not one, because they answer different questions. The
+               first is the build this page is RUNNING. The second is the build
+               this device has CACHED and will start next time. When they differ,
+               that is precisely the state somebody means by "my app is out of
+               date", and it now says so instead of being invisible. -->
+          <div id="swStamp" style="color:var(--text-faint);font-size:12.5px;letter-spacing:.04em;margin-top:4px"></div>
+          <div id="updateNote" style="margin-top:10px;display:none"></div>
         </div>
       </section>
     </main>
@@ -2506,7 +2514,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v59';
+const APP_VERSION='layi-v60';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -7739,7 +7747,24 @@ function renderPlanPanel(){
    A person who is not the owner never sees this panel, because
    my_billing refuses them — and a panel that exists only to show an
    error is worse than no panel. */
-let BILLING=null;let _billingBusy=false;
+/* CARD PAYMENT IS OFF UNTIL IT IS ON, and the app asks rather than assumes.
+   Production ships with the Flutterwave key unset until the account is
+   configured and the whole flow has passed on staging. In that state the
+   panel must not show plan buttons: a button that apologises is worse than
+   no button, because somebody has already decided to pay by the time they
+   read the apology. The billing function answers `configured` on its own,
+   before any key is needed, so the answer is the environment’s and not a
+   flag in the page that could disagree with it. */
+let BILLING=null;let _billingBusy=false;let CHECKOUT_LIVE=null;
+async function loadCheckoutAvailability(){
+  if(CHECKOUT_LIVE!==null)return CHECKOUT_LIVE;
+  CHECKOUT_LIVE=false;
+  try{
+    const r=await supa.functions.invoke('billing',{body:{action:'status'}});
+    CHECKOUT_LIVE=!!(r&&r.data&&r.data.configured);
+  }catch(e){CHECKOUT_LIVE=false;}
+  return CHECKOUT_LIVE;
+}
 function studioIsReadOnly(){return !!(BILLING&&BILLING.status&&BILLING.status!=='active');}
 function refreshUnpaidPill(){
   try{const el=document.getElementById('unpaidPill');
@@ -7755,6 +7780,7 @@ async function loadBilling(){
     const {data,error}=await supa.rpc('my_billing',{p_business:myBusinessId});
     if(error)throw error;
     BILLING=data||null;
+    await loadCheckoutAvailability();
   }catch(e){BILLING=null;}
   refreshUnpaidPill();renderBillingPanel();
 }
@@ -7801,7 +7827,17 @@ function renderBillingPanel(){
 
   /* WHAT IT WOULD COST, from the server. A price this screen worked out
      itself would be a price that can disagree with the one charged. */
-  if(prices.length){
+  if(prices.length&&!CHECKOUT_LIVE){
+    /* The prices are still worth showing — somebody asking what Pro costs
+       deserves an answer — but there is nothing to press yet. */
+    lines.push('<div style="margin-top:14px;font-weight:600">What the plans cost</div>');
+    lines.push(prices.map(function(p){
+      return '<div class="bd-row"><span class="bl">'+esc(label[p.plan]||p.plan)+', '
+        +esc(p.cycle==='annual'?'a year':'a month')+'</span><span class="bv">'
+        +billingMoney(p.amount,p.currency)+'</span></div>';
+    }).join(''));
+    lines.push('<div class="sd" style="color:var(--text-faint);margin-top:8px">Paying by card is not switched on yet. Talk to us and we will set your plan up directly.</div>');
+  }else if(prices.length){
     const groups={};prices.forEach(function(p){(groups[p.plan]=groups[p.plan]||[]).push(p);});
     lines.push('<div style="margin-top:14px;font-weight:600">'+((sub&&!sub.is_trial)?'Change plan':'Choose a plan')+'</div>');
     Object.keys(groups).forEach(function(pl){
@@ -7818,7 +7854,7 @@ function renderBillingPanel(){
     });
   }
 
-  if(sub&&!sub.is_trial){
+  if(sub&&!sub.is_trial&&CHECKOUT_LIVE){
     lines.push('<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
       +(sub.cancelled_at
         ?'<button class="btn" onclick="resumeSubscription()">Keep my subscription</button>'
@@ -7844,6 +7880,7 @@ function renderBillingPanel(){
 
 async function startCheckout(plan,cycle){
   if(_billingBusy)return;
+  if(!CHECKOUT_LIVE){alert('Paying by card is not switched on yet. Talk to us and we will set your plan up directly.');return;}
   if(!(supa&&liveMode&&myBusinessId)){alert('This needs a connection.');return;}
   _billingBusy=true;
   try{
@@ -15091,7 +15128,7 @@ function addRole(){
 if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):','')||'').trim();if(!name)return;const list=getRoles();list.push({id:uid('role'),name:name,perms:Object.assign(allPerms(0),{allOrders:1}),builtin:false});setRoles(list);logAudit('Role created',name);renderRoles();}
 
 (function init(){const s=load('layi_dash_settings',null);if(s)SETTINGS=Object.assign({},DEFAULTS,s);
-  try{const bs=document.getElementById('buildStamp');if(bs)bs.textContent='Build '+APP_VERSION;}catch(e){}
+  try{renderAbout();}catch(e){}
   applyStages();
   getRoles();getUsers();migrateRoles();
   try{migrateBranchOwnership();}catch(e){console.warn('branch migration:',e);}
@@ -15115,16 +15152,150 @@ if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):'
   try{ if(typeof startAuthArrival==='function')startAuthArrival(); }catch(e){}})();
 </script>
 <script>
-// Progressive Web App: register the offline/install worker.
-// Guarded so it is a no-op on file:// (navigator has no serviceWorker) and in the
-// headless audit sandbox, and never throws if registration is unavailable.
+/* ===== KEEPING AN INSTALLED APP UP TO DATE ==========================
+   The old version of this block was four lines: register and hope. It is
+   the reason a phone sat on an older release. Three things were wrong and
+   all three are fixed here and in sw.js.
+
+   1. THE WORKER TOOK OVER MID-SESSION. sw.js called skipWaiting() on
+      install, so a new worker became the controller while the tab carried
+      on running the old html. Nothing reloaded, so nothing changed on
+      screen — for weeks, on an installed app that is never really closed.
+      Now the worker waits and the page decides.
+
+   2. NOTHING EVER CHECKED. An installed app can go days without a
+      navigation, and a service worker is only re-fetched on one. So the
+      page now asks: when it starts, every time it comes back to the front,
+      and every half hour it stays open.
+
+   3. NOBODY WAS TOLD. There is a pill now, and an About panel that shows
+      the running build beside the cached one.
+
+   WHAT IT WILL NOT DO IS RELOAD WHILE SOMEBODY IS TYPING. An update is a
+   reload, and a reload in the middle of an order form loses the form. So
+   it applies itself only when the app is in the background, and otherwise
+   waits to be tapped — and re-checks even then. The outbox is deliberately
+   NOT part of that test: it lives in localStorage and survives a reload,
+   which is the whole reason it was built that way. */
+let SW_REG=null,SW_WAITING=null,SW_CACHE_VERSION="",_updateReloading=false;
+
+/* Would reloading right now cost somebody something they cannot get back? */
+function updateIsSafeNow(){
+  try{
+    const el=document.activeElement;
+    if(el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.isContentEditable))return false;
+    if(document.querySelector('.modal.open,.sheet.open,dialog[open]'))return false;
+    return true;
+  }catch(e){return true;}
+}
+function refreshUpdatePill(){
+  try{const el=document.getElementById('updatePill');
+    if(el)el.style.display=SW_WAITING?'inline-flex':'none';}catch(e){}
+  try{renderAbout();}catch(e){}
+}
+function renderAbout(){
+  const b=document.getElementById('buildStamp');
+  if(b)b.textContent='Build '+APP_VERSION;
+  const sw=document.getElementById('swStamp');
+  if(sw){
+    sw.textContent=SW_CACHE_VERSION?('Offline copy '+SW_CACHE_VERSION):'Offline copy not installed';
+    sw.style.color=(SW_CACHE_VERSION&&SW_CACHE_VERSION!==APP_VERSION)?'var(--amber)':'var(--text-faint)';
+  }
+  const n=document.getElementById('updateNote');
+  if(n){
+    if(SW_WAITING){
+      n.style.display='';
+      n.innerHTML='<div style="color:var(--accent);font-size:13px;margin-bottom:8px">A new version of The Label Board is ready on this device.</div>'
+        +'<button class="btn" onclick="applyUpdate()">Update now</button>';
+    }else{n.style.display='none';n.innerHTML='';}
+  }
+}
+
+/* Ask the worker which build it is holding. A one-shot MessageChannel, so
+   two overlapping questions cannot answer each other. */
+function askWorkerVersion(){
+  try{
+    const c=navigator.serviceWorker.controller;if(!c)return;
+    const ch=new MessageChannel();
+    ch.port1.onmessage=function(e){
+      if(e.data&&e.data.type==='VERSION'){SW_CACHE_VERSION=String(e.data.version||'');try{renderAbout();}catch(x){}}
+    };
+    c.postMessage({type:'VERSION'},[ch.port2]);
+  }catch(e){}
+}
+
+function noteWaiting(w){
+  if(!w)return;
+  SW_WAITING=w;
+  refreshUpdatePill();
+  /* IN THE BACKGROUND IS THE CHEAPEST MOMENT. Nobody is looking, nothing
+     is half-typed, and they come back to the new version already running. */
+  if(document.visibilityState==='hidden'&&updateIsSafeNow())applyUpdate(true);
+}
+
+function applyUpdate(quiet){
+  try{
+    if(!SW_WAITING)return;
+    if(!updateIsSafeNow()){
+      if(!quiet)toast('Finish what you are typing and tap Update again.');
+      return;
+    }
+    try{store.set('layi_dash_updated_from',APP_VERSION);}catch(e){}
+    _updateReloading=true;
+    SW_WAITING.postMessage({type:'SKIP_WAITING'});
+    if(!quiet)toast('Updating\u2026');
+    /* If controllerchange never arrives — an old browser, a worker that
+       failed to activate — reload anyway rather than leaving a pill that
+       does nothing when tapped. */
+    setTimeout(function(){if(_updateReloading)location.reload();},2500);
+  }catch(e){}
+}
+
 try {
   if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      /* Only when WE asked. A controllerchange we did not ask for is the
+         first worker taking control on a fresh install, and reloading then
+         would bounce somebody out of the sign-in they just completed. */
+      if (_updateReloading) { _updateReloading = false; location.reload(); }
+      else { askWorkerVersion(); }
+    });
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("/sw.js").catch(function () {});
+      navigator.serviceWorker.register("/sw.js").then(function (reg) {
+        SW_REG = reg;
+        askWorkerVersion();
+        if (reg.waiting && navigator.serviceWorker.controller) noteWaiting(reg.waiting);
+        reg.addEventListener("updatefound", function () {
+          const w = reg.installing;
+          if (!w) return;
+          w.addEventListener("statechange", function () {
+            /* installed WITH a controller already present means this is a
+               replacement rather than a first install. */
+            if (w.state === "installed" && navigator.serviceWorker.controller) noteWaiting(w);
+          });
+        });
+        setInterval(function () { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
+      }).catch(function () {});
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState !== "visible") return;
+      try { if (SW_REG) SW_REG.update(); } catch (e) {}
+      askWorkerVersion();
     });
   }
 } catch (e) {}
+
+/* And say so once, afterwards, so an update is something that visibly
+   happened rather than something somebody has to go and check. */
+try{
+  const from=store.get('layi_dash_updated_from');
+  if(from&&from!==APP_VERSION){
+    store.del('layi_dash_updated_from');
+    setTimeout(function(){try{toast('Updated to '+APP_VERSION);}catch(e){}},1200);
+  }else if(from){
+    store.del('layi_dash_updated_from');
+  }
+}catch(e){}
 </script>
 </body>
 </html>

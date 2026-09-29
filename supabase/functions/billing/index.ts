@@ -105,6 +105,17 @@ Deno.serve(async (req) => {
     const action = str(body.action)
     const payload = (body.payload ?? {}) as Record<string, unknown>
 
+    /* IS THIS ENVIRONMENT TAKING PAYMENTS AT ALL?
+       Asked before anything else, and answerable on its own, because the app
+       has to know whether to OFFER a card payment rather than find out by
+       failing one. Production ships with the key unset until Flutterwave is
+       configured and has passed staging end to end, and until then the
+       Subscription panel shows no plan buttons instead of buttons that
+       apologise. */
+    if (action === 'status') {
+      return json({ ok: true, configured: !!FLW_KEY })
+    }
+
     if (!FLW_KEY) {
       /* SAID PLAINLY RATHER THAN FAILING OBSCURELY. Until the key is set this
          is a 503 with a sentence, not a crash in the middle of a checkout. */

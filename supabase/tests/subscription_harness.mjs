@@ -313,6 +313,17 @@ section('Not paying means read only, and not gone');
     ($1,'L-0001','{"id":"L-0001"}'::jsonb,45000)`, [BIZ]);
   await admin(`update public.businesses set status='suspended' where id=$1`, [BIZ]);
 
+  /* THE FLAG IS DOWN IN A FRESH DATABASE, and that is deliberate: locking a
+     studio out is a billing action, and it ships before Flutterwave does.
+     So the first thing this section proves is that the mechanism is off, and
+     then it switches it on and proves the mechanism. Both matter — shipping
+     it switched on would lock a studio out with no way to pay. */
+  const beforeFlag = await asUser(U.ada,
+    `insert into public.orders (business_id,app_id,doc) values ($1,'L-0000','{}'::jsonb)`, [BIZ]);
+  ok('with the flag down a suspended studio still writes', !beforeFlag.error, beforeFlag.error);
+  await admin(`delete from public.orders where app_id='L-0000' and business_id=$1`, [BIZ]);
+  await admin(`update public.platform_flags set on_off = true where key='enforce_unpaid_readonly'`);
+
   const read = await asUser(U.ada, `select id from public.orders where business_id=$1`, [BIZ]);
   ok('every record is still readable', read.rows.length === 1, 'saw ' + read.rows.length);
   const write = await asUser(U.ada,
