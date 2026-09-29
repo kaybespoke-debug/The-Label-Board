@@ -75,7 +75,18 @@ const restore = async () => {
    Mixing the two in one matrix reads like a permission failure and is how a
    green suite starts lying. */
 const READ = {
-  layi_dash_orders:   { owner: true, manager: true,  staff: true,  viewer: true },
+  /* layi_dash_orders LEFT THIS MATRIX ON 29 SEPTEMBER, and not because the
+     permission changed. Orders are relational rows now and the key is
+     RETIRED for any studio that has moved — refused on write and absent on
+     read — because one blob per business is what defeated seeCost and
+     seeContact in the first place. This probe's studio has moved, so every
+     assertion here became "a key that no longer exists cannot be read",
+     which is true of any name you invent.
+
+     Where it is proved instead: tools/order_migration_probe.js, which
+     writes the blob to a studio that has NOT moved, shows a viewer being
+     handed every cost out of it, migrates, and then shows the same reads
+     refused — six roles, over the real API. */
   layi_dash_txns:     { owner: true, manager: true,  staff: false, viewer: false },
   layi_dash_audit:    { owner: true, manager: true,  staff: false, viewer: false },
   layi_dash_appts:    { owner: true, manager: true,  staff: true,  viewer: false },
@@ -85,7 +96,6 @@ const READ = {
   layi_dash_roles:    { owner: true, manager: true,  staff: true,  viewer: true },
 };
 const WRITE = {
-  layi_dash_orders:   { owner: true, manager: true,  staff: true,  viewer: false },
   layi_dash_txns:     { owner: true, manager: true,  staff: false, viewer: false },
   layi_dash_audit:    { owner: true, manager: true,  staff: false, viewer: false },
   /* layi_dash_users LEFT THIS MATRIX ON 29 SEPTEMBER, and not because the
@@ -150,7 +160,11 @@ const setRole = async (uid, tierKey) => {
   {
     const del = await one(WHO.viewer, { method: 'DELETE', path: `/rest/v1/app_state?business_id=eq.${BIZ}&key=eq.layi_dash_orders` });
     const still = await readKey(WHO.owner, 'layi_dash_orders');
-    ok('a viewer cannot delete the orders key', still, 'status ' + del.status);
+  /* The delete assertion that was here asked whether a viewer could delete
+     layi_dash_orders. The key is retired, so the DELETE matches no rows,
+     and PostgREST answers a zero-row delete with 204 — the same B1 shape
+     this suite exists to catch. An assertion that cannot fail is worse
+     than none, so it is gone rather than adjusted. */
   }
 
   // -------------------------------------------------------------------

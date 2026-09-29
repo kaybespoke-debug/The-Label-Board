@@ -2520,7 +2520,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v63';
+const APP_VERSION='layi-v64';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3001,15 +3001,98 @@ function branchNameForId(id){
   const b=CLOUD_BRANCHES.find(function(x){return x.id===id;});
   return b?b.name:"";
 }
+/* An order names its client as text, because that is what a person types.
+   The row wants the customer's id. pullCustomers keeps dbId on every local
+   record, so this is a lookup and not a request. A name that has never been
+   saved as a client returns null, and the order keeps the name in its
+   document either way, so nothing is lost while the link is missing. */
+function customerIdForName(name){
+  const n=String(name||"").trim().toLowerCase();
+  if(!n)return null;
+  const all=getCustomers()||{};
+  for(const k in all){
+    const c=all[k];
+    if(c&&c.dbId&&String(c.name||k).trim().toLowerCase()===n)return c.dbId;
+  }
+  return null;
+}
 
-/* What leaves the device. The three protected fields are stripped here
-   rather than anywhere else, so there is one place to check. */
-const ORDER_PROTECTED=["cost","email","phone","whatsapp"];
+/* WHAT LEAVES THE DEVICE, AND WHERE EACH PART OF IT LANDS.
+
+   This list used to be ["cost","email","phone","whatsapp"] and it was the
+   same mistake as the one in the migration function: written against a
+   field shape no order has ever had. Surveying the 68 live orders found
+   `costs` (plural, an array), never `cost`; no `phone` at all; and five
+   more things that needed protecting, three of them one level down where
+   a glance at the field list does not find them.
+
+   So the document that goes up carries none of it, and the parts that
+   matter travel separately to tables that ask a permission first:
+
+     costs[] + saleItems[].unitCost  -> order_costs        seeCost
+     commissions[] + director/referral -> order_commissions  seeCost
+     delivery.location + email/whatsapp/address -> order_contacts  seeContact
+
+   THIS LIST IS THE SAME LIST AS app.order_doc_without_secrets in
+   20260929240000. If one changes the other must, or the database will
+   strip something the app still thinks it sent, and it will be lost. */
+const ORDER_PROTECTED=["costs","cost","commissions",
+  "directorAmount","directorPct","directorOn","referralAmount","referrerId",
+  "email","whatsapp","address","phone"];
 function orderDoc(o){
   const d=Object.assign({},o);
   ORDER_PROTECTED.forEach(function(k){delete d[k];});
   delete d._rev;
+  /* a cost hiding inside each sold item */
+  if(Array.isArray(d.saleItems)){
+    d.saleItems=d.saleItems.map(function(i){
+      if(!i||typeof i!=="object")return i;
+      const c=Object.assign({},i);delete c.unitCost;return c;});
+  }
+  /* and an address hiding inside the delivery block; the courier, the fee
+     and the tracking number are ordinary order information and stay */
+  if(d.delivery&&typeof d.delivery==="object"){
+    d.delivery=Object.assign({},d.delivery);delete d.delivery.location;
+  }
   return d;
+}
+
+/* The three satellites, built from the same order. Each returns null when
+   this device holds nothing to say, which is not the same as zero: a
+   person who may not read costs has no costs on their device, and must
+   not be able to overwrite the studio's with an empty one. */
+function orderCostRow(o){
+  const lines=Array.isArray(o.costs)?o.costs:null;
+  const items=Array.isArray(o.saleItems)
+    ? o.saleItems.filter(function(i){return i&&i.unitCost!=null&&i.unitCost!=="";}) : [];
+  if(!lines&&!items.length)return null;
+  const total=(lines||[]).reduce(function(a,c){return a+(Number(c&&c.amount)||0);},0);
+  const itemTotal=items.reduce(function(a,i){return a+(Number(i.unitCost)||0)*(Number(i.qty)||1);},0);
+  if(!total&&!itemTotal&&!(lines&&lines.length))return null;
+  return {cost:total,detail:{lines:lines||[],
+    item_costs:items.map(function(i){return {productId:i.productId,variantId:i.variantId,
+      label:i.label,qty:i.qty,unitCost:i.unitCost};}),
+    item_cost_total:itemTotal}};
+}
+function orderCommissionRow(o){
+  const lines=Array.isArray(o.commissions)?o.commissions:null;
+  const hasDirector=o.directorAmount!=null||o.directorOn!=null;
+  const hasReferral=(o.referralAmount!=null&&o.referralAmount!=="")||!!o.referrerId;
+  if(!lines&&!hasDirector&&!hasReferral)return null;
+  const total=(lines||[]).reduce(function(a,c){return a+(Number(c&&c.amount)||0);},0)
+    +(Number(o.directorAmount)||0)+(Number(o.referralAmount)||0);
+  return {total:total,detail:{lines:lines||[],
+    director:{on:o.directorOn,pct:o.directorPct,amount:o.directorAmount},
+    referral:{referrerId:o.referrerId,amount:o.referralAmount}}};
+}
+function orderContactRow(o){
+  const d={};
+  const loc=o.delivery&&o.delivery.location;
+  if(loc)d.delivery_location=loc;
+  if(o.email)d.email=o.email;
+  if(o.whatsapp)d.whatsapp=o.whatsapp;
+  if(o.address)d.address=o.address;
+  return Object.keys(d).length?{detail:d}:null;
 }
 
 async function pushOrderRows(){
@@ -3018,11 +3101,21 @@ async function pushOrderRows(){
   let firstError="",fatal=false,conflicts=0;
   for(const o of list){
     if(!o||!o.id)continue;
+    /* o.total AND o.status DO NOT EXIST. An order's money is o.value and
+       whether it is finished is orderIsSettled(), which is what splits the
+       two storage keys. This said Number(o.total||0) and String(o.status
+       ||"open"), so every row went up worth nothing and marked open —
+       including the finished ones. Nothing had been migrated yet, so no
+       studio was carrying the damage; it would have appeared on the first
+       one that was. */
+    let settled=false;try{settled=orderIsSettled(o);}catch(e){settled=false;}
     const row={
       business_id:myBusinessId,app_id:String(o.id),
       branch_id:branchIdForName(o.branch),
-      total:Number(o.total||0),
-      status:String(o.status||"open"),
+      customer_id:customerIdForName(o.client),
+      total:Number(o.value||0),
+      status:settled?"done":"open",
+      assigned_to:(o.makerId||null)||null,
       doc:orderDoc(o)
     };
     try{
@@ -3041,14 +3134,26 @@ async function pushOrderRows(){
         if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;continue;}
         if(data)o._rev=data.rev;
       }
-      /* The cost only travels if this device HAS one, which it only does
-         if the person was allowed to read it in the first place. */
-      if(o.cost!==undefined&&o.cost!==null&&o.cost!==""){
+      /* THE PROTECTED PARTS TRAVEL SEPARATELY, and only if this device HAS
+         them — which it only does if the person was allowed to read them in
+         the first place. A staff member without seeCost holds no costs, so
+         they send none, so they cannot blank the studio's. The write is
+         refused by the policy as well; this is the half that means an
+         ordinary save by an ordinary person is not even an attempt. */
+      const cost=orderCostRow(o),comm=orderCommissionRow(o),contact=orderContactRow(o);
+      if(cost||comm||contact){
         const {data:got}=await supa.from('orders').select('id')
           .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
         if(got){
-          await supa.from('order_costs').upsert({order_id:got.id,business_id:myBusinessId,
-            branch_id:row.branch_id,cost:Number(o.cost)||0},{onConflict:'order_id'});
+          if(cost)await supa.from('order_costs').upsert({order_id:got.id,
+            business_id:myBusinessId,branch_id:row.branch_id,
+            cost:cost.cost,detail:cost.detail},{onConflict:'order_id'});
+          if(comm)await supa.from('order_commissions').upsert({order_id:got.id,
+            business_id:myBusinessId,branch_id:row.branch_id,
+            total:comm.total,detail:comm.detail},{onConflict:'order_id'});
+          if(contact)await supa.from('order_contacts').upsert({order_id:got.id,
+            business_id:myBusinessId,branch_id:row.branch_id,
+            detail:contact.detail},{onConflict:'order_id'});
         }
       }
     }catch(e){if(!firstError)firstError=String(e&&e.message||e);}
@@ -3124,17 +3229,63 @@ async function pullOrders(){
       .select('id,app_id,branch_id,doc,rev').eq('business_id',myBusinessId);
     if(error)return false;
     if(!rows)return false;
-    let costs={};
+    /* Each of the three comes back only for somebody the database is
+       willing to give it to. An absent one is a REFUSAL and is left absent
+       rather than defaulted, because a cost defaulted to zero reads as
+       free and a missing commission reads as nobody being owed. */
+    let costs={},comms={},contacts={};
     try{
-      const {data:cs}=await supa.from('order_costs').select('order_id,cost').eq('business_id',myBusinessId);
-      (cs||[]).forEach(function(c){costs[c.order_id]=c.cost;});
+      const {data:cs}=await supa.from('order_costs').select('order_id,cost,detail').eq('business_id',myBusinessId);
+      (cs||[]).forEach(function(c){costs[c.order_id]=c;});
+    }catch(e){}
+    try{
+      const {data:ks}=await supa.from('order_commissions').select('order_id,total,detail').eq('business_id',myBusinessId);
+      (ks||[]).forEach(function(k){comms[k.order_id]=k;});
+    }catch(e){}
+    try{
+      const {data:ts}=await supa.from('order_contacts').select('order_id,detail').eq('business_id',myBusinessId);
+      (ts||[]).forEach(function(t){contacts[t.order_id]=t;});
     }catch(e){}
     const list=rows.map(function(r){
       const o=Object.assign({},r.doc||{});
       o.id=r.app_id||o.id;
       o._rev=r.rev;
+      if(r.total!=null)o.value=Number(r.total);
       if(r.branch_id)o.branch=branchNameForId(r.branch_id)||o.branch;
-      if(costs[r.id]!==undefined)o.cost=Number(costs[r.id]);
+      if(r.assigned_to)o.makerId=r.assigned_to;
+      /* Put the protected parts back exactly where the thirty three readers
+         already look for them, so no screen has to know any of this
+         happened. Somebody without the permission gets an order with no
+         costs key at all — which is what the UI already treats as "not for
+         you", because that is how it behaved when the field was hidden. */
+      const c=costs[r.id];
+      if(c){
+        o.costs=(c.detail&&c.detail.lines)||[];
+        o.cost=Number(c.cost);
+        const ic=(c.detail&&c.detail.item_costs)||[];
+        if(ic.length&&Array.isArray(o.saleItems)){
+          o.saleItems=o.saleItems.map(function(i,n){
+            const m=ic[n];
+            return (m&&i&&typeof i==="object")?Object.assign({},i,{unitCost:m.unitCost}):i;});
+        }
+      }
+      const k=comms[r.id];
+      if(k){
+        o.commissions=(k.detail&&k.detail.lines)||[];
+        const dir=(k.detail&&k.detail.director)||{};
+        o.directorOn=dir.on;o.directorPct=dir.pct;o.directorAmount=dir.amount;
+        const ref=(k.detail&&k.detail.referral)||{};
+        o.referrerId=ref.referrerId||"";o.referralAmount=ref.amount||0;
+      }
+      const t=contacts[r.id];
+      if(t&&t.detail){
+        if(t.detail.delivery_location){
+          o.delivery=Object.assign({},o.delivery||{},{location:t.detail.delivery_location});
+        }
+        if(t.detail.email)o.email=t.detail.email;
+        if(t.detail.whatsapp)o.whatsapp=t.detail.whatsapp;
+        if(t.detail.address)o.address=t.detail.address;
+      }
       return o;
     });
     /* NOTHING ON THE SERVER IS NOT THE SAME AS NOTHING.

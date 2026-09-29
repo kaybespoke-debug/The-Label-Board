@@ -24,12 +24,38 @@ straight back. Four production studios had the password and four had the PIN
 list; all eight are gone and every settings row is byte-identical minus that
 one field. `tools/credential_probe.js` went 12 failed to 18 passed.
 
+**P2 is DONE on staging and waiting for a production window.** The order blob
+defeated seeCost and seeContact mechanically — one jsonb per business, so
+anybody who could open Orders was handed all of it. Surveying the 68 live
+orders first changed the design: three of the seven sensitive things hide one
+level down (a unitCost inside each sold item, a delivery address inside the
+delivery block, and the commission lines), and a migration that moved "cost and
+contact" would have left five of the seven where they were.
+
+Two things had to be replaced rather than used. The deployed
+`migrate_orders_to_rows` reads `total`, `status` and `cost`, none of which any
+order has, so it would have written zero money on all 68, marked the twelve
+completed ones open, and left the costs in `doc` on 68 of 68 — then reported
+`matched = true`. The app's own `orderDoc()` had the identical blind spot and
+also wrote `total: 0` and `status: 'open'` on every push.
+
+Orders are now rows with three satellites: `order_costs` and
+`order_commissions` behind seeCost, `order_contacts` behind seeContact. A
+trigger strips the protected keys out of `orders.doc` on the way in, because
+doc is granted to authenticated and RLS is per row, never per column.
+Retirement refuses unless that studio reconciles green, identifier by
+identifier. `permission_catalogue` now says seeCost and seeContact are enforced
+by the database; money and receivables stay honestly marked `ui_only`.
+
+Gates: `orders_migration_harness` 79, `audit_order_split` 44 (the 24th app
+gate), `order_migration_probe` 66 against staging with real sessions and
+idempotent. Staging fingerprint matches the repo at 871 objects.
+
 **Still open, and the reason multi-user external studios are NOT ready:**
 
-- **P2 — the legacy order blob.** Orders still live in a jsonb blob that
-  defeats `seeCost` and `seeContact`. Production has 68 blob orders and 0
-  relational rows, so **no destructive cleanup is permitted** until the
-  relational copy is proven complete per studio.
+- **P2 is fixed but NOT on production.** The 68 blob orders across two studios
+  are still there and still readable by anyone who can open Orders. The
+  promotion is prepared and waiting.
 - **P3 — the outbox is not tenant-bound.** A queued write can be sent to
   whichever studio the UI is showing when it drains. Confirmed by direct
   experiment. Legacy entries with no `business_id` must be quarantined, never
@@ -38,6 +64,35 @@ one field. `tools/credential_probe.js` went 12 failed to 18 passed.
   against 14). The partner portal cannot be signed into.
 - **P5 — the security gates are not load-bearing.** Five of ten deliberate
   security mutations were caught by nothing.
+
+**The public-repository sweep, 29 September.** Every git object, every branch,
+every dangling commit, every JWT decoded rather than pattern-matched: **no live
+credential has ever been committed.** The three JWTs in the repo are all
+`role: anon`, which is public by design. No .env file has ever existed. Nothing
+to rotate.
+
+Two things did turn up:
+
+- **Three real partners' details were published** — names, businesses, referral
+  codes and email addresses in `build_overflow_harness.js`, one of them named
+  again in two documents with auth timestamps. Removed from HEAD on 29
+  September and replaced with invented strings of identical length so the
+  overflow fixture still means what it meant. **Still in git history** in four
+  commits, the earliest 17 September; a rewrite is Kayode's call.
+- **`AUDIT_2026-09-23.md` is on `origin/main` and has been since 23 September**
+  — 782 lines, a graded findings table, a 37-row attack matrix and a
+  remediation roadmap, naming the live project. It is the very thing
+  `PRODUCT_AUDIT.md` was gitignored to prevent, and it was already published.
+  Making the repository private is approved in principle and is waiting on one
+  check: that the Netlify integration keeps access to a private repo.
+
+**The retired Supabase project `gcdrkoitjqwbidcfgyzl` is gone**, not merely
+abandoned: live and staging both resolve and answer 401, and that host has no
+DNS record at all. Supabase keeps the hostname for a paused project, so its
+anon key in git history is inert.
+
+**Leaked-password protection is OFF on production**, confirmed from the
+platform advisor rather than from this file. Dashboard-only, owner's call.
 
 **Two things found while promoting P1:**
 
