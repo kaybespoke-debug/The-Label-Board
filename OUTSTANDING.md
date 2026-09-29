@@ -2366,6 +2366,38 @@ Needs a password, a dashboard setting on a live service, or a commercial call.
 
 ---
 
+## The countdown is off, and it is a switch not a deletion
+
+Turned off 29 September at Kayode’s word: the app is still being fixed, and
+a clock ticking down to a day nobody has committed to is a promise the site
+cannot keep. The one thing worse than no date is a date that moves.
+
+`SITE.countdown: false` in `web/js/config.js`, read by one guard in
+`web/js/site.js`. **The date is kept rather than blanked.** Blanking
+`launchDate` would also silence the clock but throws away the answer, and the
+page still reads the month from it. Turning it back on is one word.
+
+This needed no new design. The hero has always carried "Opening in November."
+for visitors whose JavaScript never arrived, and the clock only overwrote it.
+Off, the fallback is simply the message.
+
+**That is also the new risk.** With the clock off, that sentence is the only
+thing the hero says about opening, so it stopped being a fallback and became
+load-bearing. `audit_web.js` now guards it, along with the flag existing and
+the clock still reading it. None of the three care whether it is on or off,
+so they stay green the morning it goes back on.
+
+Mutation tested four ways: guard removed, flag deleted, sentence deleted, and
+switched back on. The first three go red on exactly one check each, the
+fourth stays green at 2265.
+
+**Getting it to main needed a cherry-pick, not a merge.** The branch it was
+written on carries the admin `netlify.toml`, so merging would have repointed
+the customer site’s publish folder, which is the trap CLAUDE.md warns about.
+The commit touches three files and none of them is that one, so cherry-pick
+sidestepped it entirely. Worth remembering for any web/ fix started off a
+branch that came from admin-deploy.
+
 ## SMTP, the last thing the partner portal needs
 
 **Supabase’s built-in sender cannot do this.** It sends **2 messages an hour,
