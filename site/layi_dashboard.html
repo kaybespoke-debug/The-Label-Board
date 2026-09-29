@@ -1049,7 +1049,7 @@ body.modal-open{overflow:hidden}
     <div class="brand" id="loginBrand">LABEL BOARD</div>
     <div class="brand-sub">Run the business behind your label.</div>
     <p class="lead">Sign in to your account.</p>
-    <div class="field"><input type="text" class="fld" id="loginUser" placeholder="Email or username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="field"><input type="text" class="fld" id="loginUser" placeholder="Email address" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="field" style="position:relative"><input type="password" class="fld" id="loginPass" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:46px"><span id="pwToggle" onclick="togglePw()" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-dim);font-size:13px;user-select:none">Show</span></div>
     <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
     <button class="btn ghost" id="bioUnlockBtn" style="width:100%;display:none;margin-top:9px;align-items:center;justify-content:center;gap:8px" onclick="biometricUnlock()"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="vertical-align:-3px"><path d="M12 10.2a2 2 0 0 1 2 2c0 2.8-.4 4.8-1 6.6"/><path d="M8.2 12a3.8 3.8 0 0 1 7.6 0c0 2.9-.4 4.7-1 6.7"/><path d="M5.6 13a6.4 6.4 0 0 1 12.8 0c0 1.9-.2 3.4-.6 4.9"/><path d="M12 12.2v.6c0 3.8-.6 5.7-1.2 7.5"/></svg> Unlock with Face ID / fingerprint</button>
@@ -2520,7 +2520,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v62';
+const APP_VERSION='layi-v63';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4026,6 +4026,16 @@ function lightbox(src){const lb=document.getElementById('lightbox');lb.querySele
    by typing a PIN, because a live account’s PIN was never checked against
    anything the server knew. */
 function localLoginAllowed(){ return !SUPA_URL; }
+
+/* AND THE FIELD SHOULD NOT PROMISE WHAT THE DEVICE CANNOT DO. The markup says
+   "Email address", because that is the answer everywhere the app has a
+   backend. On the demo and on a file:// copy a username is still a login, so
+   the placeholder says so there. Told once, at boot, rather than argued about
+   in an error message after somebody has typed. */
+function labelLoginField(){
+  const el=document.getElementById('loginUser');
+  if(el&&localLoginAllowed())el.placeholder='Email or username';
+}
 
 async function doLogin(){
   const raw=(document.getElementById('loginUser').value||'').trim();
@@ -15250,6 +15260,7 @@ if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):'
 
 (function init(){const s=load('layi_dash_settings',null);if(s)SETTINGS=Object.assign({},DEFAULTS,s);
   try{renderAbout();}catch(e){}
+  try{labelLoginField();}catch(e){}
   applyStages();
   getRoles();getUsers();migrateRoles();
   try{migrateBranchOwnership();}catch(e){console.warn('branch migration:',e);}
