@@ -2127,6 +2127,28 @@ async function switchStudio(id){
   myBusinessId=id;myMembershipRole=m.role||'';
   try{closeModal();}catch(e){}
   try{toast('Opening '+(studioNameById(id)||'the studio')+'\u2026');}catch(e){}
+  /* UNSENT WORK IS MADE SELF-CONTAINED BEFORE ITS SOURCE IS CLEARED.
+
+     An orders entry does not carry the orders; it reads the device's array
+     when it is sent. The next two lines delete that array. So before they
+     run, any pending orders entry for the studio being left takes a copy
+     of what it was going to send. Without this, switching studios with an
+     unsent order change threw the change away — silently, because the
+     queue entry survived and had nothing left to read.
+
+     The queue itself is NOT touched. Entries keep their own business_id
+     and are neither reassigned, rewritten nor cleared. */
+  try{
+    const leaving=myMemberships&&myBusinessId?myBusinessId:null;
+    const q=outbox();let changed=false;
+    q.forEach(function(x){
+      if(x.kind==="orders"&&x.business_id&&x.business_id!==id&&
+         !(x.payload&&x.payload.orders)){
+        try{x.payload={orders:rawOrders()};changed=true;}catch(e){}
+      }
+    });
+    if(changed)setOutbox(q);
+  }catch(e){}
   /* Local data belongs to the studio it came from. Clearing it before the
      pull is what stops one studio's orders appearing under another's name
      for the second it takes to hydrate. */
@@ -2520,7 +2542,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v64';
+const APP_VERSION='layi-v65';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -2700,16 +2722,52 @@ const OUTBOX_MAX_TRIES=8;
 let _drainTimer=null,_draining=false,_drainAgain=false;
 function outbox(){try{const v=JSON.parse(store.get(OUTBOX_KEY)||"[]");return Array.isArray(v)?v:[];}catch(e){return [];}}
 function setOutbox(v){try{store.set(OUTBOX_KEY,JSON.stringify(v));}catch(e){}updateSyncPill();}
+/* EVERY QUEUED WRITE CARRIES THE STUDIO IT WAS MADE IN.
+
+   The audit's finding, reproduced by experiment: queue a write while
+   Studio A is open, switch to Studio B, let the queue drain. The entry
+   held no studio, so sendOutboxEntry read the CURRENT myBusinessId and
+   posted A's work into B.
+
+   The tenant is stamped HERE, at the moment the person did the thing, and
+   is never filled in later. A queue entry with no business_id is not a
+   queue entry that can be repaired at flush time — by then the only
+   answer available is the wrong one.
+
+   AND THE COLLAPSE KEY GAINED THE STUDIO TOO, which was a second bug
+   sitting next to the first. It was (kind,key), so a settings save in
+   Studio B REPLACED a queued settings save for Studio A: the entry was
+   not misrouted, it was destroyed. */
 function outboxQueue(entry){
   const q=outbox();
-  /* one per (kind,key): the latest value is the only one worth sending */
-  const i=q.findIndex(function(x){return x.kind===entry.kind&&x.key===entry.key;});
-  const row=Object.assign({id:uid("ob"),tries:0,lastError:"",at:new Date().toISOString()},entry);
+  const biz=entry.business_id||myBusinessId||null;
+  /* One per (business, kind, key): the latest value for THAT studio is the
+     only one worth sending, and another studio's is a different thing. */
+  const i=q.findIndex(function(x){
+    return x.kind===entry.kind&&x.key===entry.key&&(x.business_id||null)===biz;});
+  const row=Object.assign({
+    id:uid("ob"),
+    business_id:biz,
+    branch_id:(typeof activeBranchId==="function"?activeBranchId():null)||null,
+    state:biz?"pending":"unresolved_tenant",
+    tries:0,lastError:"",at:new Date().toISOString()
+  },entry,{business_id:biz});
+  if(!biz)row.state="unresolved_tenant";
   if(i>=0){row.id=q[i].id;row.tries=0;row.lastError="";q[i]=row;}else{q.push(row);}
   setOutbox(q);
   scheduleDrain(150);
 }
 function outboxDrop(id){setOutbox(outbox().filter(function(x){return x.id!==id;}));}
+/* Do I still belong to that studio? Asked of the memberships this session
+   actually read from the server, never of the studio on screen. */
+function memberOf(biz){
+  if(!biz)return false;
+  if(!Array.isArray(myMemberships)||!myMemberships.length)return biz===myBusinessId;
+  return myMemberships.some(function(m){
+    return m.business_id===biz&&(m.status===undefined||m.status==="active");});
+}
+/* Entries that name no studio, kept and shown rather than sent or deleted. */
+function outboxUnresolved(){return outbox().filter(function(x){return !x.business_id;});}
 function outboxFailures(){return outbox().filter(function(x){return x.tries>=OUTBOX_MAX_TRIES;});}
 function outboxPending(){return outbox().filter(function(x){return x.tries<OUTBOX_MAX_TRIES;});}
 
@@ -2739,6 +2797,12 @@ async function drainOutbox(){
       const i=cur.findIndex(function(x){return x.id===entry.id;});
       if(i<0)continue;               // replaced by a newer value while in flight
       if(res.ok){cur.splice(i,1);setOutbox(cur);continue;}
+      /* "Not now" is not a failure. An orders entry for a studio that is
+         not open waits without burning a retry, or eight switches would
+         exhaust it and call it dead. */
+      if(res.defer)continue;
+      if(res.unresolved){cur[i].state="unresolved_tenant";cur[i].lastError=res.error;
+        cur[i].tries=OUTBOX_MAX_TRIES;setOutbox(cur);continue;}
       cur[i].tries=(cur[i].tries||0)+1;
       cur[i].lastError=res.error||"";
       cur[i].fatal=!!res.fatal;
@@ -2778,10 +2842,31 @@ function cloudSafe(key,payload){
   return copy;
 }
 
+/* THE ENTRY'S STUDIO, NEVER THE ONE ON SCREEN.
+
+   Every branch below addresses e.business_id. Studio B may be open while
+   an authorised queued write for Studio A is sent — that is fine and is
+   the point of a durable queue. Sending A's payload INTO B is not, and it
+   is now not expressible: there is no line here that reads myBusinessId.
+
+   A membership that has gone is the server's answer to give, not ours to
+   guess: the write is attempted and RLS refuses it with 42501, which
+   outboxResult already treats as fatal. */
 async function sendOutboxEntry(e){
+  const biz=e.business_id||null;
+  if(!biz){
+    /* A legacy entry from a build that did not stamp the studio. It is not
+       sent and it is not deleted; see outboxUnresolved(). */
+    return {ok:false,fatal:true,unresolved:true,
+      error:"This saved change belongs to an older version of The Label Board and could not be safely matched to a studio. It has not been sent."};
+  }
+  if(!memberOf(biz)){
+    return {ok:false,fatal:true,
+      error:"You are no longer a member of the studio this change belongs to."};
+  }
   if(e.kind==="state"){
     const {error}=await supa.from("app_state").upsert(
-      {business_id:myBusinessId,key:e.key,data:cloudSafe(e.key,e.payload),updated_at:new Date().toISOString()},
+      {business_id:biz,key:e.key,data:cloudSafe(e.key,e.payload),updated_at:new Date().toISOString()},
       {onConflict:"business_id,key"});
     return outboxResult(error);
   }
@@ -2792,7 +2877,18 @@ async function sendOutboxEntry(e){
     const {error}=await supa.from("audit_log").insert(e.payload);
     return outboxResult(error);
   }
-  if(e.kind==="orders"){return await pushOrderRows(e.payload);}
+  if(e.kind==="orders"){
+    /* ORDERS ARE THE ONE KIND WHOSE PAYLOAD IS NOT IN THE ENTRY. It reads
+       the device's order array, and that array belongs to whichever studio
+       is open. So either this studio is the open one and the array is its
+       own, or the entry carries a snapshot taken before the switch cleared
+       it. Anything else waits: not an error, not a try, just not now. */
+    if(e.payload&&typeof e.payload==="object"&&Array.isArray(e.payload.orders)){
+      return await pushOrderRows(biz,e.payload.orders);
+    }
+    if(biz!==myBusinessId)return {ok:false,fatal:false,defer:true,error:""};
+    return await pushOrderRows(biz,null);
+  }
   if(e.kind==="fault"){
     /* No return=representation here either, and for a stronger reason:
        a studio has NO select on error_reports at all, so asking for the
@@ -3095,9 +3191,22 @@ function orderContactRow(o){
   return Object.keys(d).length?{detail:d}:null;
 }
 
-async function pushOrderRows(){
-  if(!supa||!liveMode||!myBusinessId)return {ok:true};
-  const list=rawOrders();
+/* THE STUDIO AND THE LIST BOTH COME IN.
+
+   This read biz and rawOrders() — two globals that mean "whatever
+   is on screen". A queued orders write for Studio A, drained while Studio
+   B was open, therefore took B's orders and wrote them wherever B pointed.
+   It also DELETES orders absent from the list it is given, so a drain
+   during B's hydration, when the array is briefly empty, could have swept
+   B's orders away.
+
+   Both are now arguments. p_list null means "this studio is the open one,
+   use the device's array", which sendOutboxEntry only ever passes when it
+   has checked that. */
+async function pushOrderRows(p_business,p_list){
+  const biz=p_business||biz;
+  if(!supa||!liveMode||!biz)return {ok:true};
+  const list=Array.isArray(p_list)?p_list:rawOrders();
   let firstError="",fatal=false,conflicts=0;
   for(const o of list){
     if(!o||!o.id)continue;
@@ -3110,7 +3219,7 @@ async function pushOrderRows(){
        one that was. */
     let settled=false;try{settled=orderIsSettled(o);}catch(e){settled=false;}
     const row={
-      business_id:myBusinessId,app_id:String(o.id),
+      business_id:biz,app_id:String(o.id),
       branch_id:branchIdForName(o.branch),
       customer_id:customerIdForName(o.client),
       total:Number(o.value||0),
@@ -3123,10 +3232,10 @@ async function pushOrderRows(){
         /* An edit, based on a revision. eq(rev) is the concurrency control:
            zero rows means somebody else moved it on. */
         const {data,error}=await supa.from('orders').update(row)
-          .eq('business_id',myBusinessId).eq('app_id',String(o.id)).eq('rev',o._rev)
+          .eq('business_id',biz).eq('app_id',String(o.id)).eq('rev',o._rev)
           .select('rev').maybeSingle();
         if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;continue;}
-        if(!data){conflicts++;await noteOrderConflict(o);continue;}
+        if(!data){conflicts++;await noteOrderConflict(o,biz);continue;}
         o._rev=data.rev;
       }else{
         const {data,error}=await supa.from('orders').upsert(row,{onConflict:'business_id,app_id'})
@@ -3143,16 +3252,16 @@ async function pushOrderRows(){
       const cost=orderCostRow(o),comm=orderCommissionRow(o),contact=orderContactRow(o);
       if(cost||comm||contact){
         const {data:got}=await supa.from('orders').select('id')
-          .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
+          .eq('business_id',biz).eq('app_id',String(o.id)).maybeSingle();
         if(got){
           if(cost)await supa.from('order_costs').upsert({order_id:got.id,
-            business_id:myBusinessId,branch_id:row.branch_id,
+            business_id:biz,branch_id:row.branch_id,
             cost:cost.cost,detail:cost.detail},{onConflict:'order_id'});
           if(comm)await supa.from('order_commissions').upsert({order_id:got.id,
-            business_id:myBusinessId,branch_id:row.branch_id,
+            business_id:biz,branch_id:row.branch_id,
             total:comm.total,detail:comm.detail},{onConflict:'order_id'});
           if(contact)await supa.from('order_contacts').upsert({order_id:got.id,
-            business_id:myBusinessId,branch_id:row.branch_id,
+            business_id:biz,branch_id:row.branch_id,
             detail:contact.detail},{onConflict:'order_id'});
         }
       }
@@ -3163,24 +3272,36 @@ async function pushOrderRows(){
      read, so nothing another branch holds can be swept up by it. */
   try{
     const ids=list.map(function(o){return String(o.id);}).filter(Boolean);
-    let q=supa.from('orders').delete().eq('business_id',myBusinessId);
+    let q=supa.from('orders').delete().eq('business_id',biz);
     if(ids.length)q=q.not('app_id','in','("'+ids.join('","')+'")');
     await q;
   }catch(e){}
-  try{saveLocal(ORDERS_KEY,splitOrders(list).live);saveLocal(ORDERS_DONE_KEY,splitOrders(list).done);}catch(e){}
-  if(conflicts)renderSyncConflicts();
+  /* NEVER WRITE ANOTHER STUDIO'S ORDERS ONTO THIS DEVICE. This line keeps
+     the local array in step with what was accepted, which is right when the
+     studio being pushed is the one on screen and is cross-tenant
+     contamination when it is not. */
+  if(biz===myBusinessId&&!Array.isArray(p_list)){
+    try{saveLocal(ORDERS_KEY,splitOrders(list).live);saveLocal(ORDERS_DONE_KEY,splitOrders(list).done);}catch(e){}
+  }
+  /* A conflict raised while another studio is open belongs to the studio
+     the write belonged to, and must not be shown as though it were this
+     one's. It is recorded and surfaced when that studio is opened. */
+  if(conflicts&&biz===myBusinessId)renderSyncConflicts();
   if(firstError)return {ok:false,fatal:fatal,error:firstError};
   return {ok:true};
 }
 
 /* The other device won, because it got there first. Nothing is discarded:
    the version from this device is kept and the person is asked. */
-async function noteOrderConflict(o){
+async function noteOrderConflict(o,p_business){
+  const biz=p_business||myBusinessId;
   try{
     const {data}=await supa.from('orders').select('doc,rev')
-      .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
+      .eq('business_id',biz).eq('app_id',String(o.id)).maybeSingle();
     ORDER_CONFLICTS=ORDER_CONFLICTS.filter(function(c){return c.id!==o.id;});
-    ORDER_CONFLICTS.push({id:o.id,mine:o,theirs:data?data.doc:null,at:new Date().toISOString()});
+    /* stamped with the studio, so a conflict from one cannot be shown or
+       resolved as though it belonged to another */
+    ORDER_CONFLICTS.push({id:o.id,business_id:biz,mine:o,theirs:data?data.doc:null,at:new Date().toISOString()});
   }catch(e){}
 }
 function renderSyncConflicts(){
