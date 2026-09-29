@@ -262,7 +262,9 @@ Kayode confirmed sign-in afterwards. `layiojomo@gmail.com` is now free.
 Every one of the six seeded test studios is ALSO a partner, which is the seed
 data rather than a bug, but it means `is_partner` is noisy until the test rows
 are cleared. There is also a real partner signup nobody had mentioned,
-`r2wapparels@gmail.com`, last seen 15 September.
+the one real partner signup, last seen 15 September. (Their address was
+here until 29 September; this repository is public and it was not ours to
+publish.)
 
 **Two orphan memberships are invisible to it and should not be.** Test Studio
 and Test Studio Two have owner rows pointing at auth users that do not exist,
