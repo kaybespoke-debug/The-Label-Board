@@ -116,11 +116,12 @@
            actions, because they are one idea: we open on a date, and this is
            how you are there when we do.
 
-           The sentence reads "Opening in November." before any script runs,
-           so no JavaScript means vague rather than blank. Once the browser
-           has the date it counts, and it gets finer as it closes: days, then
-           hours, then minutes, then the seconds. At zero it takes itself off
-           rather than sitting there at nothing. -->
+           NOTHING HERE NAMES A DATE OR A MONTH, and that is deliberate. The
+           sentence that used to sit under the clock came out on 29 September.
+           The site promises nothing while the app is still being fixed, and
+           the decision to announce stays a decision somebody makes rather
+           than one the page keeps making on its own every time it loads.
+           audit_web.js holds it to that for as long as the countdown is off. -->
       <div class="opens-row">
         <a class="btn btn-line btn-sm" href="waitlist.html">Join waitlist</a>
 
@@ -129,17 +130,16 @@
              countdown with numbers typed into the HTML is a countdown that is
              wrong for everybody whose JavaScript did not arrive.
 
-             The sentence below it is the truth without JavaScript. When the
-             clock takes over, the sentence stays for screen readers and goes
-             visually, because four numbers changing every second is not
-             something anybody wants read aloud to them. -->
+             It is left here rather than deleted so that turning the countdown
+             back on stays one word in config.js. Switched off it shows nothing
+             to anybody, script or no script, because it holds no numbers until
+             the script puts them there. -->
         <div class="clock" data-opens hidden aria-hidden="true">
           <div class="seg"><b data-cd="d">--</b><span>days</span></div>
           <div class="seg"><b data-cd="h">--</b><span>hrs</span></div>
           <div class="seg"><b data-cd="m">--</b><span>mins</span></div>
           <div class="seg"><b data-cd="s">--</b><span>secs</span></div>
         </div>
-        <p class="opens" data-opens-text>Opening in <span data-cfg="launchMonth">November</span>.</p>
       </div>
     </div>
 

@@ -47,9 +47,11 @@
      photo sits over its icon and removes itself if the file is not there; a
      panel photo is only applied once the browser has actually loaded it. */
   /* ---------------- how long until we open ----------------
-     The element already reads "Opening to new businesses in November." before
-     this runs, so a visitor with no JavaScript, or one who arrives before this
-     file does, gets a true sentence rather than an empty box or a zero.
+     There is no sentence under the clock any more. It came out on 29 September
+     so the site names no month until somebody decides to name one, and the code
+     below is already null safe about it. A visitor with no JavaScript sees the
+     waiting list button and nothing about a date, which is now the intended
+     state rather than a degraded one.
 
      Three rules this follows, and each one is a thing countdowns usually get
      wrong:

@@ -238,11 +238,26 @@ check(typeof S.countdown === 'boolean',
 check(read('js/site.js').includes('cfg.countdown === false'),
   'the home page clock actually reads that switch');
 
-/* With the clock off this sentence is the ONLY thing the hero says about
-   opening, so it stops being a fallback and becomes the message. It was
-   always allowed to be deleted as long as the clock covered for it. */
-check(html['index.html'].includes('data-opens-text'),
-  'the home page still says when we open without the clock');
+/* THIS CHECK WAS THE OPPOSITE YESTERDAY, and the reversal is the point.
+   Yesterday the clock went off and the sentence under it became the only
+   thing the hero said about opening, so it was guarded. On 29 September
+   Kayode took the sentence out too: the site is to promise nothing until he
+   decides to announce, because a page that keeps saying "November" is a page
+   making that decision for him every time it loads.
+
+   So while the switch is off, the home page must name no month and no date.
+   Comments are stripped first, because the markup around the clock explains
+   what used to be there and saying so is not the same as promising it.
+
+   Checked ONLY while the countdown is off, so it lifts by itself the morning
+   he turns the clock back on rather than standing in his way. */
+if (S.countdown === false) {
+  const heroCopy = html['index.html'].replace(/<!--[^]*?-->/g, '');
+  check(!heroCopy.includes('data-opens-text'),
+    'the home page carries no opening sentence while the countdown is off');
+  check(!/opening in|opens in|launching in|launches in/i.test(heroCopy),
+    'the home page names no month or date while the countdown is off');
+}
 
 /* ================= 6. the prices match the ones we bill ================= */
 const adminData = fs.readFileSync(path.join(__dirname, 'admin', 'js', 'data.js'), 'utf8');
