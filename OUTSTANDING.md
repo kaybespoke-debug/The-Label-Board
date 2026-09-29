@@ -5,7 +5,58 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 23 September 2026 (twentieth session)
+Last updated: 29 September 2026 (twenty-first session)
+
+## 28–29 September 2026 — the delivery programme, Phase 0 to G
+
+**`DELIVERY_STATUS.md` is the live document for this work.** It is written
+as DONE / IN PROGRESS / BLOCKED with no deferred bucket, on the instruction
+that nothing identified as necessary may be moved out of the release. This
+entry is the summary; that file is the detail.
+
+On `phase-1b-team-invitations`, not on `main` and not on `admin-deploy`.
+Two migrations are on production (the studio-settings guard and the Phase 0
+role-authority fix, both applied 28 September). **Everything else is on
+staging only and is waiting to be promoted as one release candidate.**
+
+- **Phase 0 + A–D**: business-scoped RBAC. Membership is who, a business
+  role is what, branch scope is where, and the owner is the only inherent
+  superuser. Team invitations carry a role and a branch. Password recovery
+  moved off the dead Supabase SMTP onto Resend.
+- **E**: orders are relational rows with cost and contact details in their
+  own tables, so `seeCost` and `seeContact` are refusals at the API rather
+  than fields the browser chose not to draw. A durable outbox with visible
+  failure, conflict detection, and an append-only audit trail.
+- **F**: it tells us when it breaks (`error_reports`, browser and Edge
+  Functions, source stamped by the database). A studio can close, reopen
+  within thirty days, and be purged without taking our books with it. A
+  person can delete their account. A server-side export of everything, and a
+  restore drilled on every test run. `RECOVERY.md` is the runbook.
+- **G**: Flutterwave. Code complete on staging, 92 assertions. Waiting on
+  two test-mode secrets, below.
+
+**The one that is worth remembering.** Sixteen database objects existed on
+staging and in no migration — including the column the whole
+audit-authenticity claim rests on. Found by counting both sides rather than
+by testing behaviour. `supabase/tests/schema_inventory.mjs` now makes that
+check one command each way, and the rule is: never apply SQL to a project
+except from a migration file.
+
+### Waiting on Kayode
+
+1. **Two Flutterwave TEST secrets on the STAGING Supabase project only**, so
+   a real test payment can be made end to end:
+   - `FLW_SECRET_KEY` — the **test** secret key from the Flutterwave
+     dashboard (`FLWSECK_TEST-…`). Not the live one.
+   - `FLW_SECRET_HASH` — any long random string, set to the *same* value in
+     Flutterwave’s dashboard under Settings → Webhooks → Secret hash.
+   And the webhook URL pasted into that same dashboard page:
+   `https://pakxhimjhrcpqvtsqwqz.supabase.co/functions/v1/billing-webhook`
+   Production keys only after the whole staging billing flow passes.
+2. **Whether the pilot starts on full scope or owner-only.**
+3. **Promotion approval for the release candidate**, which is Batch H.
+
+---
 
 ## Shipped 21 September 2026
 
@@ -740,7 +791,7 @@ quoted-printable name and a `TEL;TYPE=CELL` all parse, and that a file that is
 not a vCard is refused without throwing.
 
 
-## The free trial is SILENT until Flutterwave, 21 September
+## The free trial is SILENT until Flutterwave, 21 September — no longer silent; G took the payment path and a trial that ends now makes the studio read-only rather than leaving it fully working
 
 Kayode asked whether the trial, demo and partner buttons should all be
 active while the app opens in November and tests in October. Checked
@@ -1495,7 +1546,7 @@ longest at 5.1, and what is left of it is three stacked plan cards (1.9)
 and the table (1.7). Neither can shrink further without taking something
 out of the cards, which is a content decision.
 
-## Flutterwave billing: planned, not built
+## Flutterwave billing: planned, not built — SUPERSEDED 29 September, see the top of this file
 
 `BILLING.md` holds the plan. Seven phases, each ending in something
 demonstrable. It is waiting on five decisions and a test-mode account.
@@ -2945,3 +2996,166 @@ Kayode gave, which is time, not space.
   app cheap to ship. Four taps is not worth either. The Android picker that
   already works stays. Worth re-raising only if we go native for a reason that
   is not contacts, or if Apple ever switches on the API it has had since 2021.
+
+---
+
+## Team invitations, 28 September 2026 — the path exists and staging sent a real one
+
+Phase 1B had a database, two email templates and no wire between them. The
+`invite` action was still the pre-Phase-1A body behind its 503, so there was no
+route from "owner invites somebody" to "an email arrives". Built on
+`phase-1b-team-invitations`, deployed to STAGING only, and exercised against
+real GoTrue and real Resend.
+
+**The order, which is the whole fix.** Invitation row first, carrying a
+one-time nonce; account second, carrying that nonce; `provision_studio`
+recognises its own invitation and writes nothing. Nine businesses became ten in
+September because it happened the other way round. Measured today: an auth user
+was created three separate times during the failure tests and the business count
+never moved off 10.
+
+**Nothing is granted at invite time.** No membership, no profile. The seat is
+held by the pending invitation, which `app.seats_used` already counts, so
+Adé Bespoke read 9 active + 1 pending = 10 of 50 with nobody yet able to sign
+in.
+
+**Proved on staging, not argued:**
+
+- `generateLink` creates exactly one auth user and the metadata that reaches the
+  invitee is `{"name": "Tola Adisa"}` — the nonce pair deleted by sending each
+  key as `null`, because `updateUserById` merges, and the name kept because
+  `accept_invitation` reads it to write their profile.
+- A failed send keeps nothing: invitation `cancelled` with the reason recorded,
+  nonce cleared, and the account deleted. Three separate failures, three clean
+  rollbacks, `auth.users` back to its starting count each time.
+- Resend on an unconfirmed invited account re-issues a **type `invite`** link.
+  PHASE_1B_DESIGN.md recorded that as unproven; it is proven, and the recovery
+  and magiclink fallbacks below it were never reached.
+- One invitation, one account, no duplicates after a resend.
+
+**Two deviations from the design, both deliberate:**
+
+1. **The invitation id travels in the query string, not the fragment.** GoTrue
+   appends its own fragment to `redirect_to`, so an id in the fragment arrives
+   as `#invitation=…#access_token=…` and the app's arrival parser finds no
+   access token at all. The cost is that a pointer reaches a web server log,
+   and it is only a pointer: `accept_invitation` needs a session whose
+   confirmed email matches the address the invitation names.
+2. **The feature switch asks which database it is**, rather than being a
+   constant to flip per deployment or a variable to set per project. Staging's
+   ref turns it on; production cannot be turned on by any setting.
+
+**Still to do before production invitations:**
+
+- The invitee half has not been walked by a human yet: acceptance, the profile
+  and membership it writes, and the seat converting rather than doubling. One
+  invitation is pending in staging for exactly that.
+- The existing-user path has been read and gated but not sent to a real
+  mailbox that already has an account.
+- **The app has no invite UI on the new shape.** `TEAM_INVITES_ENABLED` is
+  still `false` in `site/layi_dashboard.html`, and the old team form sends
+  `role_id`/`staff_id` rather than `role`/`branch_id`, so it would produce a
+  staff invite with no branch. The server takes both; the form needs the two
+  fields.
+- `sendReset` still goes through `resetPasswordForEmail`, which is Supabase's
+  own SMTP and has been broken since 13 September. Everything else now sends
+  through Resend. It is the last thing in the app that does not.
+- An expired or cancelled invitation is invisible to the owner. It releases its
+  seat with no action, which is right, but there is no screen that says so.
+
+### The invitee’s half, walked by a person — 28 September
+
+It worked, and it found two things a harness would not have.
+
+**The set-password screen was a one-shot with a trap in it.** The link is
+single use and confirming it spends it. If the password step then fails for
+any reason the person is stranded, and "Forgot password?" goes through
+Supabase’s own SMTP, broken since 13 September. The trap: a phone that offers
+to invent a strong password fills the first box and leaves the confirm box
+empty, the app called that a mismatch, and neither box had a way to reveal
+what was in it. Fixed: the confirm box has its own Show, an empty second box
+gets its own sentence, and a refused password says the screen is still open.
+Recovery from that state needs no new invitation — resending the existing one
+falls through to a `recovery` link, which is a password link.
+
+**An invited MANAGER was handed the owner’s studio questionnaire.** The test
+was three conditions and all three were about the business: live, not set up,
+no orders. Nothing asked who was looking, so an unfinished studio asked
+whoever walked in. Fixed by `ownsThisStudio()`, which reads the MEMBERSHIP;
+the app now takes its business context from memberships rather than from
+`profiles`, which accept_invitation overwrites. Twelve checks in
+`audit_first_run.js` across manager, staff, viewer and both halves of the
+offline fallback.
+
+**Also learned, and worth writing down:**
+
+- Confirming an invitation makes GoTrue write a 60-character bcrypt into
+  `encrypted_password` even though nobody chose one. `email_confirmed_at` is
+  therefore NOT a proxy for "can sign in", and neither is the presence of a
+  password hash. Measured on two accounts.
+- Any resend invalidates the link in the previous email. Generating a link of
+  any type rotates the token.
+- `invite` is refused for an address GoTrue already holds as confirmed;
+  `recovery` and `magiclink` are issued. That is what makes resend work as a
+  recovery path.
+- **A studio cannot be deleted.** `provision_studio` writes a `partners` row of
+  kind `customer` beside the business; `partners.business_id` is ON DELETE SET
+  NULL and a check constraint says a customer-kind partner must have a
+  business, so the delete fails on `partners_kind_matches_business` — naming
+  neither the studio nor the reason. Nobody has needed to offboard a studio
+  yet. Somebody will.
+- `app_state` is governed by `in_scope`, not `is_business_admin`, so **any
+  active member of any role can write the whole settings blob** — the studio’s
+  name, trade, production stages and plan. The questionnaire was one way in;
+  Settings is another. Worth deciding on its own, separately from this fix.
+
+### Studio settings, and who owns them — 28 September
+
+Measured on staging before anything was built. A real session for a real
+member, straight to PostgREST with no app in the path: **every role, down to a
+VIEWER, could rename the studio, reset setupDone, rewrite the production
+board, redefine the outlets, switch the team tools on and set the plan to
+premium.** Twenty-eight attempts, twenty-eight 200s.
+
+Closed with a field-level trigger on the settings blob rather than a policy,
+because `layi_dash_settings` holds what the studio IS next to what it did
+today — the next invoice number, inventory categories, message templates — and
+47 places in the app write that row. Issuing an invoice bumps invoiceNo and
+saves the whole blob, so an owner-only UPDATE policy would have stopped a
+manager issuing an invoice. RLS cannot see fields; a trigger can.
+
+**Owner only:** company, branches, branchActivities, productionStages,
+stagesV2, setupDone, setupTeamBand, setupOutletsBand, itemWord, teamTools,
+ownerPassword, ownerPay, payroll.
+
+**Deliberately left operational**, and it is a judgement call rather than an
+oversight: currency, tiers, templates, the product catalogue, inventory
+categories, defaults, the QC checklist, suppliers. A manager changing one of
+those is doing their job. Any of them can move up on request.
+
+**The plan is stamped, not rejected.** `businesses.plan` is written into the
+blob on every browser write, so a blob claiming premium is corrected by the
+next save and no request shape can set it. Rejecting would have meant every
+ordinary save failing for a studio whose copy had drifted. The app stopped
+guessing to match: the questionnaire no longer chooses a plan at all and
+`adoptPlan()` reads billing’s answer at sign-in.
+
+**What was already right, checked rather than assumed:** `authenticated` holds
+column-level UPDATE on `businesses` for exactly four columns — name,
+contact_email, last_seen_at, app_version. Plan, seats, branches, storage caps
+and trial dates were never reachable from a browser. What was reachable was
+the studio’s name, by any `is_business_admin`, which counts managers; a second
+trigger now requires an owner for the two identity columns and leaves presence
+alone.
+
+**Two things worth knowing for later:**
+
+- For staff and viewers, a refused write to `businesses` returns **200 with no
+  rows changed** — the policy matches nothing rather than raising. It is safe,
+  and it is the same shape as the B1 bug: a scoped write that reports success
+  when it matched nothing. Anything that ever needs to KNOW a write landed must
+  read it back.
+- `SETTINGS.accent` lives in the studio-wide blob, so the accent colour is
+  shared by everyone in the studio rather than being a personal preference.
+  Nobody has complained. It is the only genuinely personal setting that is not
+  device-local.

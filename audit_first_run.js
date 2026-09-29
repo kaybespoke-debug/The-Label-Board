@@ -68,7 +68,8 @@ function boot() {
 /* A studio as it arrives: signed in, nothing of its own yet. */
 function freshStudio() {
   const b = boot();
-  b.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";');
+  b.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="owner";');
   b.run('SETTINGS=Object.assign({},DEFAULTS);');
   b.run('save("layi_dash_orders",[]);');
   return b;
@@ -116,6 +117,133 @@ section('A new studio is asked, an existing one is not');
      'liveMode is false, so there is no tenant to set up');
 }
 
+// ---------------------------------------------------------------------
+section('The questionnaire belongs to the owner, and to nobody else');
+// ---------------------------------------------------------------------
+/* FOUND ON STAGING, 28 September, by the first person ever invited into a
+   studio. The three original conditions were all about the BUSINESS — live,
+   not set up, no orders — and none of them asked who was looking. A manager
+   joining a studio whose owner had not finished setting it up was handed the
+   owner's questionnaire: name the business, pick its trade, choose its plan.
+
+   The database would have taken every one of those answers. app_state's RLS
+   is in_scope, not is_business_admin, so an active member of any role can
+   write the settings blob; and is_business_admin counts managers, so the
+   studio's name would have been pushed to the operator console too. */
+{
+  ['manager', 'staff', 'viewer'].forEach(role => {
+    const b = boot();
+    b.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="' + role + '";');
+    b.run('SETTINGS=Object.assign({},DEFAULTS);');
+    b.run('save("layi_dash_orders",[]);');
+    ok('a ' + role + ' joining an unfinished studio is not asked to set it up',
+       b.run('needsStudioSetup()') === false,
+       'they are joining a business that already exists; it is not theirs to name');
+
+    /* And if the screen were reached some other way, it still writes nothing. */
+    b.run('setupDraft={name:"Renamed By A Teammate",you:"X",location:"",does:[],channels:[],team:"",outlets:"",studios:[]};');
+    b.run('saveStudioSetup();');
+    ok('and a ' + role + ' cannot answer it anyway',
+       b.run('SETTINGS.setupDone') !== true
+       && b.run('(SETTINGS.company&&SETTINGS.company.name)||""') !== 'Renamed By A Teammate',
+       'the screen not opening is a UI decision; this is the one that holds');
+
+    b.run('skipStudioSetup();');
+    ok('nor mark it done by skipping', b.run('SETTINGS.setupDone') !== true,
+       'skipping writes setupDone, so the owner would never be asked again');
+  });
+
+  /* The owner of that same unfinished studio is still asked. */
+  const own = freshStudio();
+  ok('the owner of the same studio is still asked', own.run('needsStudioSetup()') === true);
+
+  /* And a device that has not read a membership yet falls back to the app's
+     own label rather than getting stricter while it is guessing. */
+  const off = boot();
+  off.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole=""; currentUser={id:"u1",roleId:"owner"};');
+  off.run('SETTINGS=Object.assign({},DEFAULTS);');
+  off.run('save("layi_dash_orders",[]);');
+  ok('an owner whose membership has not been read is still asked',
+     off.run('needsStudioSetup()') === true,
+     'offline, or a session restored before the network answered');
+
+  const off2 = boot();
+  off2.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+         + ' myMembershipRole=""; currentUser={id:"u2",roleId:"mgr"};');
+  off2.run('SETTINGS=Object.assign({},DEFAULTS);');
+  off2.run('save("layi_dash_orders",[]);');
+  ok('and a manager in the same position is not',
+     off2.run('needsStudioSetup()') === false);
+}
+// ---------------------------------------------------------------------
+section('The studio\u2019s own settings are the owner\u2019s, everywhere');
+// ---------------------------------------------------------------------
+/* The database refuses these field by field, which is the protection.
+   Measured on staging on 28 September, before that guard existed: a VIEWER
+   could rename the studio, reset setupDone, rewrite the production board,
+   redefine the outlets and set the plan to premium, and PostgREST returned
+   200 to all five.
+
+   These checks are the app agreeing with the database. A control that is
+   offered and then refused is worse than one that was never offered. */
+{
+  const SAVERS = [
+    'savePayrollSetup', 'saveOwnerPay', 'toggleTeamTools', 'bizApplyDoes',
+    'saveItemWord', 'saveStages', 'bsAddType', 'bsRemoveType', 'saveBranches',
+    'uploadLogo', 'clearLogo', 'uploadSignature', 'clearSignature', 'saveCompany',
+    /* the branch switcher has its own editor, reachable from the header on
+       every screen; gating the Settings panel alone would have left it open */
+    'beAddType', 'beRemoveType', 'saveBranchEdit', 'deleteBranch',
+    /* Phase 0: the permission table itself. A manager with the users
+       permission could open this editor and be refused by the database. */
+    'saveRole', 'resetRoles', 'addRole', 'toggleRolePerm',
+  ];
+  SAVERS.forEach(fn => {
+    const body = (function () {
+      const i = code.indexOf('function ' + fn + '(');
+      return i < 0 ? '' : code.slice(i, i + 420);
+    })();
+    ok(fn + ' asks whether this is the owner\u2019s studio',
+       body.indexOf('ownerOnlySetting(') > 0,
+       'it writes part of what the studio IS, not what it did today');
+  });
+
+  /* And it is not only a message: nothing is written. */
+  const mgr = boot();
+  mgr.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="manager"; currentUser={id:"m1",roleId:"mgr"};');
+  mgr.run('SETTINGS=Object.assign({},DEFAULTS); SETTINGS.teamTools="off";'
+        + ' SETTINGS.productionStages=["A","B"]; SETTINGS.company={name:"Adé Bespoke"};');
+  mgr.run('toggleTeamTools(true);');
+  ok('a manager cannot switch the team tools on', mgr.run('SETTINGS.teamTools') === 'off');
+  mgr.run('saveCompany();');
+  ok('nor rewrite the company details', mgr.run('SETTINGS.company.name') === 'Adé Bespoke');
+  mgr.run('saveStages();');
+  ok('nor the production board', mgr.run('SETTINGS.productionStages.join("|")') === 'A|B');
+  mgr.run('saveBranches();');
+  ok('nor the outlets', mgr.run('JSON.stringify(SETTINGS.branches||null)') === 'null');
+
+  /* The owner of the same studio is unaffected. */
+  const own = boot();
+  own.run('liveMode=true; myBusinessId="22222222-2222-2222-2222-222222222222";'
+        + ' myMembershipRole="owner"; currentUser={id:"o1",roleId:"owner"};');
+  own.run('SETTINGS=Object.assign({},DEFAULTS); SETTINGS.teamTools="off";');
+  own.run('toggleTeamTools(true);');
+  ok('the owner still can', own.run('SETTINGS.teamTools') === 'on');
+
+  /* And the panels that carry those controls are not drawn for them. */
+  ok('the owner-only panels are named in one list',
+     /const OWNER_ONLY_PANELS=\[/.test(code)
+     && code.indexOf("'Company details'") > 0
+     && code.indexOf("'Production workflow'") > 0
+     && code.indexOf("'Your plan'") > 0,
+     'so the settings screen and the savers cannot drift apart');
+  ok('and the settings screen applies it every time it groups itself',
+     /function groupSettings\(\)\{\n?\s*try\{applyOwnerOnlyVisibility\(\);\}/.test(code),
+     'a panel hidden once and redrawn later is a control that comes back');
+}
 // ---------------------------------------------------------------------
 section('The answers become the studio');
 // ---------------------------------------------------------------------
@@ -301,11 +429,38 @@ section('How many of you, and how many outlets');
     b.run("getBranches().map(function(x){return x.name;}).join('|')"));
   ok('which is what makes the app open on the all-studios view',
     b.run('multiBranch()') === true);
-  ok('the plan starts as one that fits what they described',
-    b.run("SETTINGS.plan") === b.run("smallestPlanFitting(3,8).id"),
-    'got ' + b.run('SETTINGS.plan'));
-  ok('which for six people is not the three-seat plan',
-    b.run("SETTINGS.plan") !== 'starter' && b.run("SETTINGS.plan") !== 'trial');
+  /* THIS USED TO ASSERT THE OPPOSITE, and asserting it was the bug.
+     The questionnaire chose a plan from the two counts — "six of us, three
+     outlets" became Pro — and wrote it into a blob the customer controls.
+     On a device that is a nice touch. On a tenant it is the customer
+     writing their own subscription, and it was reachable by every member of
+     the studio, not only the owner: measured on staging, a VIEWER could
+     PATCH plan to premium and the API returned 200.
+
+     So the plan is billing’s answer now. The questionnaire does not write
+     one, adoptPlan() reads businesses.plan at sign-in, and the database
+     stamps this field from that column on every write. */
+  ok('the questionnaire does not decide the plan',
+    b.run("SETTINGS.plan") === undefined,
+    'it is a subscription, not an answer to a form: got ' + b.run('SETTINGS.plan'));
+  ok('and a live studio never guesses one either',
+    (function () {
+      const g = freshStudio();
+      g.run('ensurePlan();');
+      return g.run('SETTINGS.plan') === undefined;
+    })(),
+    'ensurePlan is for a device with no subscription behind it');
+  ok('a device that is not live still gets a sensible default',
+    (function () {
+      const d = boot();
+      d.run('liveMode=false; SETTINGS=Object.assign({},DEFAULTS); delete SETTINGS.plan;');
+      d.run('ensurePlan();');
+      return typeof d.run('SETTINGS.plan') === 'string';
+    })(),
+    'nobody is billing a device');
+  ok('and the app can read the plan back from billing',
+    /adoptPlan/.test(code) && /from\('businesses'\)\.select\('plan'\)/.test(code),
+    'otherwise the copy in the blob is whatever was there last');
 
   // a solo studio is left exactly as it was
   const s = freshStudio();

@@ -170,10 +170,15 @@ const liveBefore=_ls[LIVE];
     F('a device upgrading from the single-blob version cannot read its own orders');
 }
 
-/* 7) The finished half has to actually sync, or it is a local-only archive. ----------- */
-if(run("STATE_KEYS.indexOf('"+DONE+"')")<0)
-  F('the finished half is not in STATE_KEYS, so it never leaves the device and a new phone sees half the history');
-if(run("STATE_KEYS.indexOf('"+LIVE+"')")<0)F('the open half is not in STATE_KEYS');
+/* 7) Both halves have to actually leave the device, or the finished one is
+      a local-only archive. They are ROWS now rather than app_state blobs, so
+      the question is whether each has a pusher, not which list it is in. */
+if(run("ORDER_KEYS.indexOf('"+DONE+"')")<0 || !run("typeof SYNC_PUSHERS['"+DONE+"']==='function'"))
+  F('the finished half has no cloud pusher, so it never leaves the device and a new phone sees half the history');
+if(run("ORDER_KEYS.indexOf('"+LIVE+"')")<0 || !run("typeof SYNC_PUSHERS['"+LIVE+"']==='function'"))
+  F('the open half has no cloud pusher');
+if(run("STATE_KEYS.indexOf('"+LIVE+"')")>=0 || run("STATE_KEYS.indexOf('"+DONE+"')")>=0)
+  F('an order key is wired BOTH as a row and as an app_state blob, which is two stores arguing');
 
 /* 8) The release window, when the studio is running two versions at once. ------------
    This is the one that was missed. The split is safe once every device is on the new

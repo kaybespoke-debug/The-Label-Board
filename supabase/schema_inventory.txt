@@ -1,0 +1,838 @@
+col account_directory.banned
+col account_directory.belongs_to
+col account_directory.confirmed
+col account_directory.created_at
+col account_directory.email
+col account_directory.id
+col account_directory.is_operator
+col account_directory.is_partner
+col account_directory.is_studio_user
+col account_directory.last_sign_in_at
+col account_directory.operator_role
+col account_directory.partner_code
+col account_directory.studio
+col account_directory.studio_role
+col app_state.business_id
+col app_state.data
+col app_state.key
+col app_state.updated_at
+col attendance.branch_id
+col attendance.business_id
+col attendance.id
+col attendance.off_at
+col attendance.on_at
+col attendance.staff_id
+col audit_log.action
+col audit_log.actor
+col audit_log.actor_label
+col audit_log.at
+col audit_log.branch_id
+col audit_log.business_id
+col audit_log.detail
+col audit_log.entity
+col audit_log.entity_id
+col audit_log.entity_label
+col audit_log.id
+col audit_log.source
+col billing_intents.amount
+col billing_intents.business_id
+col billing_intents.created_at
+col billing_intents.created_by
+col billing_intents.currency
+col billing_intents.cycle
+col billing_intents.fw_tx_id
+col billing_intents.id
+col billing_intents.note
+col billing_intents.plan
+col billing_intents.settled_at
+col billing_intents.status
+col billing_intents.tx_ref
+col branches.business_id
+col branches.created_at
+col branches.id
+col branches.name
+col business_role_permissions.granted_at
+col business_role_permissions.granted_by
+col business_role_permissions.permission_key
+col business_role_permissions.role_id
+col business_roles.business_id
+col business_roles.created_at
+col business_roles.id
+col business_roles.is_system
+col business_roles.key
+col business_roles.name
+col business_roles.tier
+col business_roles.updated_at
+col businesses.app_version
+col businesses.closed_at
+col businesses.closed_by
+col businesses.closed_reason
+col businesses.cohort
+col businesses.contact_email
+col businesses.created_at
+col businesses.id
+col businesses.last_seen_at
+col businesses.max_branches
+col businesses.max_seats
+col businesses.name
+col businesses.notes
+col businesses.payment_sharing_allowed
+col businesses.pending_owner_email
+col businesses.plan
+col businesses.purge_after
+col businesses.referred_by
+col businesses.referred_on
+col businesses.slug
+col businesses.status
+col businesses.storage_cap_bytes
+col businesses.storage_cap_note
+col businesses.storage_used_bytes
+col businesses.trial_cancelled_on
+col businesses.trial_ends_on
+col businesses.trial_started_on
+col customer_contacts.address
+col customer_contacts.branch_id
+col customer_contacts.business_id
+col customer_contacts.customer_id
+col customer_contacts.email
+col customer_contacts.phone
+col customer_contacts.updated_at
+col customer_contacts.whatsapp
+col customers.branch_id
+col customers.business_id
+col customers.created_at
+col customers.id
+col customers.measurements
+col customers.name
+col customers.note
+col enquiries.at
+col enquiries.business
+col enquiries.email
+col enquiries.extra
+col enquiries.handled_at
+col enquiries.handled_by
+col enquiries.id
+col enquiries.kind
+col enquiries.message
+col enquiries.name
+col enquiries.notes
+col enquiries.phone
+col enquiries.source_page
+col enquiries.state
+col error_reports.app_version
+col error_reports.at
+col error_reports.at_url
+col error_reports.business_id
+col error_reports.id
+col error_reports.kind
+col error_reports.message
+col error_reports.source
+col error_reports.stack
+col error_reports.ua
+col error_reports.user_id
+col feedback.app_version
+col feedback.body
+col feedback.business_id
+col feedback.contact_email
+col feedback.contact_name
+col feedback.context_page
+col feedback.created_at
+col feedback.created_by
+col feedback.id
+col feedback.kind
+col feedback.rating
+col feedback.ref
+col feedback.state
+col feedback.title
+col feedback.urgency
+col feedback_inbox.app_version
+col feedback_inbox.body
+col feedback_inbox.business_id
+col feedback_inbox.business_name
+col feedback_inbox.business_plan
+col feedback_inbox.contact_email
+col feedback_inbox.contact_name
+col feedback_inbox.context_page
+col feedback_inbox.created_at
+col feedback_inbox.id
+col feedback_inbox.kind
+col feedback_inbox.last_reply_at
+col feedback_inbox.rating
+col feedback_inbox.ref
+col feedback_inbox.reply_count
+col feedback_inbox.state
+col feedback_inbox.title
+col feedback_inbox.urgency
+col feedback_replies.at
+col feedback_replies.author
+col feedback_replies.body
+col feedback_replies.business_id
+col feedback_replies.feedback_id
+col feedback_replies.id
+col feedback_replies.side
+col memberships.branch_id
+col memberships.business_id
+col memberships.closed_from
+col memberships.created_at
+col memberships.id
+col memberships.role
+col memberships.role_id
+col memberships.status
+col memberships.user_id
+col order_costs.branch_id
+col order_costs.business_id
+col order_costs.cost
+col order_costs.detail
+col order_costs.order_id
+col order_costs.updated_at
+col order_items.business_id
+col order_items.id
+col order_items.order_id
+col order_items.price
+col order_items.product_id
+col order_items.qty
+col order_summary.branch_id
+col order_summary.business_id
+col order_summary.id
+col order_summary.item_count
+col order_summary.ref
+col order_summary.total
+col orders.app_id
+col orders.assigned_to
+col orders.branch_id
+col orders.business_id
+col orders.created_at
+col orders.customer_id
+col orders.doc
+col orders.id
+col orders.ref
+col orders.rev
+col orders.status
+col orders.total
+col orders.updated_at
+col orders.updated_by
+col partner_accounts.account_name
+col partner_accounts.account_number
+col partner_accounts.added_on
+col partner_accounts.bank_name
+col partner_accounts.currency
+col partner_accounts.id
+col partner_accounts.is_primary
+col partner_accounts.partner_id
+col partner_accounts.verified
+col partner_accounts.verified_on
+col partner_ledger.amount
+col partner_ledger.basis
+col partner_ledger.clears_on
+col partner_ledger.created_at
+col partner_ledger.credited_on
+col partner_ledger.id
+col partner_ledger.kind
+col partner_ledger.milestone
+col partner_ledger.note
+col partner_ledger.partner_id
+col partner_ledger.payout_id
+col partner_ledger.period
+col partner_ledger.rate_pct
+col partner_ledger.referral_id
+col partner_ledger.status
+col partner_ledger.tier
+col partner_links.active
+col partner_links.clicks
+col partner_links.code
+col partner_links.created_at
+col partner_links.id
+col partner_links.is_default
+col partner_links.label
+col partner_links.partner_id
+col partner_payouts.account_name
+col partner_payouts.account_number
+col partner_payouts.amount
+col partner_payouts.bank_name
+col partner_payouts.bank_ref
+col partner_payouts.created_at
+col partner_payouts.id
+col partner_payouts.method
+col partner_payouts.paid_on
+col partner_payouts.partner_id
+col partner_payouts.ref
+col partner_rate_bands.label
+col partner_rate_bands.min_active
+col partner_rate_bands.rate_pct
+col partner_referrals.added_by
+col partner_referrals.business_id
+col partner_referrals.business_name
+col partner_referrals.city
+col partner_referrals.created_at
+col partner_referrals.cycle
+col partner_referrals.first_payment
+col partner_referrals.id
+col partner_referrals.lapsed_on
+col partner_referrals.last_seen
+col partner_referrals.link_id
+col partner_referrals.mrr
+col partner_referrals.outlets
+col partner_referrals.owner_name
+col partner_referrals.partner_id
+col partner_referrals.plan
+col partner_referrals.signed_up_on
+col partner_referrals.staff_count
+col partner_referrals.stage
+col partner_referrals.subscribed_on
+col partners.business_id
+col partners.business_name
+col partners.city
+col partners.code
+col partners.created_at
+col partners.email
+col partners.frozen_at
+col partners.frozen_reason
+col partners.id
+col partners.joined_on
+col partners.kind
+col partners.name
+col partners.payout_frozen
+col partners.pending_email
+col partners.phone
+col partners.status
+col partners.tax_id
+col partners.tier
+col partners.user_id
+col payment_events.at
+col payment_events.event_id
+col payment_events.id
+col payment_events.kind
+col payment_events.outcome
+col payment_events.payload
+col payment_events.provider
+col payment_events.tx_ref
+col payment_methods.added_at
+col payment_methods.business_id
+col payment_methods.fingerprint
+col payment_methods.id
+col payment_methods.label
+col payment_methods.verified
+col permission_catalogue.created_at
+col permission_catalogue.enforceable
+col permission_catalogue.grp
+col permission_catalogue.key
+col permission_catalogue.label
+col permission_catalogue.sort
+col permission_catalogue.tier_min
+col plan_feature_catalogue.blurb
+col plan_feature_catalogue.feature
+col plan_feature_catalogue.label
+col plan_features.feature
+col plan_features.plan
+col plan_limits.label
+col plan_limits.max_seats
+col plan_limits.max_studios
+col plan_limits.plan
+col plan_prices.active
+col plan_prices.amount
+col plan_prices.currency
+col plan_prices.cycle
+col plan_prices.plan
+col plan_state_keys.feature
+col plan_state_keys.state_key
+col platform_admins.active
+col platform_admins.added_at
+col platform_admins.email
+col platform_admins.id
+col platform_admins.name
+col platform_admins.role
+col platform_audit.action
+col platform_audit.admin_email
+col platform_audit.admin_id
+col platform_audit.at
+col platform_audit.business_id
+col platform_audit.detail
+col platform_audit.id
+col platform_flags.changed_at
+col platform_flags.key
+col platform_flags.note
+col platform_flags.on_off
+col products.business_id
+col products.created_at
+col products.id
+col products.name
+col products.price
+col profiles.business_id
+col profiles.created_at
+col profiles.id
+col profiles.name
+col profiles.role_id
+col profiles.staff_id
+col referral_attempts.at
+col referral_attempts.business_id
+col referral_attempts.code
+col referral_attempts.id
+col referral_attempts.outcome
+col referral_attempts.partner_id
+col referral_attempts.reason
+col staff.basic
+col staff.branch_id
+col staff.business_id
+col staff.created_at
+col staff.id
+col staff.job_title
+col staff.name
+col staff.user_id
+col suppliers.business_id
+col suppliers.contact
+col suppliers.created_at
+col suppliers.data
+col suppliers.id
+col suppliers.name
+col suppliers.note
+col suppliers.type
+col team_invitations.accepted_at
+col team_invitations.accepted_by
+col team_invitations.branch_id
+col team_invitations.business_id
+col team_invitations.cancelled_at
+col team_invitations.cancelled_reason
+col team_invitations.created_at
+col team_invitations.email
+col team_invitations.expires_at
+col team_invitations.id
+col team_invitations.invited_by
+col team_invitations.nonce_hash
+col team_invitations.nonce_issued_at
+col team_invitations.role
+col team_invitations.role_id
+col team_invitations.status
+col tlb_audit_log.action
+col tlb_audit_log.created_at
+col tlb_audit_log.details
+col tlb_audit_log.entity_id
+col tlb_audit_log.entity_type
+col tlb_audit_log.id
+col tlb_audit_log.staff_id
+col tlb_closed_studios.business_id
+col tlb_closed_studios.closed_at
+col tlb_closed_studios.closed_reason
+col tlb_closed_studios.created_at
+col tlb_closed_studios.name
+col tlb_closed_studios.plan
+col tlb_closed_studios.purged_at
+col tlb_closed_studios.purged_by
+col tlb_closed_studios.row_counts
+col tlb_closed_studios.slug
+col tlb_commissions.commission_amount
+col tlb_commissions.created_at
+col tlb_commissions.customer_id
+col tlb_commissions.id
+col tlb_commissions.payment_date
+col tlb_commissions.payment_id
+col tlb_commissions.staff_id
+col tlb_commissions.status
+col tlb_commissions.subscription_id
+col tlb_commissions.updated_at
+col tlb_customers.business_id
+col tlb_customers.business_name
+col tlb_customers.business_type
+col tlb_customers.created_at
+col tlb_customers.id
+col tlb_customers.location
+col tlb_customers.notes
+col tlb_customers.owner_email
+col tlb_customers.owner_name
+col tlb_customers.owner_phone
+col tlb_customers.status
+col tlb_customers.updated_at
+col tlb_customers.website
+col tlb_notes.content
+col tlb_notes.created_at
+col tlb_notes.created_by
+col tlb_notes.customer_id
+col tlb_notes.id
+col tlb_notes.note_type
+col tlb_notes.updated_at
+col tlb_payments.amount
+col tlb_payments.created_at
+col tlb_payments.currency
+col tlb_payments.customer_id
+col tlb_payments.flutterwave_reference
+col tlb_payments.id
+col tlb_payments.notes
+col tlb_payments.payment_date
+col tlb_payments.payment_method
+col tlb_payments.status
+col tlb_payments.subscription_id
+col tlb_payments.updated_at
+col tlb_pipeline.customer_id
+col tlb_pipeline.deal_value
+col tlb_pipeline.id
+col tlb_pipeline.next_action
+col tlb_pipeline.next_action_date
+col tlb_pipeline.probability_percent
+col tlb_pipeline.stage
+col tlb_pipeline.stage_entered_at
+col tlb_pipeline.updated_at
+col tlb_staff.auth_user_id
+col tlb_staff.avatar_url
+col tlb_staff.commission_rate
+col tlb_staff.created_at
+col tlb_staff.email
+col tlb_staff.id
+col tlb_staff.is_active
+col tlb_staff.name
+col tlb_staff.phone
+col tlb_staff.role
+col tlb_staff.updated_at
+col tlb_subscriptions.billing_cycle
+col tlb_subscriptions.cancel_requested_at
+col tlb_subscriptions.created_at
+col tlb_subscriptions.customer_id
+col tlb_subscriptions.end_date
+col tlb_subscriptions.id
+col tlb_subscriptions.is_active
+col tlb_subscriptions.is_trial
+col tlb_subscriptions.monthly_equivalent_price
+col tlb_subscriptions.plan_tier
+col tlb_subscriptions.renewal_date
+col tlb_subscriptions.start_date
+col tlb_subscriptions.trial_end_date
+col tlb_subscriptions.updated_at
+col tlb_support_tickets.assigned_to
+col tlb_support_tickets.created_at
+col tlb_support_tickets.customer_id
+col tlb_support_tickets.description
+col tlb_support_tickets.id
+col tlb_support_tickets.priority
+col tlb_support_tickets.status
+col tlb_support_tickets.title
+col tlb_support_tickets.updated_at
+col tlb_tasks.assigned_to
+col tlb_tasks.created_at
+col tlb_tasks.customer_id
+col tlb_tasks.description
+col tlb_tasks.due_date
+col tlb_tasks.id
+col tlb_tasks.priority
+col tlb_tasks.status
+col tlb_tasks.title
+col tlb_tasks.updated_at
+col tlb_trial_history.created_at
+col tlb_trial_history.customer_email
+col tlb_trial_history.customer_id
+col tlb_trial_history.id
+col tlb_trial_history.ip_address
+col tlb_trial_history.trial_end_date
+col tlb_trial_history.trial_start_date
+col transactions.amount
+col transactions.at
+col transactions.branch_id
+col transactions.business_id
+col transactions.id
+col transactions.kind
+col transactions.order_id
+fn app.attach_referral(p_business uuid, p_code text)
+fn app.audit(p_business uuid, p_action text, p_detail text, p_entity text, p_entity_id text, p_entity_label text, p_branch uuid)
+fn app.audit_branches()
+fn app.audit_business()
+fn app.audit_invitation()
+fn app.audit_membership()
+fn app.audit_permissions()
+fn app.bump_order_rev()
+fn app.can(p_business uuid, p_perm text)
+fn app.can_here(p_business uuid, p_perm text, p_branch uuid)
+fn app.cancel_subscription(p_business uuid)
+fn app.cancel_team_invitation(p_invitation_id uuid)
+fn app.claim_referral_code(p_code text)
+fn app.close_studio(p_business uuid, p_reason text)
+fn app.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval)
+fn app.current_partner()
+fn app.default_membership_role()
+fn app.default_permissions(p_tier text)
+fn app.delete_my_account(p_close_solely_owned boolean)
+fn app.discard_invitation(p_invitation_id uuid, p_reason text)
+fn app.enforce_branch_limit()
+fn app.enforce_one_business_per_method()
+fn app.enforce_payroll_feature()
+fn app.enforce_seat_limit()
+fn app.enforce_state_feature()
+fn app.enforce_table_feature()
+fn app.ensure_billing_record(p_business uuid)
+fn app.error_reports_recently(p_business uuid)
+fn app.export_studio(p_business uuid)
+fn app.feature_refusal(p_feature text)
+fn app.flag(p_key text)
+fn app.guard_business_identity()
+fn app.guard_business_role()
+fn app.guard_last_owner()
+fn app.guard_owner_permissions()
+fn app.guard_profile_authority()
+fn app.guard_studio_settings()
+fn app.has_all_branches(p_business uuid)
+fn app.has_paid(p_business uuid)
+fn app.import_studio(p_json jsonb)
+fn app.in_scope(p_business uuid, p_branch uuid)
+fn app.is_business_admin(p_business uuid)
+fn app.is_owner(p_business uuid)
+fn app.is_partner(p_partner uuid)
+fn app.is_platform_admin()
+fn app.is_tlb_owner()
+fn app.limits_for(p_business uuid)
+fn app.lock_business_seats(p_business uuid)
+fn app.may_read_key(p_business uuid, p_key text)
+fn app.may_write_key(p_business uuid, p_key text)
+fn app.media_business_of(p_name text)
+fn app.media_usage_sync()
+fn app.migrate_orders_to_rows(p_business uuid)
+fn app.my_billing(p_business uuid)
+fn app.my_staff_id()
+fn app.no_commission_before_payment()
+fn app.on_trial(p_business uuid)
+fn app.open_checkout(p_business uuid, p_plan text, p_cycle text)
+fn app.partner_account_reverify()
+fn app.partner_me()
+fn app.perm_for_key(p_key text)
+fn app.pin_referral()
+fn app.plan_allows(p_business uuid, p_feature text)
+fn app.plan_storage_bytes(p_plan text)
+fn app.provision_studio()
+fn app.purge_studio(p_business uuid)
+fn app.recheck_referral_on_payment_method()
+fn app.referral_code_for(p_name text)
+fn app.referral_follows_studio()
+fn app.refuse_write_when_unpaid()
+fn app.reopen_studio(p_business uuid)
+fn app.resume_subscription(p_business uuid)
+fn app.seats_used(p_business uuid, p_exclude_membership uuid)
+fn app.seed_business_roles()
+fn app.self_referral_reason(p_partner uuid, p_business uuid)
+fn app.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
+fn app.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric)
+fn app.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb)
+fn app.slugify(p text)
+fn app.stamp_audit_actor()
+fn app.stamp_error_report()
+fn app.storage_cap_for(p_business uuid)
+fn app.storage_has_room(p_business uuid)
+fn app.tlb_staff_id()
+fn app.trial_days()
+fn app.usage_for(p_business uuid)
+fn app.void_pending_on_churn()
+fn app.write_perm_for_key(p_key text)
+fn public.accept_invitation(p_invitation_id uuid)
+fn public.account_for_recovery(p_email text)
+fn public.can(p_business uuid, p_perm text)
+fn public.cancel_subscription(p_business uuid)
+fn public.cancel_team_invitation(p_invitation_id uuid)
+fn public.cancel_trial(p_business uuid)
+fn public.claim_referral_code(p_code text)
+fn public.close_studio(p_business uuid, p_reason text)
+fn public.cohort_taken(p_cohort text)
+fn public.convert_trial_to_paid(p_business uuid, p_plan text, p_cycle text, p_price numeric, p_paid_on date, p_reference text)
+fn public.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval)
+fn public.delete_my_account(p_close_solely_owned boolean)
+fn public.discard_invitation(p_invitation_id uuid, p_reason text)
+fn public.expire_finished_terms(p_on date)
+fn public.expire_finished_trials(p_on date)
+fn public.export_studio(p_business uuid)
+fn public.import_studio(p_json jsonb)
+fn public.migrate_my_orders(p_business uuid)
+fn public.my_billing(p_business uuid)
+fn public.my_commission_summary()
+fn public.my_membership(p_business uuid)
+fn public.my_permissions(p_business uuid)
+fn public.my_plan_features()
+fn public.my_plan_usage()
+fn public.my_storage_usage()
+fn public.my_trial()
+fn public.open_checkout(p_business uuid, p_plan text, p_cycle text)
+fn public.partner_accrue_month(p_month date, p_partner uuid)
+fn public.partner_active_paying(p_partner uuid, p_on date)
+fn public.partner_clear_ledger(p_on date)
+fn public.partner_commission_summary(p_partner uuid)
+fn public.partner_me()
+fn public.partner_payout_run(p_partner uuid, p_on date)
+fn public.partner_referral_rate(p_referral uuid, p_on date)
+fn public.partner_referral_term_end(p_referral uuid)
+fn public.partner_tier_rate(p_active integer)
+fn public.partner_void_on_refund(p_business uuid, p_reason text)
+fn public.platform_billing_summary()
+fn public.platform_enquiries(p_state text)
+fn public.platform_partner_summary()
+fn public.platform_referral_risk()
+fn public.platform_tenant_summary()
+fn public.purge_studio(p_business uuid)
+fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text)
+fn public.recount_storage_usage()
+fn public.reopen_studio(p_business uuid)
+fn public.resume_subscription(p_business uuid)
+fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text)
+fn public.set_partner_payout_frozen(p_partner uuid, p_frozen boolean, p_reason text)
+fn public.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer)
+fn public.set_studio_plan(p_business uuid, p_plan text, p_cycle text, p_price numeric)
+fn public.set_studio_storage_cap(p_business uuid, p_gb numeric, p_note text)
+fn public.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amount numeric, p_currency text, p_status text, p_payload jsonb)
+fn public.start_free_trial(p_business uuid, p_days integer)
+fn public.studio_payments(p_business uuid)
+fn public.submit_enquiry(p_kind text, p_name text, p_email text, p_phone text, p_business text, p_message text, p_source_page text, p_extra jsonb, p_trap text)
+pol app_state.app_state_delete
+pol app_state.app_state_insert
+pol app_state.app_state_select
+pol app_state.app_state_update
+pol attendance.attendance_delete
+pol attendance.attendance_insert
+pol attendance.attendance_select
+pol attendance.attendance_update
+pol audit_log.audit_log_insert
+pol audit_log.audit_log_select
+pol billing_intents.billing_intents_select
+pol branches.branches_delete
+pol branches.branches_insert
+pol branches.branches_select
+pol branches.branches_update
+pol business_role_permissions.business_role_permissions_delete
+pol business_role_permissions.business_role_permissions_insert
+pol business_role_permissions.business_role_permissions_select
+pol business_roles.business_roles_delete
+pol business_roles.business_roles_insert
+pol business_roles.business_roles_select
+pol business_roles.business_roles_update
+pol businesses.businesses_insert
+pol businesses.businesses_select
+pol businesses.businesses_update
+pol customer_contacts.customer_contacts_delete
+pol customer_contacts.customer_contacts_insert
+pol customer_contacts.customer_contacts_select
+pol customer_contacts.customer_contacts_update
+pol customers.customers_delete
+pol customers.customers_insert
+pol customers.customers_select
+pol customers.customers_update
+pol error_reports.error_reports_insert
+pol error_reports.error_reports_select
+pol feedback.feedback_insert
+pol feedback.feedback_select
+pol feedback_replies.feedback_replies_insert
+pol feedback_replies.feedback_replies_select
+pol memberships.memberships_delete
+pol memberships.memberships_insert
+pol memberships.memberships_select
+pol memberships.memberships_update
+pol order_costs.order_costs_delete
+pol order_costs.order_costs_select
+pol order_costs.order_costs_update
+pol order_costs.order_costs_write
+pol order_items.order_items_delete
+pol order_items.order_items_insert
+pol order_items.order_items_select
+pol order_items.order_items_update
+pol orders.orders_delete
+pol orders.orders_insert
+pol orders.orders_select
+pol orders.orders_update
+pol partner_accounts.partner_accounts_delete
+pol partner_accounts.partner_accounts_insert
+pol partner_accounts.partner_accounts_select
+pol partner_accounts.partner_accounts_update
+pol partner_ledger.partner_ledger_select
+pol partner_links.partner_links_delete
+pol partner_links.partner_links_insert
+pol partner_links.partner_links_select
+pol partner_links.partner_links_update
+pol partner_payouts.partner_payouts_select
+pol partner_rate_bands.partner_rate_bands_read
+pol partner_referrals.partner_referrals_select
+pol partners.partners_select
+pol partners.partners_update
+pol payment_events.payment_events_select
+pol permission_catalogue.permission_catalogue_read
+pol plan_feature_catalogue.plan_feature_catalogue_read
+pol plan_features.plan_features_read
+pol plan_limits.plan_limits_read
+pol plan_prices.plan_prices_read
+pol platform_flags.platform_flags_read
+pol products.products_delete
+pol products.products_insert
+pol products.products_select
+pol products.products_update
+pol profiles.profiles_select
+pol profiles.profiles_update_self
+pol staff.staff_delete
+pol staff.staff_insert
+pol staff.staff_select
+pol staff.staff_update
+pol suppliers.suppliers_delete
+pol suppliers.suppliers_insert
+pol suppliers.suppliers_select
+pol suppliers.suppliers_update
+pol tlb_audit_log.audit_log_platform_read
+pol tlb_closed_studios.tlb_closed_studios_select
+pol tlb_commissions.tlb_commissions_insert
+pol tlb_commissions.tlb_commissions_select
+pol tlb_customers.tlb_customers_admin_insert
+pol tlb_customers.tlb_customers_admin_select
+pol tlb_customers.tlb_customers_admin_update
+pol tlb_notes.tlb_notes_admin_insert
+pol tlb_notes.tlb_notes_admin_select
+pol tlb_payments.tlb_payments_admin_insert
+pol tlb_payments.tlb_payments_admin_select
+pol tlb_pipeline.tlb_pipeline_admin_insert
+pol tlb_pipeline.tlb_pipeline_admin_select
+pol tlb_pipeline.tlb_pipeline_admin_update
+pol tlb_staff.tlb_staff_insert
+pol tlb_staff.tlb_staff_select
+pol tlb_staff.tlb_staff_update
+pol tlb_subscriptions.tlb_subscriptions_admin_insert
+pol tlb_subscriptions.tlb_subscriptions_admin_select
+pol tlb_subscriptions.tlb_subscriptions_admin_update
+pol tlb_support_tickets.tlb_support_tickets_select
+pol tlb_support_tickets.tlb_support_tickets_update
+pol tlb_tasks.tlb_tasks_select
+pol tlb_tasks.tlb_tasks_update
+pol transactions.transactions_delete
+pol transactions.transactions_insert
+pol transactions.transactions_select
+pol transactions.transactions_update
+trg app_state.app_state_plan_feature
+trg app_state.app_state_studio_settings_guard
+trg app_state.app_state_unpaid_guard
+trg attendance.attendance_plan_feature
+trg attendance.attendance_unpaid_guard
+trg audit_log.audit_log_actor
+trg branches.audit_branches_t
+trg branches.branches_plan_limit
+trg branches.branches_unpaid_guard
+trg business_role_permissions.audit_role_permissions
+trg business_role_permissions.business_role_permissions_guard
+trg business_role_permissions.business_role_permissions_unpaid_guard
+trg business_roles.business_roles_guard
+trg business_roles.business_roles_unpaid_guard
+trg businesses.audit_businesses
+trg businesses.businesses_identity_guard
+trg businesses.businesses_referral_follows
+trg businesses.businesses_referral_is_permanent
+trg businesses.businesses_seed_roles
+trg customer_contacts.customer_contacts_unpaid_guard
+trg customers.customers_unpaid_guard
+trg error_reports.error_reports_stamp
+trg memberships.audit_memberships
+trg memberships.memberships_default_role
+trg memberships.memberships_last_owner_guard
+trg memberships.memberships_plan_limit
+trg memberships.memberships_unpaid_guard
+trg order_costs.order_costs_unpaid_guard
+trg order_items.order_items_unpaid_guard
+trg orders.orders_rev
+trg orders.orders_unpaid_guard
+trg partner_accounts.partner_accounts_reverify
+trg partner_ledger.partner_ledger_no_commission_before_payment
+trg partner_referrals.partner_referrals_void_on_churn
+trg payment_methods.payment_methods_one_business
+trg payment_methods.payment_methods_recheck_referral
+trg payment_methods.payment_methods_unpaid_guard
+trg products.products_unpaid_guard
+trg profiles.profiles_authority_guard
+trg staff.staff_plan_feature
+trg staff.staff_unpaid_guard
+trg suppliers.suppliers_plan_feature
+trg suppliers.suppliers_unpaid_guard
+trg team_invitations.audit_invitations
+trg team_invitations.team_invitations_unpaid_guard
+trg transactions.transactions_unpaid_guard

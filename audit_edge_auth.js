@@ -77,8 +77,11 @@ section('team-admin: the privileged calls are unreachable without a proved targe
   if (at >= 0) {
     const guard = code.slice(at, code.indexOf('\n    }', at));
     ok('it proves ownership with a SELECT, not a scoped write',
-       /\.from\('profiles'\)\s*\.select\(/.test(guard),
+       /\.from\('memberships'\)\s*\.select\(/.test(guard),
        'a scoped UPDATE that matches nothing returns no error. That was the bug');
+    ok('and it asks MEMBERSHIPS, which is what RLS reads',
+       !/\.from\('profiles'\)/.test(guard),
+       'profiles names one studio; a teammate may belong to several');
     ok('scoped to the caller’s business', /\.eq\('business_id',\s*biz\)/.test(guard));
     ok('scoped to the id it was handed', /\.eq\('id',\s*wanted\)/.test(guard));
     ok('a missing row is a refusal, not a pass',
@@ -127,6 +130,66 @@ section('team-admin: the privileged calls are unreachable without a proved targe
        'calling the check and not reading its answer is the same as not calling it');
   });
 
+  /* ---- THE PRIVILEGE MATRIX MUST NOT HAVE WIDENED ----
+     memberships.role has the word 'manager' in it. That is not a reason to
+     start letting managers administer team accounts. Before this change
+     `list` sat above the owner gate and everything else sat below it, and
+     that is exactly what must still be true. */
+  ok('what each action needs is a PERMISSION, not a tier',
+     code.includes("const NEEDS: Record<string, string> = {")
+     && code.includes("invite: 'team.invite'")
+     && code.includes("delete: 'team.remove'")
+     && code.includes("update: 'users'")
+     && !code.includes('const OWNER_ONLY ='),
+     'an owner-only array is the hidden rule the rest of the system dropped: '
+     + 'being called a manager must not bypass a denied permission, and an '
+     + 'owner who delegates inviting must be able to');
+  ok('and sendReset is the one thing that stays a tier',
+     code.includes("const OWNER_ONLY_ACTIONS = ['sendReset']"),
+     'it is account recovery, not team work');
+  ok('the owner gate tests for owner and nothing else',
+     code.includes("if (needsOwner && m.role !== 'owner') {")
+     && !code.includes("m.role !== 'owner' &&"),
+     'memberships.role has the word manager in it; that is not a reason to start letting them');
+  ok('every mutating action is checked against the caller\u2019s permission',
+     /const need = NEEDS\[action\]/.test(code)
+     && /if \(need && !\(await callerCan\(need\)\)\)/.test(code),
+     'and the check sits above every one of them, not inside each');
+  ok('callerCan short-circuits on owner, exactly as app.can does in SQL',
+     code.indexOf('const callerCan') > 0
+     && code.indexOf('if (isOwner) return true') > 0
+     && code.indexOf('if (!myRoleId) return false') > 0,
+     'the service role has no auth.uid(), so it cannot ask the database on '
+     + 'the caller\u2019s behalf and has to ask the same question itself, the '
+     + 'same way round: owner first, then the table, and no role at all is false');
+  ok('a caller with no business role can do nothing',
+     /if \(!myRoleId\) return false/.test(code),
+     'a half-migrated membership must fail closed');
+
+  /* ---- THE LIFECYCLE, once somebody can belong to two studios ----
+     Removal and editing both used to assume one studio per person. They
+     no longer can. */
+  ok('update only writes the fields it was actually given',
+     code.includes("if ('name' in payload)")
+     && code.includes("if ('role_id' in payload)")
+     && code.includes("if ('staff_id' in payload)"),
+     'it used to default role_id to cre and staff_id to null, so sending just '
+     + 'a name silently demoted somebody and unlinked their staff record');
+  ok('delete removes the MEMBERSHIP, not the person',
+     /from\('memberships'\)\s*\n?\s*\.delete\(\)\.eq\('user_id', v\.target\)\.eq\('business_id', biz\)/.test(code),
+     'removing somebody from one studio must not destroy the account they run '
+     + 'their own label with');
+  ok('and only deletes the account when that was their last studio',
+     /if \(\(rest \?\? \[\]\)\.length > 0\)/.test(code));
+  ok('a repointed profile does not keep the role it had elsewhere',
+     code.includes('role_id: APP_ROLE[String(stays.role)] ?? \'cre\''),
+     'removed from A as a manager, left in B as a viewer, still labelled manager');
+  ok('and that mapping only ever goes downward',
+     code.includes("const APP_ROLE: Record<string, string> = { owner: 'owner', manager: 'mgr' }")
+     && code.includes("APP_ROLE[String(stays.role)] ?? 'cre'"),
+     'the map names only the two roles that keep something, and everything '
+     + 'else lands on the app default rather than on whatever it had');
+
   /* ---- passwords ---- */
   ok('no action takes a password from the browser',
      !/payload\.password/.test(code) && !/password:\s*str\(/.test(code),
@@ -135,17 +198,145 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      !/auth\.admin\.createUser\(/.test(code),
      'invitations replaced it: they choose their own and it never crosses this boundary');
   ok('an invitation is what creates a teammate now',
-     /auth\.admin\.inviteUserByEmail\(/.test(code));
+     code.includes('auth.admin.generateLink({')
+     && !/auth\.admin\.inviteUserByEmail\(/.test(code),
+     'generateLink makes the same account and hands back the link instead of '
+     + 'posting it, so the wording and the sender are ours and Supabase\u2019s own '
+     + 'mailer, broken since 13 September, is not in the path');
+
+  /* ---- WHERE THE FEATURE SWITCH LIVES -------------------------------
+     Production must not be one settings change away from sending live
+     invitations. So the switch is not a variable at all: it asks which
+     database it is talking to, and staging is the only answer that turns
+     it on. There is nothing to set on the wrong project. */
+  ok('invitations are on in staging and off everywhere else',
+     code.includes("const TEAM_INVITES_ENABLED = (Deno.env.get('SUPABASE_URL') || '').includes(STAGING_REF)")
+     && code.includes("const STAGING_REF = 'pakxhimjhrcpqvtsqwqz'"),
+     'an env var can be set on the wrong project; a project ref cannot be');
+  ok('and production is not that project',
+     !/includes('eskubrbgbcbaejynjxvh')/.test(code)
+     && code.indexOf('eskubrbgbcbaejynjxvh') < 0,
+     'the live ref appearing anywhere near this switch is the one way it '
+     + 'could be on in production');
+  ok('and the switch is read before anything the invite does',
+     code.indexOf('TEAM_INVITES_ENABLED') < code.indexOf("rpc('create_team_invitation'"),
+     'a 503 that arrives after the row is written is not a disabled feature');
+
+  /* ---- THE ORDER OF THE TWO WRITES ----------------------------------
+     This is the whole Phase 1A bug in one property. The account INSERT
+     fires provision_studio; if no invitation exists yet for that address
+     the trigger invents a studio named after the invitee. So the
+     invitation must be written first, and the nonce it mints is what the
+     trigger recognises. */
+  const inviteBlock = (function () {
+    const from = code.indexOf("if (action === 'invite') {");
+    if (from < 0) return '';
+    const to = code.indexOf("if (action === 'resendInvitation')", from);
+    return code.slice(from, to > 0 ? to : code.length);
+  })();
+  ok('the invitation is created BEFORE the account',
+     inviteBlock.indexOf("rpc('create_team_invitation'") > 0
+     && inviteBlock.indexOf("rpc('create_team_invitation'") < inviteBlock.indexOf('auth.admin.generateLink({'),
+     'the other way round and the trigger invents a studio, which is what 9 '
+     + 'businesses becoming 10 looked like. Scoped to the invite block: there '
+     + 'is a second generateLink in emailPasswordReset now, and a password '
+     + 'reset is not an invitation');
+  ok('and the account carries the nonce so the trigger can abstain',
+     code.includes('team_invitation_id: inv.invitation_id')
+     && code.includes('team_invitation_nonce: inv.nonce'),
+     'without it provision_studio cannot tell our own invitation from a '
+     + 'stranger signing up, and it must not guess');
+  ok('no membership and no profile are written at invite time',
+     !/from\('memberships'\)\s*\n?\s*\.insert\(/.test(code)
+     && !/from\('profiles'\)\.insert\(/.test(code),
+     'the seat is held by the pending invitation; access starts at '
+     + 'acceptance, by the invitee, or an owner grants entry to somebody who '
+     + 'never answered');
+
+  /* ---- WHAT HAPPENS WHEN THE EMAIL DOES NOT GO ---------------------
+     An invitation nobody was told about still holds a seat, still
+     expires silently, and the owner believes it was sent. */
+  ok('a failed send takes the invitation back',
+     /rpc\('discard_invitation'[\s\S]{0,400}could not be sent/.test(code),
+     'otherwise a seat is held for somebody who was never contacted');
+  ok('and the account it just made with it',
+     /if \(createdUser\) await admin\.auth\.admin\.deleteUser\(createdUser\)/.test(code),
+     'an account with no studio and no invitation is an orphan the owner '
+     + 'cannot see or clear');
+  ok('but a failed RESEND takes nothing back',
+     /NOTHING IS DISCARDED HERE/.test(code),
+     'the invitation was already sent once and may already be in use; a '
+     + 'flaky second send must not cancel it');
+  const resendBlock = (function () {
+    const from = code.indexOf("if (action === 'resendInvitation') {");
+    if (from < 0) return '';
+    const to = code.indexOf("if (action === 'update')", from);
+    return code.slice(from, to > 0 ? to : code.length);
+  })();
+  ok('resend re-uses the invitation rather than minting another',
+     resendBlock.length > 0 && resendBlock.indexOf("rpc('create_team_invitation'") < 0,
+     'a second invitation row would hold a second seat and leave two live '
+     + 'links for one person');
+  ok('the resend wording follows the LINK, not the account',
+     code.includes("invitationEmail(via === 'magiclink' ? 'existing' : 'new'")
+     && code.indexOf("invitationEmail(confirmed ?") < 0,
+     'GoTrue writes a placeholder password at confirmation, so confirmed does '
+     + 'not mean they can sign in; somebody who opened an invitation and never '
+     + 'finished would be told there is nothing to set up');
+  ok('and never re-issues the nonce',
+     /No `data` on any of these/.test(code),
+     'it was single-use and is already spent; the INSERT it identified '
+     + 'cannot happen twice');
+
+  /* ---- THE NONCE IS NOT A SECRET IN TRANSIT ------------------------ */
+  ok('the nonce never reaches the email or the link',
+     !/nonce[\s\S]{0,80}(action_link|landingFor|link =)/.test(code)
+     && !/link[\s\S]{0,40}nonce/.test(code),
+     'it is provenance for the trigger, not a credential for the invitee, '
+     + 'and the invitation id is what the link carries');
+  ok('and is cleared from the invitee\u2019s own metadata immediately',
+     /user_metadata: \{ name, team_invitation_id: null, team_invitation_nonce: null \}/.test(code),
+     'sent as null because updateUserById MERGES \u2014 and the name stays, '
+     + 'because accept_invitation reads it to write their profile');
+  ok('the metadata is not wiped wholesale',
+     !/^\s*user_metadata: \{\},?\s*$/m.test(code)
+     && !/updateUserById\([^)]*user_metadata: \{\}/.test(code),
+     'that would leave every invited teammate named after the front of '
+     + 'their email address');
   ok('a password sent anyway is refused rather than ignored',
      /'password' in payload/.test(code),
      'silently dropping it would leave an owner believing they had set one');
 
-  /* ---- what the caller is allowed to be ---- */
-  ok('the studio comes from the database, never the body',
-     /from\('profiles'\)\.select\('role_id,business_id'\)\.eq\('id', user\.id\)/.test(code)
-     && !/payload\.business_id/.test(code));
-  ok('everything that changes an account is owner only',
-     /if \(!isOwner\) return json\(/.test(code));
+  /* ---- WHERE THE CALLER'S BUSINESS COMES FROM ----------------------
+     It used to be profiles.business_id, which names ONE studio and is
+     overwritten by accept_invitation. An owner of two studios read as a
+     member of whichever they joined last, so team-admin listed the wrong
+     team and refused the right one.
+
+     Now the request may carry business_id as a SELECTOR, and the selector
+     is worthless on its own: it has to be matched against an active
+     membership before it means anything. These checks are the difference
+     between "the client chose" and "the client asked and the server
+     agreed". */
+  ok('profiles is no longer the caller\u2019s security authority',
+     !/from\('profiles'\)\.select\('role_id,business_id'\)/.test(code),
+     'that read is what made a multi-business owner unmanageable');
+  ok('a business_id from the request is verified against memberships',
+     /\.from\('memberships'\)[\s\S]{0,200}\.eq\('business_id', wanted\)[\s\S]{0,120}\.eq\('status', 'active'\)/.test(code),
+     'a selector that is not checked is just the client choosing');
+  ok('an unmatched selector is refused',
+     /if \(!m\) return json\(\{ error: 'You are not a member of that studio\.' \}, 403\)/.test(code));
+  ok('the role comes from that membership row',
+     /myRole = m\.role as string/.test(code) && /const isOwner = myRole === 'owner'/.test(code));
+  ok('with no selector it refuses to guess between studios',
+     /code: 'choose_business'/.test(code),
+     'silently picking one is how somebody edits the wrong team and never notices');
+  ok('and never falls back to profiles',
+     !/me\.business_id/.test(code));
+  ok('everything that changes an account needs a permission',
+     code.indexOf('const need = NEEDS[action]') > 0
+     && code.indexOf('if (!isOwner) return json(') < 0,
+     'the tier wall is gone and a permission check replaced it');
   ok('the error handler does not echo the thrown object',
      !/String\(\(e as Error\)\.message/.test(code),
      'in a service-role context the detail in a thrown error is privileged');
@@ -159,12 +350,15 @@ section('team-admin: the caller is still established the same way');
 {
   const code = src('team-admin');
   ok('the caller is resolved from their own token, not from the body',
-     /auth\.getUser\(\)/.test(code) && !/payload\.(user_id|caller|business_id)/.test(code));
+     /auth\.getUser\(\)/.test(code) && !/payload\.(user_id|caller)\b/.test(code),
+     'business_id is allowed as a selector; an identity never is');
   ok('an unsigned caller is refused', /return json\(\{ error: 'Not signed in' \}, 401\)/.test(code));
-  ok('the business comes from the caller’s profile, never the body',
-     /from\('profiles'\)\.select\('role_id,business_id'\)\.eq\('id', user\.id\)/.test(code));
-  ok('everything that changes an account is owner only',
-     /if \(!isOwner\) return json\(/.test(code));
+  ok('the business comes from a verified membership, never from the body alone',
+     /\.eq\('user_id', user\.id\)[\s\S]{0,80}\.eq\('business_id', wanted\)/.test(code));
+  ok('everything that changes an account needs a permission',
+     code.indexOf('const need = NEEDS[action]') > 0
+     && code.indexOf('if (!isOwner) return json(') < 0,
+     'the tier wall is gone and a permission check replaced it');
 }
 
 // =====================================================================

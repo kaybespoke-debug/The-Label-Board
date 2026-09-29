@@ -98,8 +98,16 @@ section('Everything the code names actually exists');
 // Read the code rather than a hand-kept list, so a new table the app starts
 // using is checked the day it is used.
 const app   = readFileSync(join(repo, 'site', 'layi_dashboard.html'), 'utf8');
-const adminFn = readFileSync(join(repo, 'supabase', 'functions', 'admin-api', 'index.ts'), 'utf8');
-const teamFn  = readFileSync(join(repo, 'supabase', 'functions', 'team-admin', 'index.ts'), 'utf8');
+/* EVERY Edge Function, discovered rather than listed. Two were named here
+   by hand, and Batch G added two more that nothing would have read: a
+   hand-kept list of the things a gate reads is the same mistake as a
+   hand-kept list of the things it checks. */
+const edgeFns = readdirSync(join(repo, 'supabase', 'functions'), { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => ({ name: d.name,
+              src: (() => { try { return readFileSync(join(repo, 'supabase', 'functions', d.name, 'index.ts'), 'utf8'); }
+                            catch { return ''; } })() }))
+  .filter(f => f.src);
 
 /* All four apps, not just the customer one. The partner portal reaches the
    database by hand-built fetch rather than supabase-js, so it called
@@ -119,7 +127,7 @@ const webJs     = jsIn('web/js');
 
 const named = new Set();
 const rpcs  = new Set();
-[app, adminFn, teamFn, consoleJs, portalJs, webJs].forEach(src => {
+[app, ...edgeFns.map(f => f.src), consoleJs, portalJs, webJs].forEach(src => {
   (src.match(/from\('([a-z_]+)'\)/g) || []).forEach(m => named.add(m.slice(6, -2)));
   /* No closing paren in this pattern, and that is the fix rather than a
      looseness. It used to be /rpc\('([a-z_]+)'\)/, which only ever matched a
@@ -292,8 +300,7 @@ function insertsIn(src, label) {
 }
 
 const inserts = [
-  ...insertsIn(adminFn, 'admin-api'),
-  ...insertsIn(teamFn, 'team-admin'),
+  ...edgeFns.flatMap(f => insertsIn(f.src, f.name)),
 ];
 ok('the Edge Functions are being scanned for inserted columns too', inserts.length > 0,
    'found no from().insert({...}) — the scanner has stopped working');
@@ -318,8 +325,7 @@ for (const { table, keys, label } of upsertsIn(app, 'the app')) {
 }
 
 const selects = [
-  ...selectsIn(adminFn, 'admin-api'),
-  ...selectsIn(teamFn, 'team-admin'),
+  ...edgeFns.flatMap(f => selectsIn(f.src, f.name)),
 ];
 ok('the Edge Functions are actually being scanned for columns', selects.length > 0,
    'found no select() with an explicit column list — the scanner has stopped working');
@@ -399,12 +405,31 @@ await asAdmin(`insert into memberships(user_id,business_id,role,status) values (
 await asAdmin(`insert into memberships(user_id,business_id,role,status) values ($1,$2,'owner','active')`, [U.bola, ids.bizB]);
 
 {
-  // exactly the shape custToRow() produces
+  /* A CLIENT IS TWO ROWS NOW. custToRow() writes the operational half and
+     custToContactRow() writes the personal half, because a workroom role a
+     studio keeps away from phone numbers still has to cut a garment, and
+     one row could not say that. Both halves are asserted here, in the
+     order and the shape the app actually sends them. */
   const r = await asUser(U.ada,
-    `insert into customers(business_id,name,email,whatsapp,address,note,measurements)
-     values ($1,'Mrs Oladuja','o@example.com','+234 802 000 0000','Lekki','Prefers emerald',$2) returning id`,
+    `insert into customers(business_id,name,note,measurements)
+     values ($1,'Mrs Oladuja','Prefers emerald',$2) returning id`,
     [ids.bizA, JSON.stringify({ meas: { Waist: '32' }, history: [] })]);
   ok('the app can save a customer as it actually builds one', !r.error, r.error);
+
+  const k = await asUser(U.ada,
+    `insert into customer_contacts(customer_id,business_id,phone,email,whatsapp,address)
+     values ($1,$2,'+234 802 000 0000','o@example.com','+234 802 000 0000','Lekki') returning customer_id`,
+    [r.rows[0] && r.rows[0].id, ids.bizA]);
+  ok('the contact half saves as its own row', !k.error, k.error);
+
+  /* and the app reads them back together, which is the one join it makes */
+  const both = await asUser(U.ada,
+    `select c.name, k.phone from customers c
+     left join customer_contacts k on k.customer_id = c.id
+     where c.name = 'Mrs Oladuja'`);
+  ok('a client comes back with both halves in one read',
+     both.rows.length === 1 && both.rows[0].phone === '+234 802 000 0000',
+     both.error || JSON.stringify(both.rows));
 
   // and a customer with nothing but a name, which the app also allows
   const bare = await asUser(U.ada,
