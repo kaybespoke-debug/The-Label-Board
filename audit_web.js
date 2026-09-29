@@ -228,6 +228,22 @@ built.forEach(p => {
   });
 });
 
+/* The countdown has an off switch, and a switch nothing reads is a switch
+   that lies. These two do not care whether it is on or off, only that the
+   flag exists and that the clock is still wired to it. So they stay green
+   the morning Kayode turns it back on, and go red if either half is quietly
+   deleted and the other left behind. */
+check(typeof S.countdown === 'boolean',
+  'the configuration says whether the countdown is running');
+check(read('js/site.js').includes('cfg.countdown === false'),
+  'the home page clock actually reads that switch');
+
+/* With the clock off this sentence is the ONLY thing the hero says about
+   opening, so it stops being a fallback and becomes the message. It was
+   always allowed to be deleted as long as the clock covered for it. */
+check(html['index.html'].includes('data-opens-text'),
+  'the home page still says when we open without the clock');
+
 /* ================= 6. the prices match the ones we bill ================= */
 const adminData = fs.readFileSync(path.join(__dirname, 'admin', 'js', 'data.js'), 'utf8');
 /* The id is what the database stores; the NAME is what a customer is sold,

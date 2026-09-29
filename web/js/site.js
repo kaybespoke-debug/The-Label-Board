@@ -88,6 +88,16 @@
     var line = document.querySelector('[data-opens-text]');
     if (!clock) return;
     var cfg = (typeof SITE !== 'undefined') ? SITE : null;
+
+    /* The countdown has an off switch that does not touch the date. See
+       `countdown` in config.js for why it is off today.
+
+       Leaving here leaves the page exactly as the HTML wrote it: the clock
+       stays hidden, the sentence keeps saying the month, and no timer starts.
+       That is the same state a visitor with no JavaScript gets, which is why
+       it needs no separate design. The honest fallback was already built. */
+    if (cfg && cfg.countdown === false) return;
+
     var raw = cfg && cfg.launchDate;
     if (!raw) return;
 

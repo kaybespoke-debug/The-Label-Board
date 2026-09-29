@@ -87,6 +87,21 @@ const SITE = {
      the page says "in November" on its own, and only becomes a number of
      days once the browser has worked it out. So if this is wrong, the site
      is vague rather than wrong.                                          */
+  /* ---- is the countdown running ----
+     OFF since 29 September, because the app is still being fixed. A clock
+     ticking down to a day nobody has committed to is a promise the site
+     cannot keep, and the one thing worse than no date is a date that moves.
+
+     Off, the home page says "Opening in November." and stops there, which is
+     exactly what a visitor with no JavaScript has always been shown. The
+     clock never unhides, the waiting list button stays, and nothing else on
+     the site changes.
+
+     THE DATE BELOW IS KEPT rather than blanked. Blanking it would also
+     silence the clock, but it would throw away the answer, and the month is
+     still read by the page. Turning the countdown back on is this one word. */
+  countdown: false,
+
   launchDate: '2026-11-01',
   launchMonth: 'November',
 
