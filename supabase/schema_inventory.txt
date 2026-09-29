@@ -179,6 +179,17 @@ col memberships.role
 col memberships.role_id
 col memberships.status
 col memberships.user_id
+col order_commissions.branch_id
+col order_commissions.business_id
+col order_commissions.detail
+col order_commissions.order_id
+col order_commissions.total
+col order_commissions.updated_at
+col order_contacts.branch_id
+col order_contacts.business_id
+col order_contacts.detail
+col order_contacts.order_id
+col order_contacts.updated_at
 col order_costs.branch_id
 col order_costs.business_id
 col order_costs.cost
@@ -586,6 +597,11 @@ fn app.my_staff_id()
 fn app.no_commission_before_payment()
 fn app.on_trial(p_business uuid)
 fn app.open_checkout(p_business uuid, p_plan text, p_cycle text)
+fn app.order_commission_total(p_order jsonb)
+fn app.order_cost_total(p_order jsonb)
+fn app.order_doc_carries_no_secrets()
+fn app.order_doc_without_secrets(p_order jsonb)
+fn app.order_item_cost_total(p_order jsonb)
 fn app.partner_account_reverify()
 fn app.partner_me()
 fn app.perm_for_key(p_key text)
@@ -595,6 +611,7 @@ fn app.plan_storage_bytes(p_plan text)
 fn app.provision_studio()
 fn app.purge_studio(p_business uuid)
 fn app.recheck_referral_on_payment_method()
+fn app.reconcile_orders(p_business uuid)
 fn app.referral_code_for(p_name text)
 fn app.referral_follows_studio()
 fn app.refuse_write_when_unpaid()
@@ -660,6 +677,7 @@ fn public.platform_partner_summary()
 fn public.platform_referral_risk()
 fn public.platform_tenant_summary()
 fn public.purge_studio(p_business uuid)
+fn public.reconcile_my_orders(p_business uuid)
 fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text)
 fn public.recount_storage_usage()
 fn public.reopen_studio(p_business uuid)
@@ -716,6 +734,14 @@ pol memberships.memberships_delete
 pol memberships.memberships_insert
 pol memberships.memberships_select
 pol memberships.memberships_update
+pol order_commissions.order_commissions_delete
+pol order_commissions.order_commissions_insert
+pol order_commissions.order_commissions_select
+pol order_commissions.order_commissions_update
+pol order_contacts.order_contacts_delete
+pol order_contacts.order_contacts_insert
+pol order_contacts.order_contacts_select
+pol order_contacts.order_contacts_update
 pol order_costs.order_costs_delete
 pol order_costs.order_costs_select
 pol order_costs.order_costs_update
@@ -821,6 +847,7 @@ trg memberships.memberships_plan_limit
 trg memberships.memberships_unpaid_guard
 trg order_costs.order_costs_unpaid_guard
 trg order_items.order_items_unpaid_guard
+trg orders.orders_doc_carries_no_secrets
 trg orders.orders_rev
 trg orders.orders_unpaid_guard
 trg partner_accounts.partner_accounts_reverify
