@@ -611,6 +611,7 @@ fn app.stamp_audit_actor()
 fn app.stamp_error_report()
 fn app.storage_cap_for(p_business uuid)
 fn app.storage_has_room(p_business uuid)
+fn app.strip_credentials_from_state()
 fn app.tlb_staff_id()
 fn app.trial_days()
 fn app.usage_for(p_business uuid)
@@ -790,6 +791,7 @@ pol transactions.transactions_delete
 pol transactions.transactions_insert
 pol transactions.transactions_select
 pol transactions.transactions_update
+trg app_state.app_state_no_credentials
 trg app_state.app_state_plan_feature
 trg app_state.app_state_studio_settings_guard
 trg app_state.app_state_unpaid_guard

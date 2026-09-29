@@ -107,10 +107,24 @@ await admin(`insert into public.memberships (user_id,business_id,role,status) va
 await admin(`insert into public.profiles (id,name,role_id,business_id) values
   ($1,'Ada','owner',$3),($2,'Tunde','manager',$3)
   on conflict (id) do update set name = excluded.name`, [U.ada, U.tunde, BIZ]);
+/* THE STUDIO ALREADY HAS THE CREDENTIAL IN IT, because every studio on
+   production does. The settings blob carries ownerPassword and the device
+   account list carries a PIN per row, and until this release both were
+   readable over the API by anybody with a membership. Seeding them as
+   '{"seeded":true}' would let the cleanup pass by having nothing to do. */
+const SEED = {
+  layi_dash_settings: '{"seeded":true,"currency":"NGN","ownerPassword":"h0rsesh0e",' +
+                      '"company":{"name":"A Studio","ownerPassword":"h0rsesh0e"}}',
+  layi_dash_users:    '[{"id":"u1","username":"ada","roleId":"owner","pin":"4417"}]',
+};
 for (const k of LIVE_KEYS) {
-  await admin(`insert into public.app_state (business_id,key,data) values ($1,$2,'{"seeded":true}'::jsonb)
-    on conflict (business_id,key) do nothing`, [BIZ, k]);
+  await admin(`insert into public.app_state (business_id,key,data) values ($1,$2,$3::jsonb)
+    on conflict (business_id,key) do nothing`, [BIZ, k, SEED[k] || '{"seeded":true}']);
 }
+/* What the studio should have once the release has been applied. The account
+   list is not one of them: it is a list of usernames and PINs that describes a
+   device, it should never have synced, and the release deletes it. */
+const POST_KEYS = LIVE_KEYS.filter(k => k !== 'layi_dash_users');
 await admin(`insert into public.customers (business_id,name,email,phone,measurements) values
   ($1,'Mrs Oladuja','o@live.test','+234 802 000 0000','{"meas":{"Waist":"32"}}'::jsonb),
   ($1,'Mr Eze','','', '{}'::jsonb)`, [BIZ]);
@@ -132,9 +146,28 @@ section('Before: a studio that works, on production’s schema');
   const read = await asUser(U.ada, `select key from public.app_state where business_id=$1`, [BIZ]);
   ok('the owner reads every key', read.rows.length === LIVE_KEYS.length,
      'saw ' + read.rows.length + ' of ' + LIVE_KEYS.length);
+  /* The blob a real app saves, which is the seeded one — an ordinary save
+     that happens to carry the owner's password, because until this release
+     that is what SETTINGS contained. Writing '{"before":true}' here would
+     wipe the credential before the upgrade and leave the cleanup nothing to
+     find, which is how this assertion first passed. */
   const write = await asUser(U.ada,
-    `update public.app_state set data='{"before":true}'::jsonb where business_id=$1 and key='layi_dash_settings' returning key`, [BIZ]);
+    `update public.app_state set data=$2::jsonb where business_id=$1 and key='layi_dash_settings' returning key`,
+    [BIZ, SEED.layi_dash_settings]);
   ok('and can save', write.rows.length === 1, write.error || 'nothing saved');
+
+  /* THE FINDING, REPRODUCED ON PRODUCTION'S SCHEMA. Tunde is a manager. He
+     has no business knowing the owner's password, and on the schema
+     production is running right now he is handed it by asking. This assertion
+     is meant to pass here and its mirror below is meant to pass after. */
+  const leak = await asUser(U.tunde,
+    `select data ->> 'ownerPassword' p from public.app_state
+     where business_id=$1 and key='layi_dash_settings'`, [BIZ]);
+  ok('and today a manager can read the owner’s password, which is the finding',
+     leak.rows.length === 1 && leak.rows[0].p === 'h0rsesh0e', JSON.stringify(leak.rows));
+  const pins = await asUser(U.tunde,
+    `select data from public.app_state where business_id=$1 and key='layi_dash_users'`, [BIZ]);
+  ok('and the PINs beside it', pins.rows.length === 1, JSON.stringify(pins.error || pins.rows.length));
   const cust = await asUser(U.ada, `select name from public.customers where business_id=$1`, [BIZ]);
   ok('and sees the clients', cust.rows.length === 2, 'saw ' + cust.rows.length);
 }
@@ -166,10 +199,33 @@ section('After: nothing was lost');
     (select count(*) from public.suppliers where business_id=$1) su,
     (select count(*) from auth.users) u`, [BIZ]);
   for (const [k, label] of [['b','studios'],['m','memberships'],['p','profiles'],
-                            ['s','app_state rows'],['c','clients'],['su','suppliers'],['u','accounts']]) {
+                            ['c','clients'],['su','suppliers'],['u','accounts']]) {
     ok('the same number of ' + label, String(now[k]) === String(BEFORE[k]),
        BEFORE[k] + ' -> ' + now[k]);
   }
+
+  /* ONE app_state ROW IS GONE ON PURPOSE, and exactly one. A release that
+     quietly took two would look identical to this assertion if it only
+     counted "fewer". */
+  ok('one app_state row fewer, and it is the account list',
+     Number(now.s) === Number(BEFORE.s) - 1, BEFORE.s + ' -> ' + now.s);
+  const gone = await one(`select count(*) c from public.app_state
+    where business_id=$1 and key='layi_dash_users'`, [BIZ]);
+  ok('the device account list, with its PINs, was deleted', Number(gone.c) === 0, gone.c + ' left');
+  /* Asked in SQL rather than in JavaScript, like the measurements check
+     below, because the driver hands a jsonb column back as text often enough
+     that a green test could mean "undefined === undefined". */
+  const st = await one(`select
+      (data ? 'ownerPassword') top,
+      ((data -> 'company') ? 'ownerPassword') nested,
+      data ->> 'currency' cur,
+      data ->> 'seeded' seeded,
+      data -> 'company' ->> 'name' co
+    from public.app_state where business_id=$1 and key='layi_dash_settings'`, [BIZ]);
+  ok('the owner password was removed from settings',
+     st.top === false && st.nested === false, JSON.stringify(st));
+  ok('and the rest of the settings survived the removal',
+     st.cur === 'NGN' && st.seeded === 'true' && st.co === 'A Studio', JSON.stringify(st));
 
   /* THE CONTACT DETAILS MOVED TABLES. customers lost four columns and
      customer_contacts gained them, and the migration copies rather than
@@ -203,20 +259,50 @@ section('After: the studio still works, which is the whole question');
      JSON.stringify(mem.map(m => m.role + '=' + m.role_id)));
 
   const read = await asUser(U.ada, `select key from public.app_state where business_id=$1`, [BIZ]);
-  ok('the owner still reads every key they had', read.rows.length === LIVE_KEYS.length,
-     'saw ' + read.rows.length + ' of ' + LIVE_KEYS.length);
+  ok('the owner still reads every key they had', read.rows.length === POST_KEYS.length,
+     'saw ' + read.rows.length + ' of ' + POST_KEYS.length);
   const write = await asUser(U.ada,
     `update public.app_state set data='{"after":true}'::jsonb where business_id=$1 and key='layi_dash_settings' returning key`, [BIZ]);
   ok('and still saves', write.rows.length === 1, write.error || 'nothing saved');
 
   /* every key, one at a time, because "most of them" is not an answer */
   const refused = [];
-  for (const key of LIVE_KEYS) {
+  for (const key of POST_KEYS) {
     const r = await asUser(U.ada,
       `update public.app_state set data='{"sweep":true}'::jsonb where business_id=$1 and key=$2 returning key`, [BIZ, key]);
     if (r.error || r.rows.length !== 1) refused.push(key + (r.error ? ' (' + r.error + ')' : ''));
   }
   ok('and can write every single key the live app syncs', refused.length === 0, refused.join(', '));
+
+  /* AND THE ONE KEY THAT IS NO LONGER A KEY. An old build on somebody's phone
+     will keep pushing this until it updates, so the refusal is the thing that
+     has to hold — not the new build's restraint. Tested as the OWNER, because
+     if the owner is refused then everybody is. */
+  const back = await asUser(U.ada,
+    `insert into public.app_state (business_id,key,data)
+     values ($1,'layi_dash_users','[{"username":"ada","pin":"4417"}]'::jsonb)`, [BIZ]);
+  /* REFUSED FOR THE RIGHT REASON. "it errored" would also pass if the
+     trigger function were unreachable and every app_state write were failing,
+     which is the shape of an outage rather than a rule. */
+  ok('and an old build cannot push the account list back up',
+     /not synced/.test(back.error || ''), back.error || 'IT WAS ACCEPTED');
+  const sneak = await asUser(U.ada,
+    `update public.app_state set data = data || '{"ownerPassword":"h0rsesh0e"}'::jsonb
+     where business_id=$1 and key='layi_dash_settings' returning key`, [BIZ]);
+  const after = await one(`select (data ? 'ownerPassword') p from public.app_state
+    where business_id=$1 and key='layi_dash_settings'`, [BIZ]);
+  ok('and an old build saving settings does not put the password back',
+     after.p === false, 'stored: ' + JSON.stringify(sneak.error || after));
+
+  /* THE MIRROR OF THE FINDING. Same manager, same two requests, after. */
+  const noLeak = await asUser(U.tunde,
+    `select data ->> 'ownerPassword' p from public.app_state
+     where business_id=$1 and key='layi_dash_settings'`, [BIZ]);
+  ok('and the manager is no longer handed the owner’s password',
+     noLeak.rows.length === 1 && noLeak.rows[0].p === null, JSON.stringify(noLeak.rows));
+  const noPins = await asUser(U.tunde,
+    `select data from public.app_state where business_id=$1 and key='layi_dash_users'`, [BIZ]);
+  ok('nor anybody’s PIN', noPins.rows.length === 0, JSON.stringify(noPins.error || noPins.rows.length));
 
   const cust = await asUser(U.ada, `select name from public.customers where business_id=$1`, [BIZ]);
   ok('the clients are still there for them', cust.rows.length === 2, 'saw ' + cust.rows.length);

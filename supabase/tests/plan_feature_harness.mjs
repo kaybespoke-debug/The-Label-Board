@@ -153,8 +153,14 @@ ok('  and the SAME row is accepted on Pro',
    3. WHAT BASIC KEEPS
    ===================================================================== */
 section('Basic keeps everything it was sold');
+/* layi_dash_users LEFT THIS LIST ON 29 SEPTEMBER, and not because Basic lost
+   anything. It is the device's list of username-and-PIN accounts and it is no
+   longer synced by any plan: it put a plaintext credential in a table every
+   member of the studio could read. The refusal is proved in upgrade_harness,
+   where a studio that already had one is upgraded and then tries to push it
+   back. Listing it here would have this suite assert the opposite. */
 for (const key of ['layi_dash_orders', 'layi_dash_orders_done', 'layi_dash_txns',
-                   'layi_dash_products', 'layi_dash_staff', 'layi_dash_users',
+                   'layi_dash_products', 'layi_dash_staff',
                    'layi_dash_roles', 'layi_dash_settings', 'layi_dash_tasks',
                    'layi_dash_appts', 'layi_dash_audit', 'layi_dash_planner']) {
   ok('Basic may write ' + key, (await putState(basic.id, key)) === null);

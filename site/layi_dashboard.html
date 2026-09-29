@@ -2520,7 +2520,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v61';
+const APP_VERSION='layi-v62';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -2642,7 +2642,14 @@ const SYNC_PUSHERS={
    LOCAL_ONLY_KEYS below, so anything that clears a device still clears
    them. */
 const ORDER_KEYS=['layi_dash_orders','layi_dash_orders_done'];
-const STATE_KEYS=['layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
+/* layi_dash_users LEFT THIS LIST ON 29 SEPTEMBER. It is the device’s own
+   account list and it carries a `pin` on every row. Syncing it put a
+   plaintext credential in a table every member of the studio can read, which
+   is how the audit got the owner’s PIN while signed in as staff. A live
+   studio’s team comes from memberships and team-admin; this list only ever
+   described the device. It is in DEVICE_LOCAL in audit_sync.js with the same
+   reasoning, and the migration deletes the rows already up there. */
+const STATE_KEYS=['layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
 const _statePushTimers={};
 /* THE QUEUE, NOT THE WIRE. pushState used to fire a request and swallow
    the answer; now it records what has to reach the server and the drain
@@ -2659,13 +2666,13 @@ function _pushStateDirect(key){
   if(!supa||!liveMode)return;
   clearTimeout(_statePushTimers[key]);
   _statePushTimers[key]=setTimeout(async()=>{
-    try{const {error}=await supa.from('app_state').upsert({business_id:myBusinessId||LAYI_BIZ,key:key,data:load(key,null),updated_at:new Date().toISOString()},{onConflict:'business_id,key'});
+    try{const {error}=await supa.from('app_state').upsert({business_id:myBusinessId||LAYI_BIZ,key:key,data:cloudSafe(key,load(key,null)),updated_at:new Date().toISOString()},{onConflict:'business_id,key'});
       if(error)console.warn('state push '+key+':',error.message);}catch(e){console.warn('state push '+key+':',e);}
   },400);
 }
 async function pushAllState(){ // seed an empty cloud from this device's local data (first live login of a new business)
   if(!supa||!liveMode)return;
-  try{const rows=STATE_KEYS.map(k=>({business_id:myBusinessId||LAYI_BIZ,key:k,data:load(k,null),updated_at:new Date().toISOString()})).filter(r=>r.data!=null);
+  try{const rows=STATE_KEYS.map(k=>({business_id:myBusinessId||LAYI_BIZ,key:k,data:cloudSafe(k,load(k,null)),updated_at:new Date().toISOString()})).filter(r=>r.data!=null);
     if(rows.length){const {error}=await supa.from('app_state').upsert(rows,{onConflict:'business_id,key'});if(error)console.warn('seed state:',error.message);}
   }catch(e){console.warn('seed state:',e);}
 }
@@ -2752,10 +2759,29 @@ async function drainOutbox(){
 
 /* One entry, one request. Every branch answers the same three questions:
    did it land, is it worth trying again, and has this person lost access. */
+/* NOTHING THAT AUTHENTICATES ANYBODY GOES UP.
+   The settings blob is read by every member of the studio, by design: the
+   currency, the stage names and the company name are needed to draw any
+   screen at all. ownerPassword was in there too, and that is the part the
+   audit walked out with. It is stripped on the way out rather than removed
+   from SETTINGS, because the device still uses it for the local login when
+   there is no backend. The database strips it again on arrival, so an older
+   build that has not been updated cannot put it back. */
+function cloudSafe(key,payload){
+  if(key!=='layi_dash_settings'||!payload||typeof payload!=='object')return payload;
+  const copy=Object.assign({},payload);
+  delete copy.ownerPassword;
+  if(copy.company&&typeof copy.company==="object"){
+    copy.company=Object.assign({},copy.company);
+    delete copy.company.ownerPassword;
+  }
+  return copy;
+}
+
 async function sendOutboxEntry(e){
   if(e.kind==="state"){
     const {error}=await supa.from("app_state").upsert(
-      {business_id:myBusinessId,key:e.key,data:e.payload,updated_at:new Date().toISOString()},
+      {business_id:myBusinessId,key:e.key,data:cloudSafe(e.key,e.payload),updated_at:new Date().toISOString()},
       {onConflict:"business_id,key"});
     return outboxResult(error);
   }
@@ -3222,7 +3248,7 @@ async function reportTenantPresence(){
    themselves, so nobody is locked out of a device by this.
    ================================================================================ */
 const BIZ_OWNER_KEY='layi_dash_biz_owner';
-const TENANT_KEYS=STATE_KEYS.concat(ORDER_KEYS,['layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
+const TENANT_KEYS=STATE_KEYS.concat(ORDER_KEYS,['layi_dash_users','layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
 let _deviceWiped=false;   // this device held another studio, so it may not seed the cloud
 function deviceOwner(){try{return store.get(BIZ_OWNER_KEY)||'';}catch(e){return '';}}
 function wipeTenantData(){TENANT_KEYS.forEach(function(k){try{store.del(k);}catch(e){}});}
@@ -3980,6 +4006,27 @@ function lightbox(src){const lb=document.getElementById('lightbox');lb.querySele
 
 /* ===== LOGIN ===== */
 /* (legacy role-picker login removed — replaced by account login) */
+/* WHERE A USERNAME AND A PIN ARE STILL A LOGIN, AND WHERE THEY ARE NOT.
+
+   They are a login on a device with no backend at all: the example studio,
+   a file:// copy, a preview server. That is what they were built for and it
+   still works.
+
+   They are NOT a login anywhere the app has a real backend, and that is a
+   fix rather than a tidy-up. The audit showed the chain: ownerPassword sat
+   in layi_dash_settings, which every member could read, and this function
+   accepted it. A staff member could read the owner’s password through the
+   API from their own phone and then sign in AS THE OWNER on the studio
+   tablet, seeing every screen their role hides. The credential is gone from
+   the cloud now — but a credential that authenticates nothing is a better
+   guarantee than a credential nobody can currently find.
+
+   Nobody is locked out by this. Offline is served by restoreSession(),
+   which is how an installed app opens with no signal; it was never served
+   by typing a PIN, because a live account’s PIN was never checked against
+   anything the server knew. */
+function localLoginAllowed(){ return !SUPA_URL; }
+
 async function doLogin(){
   const raw=(document.getElementById('loginUser').value||'').trim();
   const p=document.getElementById('loginPass').value||'';
@@ -3995,7 +4042,11 @@ async function doLogin(){
     }catch(e){errEl.textContent='Could not reach the live server. Check your internet connection.';}
     return;
   }
-  // Fallback: local username + pin (demo and existing on-device accounts)
+  // Local username + pin. Demo and file:// only — see localLoginAllowed().
+  if(!localLoginAllowed()){
+    errEl.textContent='Sign in with your email address and password.';
+    return;
+  }
   const u=raw.toLowerCase();
   const user=getUsers().find(x=>x.username.toLowerCase()===u&&x.active!==false);
   if(!user||String(user.pin)!==String(p)){errEl.textContent='Incorrect username or password.';return;}
@@ -5022,6 +5073,13 @@ async function biometricUnlock(){
       allowCredentials:[{type:'public-key',id:_b642b(b.credId)}]
     }});
     if(!assertion)return;
+    /* The same rule as doLogin. A fingerprint unlocking a LOCAL account on a
+       device that has a real backend would be a session with no token behind
+       it, which is not a session at all. */
+    if(!localLoginAllowed()){
+      if(er)er.textContent='Sign in with your email address and password.';
+      return;
+    }
     const user=getUsers().find(u=>u.username&&u.username.toLowerCase()===String(b.username).toLowerCase()&&u.active!==false);
     if(!user){if(er)er.textContent='That saved account is no longer on this device. Sign in with your password.';return;}
     currentUser=user; if(er)er.textContent=''; const pe=document.getElementById('loginPass'); if(pe)pe.value='';
@@ -9914,7 +9972,6 @@ function impRun(key){var im=impById(key),st=_impState[key];if(!im||!st||!st.rows
   if(res&&res.error){alert(res.error);return;}
   _impState[key]={result:res||{added:0}};logAudit('Imported '+im.title.toLowerCase(),((res&&res.added)||0)+' added'+((res&&res.updated)?', '+res.updated+' updated':''));renderImpCards();}
 function saveTiers(){const T=[{name:(fv('tier_n0')||'Starter').trim()||'Starter',min:0}];[['tier_n1','tier_m1','Bronze'],['tier_n2','tier_m2','Silver'],['tier_n3','tier_m3','Gold'],['tier_n4','tier_m4','Platinum']].forEach(([nk,mk,def])=>{T.push({name:(fv(nk)||def).trim()||def,min:amt(mk)});});SETTINGS.tiers=T;var le=document.getElementById('set_loyalty');if(le)SETTINGS.loyaltyEnabled=le.checked;save('layi_dash_settings',SETTINGS);renderCustomers();flashSaved('tierSaveBtn','Save tiers');}
-function syncOwnerPin(){const list=getUsers();const o=list.find(u=>u.roleId==='owner');if(o){o.pin=SETTINGS.ownerPassword;setUsers(list);if(currentUser&&currentUser.id===o.id)currentUser=o;}}
 function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';if(ownsThisStudio())SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();flashSaved('setSaveBtn','Save settings');}
 let invCatDraft=null;
 function renderInvCatsSettings(){const box=document.getElementById('invCatList');if(!box)return;if(!invCatDraft)invCatDraft=invCats().map(c=>({name:c.name,prod:c.prod}));

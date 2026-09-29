@@ -88,7 +88,13 @@ const WRITE = {
   layi_dash_orders:   { owner: true, manager: true,  staff: true,  viewer: false },
   layi_dash_txns:     { owner: true, manager: true,  staff: false, viewer: false },
   layi_dash_audit:    { owner: true, manager: true,  staff: false, viewer: false },
-  layi_dash_users:    { owner: true, manager: false, staff: false, viewer: false },
+  /* layi_dash_users LEFT THIS MATRIX ON 29 SEPTEMBER, and not because the
+     permission changed. The key is refused to EVERYBODY now, the owner
+     included: it is the device's list of usernames and PINs, it should never
+     have been synced, and an old build pushing it is answered with a 42501.
+     Leaving 'owner: true' here would have this probe assert the leak.
+     tools/credential_probe.js is where the refusal is proved, from both
+     sides, with a sentinel that is written before it is looked for. */
   layi_dash_staff:    { owner: true, manager: true,  staff: false, viewer: false },
 };
 
