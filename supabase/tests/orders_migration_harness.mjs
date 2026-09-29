@@ -363,6 +363,79 @@ section('8. And the old key is not a way back in');
 /* =====================================================================
    */
 console.log('\n' + '='.repeat(62));
+section('8b. The same order in both lists');
+{
+  /* FOUND ON PRODUCTION, by running the reconciliation before promoting
+     anything. Studio a3b0c40c has 40 entries and 28 identifiers: all twelve
+     of its finished orders are also in its active list, byte for byte. It is
+     worth 4,477,300, not 5,173,300 — the difference was the same twelve
+     counted twice.
+
+     An identical copy is a bookkeeping artefact and is deduplicated. A copy
+     that DIFFERS is two versions of one order, and choosing between them is
+     not a migration's decision. Both cases are checked here. */
+  const DUP = '55555555-5555-5555-5555-555555555555';
+  const duser = '22222222-0000-0000-0000-000000000010';
+  await db.query(`insert into auth.users (id,email) values ($1,'dup@p2.test')`, [duser]);
+  await db.query(`insert into public.businesses (id,name,slug,plan,status)
+    values ($1,'In Both Lists','in-both-lists','pro','active')`, [DUP]);
+  await db.query(`insert into public.memberships (business_id,user_id,role,status)
+    values ($1,$2,'owner','active') on conflict do nothing`, [DUP, duser]);
+
+  const a = order(21, { value: 100000, costs: [40000], commissions: [], items: [] });
+  const b = order(22, { value: 250000, costs: [],      commissions: [], items: [] });
+  await db.query(`insert into public.app_state (business_id,key,data) values ($1,'layi_dash_orders',$2::jsonb)`,
+    [DUP, JSON.stringify([a, b])]);
+  /* the SAME order, byte for byte, also in the finished list */
+  await db.query(`insert into public.app_state (business_id,key,data) values ($1,'layi_dash_orders_done',$2::jsonb)`,
+    [DUP, JSON.stringify([a])]);
+
+  const m = (await q(`select * from app.migrate_orders_to_rows($1)`, [DUP]))[0];
+  ok('an order in both lists is migrated once, not twice',
+     Number(m.rows_after) === 2, JSON.stringify(m));
+  ok('  and the studio is worth what it is worth, not that plus the duplicate',
+     Number(m.rows_total) === 350000, 'rows_total ' + m.rows_total);
+  const r1 = await one(`select app.reconcile_orders($1)`, [DUP]);
+  const R1 = typeof r1 === 'string' ? JSON.parse(r1) : r1;
+  ok('  the raw entries are still reported, so the duplication is visible',
+     Number(R1.source_rows) === 3 && Number(R1.source_orders) === 2,
+     'rows ' + R1.source_rows + ', orders ' + R1.source_orders);
+  ok('  the duplicate is named', (R1.duplicate_identifiers || []).length === 1, JSON.stringify(R1.duplicate_identifiers));
+  ok('  nothing conflicts', (R1.conflicting_identifiers || []).length === 0, JSON.stringify(R1.conflicting_identifiers));
+  ok('  the one in both lists is recorded as finished',
+     (await one(`select status from public.orders where business_id=$1 and app_id=$2`, [DUP, a.id])) === 'done');
+  ok('  and it reconciles green', R1.green === true, JSON.stringify(R1.green));
+
+  /* Now two copies that DIFFER, which is a decision nobody has made. It
+     needs a studio of its own, seeded before anything is migrated: once a
+     studio has rows the refuse trigger will not let the blob be edited,
+     which is that trigger being right and this test having to be written
+     around it rather than through it. */
+  const CONF = '66666666-6666-6666-6666-666666666666';
+  const cuser = '22222222-0000-0000-0000-000000000011';
+  await db.query(`insert into auth.users (id,email) values ($1,'conf@p2.test')`, [cuser]);
+  await db.query(`insert into public.businesses (id,name,slug,plan,status)
+    values ($1,'Two Versions','two-versions','pro','active')`, [CONF]);
+  await db.query(`insert into public.memberships (business_id,user_id,role,status)
+    values ($1,$2,'owner','active') on conflict do nothing`, [CONF, cuser]);
+  const a2 = JSON.parse(JSON.stringify(a)); a2.value = 999999;
+  await db.query(`insert into public.app_state (business_id,key,data) values ($1,'layi_dash_orders',$2::jsonb)`,
+    [CONF, JSON.stringify([a, b])]);
+  await db.query(`insert into public.app_state (business_id,key,data) values ($1,'layi_dash_orders_done',$2::jsonb)`,
+    [CONF, JSON.stringify([a2])]);
+  await q(`select * from app.migrate_orders_to_rows($1)`, [CONF]);
+  const r2 = await one(`select app.reconcile_orders($1)`, [CONF]);
+  const R2 = typeof r2 === 'string' ? JSON.parse(r2) : r2;
+  ok('two DIFFERENT versions of one order are named as a conflict',
+     (R2.conflicting_identifiers || []).length === 1, JSON.stringify(R2.conflicting_identifiers));
+  ok('  and that refuses', R2.green === false, JSON.stringify(R2.green));
+  const refusedDup = await (async () => {
+    try { await db.query(`select app.retire_order_blob($1)`, [CONF]); return null; }
+    catch (e) { return String(e.message).split(String.fromCharCode(10))[0]; }
+  })();
+  ok('  so the blob is not retired while two versions disagree',
+     /does not reconcile/.test(refusedDup || ''), refusedDup || 'IT WAS ALLOWED');
+}
 section('9. Retiring the source, which refuses unless the copy is proven');
 {
   /* A stale client first: the studio HAS rows now, so the old key is refused
