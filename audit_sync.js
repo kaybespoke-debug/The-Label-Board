@@ -27,7 +27,30 @@ const allKeys=[...new Set((html.match(/layi_dash_[a-z_]+/g)||[]))].sort();
    how full the studio is, as the upload policy computes it. Syncing a cache
    of a server value is how two devices end up arguing about it; each refreshes
    from my_storage_usage() instead. */
-const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls','layi_dash_storage_usage']);
+/* layi_dash_faults is the crash reports this device produced BEFORE it had a
+   session to file them under — a fault during boot is the one that loses a
+   studio a day, and there is no way to write one without being signed in.
+   They go up the moment a session arrives and the key is deleted, so it is a
+   staging post rather than a store. It is also ours rather than the studio's,
+   which is why it stays out of the backup as well. */
+/* layi_dash_updated_from is which build THIS device was running when it asked
+   the service worker to swap, so that after the reload the app can say
+   "Updated to layi-v60" once and then forget. It is written and deleted
+   within a single update, and it describes a device rather than a studio:
+   syncing it would tell a phone that a laptop had updated, which is nothing
+   the phone can act on. */
+const DEVICE_LOCAL=new Set(['layi_dash_biz_owner','layi_dash_media_urls',
+  'layi_dash_storage_usage','layi_dash_current_biz','layi_dash_outbox',
+  'layi_dash_faults','layi_dash_updated_from']);
+/* layi_dash_outbox is THIS DEVICE's queue of writes that have not reached
+   the server yet. Syncing a queue of unsent writes would be a contradiction:
+   the whole point is that it is the part the server has not seen. */
+/* layi_dash_current_biz is which studio this device is looking at, for
+   somebody who belongs to more than one. Syncing it would mean opening the
+   laptop changed what the phone was showing, and looking at one studio on
+   each is a reasonable thing to want. It is a PREFERENCE and decides only
+   what is DRAWN: every protected action re-checks the membership at the
+   server, so a tampered value buys a view of an empty studio and no data. */
 const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m,code='';while((m=re.exec(html))){const a=m[1]||'';if(/\bsrc\s*=/.test(a))continue;const t=a.match(/type\s*=\s*["']([^"']+)["']/i);if(t&&!/javascript|module/i.test(t[1]))continue;code+='\n;'+m[2]+'\n';}
 const mkEl=()=>({innerHTML:'',value:'',checked:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},setAttribute(){},getAttribute(){return null},appendChild(c){return c},addEventListener(){},removeEventListener(){},querySelector(){return null},querySelectorAll(){return[]},focus(){}});
 const cache={};const _ls={};

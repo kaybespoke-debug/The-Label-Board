@@ -390,7 +390,14 @@ function liveToSubscriber(row) {
   // businesses.status is active/suspended/closed; the console thinks in
   // active/trial/expired. A studio on the trial plan is on trial whatever
   // its row says, because that is what the app will be showing them.
-  const status = String(row.status) === 'closed' ? 'expired'
+  //
+  // SUSPENDED USED TO FALL THROUGH TO 'active', and as of this week that is
+  // a lie with consequences: a suspended studio is read only in the app, and
+  // the console was showing it as a healthy subscriber with its list price
+  // counted as MRR. A studio locked out of its own books must not appear on
+  // our side as one that is paying and fine.
+  const rawStatus = String(row.status || '');
+  const status = (rawStatus === 'closed' || rawStatus === 'suspended') ? 'expired'
     : planId === 'trial' ? 'trial' : 'active';
   const outlets = Math.max(1, Number(row.branches) || 1);
 
@@ -399,6 +406,14 @@ function liveToSubscriber(row) {
     liveId: row.id,
     live: true,
     name: row.name || '(unnamed studio)',
+    /* The backend status as it actually is, beside the mapped one.
+       "expired" cannot tell a studio the owner closed on Tuesday from one
+       that simply lapsed, and the difference decides what support does next:
+       one can be reopened by the owner until the purge date, the other needs
+       a payment. */
+    liveStatus: rawStatus,
+    closedAt: row.closed_at || null,
+    purgeAfter: row.purge_after || null,
     owner: '',
     email: row.contact_email || '',
     phone: '',

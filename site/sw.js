@@ -7,7 +7,7 @@
        re-signed url is not a fresh miss (bounded, evicts oldest first)
      - other cross-origin (Supabase API, Google Fonts) -> untouched, straight to network
    Bump CACHE on any change to force a clean swap. */
-const CACHE = 'layi-v46';
+const CACHE = 'layi-v60';
 /* Photos live in their own cache, versioned on its own, because it must
    survive a shell release: see the fetch handler below. */
 const MEDIA_CACHE = 'layi-media-v1';
@@ -22,10 +22,34 @@ const SHELL = [
   '/apple-touch-icon.png'
 ];
 
+/* IT DOES NOT SKIP WAITING ANY MORE, AND THAT IS THE FIX.
+   skipWaiting() here handed control to a new worker in the middle of a
+   session, while the tab carried on running the OLD html and the old
+   javascript against the new cache. Two things followed. The page kept
+   showing the previous release until the app was properly closed — which
+   on an installed iPhone app can be weeks — and for as long as it ran, a
+   fetch for an asset could be answered by a build the running code was not
+   written for.
+
+   So the new worker installs and then waits. The PAGE decides when to
+   swap, because only the page knows whether somebody is halfway through
+   an order form. It asks by posting SKIP_WAITING, and reloads itself on
+   controllerchange. */
 self.addEventListener('install', function (e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); })
-  );
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }));
+});
+
+/* The page's side of that conversation. VERSION is how the app can tell
+   the build it is RUNNING from the build this device has CACHED — which is
+   exactly the state somebody means by "my app is out of date". */
+self.addEventListener('message', function (e) {
+  var d = e.data || {};
+  if (d.type === 'SKIP_WAITING') { self.skipWaiting(); return; }
+  if (d.type === 'VERSION') {
+    var reply = { type: 'VERSION', version: CACHE };
+    if (e.ports && e.ports[0]) { e.ports[0].postMessage(reply); return; }
+    if (e.source && e.source.postMessage) e.source.postMessage(reply);
+  }
 });
 
 self.addEventListener('activate', function (e) {
@@ -141,7 +165,11 @@ self.addEventListener('fetch', function (e) {
 
   if (isNav) {
     e.respondWith(
-      fetch(req).then(function (res) {
+      /* no-store on the REQUEST, not just network-first. Without it the
+         browser's own HTTP cache can answer this before the network is
+         ever asked, and network-first quietly becomes cache-first for the
+         one file that decides which version of the app is running. */
+      fetch(new Request(req.url, { cache: 'no-store', credentials: 'same-origin' })).then(function (res) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) { c.put('/layi_dashboard.html', copy); });
         return res;

@@ -420,8 +420,21 @@ section('5. Branch scoping inside one business');
 section('6. Membership and the spine cannot be self-escalated');
 // =====================================================================
 {
+  /* THE INVARIANT CHANGED WITH RBAC, deliberately, and this check now says
+     the new one. It used to be "staff see only their own membership row",
+     which was true when the only rule was in_scope. The model now is: your
+     own row always, plus the team if you hold team.view — which every tier
+     does by default, because seeing who you work with is not a privilege.
+     What has NOT changed, and is the part that actually matters, is the
+     line below it: never a row from another business. */
   const own = await asUser(U.aStaff, 'select count(*)::int n from memberships');
-  ok('staff see only their own membership row', own.rows[0]?.n === 1, 'got ' + own.rows[0]?.n);
+  ok('a staff member sees their own studio\u2019s team, having team.view',
+     (own.rows[0]?.n ?? 0) >= 1, 'got ' + own.rows[0]?.n);
+
+  const otherBiz = await asUser(U.aStaff,
+    'select count(*)::int n from memberships where business_id = $1', [ids.bizB]);
+  ok('  and not one row from another business', otherBiz.rows[0]?.n === 0,
+     'got ' + otherBiz.rows[0]?.n);
 
   const team = await asUser(U.aOwner, 'select count(*)::int n from memberships');
   ok('an owner sees the whole team', team.rows[0]?.n === 2, 'got ' + team.rows[0]?.n);

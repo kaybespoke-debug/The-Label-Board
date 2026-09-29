@@ -1109,6 +1109,9 @@ body.modal-open{overflow:hidden}
           <div id="globalPeriodPopup" class="gp-popup" style="display:none"></div>
         </div>
         <select id="branchSwitch" onchange="setBranchView(this.value)" title="View one branch or all branches" style="display:none;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;height:42px;padding:0 10px;cursor:pointer;font-family:inherit;font-size:13.5px;max-width:180px"></select>
+        <button id="updatePill" onclick="applyUpdate()" title="A new version is ready" style="display:none;align-items:center;gap:7px;background:var(--accent);border:1px solid var(--accent);color:#fff;border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span>Update</span></button>
+        <button id="unpaidPill" onclick="showUnpaidInfo()" title="Read only" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--red);color:var(--red);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span>Read only</span></button>
+        <button id="syncPill" onclick="showSyncTrouble()" title="Saving" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;flex:none"></span><span id="syncPillText">Saving…</span></button>
         <button id="connPill" onclick="showOfflineInfo()" title="Connection status" style="display:none;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--amber);color:var(--amber);border-radius:10px;height:42px;padding:0 13px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;flex:none"></span><span id="connPillText">Offline</span></button>
         <button id="themeBtn" onclick="toggleTheme()" title="Switch theme" style="align-items:center;justify-content:center;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:10px;width:42px;height:42px;cursor:pointer;font-size:16px;font-family:inherit;display:inline-flex;flex:none">◑</button>
         </div>
@@ -1510,6 +1513,14 @@ body.modal-open{overflow:hidden}
           <div class="panel-head"><h3>Your plan</h3></div>
           <div id="planBox"></div>
         </div>
+        <!-- Separate from "Your plan" above, which is about limits and what is
+             included. This one is about money, and it is the owner’s alone: the
+             database refuses my_billing to everybody else, so the panel is hidden
+             rather than left to fail. -->
+        <div class="panel" data-setperm="setData" id="subscriptionPanel" style="display:none">
+          <div class="panel-head"><h3>Subscription</h3></div>
+          <div id="billingBox"><div class="kv" style="color:var(--text-faint)">Loading…</div></div>
+        </div>
         <div class="panel" data-setperm="setWorkflow" id="payMethodPanel">
           <div class="panel-head"><h3>How you get paid</h3></div>
           <p class="page-sub" style="margin-bottom:12px">The ways money comes in and goes out of your studio. These are what you pick from when you record a payment, so the list should match how you actually trade &mdash; add Opay, Moniepoint, PalmPay, MoMo, a card machine, whatever you use.</p>
@@ -1568,6 +1579,22 @@ body.modal-open{overflow:hidden}
           </div>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
         </div>
+        <!-- Separate panel from the browser backup above, because they are not
+             the same thing and a studio that thinks they are has a backup with
+             no costs and no phone numbers in it. -->
+        <div class="panel" data-setperm="setData">
+          <div class="panel-head"><h3>Your data, from the server</h3></div>
+          <p class="page-sub" style="margin-bottom:16px">Everything the studio has, gathered where all of it is visible — orders with their costs, clients with their contact details, and the full activity log. The backup above only holds what this device was allowed to see.</p>
+          <button class="btn" id="srvExportBtn" onclick="exportStudioFromServer()">⤓ Download everything</button>
+        </div>
+        <div class="panel" data-setperm="setData" id="closingPanel">
+          <div class="panel-head"><h3>Closing</h3></div>
+          <p class="page-sub" style="margin-bottom:16px">Closing the studio signs everybody out and stops the subscription. <strong>Nothing is deleted for 30 days</strong> — you can reopen it, or download everything, at any point in that time.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn danger" id="closeStudioBtn" onclick="closeThisStudio()">Close the studio…</button>
+            <button class="btn ghost" onclick="deleteMyAccount()">Delete my account…</button>
+          </div>
+        </div>
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Import old data</h3></div>
           <p class="page-sub" style="margin-bottom:16px">Bring your history across from another app, a spreadsheet or your old website. Columns are matched automatically, and re-importing updates records rather than duplicating them.</p>
@@ -1588,6 +1615,13 @@ body.modal-open{overflow:hidden}
           <div class="panel-head"><h3>About</h3></div>
           <p class="page-sub" style="margin-bottom:10px">If you ever report a problem, this is the one thing worth telling us. It says exactly which version your device is running.</p>
           <div id="buildStamp" style="color:var(--text-dim);font-size:13px;letter-spacing:.04em"></div>
+          <!-- Two lines, not one, because they answer different questions. The
+               first is the build this page is RUNNING. The second is the build
+               this device has CACHED and will start next time. When they differ,
+               that is precisely the state somebody means by "my app is out of
+               date", and it now says so instead of being invisible. -->
+          <div id="swStamp" style="color:var(--text-faint);font-size:12.5px;letter-spacing:.04em;margin-top:4px"></div>
+          <div id="updateNote" style="margin-top:10px;display:none"></div>
         </div>
       </section>
     </main>
@@ -1611,6 +1645,7 @@ body.modal-open{overflow:hidden}
     <div class="ms-item" data-view="settings" id="msSettings" onclick="go('settings');toggleMore()"><span>⚙</span> Settings</div>
     <div class="ms-item" onclick="openFeedback();toggleMore()"><span>✎</span> Help &amp; feedback</div>
     <div class="ms-item" onclick="openMyAccount();toggleMore()"><span>☺</span> My account</div>
+    <div class="ms-item" id="msStudios" onclick="openStudioSwitcher();toggleMore()" style="display:none"><span>⌂</span> Your studios</div>
     <div class="ms-item" id="msSwitch" onclick="switchAccount()"><span>⇄</span> Switch account</div>
     <div class="ms-item" onclick="logout()"><span>⏻</span> Sign out</div>
   </div>
@@ -1641,14 +1676,43 @@ body.modal-open{overflow:hidden}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ============================================================================
-   LIVE BACKEND (Supabase)
-   Paste your project's URL and anon (publishable) key between the quotes below.
-   Both blank = the app runs entirely on this device, which is the safe default.
-   Where to find them: Supabase Dashboard -> Project Settings -> API.
+   LIVE BACKEND (Supabase) — CHOSEN BY WHERE THIS PAGE IS SERVED FROM
    Full step by step: SUPABASE_SETUP.md
+
+   This used to be two hardcoded constants pointing at the live project, and
+   there is no build step here, so a Netlify environment variable could never
+   have reached them. Any copy of this file served from anywhere talked to
+   production. That is fine while there is only one place it is served from,
+   and it is how a staging site ends up writing real accounts into the live
+   database the moment there are two.
+
+   ANON KEYS ARE PUBLIC. Both of these ship in the page already and are meant
+   to; they identify a project, they do not authorise anything on their own.
+   Row level security is what stands between a caller and the data. So the
+   risk here is not exposure, it is pointing the wrong one at the wrong
+   project, which is why the mapping is explicit and short.
+
+   AN UNKNOWN HOST GETS NOTHING. No default, no nearest match, no falling back
+   to production. A hostname nobody listed — a preview build, a fork, a file
+   opened straight off the disk — runs entirely on the device, which the rest
+   of this file already handles and calls the safe default. Failing toward NO
+   data beats failing toward LIVE data, and it is the difference between a
+   confusing afternoon and an incident.
    ============================================================================ */
-const SUPA_URL='https://eskubrbgbcbaejynjxvh.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc';
+const SUPA_ENVS = {
+  'app.thelabelboard.com': {
+    url: 'https://eskubrbgbcbaejynjxvh.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVza3VicmJnYmNiYWVqeW5qeHZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MjYzOTYsImV4cCI6MjEwNDEwMjM5Nn0.BayRVXbba6Ga8jjMwd36bQh112s_2FWMbhCcE5R1_fc',
+  },
+  'the-label-board-staging.netlify.app': {
+    url: 'https://pakxhimjhrcpqvtsqwqz.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBha3hoaW1qaHJjcHF2dHNxd3F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjI3MDgsImV4cCI6MjEwNTkzODcwOH0.-gC6bciKA2D5gxC9b1Ur_YvAW8In62cdBzJ-90PkGXk',
+  },
+};
+/* location.hostname is '' for file://, which matches nothing and is the point. */
+const SUPA_ENV = SUPA_ENVS[String(location.hostname || '').toLowerCase()] || null;
+const SUPA_URL = SUPA_ENV ? SUPA_ENV.url : '';
+const SUPA_KEY = SUPA_ENV ? SUPA_ENV.key : '';
 let supa=null;
 /* Read BEFORE the Supabase client is created, because creating it consumes the
    token in the URL and clears it, and by the time any of our own code runs the
@@ -1672,6 +1736,33 @@ const AUTH_ARRIVAL=(function(){
   }catch(e){}
   return null;
 })();
+/* ===== ARRIVING ON A TEAM INVITATION =====
+   The id of the invitation, if this link is one. It rides in the QUERY
+   STRING rather than the fragment, and that is not a preference: GoTrue
+   appends its own fragment to whatever redirect it was given, so an id in
+   the fragment would arrive as '#invitation=...#access_token=...', the
+   browser would hand the whole run to location.hash, and AUTH_ARRIVAL just
+   above would find no access_token at all.
+
+   It is NOT a credential and nothing here treats it as one. accept_invitation
+   runs in the database as the signed-in person and checks that their
+   CONFIRMED email is the address the invitation names, so an id on its own
+   opens nothing. Read once, used once, and wiped out of the address bar
+   before the studio renders, because a screenshot of somebody's dashboard
+   should not carry the link they came in on.
+
+   Shape-checked rather than trusted: anything that is not a uuid is
+   ignored, so a hand-edited url cannot push a string into an rpc call. */
+const INVITATION_ID=(function(){
+  try{
+    const v=String(new URLSearchParams(String(location.search||'')).get('invitation')||'').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)?v:'';
+  }catch(e){ return ''; }
+})();
+/* Kept for one reason: if acceptance fails AND they turn out to have no
+   studio, this is the only sentence that explains why they are looking at a
+   wall. On its own it is not an error worth interrupting anybody with. */
+let INVITATION_ERROR='';
 /* An invitation and a reset both mean the same thing to this app: you are here,
    we know who you are, and you need a password. 'signup' is a confirmation link,
    which arrives the same way. */
@@ -1887,7 +1978,9 @@ function canSeeProfit(){const r=currentRole();if(!r||!r.perms)return false;retur
 function canSeeCost(){const r=currentRole();if(!r||!r.perms)return false;return r.perms.seeCost!==undefined?!!r.perms.seeCost:can('money');}
 // Receivables = who owes, what's paid in, who to chase. Anyone with full finance sees it; CRE-type roles get it on its own.
 function canReceivables(){return can('finance')||canSeeProfit()||can('receivables');}
-function getRoles(){let r=load('layi_dash_roles',null);if(!r||!Array.isArray(r)||!r.length){r=defaultRoles();save('layi_dash_roles',r);}return r;}
+function getRoles(){
+  if(liveMode&&CLOUD_ROLES&&CLOUD_ROLES.length)return CLOUD_ROLES;
+  let r=load('layi_dash_roles',null);if(!r||!Array.isArray(r)||!r.length){r=defaultRoles();save('layi_dash_roles',r);}return r;}
 function migrateRoles(){
   const defs=defaultRoles();const byId={};defs.forEach(d=>byId[d.id]=d);
   const list=getRoles();let changed=false;
@@ -1920,12 +2013,160 @@ function migrateRoles(){
   });
   if(changed)setRoles(list);
 }
-function setRoles(v){save('layi_dash_roles',v);}
+/* ===== ROLES, FROM THE DATABASE =====================================
+   A live studio's roles are rows in business_roles and
+   business_role_permissions, and which role a person holds is their
+   MEMBERSHIP. Both are per business, both are owner-only to write, and
+   neither can be edited by the people they restrict — which the blob
+   they replace could be, by anybody, until Phase 0.
+
+   A device that is not live keeps the blob. Nobody is billing a device
+   and nothing is at stake on one. */
+let CLOUD_ROLES=null, myRoleKey='', myPermissions=null;
+async function loadCloudRoles(){
+  if(!supa||!liveMode||!myBusinessId){CLOUD_ROLES=null;return false;}
+  try{
+    const mine=await supa.rpc('my_membership',{p_business:myBusinessId});
+    const me=(mine&&mine.data&&mine.data[0])||null;
+    myRoleKey=(me&&me.role_key)||'';
+    const {data,error}=await supa
+      .from('business_roles')
+      .select('id,key,name,tier,is_system,business_role_permissions(permission_key)')
+      .eq('business_id',myBusinessId);
+    if(error||!data||!data.length)return false;
+    /* EVERY KEY GETS A VALUE, and it is not tidiness.
+       permVal() falls back when a key is UNDEFINED on a role: seeCost falls
+       back to money, funds falls back to finance, and so on. Those fallbacks
+       exist so an old locally-stored role does not lose a permission it used
+       to exercise. A role built from granted rows alone has every ungranted
+       key undefined, so the fallbacks fire and a staff member with `money`
+       silently gains seeCost and seeProfit. Measured in the browser on
+       staging: can('seeCost') came back true for Staff.
+
+       So the catalogue is read too and every key is written as 0 or 1. What
+       is not granted is DENIED, not unanswered. */
+    let allKeys=[];
+    try{
+      const cat=await supa.from('permission_catalogue').select('key');
+      allKeys=((cat&&cat.data)||[]).map(function(c){return c.key;});
+    }catch(e){}
+    if(!allKeys.length)allKeys=(typeof PERM_KEYS!=='undefined'?PERM_KEYS:[]).slice();
+    CLOUD_ROLES=data.map(function(r){
+      const perms={};
+      allKeys.forEach(function(k){perms[k]=0;});
+      (r.business_role_permissions||[]).forEach(function(p){perms[p.permission_key]=1;});
+      return {id:r.key,name:r.name,builtin:!!r.is_system,tier:r.tier,rowId:r.id,perms:perms};
+    });
+    return true;
+  }catch(e){CLOUD_ROLES=null;return false;}
+}
+/* Writing them back. The owner is the only one the database will accept,
+   and the screen already refuses everybody else, so this is the third
+   line rather than the first. A diff, not a replace: two owners editing
+   different checkboxes both land, which a blob could not manage. */
+async function pushRoleChanges(next){
+  if(!supa||!liveMode||!CLOUD_ROLES)return false;
+  const byKey={};CLOUD_ROLES.forEach(function(r){byKey[r.id]=r;});
+  for(const r of (next||[])){
+    const was=byKey[r.id];
+    if(!was){
+      const ins=await supa.from('business_roles')
+        .insert({business_id:myBusinessId,key:r.id,name:r.name||r.id,tier:'staff'})
+        .select('id').maybeSingle();
+      if(ins.error||!ins.data)continue;
+      const keys=Object.keys(r.perms||{}).filter(function(k){return r.perms[k];});
+      if(keys.length)await supa.from('business_role_permissions')
+        .insert(keys.map(function(k){return {role_id:ins.data.id,permission_key:k};}));
+      continue;
+    }
+    if((r.name||'')!==(was.name||'')){
+      await supa.from('business_roles').update({name:r.name}).eq('id',was.rowId);
+    }
+    const add=[],drop=[];
+    Object.keys(r.perms||{}).forEach(function(k){
+      if(r.perms[k]&&!was.perms[k])add.push(k);
+      if(!r.perms[k]&&was.perms[k])drop.push(k);
+    });
+    if(add.length)await supa.from('business_role_permissions')
+      .insert(add.map(function(k){return {role_id:was.rowId,permission_key:k};}));
+    for(const k of drop){
+      await supa.from('business_role_permissions').delete()
+        .eq('role_id',was.rowId).eq('permission_key',k);
+    }
+  }
+  await loadCloudRoles();
+  return true;
+}
+function setRoles(v){
+  if(liveMode&&CLOUD_ROLES){CLOUD_ROLES=v;pushRoleChanges(v);return;}
+  save('layi_dash_roles',v);
+}
 function roleById(id){return getRoles().find(r=>r.id===id);}
 function roleName(id){const r=roleById(id);return r?r.name:'—';}
 function getUsers(){let u=load('layi_dash_users',null);if(!u||!Array.isArray(u)||!u.length){u=[{id:'u-owner',name:'Owner',username:'owner',pin:(SETTINGS.ownerPassword||'layi2025'),roleId:'owner',staffId:'',active:true,createdAt:new Date().toISOString()}];save('layi_dash_users',u);}return u;}
 function setUsers(v){save('layi_dash_users',v);}
-function currentRole(){return currentUser?roleById(currentUser.roleId):null;}
+/* THE MEMBERSHIP DECIDES, not profiles.role_id.
+   profiles holds one row per person for the whole platform and
+   accept_invitation overwrites it, so somebody who is an accountant in
+   one studio and a tailor in another had one answer — whichever they
+   joined last. It is a label now, and Phase 0 stopped a browser writing
+   it at all. myRoleKey comes from the membership row for THIS studio. */
+/* ===== MOVING BETWEEN STUDIOS =====
+   Nothing here is trusted. The id is checked against the memberships this
+   session actually read, the studio is loaded from scratch — roles,
+   permissions, plan and data — and the server answers every one of those
+   for the business being asked about. A person with one studio never sees
+   any of it. */
+function canSwitchStudios(){return liveMode&&myMemberships.length>1;}
+async function switchStudio(id){
+  if(!canSwitchStudios())return false;
+  const m=myMemberships.find(function(x){return x.business_id===id;});
+  if(!m){toast&&toast('You are not a member of that studio.');return false;}
+  if(id===myBusinessId){closeModal&&closeModal();return true;}
+  rememberBusiness(id);
+  myBusinessId=id;myMembershipRole=m.role||'';
+  try{closeModal();}catch(e){}
+  try{toast('Opening '+(studioNameById(id)||'the studio')+'\u2026');}catch(e){}
+  /* Local data belongs to the studio it came from. Clearing it before the
+     pull is what stops one studio's orders appearing under another's name
+     for the second it takes to hydrate. */
+  try{TENANT_KEYS.forEach(function(k){store.del(k);});}catch(e){}
+  try{await loadCloudRoles();}catch(e){}
+  try{await hydrateFromCloud();}catch(e){}
+  try{await adoptPlan();}catch(e){}
+  try{reloadSettingsFromStorage();}catch(e){}
+  try{saveSession();}catch(e){}
+  enterApp();
+  return true;
+}
+function studioNameById(id){
+  const m=myMemberships.find(function(x){return x.business_id===id;});
+  return (m&&m.business_name)||'';
+}
+function openStudioSwitcher(){
+  if(!canSwitchStudios())return;
+  const rows=myMemberships.map(function(m){
+    const here=m.business_id===myBusinessId;
+    return '<div class="ms-item" style="padding:12px 14px;'+(here?'opacity:.6;':'cursor:pointer')+'"'
+      +(here?'':' onclick="switchStudio(\''+m.business_id+'\')"')+'>'
+      +'<b>'+esc(m.business_name||'Studio')+'</b>'
+      +'<div class="sd" style="color:var(--text-dim)">'+esc(roleWordFor(m))
+      +(m.branch_id?'':' \u00b7 all branches')+(here?' \u00b7 open now':'')+'</div></div>';
+  }).join('');
+  openModal('Your studios',
+    '<div class="sd" style="margin-bottom:10px;color:var(--text-dim)">'
+    +'You belong to more than one. What you can do is decided separately in each.</div>'
+    +rows+'<div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Close</button></div>');
+}
+function roleWordFor(m){
+  const r=(CLOUD_ROLES||[]).find(function(x){return x.rowId===m.role_id;});
+  return (r&&r.name)||(m.role||'member');
+}
+function currentRole(){
+  if(!currentUser)return null;
+  if(liveMode&&myRoleKey){const r=roleById(myRoleKey);if(r)return r;}
+  return roleById(currentUser.roleId);
+}
 // New permissions fall back to their historical coupling when a role hasn't set them explicitly.
 // This keeps every existing account working exactly as before until an owner toggles the new switch.
 /* What a permission used to ride on, for roles saved before it existed. Every one of these
@@ -2251,26 +2492,71 @@ const getCustomers=()=>load('layi_dash_customers',{});
 const setCustomers=v=>{save('layi_dash_customers',v);};
 
 /* ===== LIVE SYNC: customers (first connected table) ===== */
-let liveMode=false, myBusinessId=null;
+/* WHAT THIS PERSON IS IN THIS STUDIO, taken from their membership row.
+   Not from profiles.role_id, which is the app's own label and says nothing
+   about who owns the place, and not from a guess. Blank means we have not
+   read it yet — on a device that has never been online, for instance — and
+   every reader has to decide what to do with blank rather than assume. */
+let liveMode=false, myBusinessId=null, myMembershipRole='';
+/* EVERY STUDIO THIS PERSON BELONGS TO, and which one they are looking at.
+   The choice is a PREFERENCE and nothing else: it decides what is drawn,
+   never what is allowed. Every protected action re-checks the membership
+   at the server, so a tampered preference buys a view of an empty studio
+   and no data at all. It is device-local and deliberately not synced —
+   looking at Adé on the laptop while looking at Ìfé on the phone is a
+   reasonable thing to want. */
+let myMemberships=[];
+const BIZ_PREF_KEY='layi_dash_current_biz';
+function preferredBusiness(){try{return store.get(BIZ_PREF_KEY)||'';}catch(e){return '';}}
+function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(e){}}
 /* The one release marker. It MUST equal CACHE in site/sw.js — audit_build_stamp.js
    fails the build if they drift, because a version that disagrees with the
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v46';
+const APP_VERSION='layi-v60';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
 const CONSOLE_URL='https://admin.thelabelboard.com';
 const LAYI_BIZ='11111111-1111-1111-1111-111111111111';
-function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
-function rowToCust(r){const m=r.measurements||{};return {name:r.name||'',email:r.email||'',whatsapp:r.whatsapp||'',address:r.address||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};}
+/* A CLIENT RECORD IS TWO THINGS NOW, and they are not the same secret.
+   The operational half — name, note, measurements — is what a workroom
+   needs to cut a garment. The personal half — phone, email, whatsapp,
+   address — is what seeContact is about. They used to be one row, so
+   refusing the phone number also refused the measurements, and a studio
+   that wants a tailor to have one and not the other could not say so. */
+function custToRow(c){return {business_id:myBusinessId||LAYI_BIZ,name:c.name||'',note:c.note||'',measurements:{meas:c.meas||{},history:c.measHistory||[]}};}
+function custToContactRow(c,id){return {customer_id:id,business_id:myBusinessId||LAYI_BIZ,email:c.email||'',whatsapp:c.whatsapp||'',address:c.address||'',phone:c.phone||''};}
+/* The contact half arrives embedded when the database is willing to send
+   it and is simply absent when it is not. Absent is left absent rather
+   than filled with empty strings: a blank phone number on screen says
+   "this client has none", and that is a different sentence from "you may
+   not see it". */
+function rowToCust(r){
+  const m=r.measurements||{};
+  const k=(r.customer_contacts&&(Array.isArray(r.customer_contacts)?r.customer_contacts[0]:r.customer_contacts))||null;
+  const out={name:r.name||'',note:r.note||'',meas:(m.meas||{}),measHistory:(m.history||[]),measurements:'',dbId:r.id};
+  if(k){out.email=k.email||'';out.whatsapp=k.whatsapp||'';out.address=k.address||'';out.phone=k.phone||'';}
+  return out;
+}
 async function pullCustomers(){
   if(!supa)return false;
   try{
-    const {data,error}=await supa.from('customers').select('*').order('created_at',{ascending:true});
+    const {data,error}=await supa.from('customers').select('*,customer_contacts(*)').order('created_at',{ascending:true});
     if(error){console.warn('pullCustomers:',error.message);return false;}
-    if(!(data||[]).length){const localObj=getCustomers();if(Object.keys(localObj).length&&maySeedCloudFromDevice()){await _pushCustomersNow(localObj);}else{saveLocal('layi_dash_customers',{});}return true;}
+    /* NOTHING ON THE SERVER IS NOT THE SAME AS NOTHING, the same lesson
+       the orders pull learned: a studio not yet synced and a person whose
+       branch holds no clients look identical from here, and wiping a
+       device that has work on it is the loss this batch removed. */
+    if(!(data||[]).length){
+      const localObj=getCustomers();
+      if(Object.keys(localObj).length){
+        if(maySeedCloudFromDevice())await _pushCustomersNow(localObj);
+        return false;
+      }
+      saveLocal('layi_dash_customers',{});return true;
+    }
     const obj={};(data||[]).forEach(r=>{obj[nameKey(r.name)]=rowToCust(r);});
     saveLocal('layi_dash_customers',obj);return true;
   }catch(e){console.warn('pullCustomers:',e);return false;}
@@ -2306,8 +2592,17 @@ async function _pushCustomersNow(obj){
     const list=Object.keys(obj).map(k=>obj[k]);let changed=false;
     for(const c of list){
       const row=custToRow(c);
-      if(c.dbId){const {error}=await supa.from('customers').update(row).eq('id',c.dbId);if(error)console.warn('cust update:',error.message);}
-      else{const {data,error}=await supa.from('customers').insert(row).select('id').single();if(error){console.warn('cust insert:',error.message);}else if(data){c.dbId=data.id;changed=true;}}
+      let id=c.dbId;
+      if(id){const {error}=await supa.from('customers').update(row).eq('id',id);if(error)console.warn('cust update:',error.message);}
+      else{const {data,error}=await supa.from('customers').insert(row).select('id').single();if(error){console.warn('cust insert:',error.message);}else if(data){id=c.dbId=data.id;changed=true;}}
+      /* Only if this device HAS contact details, which it only does if the
+         person was allowed to read them. A device that was refused them
+         must not write blanks over what is there. */
+      if(id&&(c.phone||c.email||c.whatsapp||c.address)){
+        const {error:ke}=await supa.from('customer_contacts')
+          .upsert(custToContactRow(c,id),{onConflict:'customer_id'});
+        if(ke)console.warn('contact save:',ke.message);
+      }
     }
     if(changed)save('layi_dash_customers',obj);
     if(list.length){const keep=list.map(c=>c.dbId).filter(Boolean);await reconcileDeletes('customers',keep);}
@@ -2322,14 +2617,39 @@ async function syncCustomersNow(){await syncNow();}
 let _hydrating=false;
 const SYNC_PUSHERS={
   'layi_dash_customers':()=>pushCustomers(getCustomers()),
+  /* ORDERS DO NOT GO INTO app_state ANY MORE. One source of truth: the
+     rows. The blob keys stay as the device’s local copy and are never
+     pushed, which is what stops two stores disagreeing. */
+  'layi_dash_orders':()=>outboxQueue({kind:'orders',key:'layi_dash_orders',payload:1}),
+  'layi_dash_orders_done':()=>outboxQueue({kind:'orders',key:'layi_dash_orders',payload:1}),
   'layi_dash_suppliers':()=>pushSuppliers(getSuppliers()),
   'layi_dash_feedback':()=>pushFeedback(getFeedback())
 };
 // Every other data key syncs as a JSON blob in the generic `app_state` table (one row per business + key).
 // Customers & suppliers keep their own relational tables above; everything else rides this generic path.
-const STATE_KEYS=['layi_dash_orders','layi_dash_orders_done','layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
+/* ORDERS ARE NOT IN HERE ANY MORE. They are rows, pushed and pulled by
+   their own pair of functions, and a key that is wired both ways is two
+   sources of truth arguing. The audit_sync gate refuses it outright,
+   which is how this was caught within a minute of the change.
+
+   The two keys remain as the device’s local copy and appear in
+   LOCAL_ONLY_KEYS below, so anything that clears a device still clears
+   them. */
+const ORDER_KEYS=['layi_dash_orders','layi_dash_orders_done'];
+const STATE_KEYS=['layi_dash_txns','layi_dash_appts','layi_dash_staff','layi_dash_users','layi_dash_roles','layi_dash_products','layi_dash_supplies','layi_dash_bills','layi_dash_pots','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_campaigns','layi_dash_log','layi_dash_audit','layi_dash_settings','layi_dash_planner'];
 const _statePushTimers={};
+/* THE QUEUE, NOT THE WIRE. pushState used to fire a request and swallow
+   the answer; now it records what has to reach the server and the drain
+   loop is responsible for it. The 400ms pause stays, because a person
+   typing into a form should not produce a request per keystroke. */
 function pushState(key){
+  if(!supa||!liveMode)return;
+  clearTimeout(_statePushTimers[key]);
+  _statePushTimers[key]=setTimeout(function(){
+    outboxQueue({kind:"state",key:key,payload:load(key,null)});
+  },400);
+}
+function _pushStateDirect(key){
   if(!supa||!liveMode)return;
   clearTimeout(_statePushTimers[key]);
   _statePushTimers[key]=setTimeout(async()=>{
@@ -2342,6 +2662,468 @@ async function pushAllState(){ // seed an empty cloud from this device's local d
   try{const rows=STATE_KEYS.map(k=>({business_id:myBusinessId||LAYI_BIZ,key:k,data:load(k,null),updated_at:new Date().toISOString()})).filter(r=>r.data!=null);
     if(rows.length){const {error}=await supa.from('app_state').upsert(rows,{onConflict:'business_id,key'});if(error)console.warn('seed state:',error.message);}
   }catch(e){console.warn('seed state:',e);}
+}
+/* ===== THE OUTBOX ====================================================
+   Every write that has to reach the server goes in here first, and the
+   queue lives in localStorage, so it survives the tab being closed, the
+   phone running out of battery, and the train going into a tunnel.
+
+   WHAT THIS REPLACES. pushState() fired a request 400ms after a save and
+   logged console.warn if it failed. Nothing retried it. Nothing told the
+   person. A studio could work all afternoon on a bad connection, see
+   every save land locally, and have none of it on the server — and the
+   only trace was a browser console nobody has open. That is the silent
+   data loss this batch exists to remove.
+
+   COLLAPSED PER KEY. A blob key is whole-value: queueing twenty versions
+   of the orders list would send nineteen stale ones. One entry per key,
+   replaced in place, so the queue stays the size of the app rather than
+   the size of the day.
+
+   IT NEVER DROPS WORK SILENTLY. An entry leaves the queue when the server
+   accepted it, or when the person is told. Those are the only two ways. */
+const OUTBOX_KEY='layi_dash_outbox';
+const OUTBOX_MAX_TRIES=8;
+let _drainTimer=null,_draining=false,_drainAgain=false;
+function outbox(){try{const v=JSON.parse(store.get(OUTBOX_KEY)||"[]");return Array.isArray(v)?v:[];}catch(e){return [];}}
+function setOutbox(v){try{store.set(OUTBOX_KEY,JSON.stringify(v));}catch(e){}updateSyncPill();}
+function outboxQueue(entry){
+  const q=outbox();
+  /* one per (kind,key): the latest value is the only one worth sending */
+  const i=q.findIndex(function(x){return x.kind===entry.kind&&x.key===entry.key;});
+  const row=Object.assign({id:uid("ob"),tries:0,lastError:"",at:new Date().toISOString()},entry);
+  if(i>=0){row.id=q[i].id;row.tries=0;row.lastError="";q[i]=row;}else{q.push(row);}
+  setOutbox(q);
+  scheduleDrain(150);
+}
+function outboxDrop(id){setOutbox(outbox().filter(function(x){return x.id!==id;}));}
+function outboxFailures(){return outbox().filter(function(x){return x.tries>=OUTBOX_MAX_TRIES;});}
+function outboxPending(){return outbox().filter(function(x){return x.tries<OUTBOX_MAX_TRIES;});}
+
+/* Backoff, so a server that is down is asked politely rather than by
+   every tab at once: 1s, 2s, 4s, up to a minute. */
+function scheduleDrain(ms){
+  clearTimeout(_drainTimer);
+  _drainTimer=setTimeout(function(){drainOutbox();},Math.max(50,ms||400));
+}
+async function drainOutbox(){
+  /* A save that arrives WHILE a drain is running must not wait for the next
+     backoff. The second caller does not queue up behind the first — that is
+     how you get a pile of overlapping passes — it leaves a note, and the
+     pass in flight does one more round before it finishes. */
+  if(_draining){_drainAgain=true;return false;}
+  if(!supa||!liveMode){updateSyncPill();return false;}
+  if(("onLine" in navigator)&&!navigator.onLine){updateSyncPill();return false;}
+  _draining=true;
+  try{
+    let q=outbox();
+    for(const entry of q.slice()){
+      if(entry.tries>=OUTBOX_MAX_TRIES)continue;
+      let res;
+      try{res=await sendOutboxEntry(entry);}
+      catch(e){res={ok:false,fatal:false,error:String(e&&e.message||e)};}
+      const cur=outbox();
+      const i=cur.findIndex(function(x){return x.id===entry.id;});
+      if(i<0)continue;               // replaced by a newer value while in flight
+      if(res.ok){cur.splice(i,1);setOutbox(cur);continue;}
+      cur[i].tries=(cur[i].tries||0)+1;
+      cur[i].lastError=res.error||"";
+      cur[i].fatal=!!res.fatal;
+      if(res.fatal)cur[i].tries=OUTBOX_MAX_TRIES;   // retrying a refusal is noise
+      setOutbox(cur);
+      if(res.revoked){onMembershipRevoked();break;}
+    }
+  }finally{_draining=false;}
+  if(_drainAgain){_drainAgain=false;return await drainOutbox();}
+  const left=outboxPending();
+  if(left.length){
+    const worst=Math.min.apply(null,left.map(function(x){return x.tries||0;}));
+    scheduleDrain(Math.min(60000,1000*Math.pow(2,worst)));
+  }
+  updateSyncPill();
+  return true;
+}
+
+/* One entry, one request. Every branch answers the same three questions:
+   did it land, is it worth trying again, and has this person lost access. */
+async function sendOutboxEntry(e){
+  if(e.kind==="state"){
+    const {error}=await supa.from("app_state").upsert(
+      {business_id:myBusinessId,key:e.key,data:e.payload,updated_at:new Date().toISOString()},
+      {onConflict:"business_id,key"});
+    return outboxResult(error);
+  }
+  if(e.kind==="audit"){
+    /* No return=representation: that needs the SELECT policy too, and
+       somebody may be allowed to be recorded without being allowed to read
+       the record. */
+    const {error}=await supa.from("audit_log").insert(e.payload);
+    return outboxResult(error);
+  }
+  if(e.kind==="orders"){return await pushOrderRows(e.payload);}
+  if(e.kind==="fault"){
+    /* No return=representation here either, and for a stronger reason:
+       a studio has NO select on error_reports at all, so asking for the
+       row back would turn every successful report into a refusal. */
+    const {error}=await supa.from("error_reports").insert(e.payload);
+    return outboxResult(error);
+  }
+  return {ok:true};
+}
+function outboxResult(error){
+  if(!error)return {ok:true};
+  const code=String(error.code||"");
+  const msg=String(error.message||"");
+  /* 42501 is a refusal: the person may not do this. Retrying it forever
+     is how a queue fills with things that will never be accepted. */
+  const fatal=code==="42501"||/permission denied|row-level security/i.test(msg);
+  const revoked=/JWT|not a member|row-level security/i.test(msg)&&code==="42501";
+  /* This said revoked:false, so onMembershipRevoked never once ran and
+     somebody removed from a studio mid-session was told "something did
+     not send" instead of "sign in again". The value was computed on the
+     line above and discarded. */
+  return {ok:false,fatal:fatal,revoked:revoked,error:msg||code};
+}
+
+/* ===== WHEN IT BREAKS ===============================================
+   Until now an error in a browser in Ibadan at 11pm was a sentence the
+   studio might or might not repeat to us, usually as "it stopped
+   working". There was no line to read. These two listeners are that
+   line, and they are deliberately modest about what they collect.
+
+   WHAT IS SCRUBBED AND WHY. A message can carry whatever was in the
+   variable that threw, and this app holds clients’ phone numbers and
+   addresses. So anything shaped like an address, a phone number or a
+   token is replaced before the report leaves the device. A stack trace
+   we can read is worth having; a client’s number in our logs is not.
+
+   TEN PER LOAD AND ONE PER MESSAGE. A broken render throws on every
+   frame. The database has its own ceiling for the same reason, because
+   this one lives inside the page that is broken.
+
+   AND THE ONES BEFORE SIGN-IN MATTER MOST, because a fault during boot
+   is the one that loses a studio a day. Nothing can be written without
+   a session, so those wait on the device and go up when one arrives. */
+const FAULT_KEY='layi_dash_faults';
+let faultsThisLoad=0;const faultSeen=Object.create(null);
+function scrubFault(t){
+  return String(t==null?'':t)
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g,'[email]')
+    .replace(/eyJ[A-Za-z0-9_.-]{12,}/g,'[token]')
+    .replace(/\+?\d[\d ()-]{7,}\d/g,'[number]')
+    .slice(0,1800);
+}
+function localFaults(){try{return JSON.parse(store.get(FAULT_KEY)||"[]")||[];}catch(e){return [];}}
+function reportFault(kind,message,stack){
+  try{
+    if(faultsThisLoad>=10)return;
+    const sig=kind+'|'+String(message||'').slice(0,120);
+    if(faultSeen[sig])return;
+    faultSeen[sig]=1;faultsThisLoad++;
+    const row={kind:kind,message:scrubFault(message)||"(no message)",
+      stack:scrubFault(stack),at_url:scrubFault(String(location.hash||"")),
+      app_version:(typeof APP_VERSION!=="undefined")?APP_VERSION:null,
+      ua:String(navigator.userAgent||"").slice(0,300)};
+    if(supa&&liveMode&&myBusinessId){
+      row.business_id=myBusinessId;
+      outboxQueue({kind:"fault",key:"fault:"+uid("f"),payload:row});
+    }else{
+      const list=localFaults();list.push(row);
+      while(list.length>20)list.shift();
+      try{store.set(FAULT_KEY,JSON.stringify(list));}catch(e){}
+    }
+  }catch(e){}
+}
+/* Whatever broke before there was a session to report it under. */
+function flushLocalFaults(){
+  try{
+    if(!(supa&&liveMode&&myBusinessId))return;
+    const list=localFaults();if(!list.length)return;
+    store.del(FAULT_KEY);
+    list.forEach(function(row){
+      row.business_id=myBusinessId;
+      outboxQueue({kind:"fault",key:"fault:"+uid("f"),payload:row});
+    });
+  }catch(e){}
+}
+/* Guarded, like the other four places that reach for window at the top
+   level: the gates run this file in node, where window is the sandbox and
+   has no addEventListener. An unguarded one took twenty-three gates red at
+   once, which is at least a fast way to find out. */
+if(typeof window!=='undefined'&&window.addEventListener){
+  window.addEventListener('error',function(ev){
+    reportFault("error",(ev&&(ev.message||(ev.error&&ev.error.message)))||"script error",
+      (ev&&ev.error&&ev.error.stack)||((ev&&ev.filename)?ev.filename+":"+ev.lineno:""));
+  });
+  window.addEventListener('unhandledrejection',function(ev){
+    const r=ev&&ev.reason;
+    reportFault("rejection",(r&&(r.message||r.error_description))||String(r||"rejected"),
+      (r&&r.stack)||"");
+  });
+}
+
+/* Access taken away while this device was elsewhere. Not an error to
+   retry: the work in the queue belongs to a studio this person is no
+   longer in, and pretending otherwise loses it quietly. */
+function onMembershipRevoked(){
+  try{toast("Your access to this studio has changed. Sign in again.");}catch(e){}
+  liveMode=false;
+  try{stopRealtime();}catch(e){}
+  updateSyncPill();
+}
+
+/* ===== WHAT THE PERSON SEES =====
+   Three states and no jargon: everything saved, still sending, or
+   something did not send. The third one is a button, because a failure
+   nobody can act on is just an apology. */
+function syncState(){
+  const failed=outboxFailures().length,pending=outboxPending().length;
+  if(failed)return {kind:"failed",n:failed};
+  if(pending)return {kind:"pending",n:pending};
+  return {kind:"ok",n:0};
+}
+function updateSyncPill(){
+  const el=document.getElementById("syncPill");if(!el)return;
+  const st=syncState();
+  const offline=("onLine" in navigator)&&!navigator.onLine;
+  if(st.kind==="ok"&&!offline){el.style.display="none";return;}
+  el.style.display="inline-flex";
+  const t=document.getElementById("syncPillText");
+  if(st.kind==="failed"){
+    el.style.borderColor="var(--red)";el.style.color="var(--red)";
+    if(t)t.textContent=st.n+(st.n===1?" change not saved":" changes not saved");
+  }else{
+    el.style.borderColor="var(--amber)";el.style.color="var(--amber)";
+    if(t)t.textContent=offline?("Offline"+(st.n?" \u00b7 "+st.n+" waiting":"")):(st.n+" saving\u2026");
+  }
+}
+function showSyncTrouble(){
+  const failed=outboxFailures();
+  if(!failed.length){
+    const p=outboxPending().length;
+    openModal("Saving","<div class=\"sd\">"+(p?p+" change"+(p===1?"":"s")+" still going up. This screen is safe to close; they will finish on their own.":"Everything on this device is saved.")+"</div><div class=\"modal-foot\"><button class=\"btn\" onclick=\"closeModal()\">Close</button></div>");
+    return;
+  }
+  const rows=failed.map(function(f){
+    return "<div style=\"padding:10px 0;border-bottom:1px solid var(--line)\"><b>"+esc(outboxLabel(f))+"</b>"
+      +"<div class=\"sd\" style=\"color:var(--text-dim)\">"+esc(f.lastError||"Could not reach the server")+"</div></div>";
+  }).join("");
+  openModal("Some changes did not save",
+    "<div class=\"sd\" style=\"margin-bottom:8px\">These are still on this device and nothing has been lost. "
+    +"They stopped being retried because the server refused them or could not be reached.</div>"
+    +rows
+    +"<div class=\"modal-foot\"><button class=\"btn ghost\" onclick=\"closeModal()\">Close</button>"
+    +"<span style=\"flex:1\"></span><button class=\"btn\" onclick=\"retryOutbox()\">Try again</button></div>");
+}
+function outboxLabel(f){
+  const names={layi_dash_orders:"Orders",layi_dash_txns:"Payments",layi_dash_settings:"Settings",
+    layi_dash_staff:"Team records",layi_dash_supplies:"Stock",layi_dash_products:"Shop items",
+    layi_dash_appts:"Appointments",layi_dash_audit:"Audit trail"};
+  if(f.kind==="orders")return "Orders";
+  if(f.kind==="audit")return "Audit trail";
+  return names[f.key]||f.key||"Changes";
+}
+function retryOutbox(){
+  setOutbox(outbox().map(function(x){return Object.assign({},x,{tries:0,lastError:"",fatal:false});}));
+  closeModal();scheduleDrain(50);
+}
+
+/* Reconnect, and the tab coming back to the front, are both reasons to
+   try again immediately rather than waiting out a backoff. */
+try{
+  window.addEventListener("online",function(){scheduleDrain(200);updateSyncPill();});
+  window.addEventListener("offline",function(){updateSyncPill();});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)scheduleDrain(300);});
+}catch(e){}
+/* ===== ORDERS, AS ROWS ==============================================
+   The device still holds one array and every reader and writer in this
+   file is untouched. What changed is the shape on the server: one row per
+   order, with the branch on the row and the cost in a table of its own.
+
+   That is what makes seeCost, seeContact and branch scope into refusals
+   instead of hidden fields. A tailor’s device receives rows for their
+   branch, without costs, and assembles the same array from them, so the
+   local copy can only ever contain what the server was willing to send.
+
+   CONFLICT IS DETECTED, NEVER GUESSED. Every row carries a rev that only
+   the database increments. A write says which rev it was based on; if the
+   row has moved on, the write matches nothing and the local version is
+   kept aside rather than thrown away or silently forced over the other
+   device’s. Last-write-wins is the behaviour this batch exists to remove. */
+let CLOUD_BRANCHES=[];
+let ORDER_CONFLICTS=[];
+async function loadCloudBranches(){
+  if(!supa||!liveMode||!myBusinessId){CLOUD_BRANCHES=[];return false;}
+  try{
+    const {data}=await supa.from('branches').select('id,name').eq('business_id',myBusinessId);
+    CLOUD_BRANCHES=data||[];return true;
+  }catch(e){return false;}
+}
+function branchIdForName(name){
+  const n=String(name||"").trim().toLowerCase();
+  if(!n)return null;
+  const b=CLOUD_BRANCHES.find(function(x){return String(x.name||"").trim().toLowerCase()===n;});
+  return b?b.id:null;
+}
+function branchNameForId(id){
+  const b=CLOUD_BRANCHES.find(function(x){return x.id===id;});
+  return b?b.name:"";
+}
+
+/* What leaves the device. The three protected fields are stripped here
+   rather than anywhere else, so there is one place to check. */
+const ORDER_PROTECTED=["cost","email","phone","whatsapp"];
+function orderDoc(o){
+  const d=Object.assign({},o);
+  ORDER_PROTECTED.forEach(function(k){delete d[k];});
+  delete d._rev;
+  return d;
+}
+
+async function pushOrderRows(){
+  if(!supa||!liveMode||!myBusinessId)return {ok:true};
+  const list=rawOrders();
+  let firstError="",fatal=false,conflicts=0;
+  for(const o of list){
+    if(!o||!o.id)continue;
+    const row={
+      business_id:myBusinessId,app_id:String(o.id),
+      branch_id:branchIdForName(o.branch),
+      total:Number(o.total||0),
+      status:String(o.status||"open"),
+      doc:orderDoc(o)
+    };
+    try{
+      if(o._rev){
+        /* An edit, based on a revision. eq(rev) is the concurrency control:
+           zero rows means somebody else moved it on. */
+        const {data,error}=await supa.from('orders').update(row)
+          .eq('business_id',myBusinessId).eq('app_id',String(o.id)).eq('rev',o._rev)
+          .select('rev').maybeSingle();
+        if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;continue;}
+        if(!data){conflicts++;await noteOrderConflict(o);continue;}
+        o._rev=data.rev;
+      }else{
+        const {data,error}=await supa.from('orders').upsert(row,{onConflict:'business_id,app_id'})
+          .select('rev').maybeSingle();
+        if(error){const r=outboxResult(error);if(!firstError)firstError=r.error;if(r.fatal)fatal=true;continue;}
+        if(data)o._rev=data.rev;
+      }
+      /* The cost only travels if this device HAS one, which it only does
+         if the person was allowed to read it in the first place. */
+      if(o.cost!==undefined&&o.cost!==null&&o.cost!==""){
+        const {data:got}=await supa.from('orders').select('id')
+          .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
+        if(got){
+          await supa.from('order_costs').upsert({order_id:got.id,business_id:myBusinessId,
+            branch_id:row.branch_id,cost:Number(o.cost)||0},{onConflict:'order_id'});
+        }
+      }
+    }catch(e){if(!firstError)firstError=String(e&&e.message||e);}
+  }
+  /* Orders removed on this device are removed there too, but only ones
+     this person could see: a delete is scoped by the same policy as the
+     read, so nothing another branch holds can be swept up by it. */
+  try{
+    const ids=list.map(function(o){return String(o.id);}).filter(Boolean);
+    let q=supa.from('orders').delete().eq('business_id',myBusinessId);
+    if(ids.length)q=q.not('app_id','in','("'+ids.join('","')+'")');
+    await q;
+  }catch(e){}
+  try{saveLocal(ORDERS_KEY,splitOrders(list).live);saveLocal(ORDERS_DONE_KEY,splitOrders(list).done);}catch(e){}
+  if(conflicts)renderSyncConflicts();
+  if(firstError)return {ok:false,fatal:fatal,error:firstError};
+  return {ok:true};
+}
+
+/* The other device won, because it got there first. Nothing is discarded:
+   the version from this device is kept and the person is asked. */
+async function noteOrderConflict(o){
+  try{
+    const {data}=await supa.from('orders').select('doc,rev')
+      .eq('business_id',myBusinessId).eq('app_id',String(o.id)).maybeSingle();
+    ORDER_CONFLICTS=ORDER_CONFLICTS.filter(function(c){return c.id!==o.id;});
+    ORDER_CONFLICTS.push({id:o.id,mine:o,theirs:data?data.doc:null,at:new Date().toISOString()});
+  }catch(e){}
+}
+function renderSyncConflicts(){
+  if(!ORDER_CONFLICTS.length)return;
+  try{toast(ORDER_CONFLICTS.length+" order"+(ORDER_CONFLICTS.length===1?"":"s")+" changed on another device");}catch(e){}
+  updateSyncPill();
+}
+function openConflicts(){
+  if(!ORDER_CONFLICTS.length){openModal("Nothing to sort out","<div class=\"sd\">No order has been changed in two places.</div><div class=\"modal-foot\"><button class=\"btn\" onclick=\"closeModal()\">Close</button></div>");return;}
+  const rows=ORDER_CONFLICTS.map(function(c){
+    const t=(c.theirs&&(c.theirs.client||c.theirs.id))||c.id;
+    return "<div style=\"padding:10px 0;border-bottom:1px solid var(--line)\"><b>"+esc(String(t))+"</b>"
+      +"<div class=\"sd\" style=\"color:var(--text-dim)\">Changed here and on another device.</div>"
+      +"<div style=\"margin-top:6px;display:flex;gap:8px\">"
+      +"<button class=\"btn ghost\" onclick=\"resolveConflict('"+esc(c.id)+"','theirs')\">Keep the other one</button>"
+      +"<button class=\"btn\" onclick=\"resolveConflict('"+esc(c.id)+"','mine')\">Keep mine</button>"
+      +"</div></div>";
+  }).join("");
+  openModal("Changed in two places",
+    "<div class=\"sd\" style=\"margin-bottom:8px\">Both versions are safe. Choose which one this studio keeps.</div>"
+    +rows+"<div class=\"modal-foot\"><button class=\"btn ghost\" onclick=\"closeModal()\">Later</button></div>");
+}
+async function resolveConflict(id,which){
+  const c=ORDER_CONFLICTS.find(function(x){return x.id===id;});if(!c)return;
+  const list=rawOrders();const i=list.findIndex(function(o){return String(o.id)===String(id);});
+  if(which==="theirs"&&c.theirs){
+    const {data}=await supa.from('orders').select('rev').eq('business_id',myBusinessId).eq('app_id',String(id)).maybeSingle();
+    const keep=Object.assign({},c.theirs);if(data)keep._rev=data.rev;
+    if(i>=0)list[i]=keep;else list.push(keep);
+  }else{
+    const {data}=await supa.from('orders').select('rev').eq('business_id',myBusinessId).eq('app_id',String(id)).maybeSingle();
+    if(i>=0&&data)list[i]._rev=data.rev;   // rebase mine onto theirs and send it
+  }
+  save(ORDERS_KEY,list);
+  ORDER_CONFLICTS=ORDER_CONFLICTS.filter(function(x){return x.id!==id;});
+  closeModal();renderAll();updateSyncPill();
+}
+
+/* Reading them back. Costs arrive only for somebody the database is
+   willing to give them to, so an absent cost is a refusal and is left
+   absent rather than defaulted to zero, which would read as free. */
+async function pullOrders(){
+  if(!supa||!liveMode||!myBusinessId)return false;
+  try{
+    const {data:rows,error}=await supa.from('orders')
+      .select('id,app_id,branch_id,doc,rev').eq('business_id',myBusinessId);
+    if(error)return false;
+    if(!rows)return false;
+    let costs={};
+    try{
+      const {data:cs}=await supa.from('order_costs').select('order_id,cost').eq('business_id',myBusinessId);
+      (cs||[]).forEach(function(c){costs[c.order_id]=c.cost;});
+    }catch(e){}
+    const list=rows.map(function(r){
+      const o=Object.assign({},r.doc||{});
+      o.id=r.app_id||o.id;
+      o._rev=r.rev;
+      if(r.branch_id)o.branch=branchNameForId(r.branch_id)||o.branch;
+      if(costs[r.id]!==undefined)o.cost=Number(costs[r.id]);
+      return o;
+    });
+    /* NOTHING ON THE SERVER IS NOT THE SAME AS NOTHING.
+       A studio whose orders have not been moved into rows yet, or a
+       person whose branch holds none, both come back with an empty list.
+       Overwriting a device that has work on it with that empty list is
+       precisely the silent data loss this batch exists to remove, and it
+       is what the tenant gate caught: 28 orders became 0.
+
+       So an empty answer leaves the device alone and sends what the
+       device has instead, which is also how a studio migrates without
+       anybody pressing anything. */
+    if(!list.length){
+      const here=rawOrders();
+      if(here.length){outboxQueue({kind:"orders",key:"layi_dash_orders",payload:1});return false;}
+      return true;
+    }
+    const parts=splitOrders(list);
+    saveLocal(ORDERS_KEY,parts.live);saveLocal(ORDERS_DONE_KEY,parts.done);
+    return true;
+  }catch(e){return false;}
 }
 function syncPush(key){
   if(!supa||!liveMode||_hydrating||!key)return;
@@ -2378,7 +3160,10 @@ async function adoptStudioName(){
     const {data,error}=await supa.from('businesses').select('name').eq('id',myBusinessId).maybeSingle();
     if(error||!data||!data.name)return false;
     SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:String(data.name)});
-    save('layi_dash_settings',SETTINGS);
+    /* Only the owner writes the studio’s own description, and this name
+       came from the server in the first place: for everybody else it is
+       held in memory for this session and there is nothing to push. */
+    if(ownsThisStudio())save('layi_dash_settings',SETTINGS);
     return true;
   }catch(e){return false;}
 }
@@ -2431,7 +3216,7 @@ async function reportTenantPresence(){
    themselves, so nobody is locked out of a device by this.
    ================================================================================ */
 const BIZ_OWNER_KEY='layi_dash_biz_owner';
-const TENANT_KEYS=STATE_KEYS.concat(['layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
+const TENANT_KEYS=STATE_KEYS.concat(ORDER_KEYS,['layi_dash_customers','layi_dash_suppliers','layi_dash_feedback']);
 let _deviceWiped=false;   // this device held another studio, so it may not seed the cloud
 function deviceOwner(){try{return store.get(BIZ_OWNER_KEY)||'';}catch(e){return '';}}
 function wipeTenantData(){TENANT_KEYS.forEach(function(k){try{store.del(k);}catch(e){}});}
@@ -2474,8 +3259,17 @@ async function hydrateFromCloud(){
     claimDeviceFor(myBusinessId, rows.length>0 || !!error);
     const a=await pullCustomers();const b=await pullSuppliers();
     if(!error){
-      rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key))saveLocal(r.key,r.data);}); // cloud → local
-      if(!rows.length&&maySeedCloudFromDevice())await pushAllState();
+      /* Orders are rows now and are pulled separately, so an old blob
+         left behind by a studio that has not been migrated yet must not
+         overwrite what the rows just said. */
+      const fromRows=['layi_dash_orders','layi_dash_orders_done'];
+      rows.forEach(r=>{if(r.key&&STATE_KEYS.includes(r.key)&&fromRows.indexOf(r.key)<0)saveLocal(r.key,r.data);}); // cloud → local
+      try{await loadCloudBranches();}catch(e){}
+      try{await pullOrders();}catch(e){}
+      if(!rows.length&&maySeedCloudFromDevice()){
+        await pushAllState();
+        outboxQueue({kind:"orders",key:"layi_dash_orders",payload:1});
+      }
     }
     reloadSettingsFromStorage();
     ok=ok&&(a!==false&&b!==false);
@@ -2899,7 +3693,9 @@ function payrollSetup(){
     lines:Array.isArray(p.lines)?p.lines:[]
   };
 }
-function savePayrollSetup(next){SETTINGS.payroll=next;save('layi_dash_settings',SETTINGS);}
+function savePayrollSetup(next){
+  if(!ownerOnlySetting('how the studio pays people'))return;
+SETTINGS.payroll=next;save('layi_dash_settings',SETTINGS);}
 /* Is this studio running anything beyond basic + commission? Drives whether the
    payslip grows a deductions section at all. */
 function payrollInUse(){
@@ -3115,7 +3911,9 @@ function onOwnerPayBasis(){const b=(document.getElementById('op_basis')||{}).val
   if(inp)inp.value=isPct?(op.pct||''):(op.amount?fmtNum(op.amount):'');
   if(hint)hint.textContent=({pctProfit:'You keep this percentage of each order profit.',pctValue:'You keep this percentage of each order total value.',perOrder:'You take this fixed amount from every order.',perOutfit:'You take this fixed amount for each piece in an order.',salary:'A fixed monthly draw, posted as a cost each month. Orders carry no owner cut.'})[b]||'';
 }
-function saveOwnerPay(){const b=(document.getElementById('op_basis')||{}).value||'pctProfit';const isPct=(b==='pctProfit'||b==='pctValue');const raw=(document.getElementById('op_val')||{}).value||'';
+function saveOwnerPay(){
+  if(!ownerOnlySetting('how the owner is paid'))return;
+const b=(document.getElementById('op_basis')||{}).value||'pctProfit';const isPct=(b==='pctProfit'||b==='pctValue');const raw=(document.getElementById('op_val')||{}).value||'';
   const num=isPct?Math.max(0,Math.min(100,+String(raw).replace(/[^0-9.]/g,'')||0)):Math.max(0,parseAmt(raw));const cur0=ownerPay();
   SETTINGS.ownerPay={basis:b,pct:isPct?num:cur0.pct,amount:isPct?cur0.amount:num};save('layi_dash_settings',SETTINGS);ensureOwnerSalary();renderAll();flashSaved('opSaveBtn','Save owner pay');}
 // what pots draw from: operating profit after the director's allocation
@@ -3206,6 +4004,32 @@ async function doLogin(){
    somebody came through. It used to live inside doLogin, which is why an invited
    studio owner reached a login form and stopped. */
 async function enterLiveStudio(user,username,errEl){
+      /* An invitation is accepted HERE, before anything reads profiles,
+         because acceptance is what writes the profile and the membership.
+         Ask first and there is nothing to find.
+
+         Everybody arrives through this one function — the invitation link,
+         an ordinary sign-in, a password reset — so the invitation is picked
+         up whichever door was used. An existing teammate invited to a second
+         studio simply signs in as they always do; there is no separate path
+         for them and no second account. */
+      if(INVITATION_ID&&supa){
+        errEl.textContent='Joining the studio…';
+        let ierr=null;
+        try{
+          const r=await supa.rpc('accept_invitation',{p_invitation_id:INVITATION_ID});
+          ierr=(r&&r.error)||null;
+        }catch(e){ ierr={message:'Could not reach the live server.'}; }
+        /* Out of the address bar either way, so a reload does not try again
+           and a shared screenshot does not carry it. */
+        try{history.replaceState(null,'',location.pathname);}catch(e){}
+        /* NOT FATAL ON ITS OWN. The commonest cause by far is a link opened
+           twice, and somebody who is already a member should land in their
+           studio rather than be told off. So it is remembered and the sign-in
+           carries on; the only place it is spoken aloud is the screen for
+           somebody who has no studio at all. */
+        if(ierr)INVITATION_ERROR=String(ierr.message||'That invitation is no longer valid.');
+      }
       const {data:prof,error:pe}=await supa.from('profiles').select('name,role_id,business_id,staff_id').eq('id',user.id).maybeSingle();
       /* The password was right and the account is real; there is simply no
          studio attached to it. That is not a sign-in failure and must not be
@@ -3241,6 +4065,12 @@ async function enterLiveStudio(user,username,errEl){
             +'Continue to the partner portal &rsaquo;</a>';
           return;
         }
+        if(INVITATION_ERROR){
+          errEl.innerHTML='That invitation could not be accepted: '+esc(INVITATION_ERROR)
+            +'<br><span style="opacity:.75">Ask the studio to send it again. An '
+            +'invitation expires, and each one can only be used once.</span>';
+          return;
+        }
         errEl.innerHTML=pe
           ? 'Signed in, but your studio could not be read: '+esc(pe.message)
           : 'That password is correct, but this account has no studio on it.'
@@ -3249,12 +4079,65 @@ async function enterLiveStudio(user,username,errEl){
             +'it has not been set up yet.</span>';
         return;
       }
+      /* ===== WHICH STUDIO, AND WHAT THEY ARE IN IT =====
+         MEMBERSHIPS, not profiles. profiles holds ONE business and
+         accept_invitation overwrites it, so it is a preference — the last
+         studio this person joined or chose. The membership is the row every
+         RLS policy in this system already reads, and it is the only one that
+         says whether somebody owns the place or merely works there.
+
+         Read as themselves: the memberships policy allows user_id =
+         auth.uid(), so this returns their own rows and nobody else's.
+
+         profiles.business_id still chooses WHICH membership when there is
+         more than one, because that is what it now means. It cannot grant
+         anything: if it names a studio they hold no active membership in,
+         the membership list wins and they land somewhere they really are. */
+      let mems=[];
+      try{
+        /* The studio's NAME comes along, because a switcher that lists two
+           uuids is not a switcher. businesses is readable by any member, so
+           this is one round trip rather than two. */
+        const {data:mrows}=await supa.from('memberships')
+          .select('business_id,role,role_id,branch_id,businesses(name)')
+          .eq('user_id',user.id).eq('status','active');
+        mems=(mrows||[]).map(function(m){
+          return {business_id:m.business_id,role:m.role,role_id:m.role_id,
+                  branch_id:m.branch_id,
+                  business_name:(m.businesses&&m.businesses.name)||''};
+        });
+      }catch(e){}
+      myMemberships=mems;
+      /* The order matters and each step is a fact rather than a guess:
+         what they chose last, then what their profile points at, then the
+         only one they have. profiles.business_id is the weaker of the two
+         and is consulted ONLY as a tiebreak, never as authority — it is
+         overwritten by accept_invitation and names one studio for a person
+         who may be in several. */
+      const pref=preferredBusiness();
+      const mine=mems.find(function(m){return m.business_id===pref;})
+                 ||mems.find(function(m){return m.business_id===prof.business_id;})
+                 ||mems[0]||null;
       currentUser={id:user.id,name:prof.name||'Owner',username:username,roleId:prof.role_id||'owner',pin:'',active:true,staffId:prof.staff_id||''};
-      liveMode=true; myBusinessId=prof.business_id||LAYI_BIZ;
+      /* filled in by loadCloudRoles a moment later; the profile's value is
+         only a starting point for a device that cannot reach the server. */
+      liveMode=true;
+      myBusinessId=(mine&&mine.business_id)||prof.business_id||LAYI_BIZ;
+      /* Blank when the read failed or returned nothing. Deliberately not
+         defaulted to 'owner': the whole point is to stop assuming that. */
+      myMembershipRole=(mine&&mine.role)||'';
       errEl.textContent='Loading your studio…';
       await hydrateFromCloud();
+      /* Before the studio is drawn, because every screen asks can() and a
+         screen drawn from the wrong role is a screen somebody has already
+         read. */
+      try{await loadCloudRoles();}catch(e){}
+      try{await adoptPlan();}catch(e){}       // billing decides, not this device
       try{await adoptStudioName();}catch(e){}   // before presence, or we report the blank
       try{reportTenantPresence();}catch(e){}
+      try{flushLocalFaults();}catch(e){}
+      try{await loadBilling();}catch(e){}
+      try{await finishBillingReturn();}catch(e){}
       startRealtime();
       /* Photos: find out how full they are, mint the URLs this screen needs,
          then move anything still held as bytes up to storage. The sweep runs
@@ -3288,8 +4171,15 @@ function showSetPassword(){
   /* A second box, because a password nobody can see is a password somebody
      mistypes once and then cannot get back into their studio with. */
   if(!document.getElementById('loginPass2')&&pwField&&pwField.parentElement){
-    const wrap=document.createElement('div');wrap.className='field';
-    wrap.innerHTML='<input type="password" class="fld" id="loginPass2" placeholder="Repeat the password" autocomplete="new-password">';
+    const wrap=document.createElement('div');wrap.className='field';wrap.style.position='relative';
+    /* ITS OWN SHOW, and it is not decoration. A phone that offers to invent a
+       strong password fills THIS kind of field and leaves the confirm box
+       empty, and the invented password is dots in a box nobody can read. With
+       no way to reveal either one, the only honest thing left to try is
+       guessing what the phone put there. That is a person stuck on the one
+       screen where the link they arrived on has already been spent. */
+    wrap.innerHTML='<input type="password" class="fld" id="loginPass2" placeholder="Repeat the password" autocomplete="new-password" style="padding-right:52px">'
+      +'<span onclick="togglePwField(\'loginPass2\',this)" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-dim);font-size:13px;user-select:none">Show</span>';
     pwField.parentElement.insertAdjacentElement('afterend',wrap);
   }
   const btn=card.querySelector('button.btn');
@@ -3308,12 +4198,22 @@ async function setMyPassword(){
   const a=(document.getElementById('loginPass')||{}).value||'';
   const b=(document.getElementById('loginPass2')||{}).value||'';
   if(a.length<8){errEl.textContent='Use at least 8 characters.';return;}
-  if(a!==b){errEl.textContent='Those two do not match.';return;}
+  /* An EMPTY second box is its own thing and must not be reported as a
+     mismatch. It is what an autofilled password looks like from here — the
+     phone fills the first box and stops — and “those two do not match” sends
+     somebody back to retype a password they were never shown. */
+  if(!b){errEl.textContent='Type the password once more in the second box. If your phone filled the first one for you, tap “Show” to read it.';return;}
+  if(a!==b){errEl.textContent='Those two do not match. Tap “Show” on either box to check what is in it.';return;}
   if(!supa){errEl.textContent='This needs the live server.';return;}
   errEl.textContent='Saving…';
   try{
     const {error}=await supa.auth.updateUser({password:a});
-    if(error){errEl.textContent='Could not set the password: '+error.message;return;}
+    /* The session from the link is good for an hour and is NOT spent by a
+       refusal, so the way out is to try again on this screen. Saying so
+       matters: the link itself is single use, and somebody who closes the
+       tab believing they have burnt it has to ask the studio to send
+       another. */
+    if(error){errEl.textContent='Could not set the password: '+error.message+' You can try a different one here — this screen is still open.';return;}
     const {data:{user}}=await supa.auth.getUser();
     if(!user){errEl.textContent='That link has expired. Use “Forgot password?” to get a new one.';return;}
     /* Clear the token out of the address bar before anything else renders, so a
@@ -3349,8 +4249,21 @@ async function forgotPassword(){
   if(raw.indexOf('@')<0){errEl.textContent='Enter your email address above first, then tap “Forgot password?”.';return;}
   if(!supa){errEl.textContent='Password reset needs the live server (email accounts only).';return;}
   errEl.textContent='Sending reset link…';
-  try{const {error}=await supa.auth.resetPasswordForEmail(raw.toLowerCase(),{redirectTo:location.href});
-    errEl.textContent=error?('Could not send reset: '+error.message):'Check your email for a link to set a new password.';
+  /* OUR FUNCTION, NOT SUPABASE'S MAILER. resetPasswordForEmail hands the
+     message to Supabase SMTP, which ACCOUNTS.md records as broken since 13
+     September — so this button has been telling people to check an inbox
+     nothing was ever sent to.
+
+     The answer is the same whatever happens, deliberately, including for an
+     address that has no account: telling somebody “no account with that
+     email” hands anybody who asks a list of who banks here. */
+  try{
+    await fetch(SUPA_URL+'/functions/v1/auth-recover',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email:raw.toLowerCase()})
+    });
+    errEl.textContent='If that address has an account, a link is on its way. It can be used once and expires in an hour.';
   }catch(e){errEl.textContent='Could not reach the server. Check your connection.';}
 }
 function show(id,on,disp){const el=document.getElementById(id);if(el)el.style.display=on?(disp||'flex'):'none';}
@@ -3480,8 +4393,68 @@ let setupDraft=null;
 /* Only for a real studio, on its first run. Never for the demo — somebody
    exploring the example already has a studio in front of them — and a device
    with orders on it has plainly been set up whatever the marker says. */
+/* Owning the studio is a fact about the membership, not about the app's
+   permission label. A manager has role_id 'mgr' and can do a great deal; they
+   still did not create this business and are not the person to be asked what
+   it is called.
+
+   The fallback is for a device that has not read a membership — offline, or a
+   session restored before the network answered. It uses the app's own label,
+   which is what this code did everywhere before, so nothing gets stricter
+   while we are guessing. */
+function ownsThisStudio(){
+  if(myMembershipRole)return myMembershipRole==='owner';
+  return !!(currentUser&&currentUser.roleId==='owner');
+}
+/* ===== WHAT BELONGS TO THE STUDIO RATHER THAN TO THE DAY =====
+   The database refuses these for anybody who is not the owner, field by
+   field, and that is the protection. This is the app agreeing with it,
+   which matters for a different reason: a control that is offered and then
+   refused is worse than one that was never offered, and somebody who edits
+   a form for two minutes before being told no has been lied to by the
+   screen.
+
+   Panels listed by their own heading, because that is what the settings
+   screen is built from and what groupSettings() already reads. A group
+   whose panels are all hidden hides itself. */
+const OWNER_ONLY_PANELS=['What your studio does','How the owner is paid',
+  /* Phase 0: the permission table is the owner's. The database refuses it to
+     everybody else whatever this list says. */
+  'Roles & permissions','Roles \u0026 permissions',
+  'Company details','Branches & outlets','Production workflow',
+  'Pay, allowances & deductions','Your plan'];
+function applyOwnerOnlyVisibility(){
+  const sec=document.getElementById('view-settings');if(!sec)return;
+  const owner=ownsThisStudio();
+  [].slice.call(sec.querySelectorAll('.panel')).forEach(function(p){
+    const h=p.querySelector('.panel-head h3');if(!h)return;
+    const t=(h.textContent||'').replace(/\s+/g,' ').trim();
+    if(OWNER_ONLY_PANELS.some(function(x){return t.toLowerCase().indexOf(x.toLowerCase())===0;})){
+      if(!owner)p.style.display='none';
+    }
+  });
+}
+/* Said once, in one voice, so no caller invents its own wording. Returns a
+   boolean so it reads as a guard at the top of the function it protects. */
+function ownerOnlySetting(what){
+  if(ownsThisStudio())return true;
+  alert('Only the studio owner can change '+what+'.\n\nThis is part of the studio\u2019s own setup, not your own settings. Nothing you have done is affected.');
+  return false;
+}
 function needsStudioSetup(){
   if(!liveMode)return false;
+  /* THE STUDIO'S STATE IS NOT A REASON TO ASK THIS PERSON.
+     These three conditions used to be the whole test, and every one of them
+     is about the BUSINESS: live, not set up, no orders yet. Nothing asked
+     who was looking. So an invited manager joining a studio whose owner had
+     not finished setting it up was handed the owner's questionnaire — asked
+     to name a business that already has a name, pick its trade, and choose
+     its plan. Found on staging, 28 September, by the first real invitee.
+
+     An incomplete studio stays incomplete until its owner finishes it. That
+     is the owner's job and nobody else's, and it is a far smaller problem
+     than a teammate quietly reconfiguring the place on their first morning. */
+  if(!ownsThisStudio())return false;
   if(SETTINGS.setupDone)return false;
   try{ if(rawOrders().length)return false; }catch(e){}
   return true;
@@ -3687,10 +4660,20 @@ function renderStudioSetup(keepScroll){
    never again — a setup screen that reappears every morning is worse than no
    setup screen at all. */
 function skipStudioSetup(){
+  /* Skipping WRITES setupDone. A teammate who reached this screen some other
+     way must not be able to mark the owner's studio as set up and have it
+     never asked again. */
+  if(!ownsThisStudio()){setupDraft=null;closeModal();return;}
   SETTINGS.setupDone=true;save('layi_dash_settings',SETTINGS);
   setupDraft=null;closeModal();
 }
 function saveStudioSetup(){
+  /* The last line of defence, and it is not theatre. This writes the studio's
+     name, its trade, its production stages and its PLAN, and app_state's RLS
+     lets any active member write — in_scope, not is_business_admin — so the
+     database would have accepted every one of those from a viewer. The screen
+     no longer opens for them; this is what holds if it ever does again. */
+  if(!ownsThisStudio()){setupDraft=null;closeModal();return;}
   setupSync();
   const d=setupDraft;if(!d)return;
   const name=(d.name||'').trim();
@@ -3782,7 +4765,18 @@ function saveStudioSetup(){
   if(teamN>1||outletsN>1)SETTINGS.teamTools='on';
   /* Start them on a plan that fits what they just described, instead of
      inferring one from a device with a single account and one branch on it. */
-  if(typeof smallestPlanFitting==='function')SETTINGS.plan=smallestPlanFitting(outletsN,teamN).id;
+  /* THE PLAN IS NOT SET HERE ANY MORE, and there is nothing left to guard
+     with a liveMode check: this screen only ever opens on a live studio, so
+     every plan it ever chose was a plan the customer wrote for themselves.
+     Starting somebody on "a plan that fits what they just described" is a
+     pleasant touch on a device and a subscription upgrade on a tenant.
+     Billing decides now, adoptPlan() reads it back at sign-in, and the
+     database stamps the copy in this blob from businesses.plan on every
+     write. ensurePlan() still guesses for a device that is not live, which
+     is nobody’s subscription.
+
+     The two counts are not wasted: they still decide the tabs, which is the
+     part of the answer that was always ours to act on. */
   SETTINGS.setupDone=true;
   save('layi_dash_settings',SETTINGS);
   if(typeof logAudit==='function')logAudit('Studio set up',name+' · '+normaliseDoes(d.does).map(doesLabel).join(', ')+(d.team?' · team '+d.team:'')+(d.outlets?' · outlets '+d.outlets:''));
@@ -3821,6 +4815,7 @@ function enterApp(){
   show('navMarketing',can('marketing'));
   show('navSuppliers',can('supplies'));show('msSuppliers',can('supplies'));
   applyBizVisibility();
+  try{applyOwnerOnlyVisibility();}catch(e){}
   show('navSales',can('sales')&&salesVisible());show('msSales',can('sales')&&salesVisible());
   show('navMywork',!!(myStaff()&&staffPortalOn()));
   show('newSupBtn',can('supplies'),'inline-block');show('logStockBtn',can('money'),'inline-block');
@@ -3832,10 +4827,13 @@ function enterApp(){
   show('navAttendance',can('attendance'));show('msAttendance',can('attendance'));
   show('navLeave',can('team'));show('msLeave',can('team'));
   show('navCompanylog',can('team'));show('msCompanylog',can('team'));
-  applyTeamVisibility();applyExampleVisibility();updateConnPill();refreshInstallUI();
+  applyTeamVisibility();applyExampleVisibility();updateConnPill();updateSyncPill();refreshUnpaidPill();refreshInstallUI();
+  try{const cb=document.getElementById('closeStudioBtn');
+    if(cb)cb.style.display=ownsThisStudio()?'':'none';}catch(e){}
   show('navExpenses',can('expenses'));show('msExpenses',can('expenses'));document.getElementById('expLockIco').style.display='none';
   show('navAudit',can('audit'));show('msAudit',can('audit'));
   show('msSwitch',isOwner());
+  show('msStudios',canSwitchStudios());
   show('syncBtn',liveMode,'inline-flex');
   renderAll();updateNavGroups();go('activity');
   try{saveSession();}catch(e){}
@@ -3864,7 +4862,7 @@ function saveSession(){
     if(!currentUser||!currentUser.id)return;
     const u=currentUser;
     localStorage.setItem(SESSION_KEY,JSON.stringify({id:u.id,at:Date.now(),
-      live:!!liveMode,biz:myBusinessId||'',
+      live:!!liveMode,biz:myBusinessId||'',mrole:myMembershipRole||'',
       user:{id:u.id,name:u.name||'',username:u.username||'',roleId:u.roleId||'owner',
             staffId:u.staffId||'',active:u.active!==false,branch:u.branch||''}}));
   }catch(e){}
@@ -3881,7 +4879,9 @@ function restoreSession(){
     if(u&&u.active===false){clearSession();return false;}
     if(!u&&!(sess.user&&sess.user.id)){clearSession();return false;}
     currentUser=u||sess.user;
-    if(!u){liveMode=!!sess.live;myBusinessId=sess.biz||null;}
+    /* mrole with it, or a restored session would forget what this person is
+       and fall back to the app's label until the network answers. */
+    if(!u){liveMode=!!sess.live;myBusinessId=sess.biz||null;myMembershipRole=sess.mrole||'';}
     const lg=document.getElementById('login');if(lg)lg.style.display='none';
     enterApp();
     /* Straight in, then check with the server. Going in first is the point: the studio
@@ -3959,7 +4959,7 @@ function updateNavGroups(){
   });
   flush();
 }
-function logout(){try{closeModal();}catch(e){}try{stopRealtime();}catch(e){}try{clearSession();}catch(e){}currentUser=null;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';const e=document.getElementById('loginUser');if(e)e.value='';const pe=document.getElementById('loginPass');if(pe)pe.value='';const er=document.getElementById('loginErr');if(er)er.textContent='';if(typeof refreshBiometricUI==='function')refreshBiometricUI();}
+function logout(){CLOUD_ROLES=null;myRoleKey='';myPermissions=null;myMemberships=[];try{closeModal();}catch(e){}try{stopRealtime();}catch(e){}try{clearSession();}catch(e){}currentUser=null;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';const e=document.getElementById('loginUser');if(e)e.value='';const pe=document.getElementById('loginPass');if(pe)pe.value='';const er=document.getElementById('loginErr');if(er)er.textContent='';if(typeof refreshBiometricUI==='function')refreshBiometricUI();}
 function switchAccount(){try{closeModal();}catch(e){}if(!isOwner())return;logout();}
 function isOwner(){return !!(currentUser&&currentUser.roleId==='owner');}
 function togglePwField(id,btn){const p=document.getElementById(id);if(!p)return;if(p.type==='password'){p.type='text';if(btn)btn.textContent='Hide';}else{p.type='password';if(btn)btn.textContent='Show';}}
@@ -4425,6 +5425,8 @@ function applyTeamVisibility(){
   const cb=document.getElementById('set_teamtools');if(cb)cb.checked=on;
 }
 function toggleTeamTools(on){
+  if(!ownerOnlySetting('whether the team tools are shown'))return;
+
   SETTINGS.teamTools=on?'on':'off';save('layi_dash_settings',SETTINGS);
   applyTeamVisibility();
   if(on){if(typeof toast==='function')toast('Team & HR tools are on.');}
@@ -4444,6 +5446,8 @@ function renderBizDoes(){
   box.innerHTML=b?craftPickerHtml(branchDoes(b),'bizToggleCraft','bizToggleMode',''):'';
 }
 function bizApplyDoes(next){
+  if(!ownerOnlySetting('what the studio does'))return;
+
   const b=bizBranch();if(!b)return;
   if(!next.length||!next.some(k=>modeOf(k))){
     if(typeof toast==='function')toast('A studio has to do at least one thing, one way or another.');
@@ -5722,10 +6726,10 @@ function buildOrderTimeline(o){
     const cls=(i===nowIdx)?'now':(e.kind==='money'?'green':'done');
     const ic=(i===nowIdx)?'●':(icon[e.kind]||'✓');
     const tag=(e.kind==='money'&&e.amt)?`<span class="otl-tag">+${cur(e.amt)}</span>`:((i===nowIdx)?'<span class="otl-tag now">current</span>':'');
-    return `<div class="otl-ev ${cls}"><span class="od">${ic}</span><div class="oda">${fmtDate(e.at)}</div><div class="ot">${esc(e.title)}${tag}</div>${e.det?`<div class="ox">${esc(e.det)}</div>`:''}${e.who?`<div class="ow">${esc(e.who)}</div>`:''}</div>`;
+    return `<div class="otl-ev ${cls}"><span class="od">${ic}</span><div class="oda">${fmtDateShort(e.at)}</div><div class="ot">${esc(e.title)}${tag}</div>${e.det?`<div class="ox">${esc(e.det)}</div>`:''}${e.who?`<div class="ow">${esc(e.who)}</div>`:''}</div>`;
   }).join('');
   if(o.stageIndex>=DELI){
-    rows+=`<div class="otl-ev green"><span class="od">✓</span><div class="oda">${o.deliveredAt?fmtDate(o.deliveredAt):''}</div><div class="ot">Delivered &amp; completed</div></div>`;
+    rows+=`<div class="otl-ev green"><span class="od">✓</span><div class="oda">${o.deliveredAt?fmtDateShort(o.deliveredAt):''}</div><div class="ot">Delivered &amp; completed</div></div>`;
   }else{
     const owed=orderNet(o)-(+o.paid||0);const dd=o.due?new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
     rows+=`<div class="otl-ev future"><span class="od">○</span><div class="oda">${dd?'Due '+dd:'No due date'}</div><div class="ot">${o.stageIndex>=RFD?'Ready for collection':'Delivered & collected'}</div>${(can('money')&&owed>0)?`<div class="ox">${curO(owed,o)} balance due on collection.</div>`:''}</div>`;
@@ -5882,7 +6886,30 @@ function invoiceFigures(o){
   const balance=total-paid;
   return {subtotal,discount,taxable,taxRate:rate,tax,shipping,total,paid,balance};
 }
-function ensureInvoiceNo(o){if(!o.invoiceNo){const list=rawOrders();const t=list.find(x=>x.id===o.id);const n=(SETTINGS.invoiceNo||1000)+1;SETTINGS.invoiceNo=n;if(t)t.invoiceNo=n;o.invoiceNo=n;save('layi_dash_orders',list);save('layi_dash_settings',SETTINGS);}return o.invoiceNo;}
+/* THE NEXT INVOICE NUMBER COMES FROM THE INVOICES.
+   It used to come only from SETTINGS.invoiceNo, which meant issuing an
+   invoice wrote the studio's settings blob. That was harmless while every
+   member could write every key. From Batch B a settings write needs the
+   `settings` permission, which a staff member does not have and should not
+   need to raise an invoice, so the counter would silently stop moving for
+   them and two invoices would carry the same number.
+
+   So the high-water mark is read from the orders themselves, which the
+   person raising the invoice can certainly write, and the settings copy is
+   kept as a hint. If that write is refused nothing breaks: the next number
+   is still one above the highest one actually used. */
+function ensureInvoiceNo(o){
+  if(!o.invoiceNo){
+    const list=rawOrders();const t=list.find(x=>x.id===o.id);
+    let hi=+SETTINGS.invoiceNo||1000;
+    list.forEach(function(x){const v=+x.invoiceNo;if(v&&v>hi)hi=v;});
+    const n=hi+1;
+    SETTINGS.invoiceNo=n;if(t)t.invoiceNo=n;o.invoiceNo=n;
+    save('layi_dash_orders',list);
+    save('layi_dash_settings',SETTINGS);   // a hint, not the source of truth
+  }
+  return o.invoiceNo;
+}
 /* The finished piece, as the client should see it. Progress photos are posted newest last,
    so the last one posted is the piece as it left the workroom; an order with no updates
    falls back to the item’s own photograph. Two at most, so the extra sheet stays one
@@ -6707,8 +7734,229 @@ function renderPlanPanel(){
     +featRows
     +(next?'<div class="sd" style="color:var(--text-faint);margin-top:10px">'+esc(next.name)+' gives you '
       +(next.studios===PLAN_UNLIMITED?'as many studios as you need':next.studios+' studios')+' and '+seatsOf(next)
-      +', '+priceOf(next)+'. Talk to us when you are ready.</div>':'')
+      +', '+priceOf(next)+'. The Subscription panel below takes the payment.</div>':'')
     +'<div class="sd" style="color:var(--text-faint);margin-top:8px">Going over a limit never hides anything you already have. It only stops you adding more.</div>';
+}
+/* ===== THE SUBSCRIPTION =============================================
+   Everything about money that matters happens on the server. This screen
+   asks my_billing what is true, offers the plans it was given, and sends
+   somebody to Flutterwave. It never computes a price: the amount comes
+   back from open_checkout, which reads it from plan_prices, and there is
+   no argument through which a browser could suggest one.
+
+   A person who is not the owner never sees this panel, because
+   my_billing refuses them — and a panel that exists only to show an
+   error is worse than no panel. */
+/* CARD PAYMENT IS OFF UNTIL IT IS ON, and the app asks rather than assumes.
+   Production ships with the Flutterwave key unset until the account is
+   configured and the whole flow has passed on staging. In that state the
+   panel must not show plan buttons: a button that apologises is worse than
+   no button, because somebody has already decided to pay by the time they
+   read the apology. The billing function answers `configured` on its own,
+   before any key is needed, so the answer is the environment’s and not a
+   flag in the page that could disagree with it. */
+let BILLING=null;let _billingBusy=false;let CHECKOUT_LIVE=null;
+async function loadCheckoutAvailability(){
+  if(CHECKOUT_LIVE!==null)return CHECKOUT_LIVE;
+  CHECKOUT_LIVE=false;
+  try{
+    const r=await supa.functions.invoke('billing',{body:{action:'status'}});
+    CHECKOUT_LIVE=!!(r&&r.data&&r.data.configured);
+  }catch(e){CHECKOUT_LIVE=false;}
+  return CHECKOUT_LIVE;
+}
+function studioIsReadOnly(){return !!(BILLING&&BILLING.status&&BILLING.status!=='active');}
+function refreshUnpaidPill(){
+  try{const el=document.getElementById('unpaidPill');
+    if(el)el.style.display=studioIsReadOnly()?'inline-flex':'none';}catch(e){}
+}
+function showUnpaidInfo(){
+  alert('This studio is read only.\n\nEverything you have is still here and still readable, and you can download all of it from Settings. Writing starts again as soon as the subscription is paid.');
+  try{go('settings');}catch(e){}
+}
+async function loadBilling(){
+  if(!(supa&&liveMode&&myBusinessId&&ownsThisStudio()))return;
+  try{
+    const {data,error}=await supa.rpc('my_billing',{p_business:myBusinessId});
+    if(error)throw error;
+    BILLING=data||null;
+    await loadCheckoutAvailability();
+  }catch(e){BILLING=null;}
+  refreshUnpaidPill();renderBillingPanel();
+}
+function billingMoney(a,cur){
+  try{return (cur||'NGN')==='NGN'?cur2(a):((cur||'')+' '+Number(a).toLocaleString('en-GB'));}
+  catch(e){return String(a);}
+}
+function renderBillingPanel(){
+  const panel=document.getElementById('subscriptionPanel');
+  const box=document.getElementById('billingBox');
+  if(!panel||!box)return;
+  if(!(BILLING&&ownsThisStudio())){panel.style.display='none';return;}
+  panel.style.display='';
+  const sub=BILLING.subscription||null;
+  const label={starter:'Basic',pro:'Pro',trial:'Trial',premium:'Bespoke'};
+  const prices=(BILLING.prices||[]);
+  const lines=[];
+
+  /* WHAT IS TRUE NOW, before anything is offered. */
+  if(BILLING.status&&BILLING.status!=='active'){
+    lines.push('<div class="kv" style="border:1px solid var(--red);border-radius:10px;padding:12px;margin-bottom:12px">'
+      +'<b style="color:var(--red)">This studio is read only.</b>'
+      +'<div style="color:var(--text-dim);font-size:13px;margin-top:4px">Nothing has been deleted and nothing will be. Every record is still here, and you can download all of it below. Paying starts the studio again straight away.</div></div>');
+  }
+  if(sub){
+    lines.push('<div class="bd-row"><span class="bl">Plan</span><span class="bv">'
+      +esc(label[sub.plan]||sub.plan||'—')+(sub.is_trial?' <span style="color:var(--text-faint)">(trial)</span>':'')+'</span></div>');
+    if(!sub.is_trial){
+      lines.push('<div class="bd-row"><span class="bl">Billed</span><span class="bv">'
+        +esc(sub.cycle==='annual'?'once a year':'every month')+'</span></div>');
+      lines.push('<div class="bd-row"><span class="bl">Price</span><span class="bv">'+billingMoney(sub.price,'NGN')+'</span></div>');
+    }
+    if(sub.renews_on){
+      lines.push('<div class="bd-row"><span class="bl">'+(sub.cancelled_at?'Runs until':'Renews')+'</span><span class="bv"'
+        +(sub.cancelled_at?' style="color:var(--amber)"':'')+'>'+esc(fmtDateShort(sub.renews_on))+'</span></div>');
+    }
+    if(sub.cancelled_at){
+      lines.push('<div class="sd" style="color:var(--amber);margin-top:8px">Cancelled. Everything keeps working until that date.</div>');
+    }
+  }
+  if(BILLING.trial_ends_on&&(!sub||sub.is_trial)){
+    lines.push('<div class="bd-row"><span class="bl">Trial ends</span><span class="bv">'+esc(fmtDateShort(BILLING.trial_ends_on))+'</span></div>');
+  }
+
+  /* WHAT IT WOULD COST, from the server. A price this screen worked out
+     itself would be a price that can disagree with the one charged. */
+  if(prices.length&&!CHECKOUT_LIVE){
+    /* The prices are still worth showing — somebody asking what Pro costs
+       deserves an answer — but there is nothing to press yet. */
+    lines.push('<div style="margin-top:14px;font-weight:600">What the plans cost</div>');
+    lines.push(prices.map(function(p){
+      return '<div class="bd-row"><span class="bl">'+esc(label[p.plan]||p.plan)+', '
+        +esc(p.cycle==='annual'?'a year':'a month')+'</span><span class="bv">'
+        +billingMoney(p.amount,p.currency)+'</span></div>';
+    }).join(''));
+    lines.push('<div class="sd" style="color:var(--text-faint);margin-top:8px">Paying by card is not switched on yet. Talk to us and we will set your plan up directly.</div>');
+  }else if(prices.length){
+    const groups={};prices.forEach(function(p){(groups[p.plan]=groups[p.plan]||[]).push(p);});
+    lines.push('<div style="margin-top:14px;font-weight:600">'+((sub&&!sub.is_trial)?'Change plan':'Choose a plan')+'</div>');
+    Object.keys(groups).forEach(function(pl){
+      const opts=groups[pl].sort(function(a,b){return a.cycle<b.cycle?-1:1;});
+      const btns=opts.map(function(p){
+        const on=sub&&!sub.is_trial&&sub.plan===p.plan&&sub.cycle===p.cycle;
+        return '<button class="btn '+(on?'ghost':'')+'" '+(on?'disabled':'')
+          +' onclick="startCheckout(\''+p.plan+'\',\''+p.cycle+'\')">'
+          +(p.cycle==='annual'?'A year':'A month')+' · '+billingMoney(p.amount,p.currency)
+          +(on?' · current':'')+'</button>';
+      }).join('');
+      lines.push('<div class="srow"><div class="smain"><b>'+esc(label[pl]||pl)+'</b></div>'
+        +'<div class="sacts" style="display:flex;gap:8px;flex-wrap:wrap">'+btns+'</div></div>');
+    });
+  }
+
+  if(sub&&!sub.is_trial&&CHECKOUT_LIVE){
+    lines.push('<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+      +(sub.cancelled_at
+        ?'<button class="btn" onclick="resumeSubscription()">Keep my subscription</button>'
+        :'<button class="btn ghost" onclick="cancelSubscription()">Cancel subscription…</button>')
+      +'</div>');
+  }
+
+  /* WHAT HAS ACTUALLY BEEN PAID, which is the only figure worth showing. */
+  const paid=(BILLING.payments||[]);
+  if(paid.length){
+    lines.push('<div style="margin-top:16px;font-weight:600">Payments</div>');
+    lines.push(paid.slice(0,12).map(function(p){
+      return '<div class="bd-row"><span class="bl">'+esc(fmtDateShort(p.paid_on))
+        +(p.note?' <span style="color:var(--text-faint)">'+esc(p.note)+'</span>':'')+'</span>'
+        +'<span class="bv">'+billingMoney(p.amount,p.currency)
+        +(p.status==='completed'?'':' <span style="color:var(--amber)">'+esc(p.status||'')+'</span>')+'</span></div>';
+    }).join(''));
+  }else{
+    lines.push('<div class="sd" style="color:var(--text-faint);margin-top:14px">Nothing has been charged yet.</div>');
+  }
+  box.innerHTML=lines.join('');
+}
+
+async function startCheckout(plan,cycle){
+  if(_billingBusy)return;
+  if(!CHECKOUT_LIVE){alert('Paying by card is not switched on yet. Talk to us and we will set your plan up directly.');return;}
+  if(!(supa&&liveMode&&myBusinessId)){alert('This needs a connection.');return;}
+  _billingBusy=true;
+  try{
+    const r=await supa.functions.invoke('billing',{body:{action:'checkout',
+      payload:{business:myBusinessId,plan:plan,cycle:cycle,name:((SETTINGS.company&&SETTINGS.company.name)||'')}}});
+    if(r.error)throw new Error(r.error.message||'Could not open the payment page');
+    const d=r.data||{};
+    if(d.error)throw new Error(d.error);
+    if(!d.link)throw new Error('The payment page could not be opened.');
+    logAudit('Started a checkout',plan+' '+cycle);
+    /* The provider’s own page, in this tab: a payment in a popup is a
+       payment a phone blocks. */
+    location.href=d.link;
+  }catch(e){
+    alert((e&&e.message)||'Could not open the payment page.');
+  }
+  _billingBusy=false;
+}
+
+async function cancelSubscription(){
+  const sub=(BILLING&&BILLING.subscription)||null;
+  const until=sub&&sub.renews_on?fmtDateShort(sub.renews_on):'the end of the term';
+  if(!confirm('Cancel the subscription?\n\nEverything keeps working until '+until+', and nothing is deleted after that either \u2014 the studio becomes read only until it is paid again.'))return;
+  try{
+    const {data,error}=await supa.rpc('cancel_subscription',{p_business:myBusinessId});
+    if(error)throw error;
+    logAudit('Cancelled the subscription','');
+    alert('Cancelled. Everything keeps working until '+(data&&data.runs_until?fmtDateShort(data.runs_until):until)+'.');
+    await loadBilling();
+  }catch(e){alert((e&&e.message)||'Could not cancel that.');}
+}
+
+async function resumeSubscription(){
+  try{
+    const {data,error}=await supa.rpc('resume_subscription',{p_business:myBusinessId});
+    if(error)throw error;
+    logAudit('Resumed the subscription','');
+    alert('Kept. It renews on '+((data&&data.renews_on)?fmtDateShort(data.renews_on):'the usual date')+'.');
+    await loadBilling();
+  }catch(e){alert((e&&e.message)||'Could not do that.');}
+}
+
+/* COMING BACK FROM THE PAYMENT PAGE.
+   The webhook will arrive on its own, and it may be a minute behind
+   somebody staring at the screen. So the app asks too, and both paths
+   produce the same event id at the server — whichever lands first applies
+   and the other is recorded as already seen. Nobody is charged twice and
+   nobody waits. */
+async function finishBillingReturn(){
+  try{
+    const q=new URLSearchParams(String(location.search||""));
+    if(q.get('billing')!=='return')return;
+    const txId=q.get('transaction_id')||'';
+    const ref=q.get('tx_ref')||'';
+    const status=(q.get('status')||'').toLowerCase();
+    /* Tidy the address bar first, so a refresh does not repeat any of this. */
+    try{history.replaceState(null,'',location.pathname+location.hash);}catch(e){}
+    if(!txId){
+      if(status==='cancelled')toast('Payment cancelled. Nothing has been charged.');
+      return;
+    }
+    toast('Checking that payment\u2026');
+    const r=await supa.functions.invoke('billing',{body:{action:'finish',
+      payload:{transaction_id:txId,tx_ref:ref}}});
+    const d=(r&&r.data)||{};
+    await loadBilling();
+    try{await adoptPlan();}catch(e){}
+    const res=d.result||{};
+    if(res.paid){
+      alert('Thank you \u2014 the payment went through and your plan is updated.');
+    }else if(d.settled&&res.reason){
+      alert('That payment was not applied: '+res.reason+'. Nothing has been charged twice.');
+    }else if(d.reason){
+      toast(d.reason);
+    }
+  }catch(e){}
 }
 function renderPayMethodSettings(){
   const box=document.getElementById('set_paymethods');
@@ -7252,6 +8500,7 @@ const SET_GROUPS=[
   {key:'data',hue:'#5b6b82',t:'Data & storage',s:'Plan, storage, backup, reset',heads:['Your plan','Storage','Backup','Import old data','Data']}
 ];
 function groupSettings(){
+  try{applyOwnerOnlyVisibility();}catch(e){}
   const sec=document.getElementById('view-settings');if(!sec)return;
   const headOf=p=>{const h=p.querySelector('.panel-head h3');return h?h.textContent.trim():'';};
   let host=document.getElementById('setGroups');
@@ -7471,11 +8720,34 @@ function smallestPlanFitting(studios,seats){
 /* Runs once. After that the plan is whatever the studio is actually paying
    for, and only billing changes it. */
 function ensurePlan(){
+  /* LIVE STUDIOS DO NOT GUESS. This was written when the app was the only
+     thing that knew anything, and it decided a plan from the number of
+     branches and logins on the device. A live studio has a subscription and
+     the server knows what it is; adoptPlan() brings it back. Guessing here
+     would also mean writing a plan the database now refuses to accept, so
+     the save would be stamped straight back. */
+  if(liveMode)return;
   if(SETTINGS.plan)return;
   const studios=getBranches().filter(b=>b.active!==false).length;
   const seats=getUsers().length;
   SETTINGS.plan=smallestPlanFitting(studios,seats).id;
   save('layi_dash_settings',SETTINGS);
+}
+/* What billing says, read back into the app. The blob carries a copy so the
+   app can gate features offline, and the database stamps that copy from
+   businesses.plan on every write, so the copy cannot drift upward. This is
+   the read that makes it current at sign-in rather than at the next save. */
+async function adoptPlan(){
+  if(!supa||!liveMode||!myBusinessId)return false;
+  try{
+    const {data,error}=await supa.from('businesses').select('plan').eq('id',myBusinessId).maybeSingle();
+    if(error||!data||!data.plan)return false;
+    if(SETTINGS.plan!==data.plan){
+      SETTINGS.plan=data.plan;   // in memory: the row is the server’s to write
+      if(typeof renderAll==='function')try{renderAll();}catch(e){}
+    }
+    return true;
+  }catch(e){return false;}
 }
 function currentPlan(){
   const id=SETTINGS.plan||'trial';
@@ -7935,7 +9207,7 @@ function askForMoreStorage(){
   }
   alert(body+'\n\nSend this to us and we will come back with a price.');
 }
-function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
+function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSettings();renderPlanPanel();renderBillingPanel();renderStorageMeter();renderNotifSettings();renderAccentPicker();refreshInstallUI();applyExampleVisibility();if(typeof renderBiometricSetting==='function')renderBiometricSetting();if(typeof renderWASettings==='function')renderWASettings();
   catalogDraft=null;renderCatalogSettings();
   const showUsers=can('users');const up=document.getElementById('usersPanel'),rp=document.getElementById('rolesPanel');if(up)up.style.display=showUsers?'block':'none';if(rp)rp.style.display=showUsers?'block':'none';if(showUsers){renderUsers();renderRoles();}
   document.querySelectorAll('#view-settings .panel').forEach(p=>{if(p.id==='usersPanel'||p.id==='rolesPanel')return;const perm=p.dataset.setperm||'settings';p.style.display=can(perm)?'':'none';});
@@ -8230,6 +9502,8 @@ function sendFeedback(){
 }
 function renderFeedbackList(){if(document.getElementById('modal')&&feedbackTab==='sent')renderFeedbackModal();}
 function saveItemWord(){
+  if(!ownerOnlySetting('what the studio calls a piece of work'))return;
+
   const el=document.getElementById('set_itemword');if(!el)return;
   const v=(el.value||'').trim().replace(/[^A-Za-z -]/g,'').slice(0,24);
   SETTINGS.itemWord=v;save('layi_dash_settings',SETTINGS);
@@ -8240,6 +9514,8 @@ function applyStagePreset(key){const el=document.getElementById('set_stages');if
 function renderStagePreview(){const el=document.getElementById('stagePreview');if(!el)return;const mid=(fv('set_stages')||'').split('\n').map(s=>s.trim()).filter(Boolean);const full=buildStages(mid.length?mid:null);el.innerHTML='<b>Full pipeline:</b> '+full.map(s=>esc(s)).join(' \u2192 ');}
 function renderStagesSettings(){const el=document.getElementById('set_stages');if(!el)return;const mid=(SETTINGS.productionStages&&SETTINGS.productionStages.length)?SETTINGS.productionStages:DEFAULT_MIDDLE;el.value=mid.join('\n');renderStagePreview();}
 function saveStages(){
+  if(!ownerOnlySetting('the production workflow'))return;
+
   const mid=(fv('set_stages')||'').split('\n').map(s=>s.trim()).filter(Boolean);
   if(!mid.length){alert('Add at least one making stage.');return;}
   const reserved=[STAGE_HEAD].concat(STAGE_TAIL).map(s=>s.toLowerCase());const seen={};const cleaned=[];
@@ -8290,6 +9566,8 @@ function bsToggleMode(i,c,m){syncBranchDraft();const b=branchDraft[i];if(!b)retu
 /* Adding your own type asks both halves now, and both can be true — a studio that
    makes uniforms and also sells them off a rail is one type, not two. */
 function bsAddType(i){
+  if(!ownerOnlySetting('what the studio does'))return;
+
   const label=(prompt('New type name (e.g. Alterations, Uniforms, Rentals):','')||'').trim();if(!label)return;
   const ans=(prompt('Do you MAKE these, SELL them ready made, or BOTH?\n\nType M, S or B \u2014 or L for just a label with no tabs of its own:','B')||'B').trim().toUpperCase().charAt(0);
   const modes=ans==='M'?['make']:ans==='S'?['stock']:ans==='L'?[]:['make','stock'];
@@ -8303,7 +9581,7 @@ function bsAddType(i){
   logAudit('Studio activity added',label+(modes.length?' ('+modes.map(modeLabel).join(' + ')+')':' (label only)'));
   renderBranchesSettings();
 }
-function bsRemoveType(key){if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>craftOf(k)!==key);});renderBranchesSettings();}
+function bsRemoveType(key){if(!ownerOnlySetting('what the studio does'))return;if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));syncBranchDraft();(branchDraft||[]).forEach(b=>{if(b.does)b.does=b.does.filter(k=>craftOf(k)!==key);});renderBranchesSettings();}
 function syncBranchDraft(){if(!branchDraft)return;branchDraft.forEach((b,i)=>{const n=document.getElementById('br_name_'+i),l=document.getElementById('br_loc_'+i);if(n)b.name=n.value;if(l)b.location=l.value;const sh=document.getElementById('br_ch_show_'+i),on=document.getElementById('br_ch_onl_'+i);if(sh||on){const cs=[];if(sh&&sh.checked)cs.push('showroom');if(on&&on.checked)cs.push('online');b.channels=cs.length?cs:['showroom'];}});}
 function addBranchRow(){
   syncBranchDraft();branchDraft=branchDraft||[];
@@ -8314,7 +9592,9 @@ function addBranchRow(){
   if(lim!==PLAN_UNLIMITED&&Math.max(drafted,planUsage().studios)>=lim){if(planStop('studios','studios'))return;}
   branchDraft.push({id:uid('br'),name:'',location:'',does:[],channels:['showroom']});renderBranchesSettings();}
 function removeBranchRow(i){syncBranchDraft();branchDraft.splice(i,1);renderBranchesSettings();}
-function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim());
+function saveBranches(){
+  if(!ownerOnlySetting('the branches'))return;
+syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim());
   const missing=named.find(b=>!(b.does&&b.does.length));
   if(missing){alert('Tick what \u201c'+missing.name.trim()+'\u201d does before saving.');return;}
   const modeless=named.find(b=>!normaliseDoes(b.does).some(k=>modeOf(k)));
@@ -8328,18 +9608,24 @@ function saveBranches(){syncBranchDraft();const named=(branchDraft||[]).filter(b
 function flashSaved(id,base){const el=document.getElementById(id);if(!el)return;el.textContent='✓ Saved';el.disabled=true;setTimeout(()=>{el.disabled=false;el.textContent=base;},1500);}
 function toast(msg){var t=document.getElementById('layiToast');if(!t){t=document.createElement('div');t.id='layiToast';t.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,.28);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:80vw;text-align:center';document.body.appendChild(t);}t.textContent=msg;requestAnimationFrame(function(){t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});clearTimeout(t._h);t._h=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(8px)';},2300);}
 function renderLogoPreview(){const el=document.getElementById('logoPreview');if(!el)return;const logo=(SETTINGS.company||{}).logo;el.innerHTML=logo?`<img src="${logo}" style="width:100%;height:100%;object-fit:contain">`:'none';}
-async function uploadLogo(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
-function clearLogo(){SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
+async function uploadLogo(input){if(!ownerOnlySetting('the company logo')){input.value='';return;}const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
+function clearLogo(){
+  if(!ownerOnlySetting('the company logo'))return;
+SETTINGS.company=Object.assign({},SETTINGS.company,{logo:''});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}
 /* A signature is an image he uploads once, not a typed name. The box is wider and shorter
    than the logo's because that is the shape a signature actually is. */
 function renderSigPreview(){const el=document.getElementById('sigPreview');if(!el)return;const sig=(SETTINGS.company||{}).signature;el.innerHTML=sig?`<img src="${sig}" style="width:100%;height:100%;object-fit:contain">`:'none';}
-async function uploadSignature(input){const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,600,0.9);SETTINGS.company=Object.assign({},SETTINGS.company,{signature:data});save('layi_dash_settings',SETTINGS);renderSigPreview();}catch(e){alert('Could not load that image.');}input.value='';}
-function clearSignature(){SETTINGS.company=Object.assign({},SETTINGS.company,{signature:''});save('layi_dash_settings',SETTINGS);renderSigPreview();}
+async function uploadSignature(input){if(!ownerOnlySetting('the signature on invoices')){input.value='';return;}const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,600,0.9);SETTINGS.company=Object.assign({},SETTINGS.company,{signature:data});save('layi_dash_settings',SETTINGS);renderSigPreview();}catch(e){alert('Could not load that image.');}input.value='';}
+function clearSignature(){
+  if(!ownerOnlySetting('the signature on invoices'))return;
+SETTINGS.company=Object.assign({},SETTINGS.company,{signature:''});save('layi_dash_settings',SETTINGS);renderSigPreview();}
 /* Puts the general wording in the box so it can be edited into theirs. It does not save;
    nothing here is theirs until they press the button that says so. */
 function useStandardTerms(){const e=document.getElementById('co_pay');if(!e)return;e.value=DEFAULT_PAY_TERMS;e.focus();}
 function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one '+tradeWord()+' type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit(tradeWordCap()+' types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save '+tradeWord()+' types');}
-function saveCompany(){syncBanks();
+function saveCompany(){
+  if(!ownerOnlySetting('the company details'))return;
+syncBanks();
   const _tb=document.getElementById('co_taxon');const _ton=_tb?_tb.checked:!!(SETTINGS.company||{}).taxOn;
   const _trate=(fv('co_taxrate')!==undefined)?(+fv('co_taxrate')||0):(+(SETTINGS.company||{}).taxRate||0);
   SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,
@@ -8565,7 +9851,7 @@ function impRun(key){var im=impById(key),st=_impState[key];if(!im||!st||!st.rows
   _impState[key]={result:res||{added:0}};logAudit('Imported '+im.title.toLowerCase(),((res&&res.added)||0)+' added'+((res&&res.updated)?', '+res.updated+' updated':''));renderImpCards();}
 function saveTiers(){const T=[{name:(fv('tier_n0')||'Starter').trim()||'Starter',min:0}];[['tier_n1','tier_m1','Bronze'],['tier_n2','tier_m2','Silver'],['tier_n3','tier_m3','Gold'],['tier_n4','tier_m4','Platinum']].forEach(([nk,mk,def])=>{T.push({name:(fv(nk)||def).trim()||def,min:amt(mk)});});SETTINGS.tiers=T;var le=document.getElementById('set_loyalty');if(le)SETTINGS.loyaltyEnabled=le.checked;save('layi_dash_settings',SETTINGS);renderCustomers();flashSaved('tierSaveBtn','Save tiers');}
 function syncOwnerPin(){const list=getUsers();const o=list.find(u=>u.roleId==='owner');if(o){o.pin=SETTINGS.ownerPassword;setUsers(list);if(currentUser&&currentUser.id===o.id)currentUser=o;}}
-function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();flashSaved('setSaveBtn','Save settings');}
+function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';if(ownsThisStudio())SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();flashSaved('setSaveBtn','Save settings');}
 let invCatDraft=null;
 function renderInvCatsSettings(){const box=document.getElementById('invCatList');if(!box)return;if(!invCatDraft)invCatDraft=invCats().map(c=>({name:c.name,prod:c.prod}));
   box.innerHTML=invCatDraft.length?invCatDraft.map((c,i)=>`<div class="srow"><div class="smain" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><input class="fld" style="max-width:240px" value="${esc(c.name)}" oninput="invCatDraft[${i}].name=this.value" placeholder="Category name"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer"><input type="checkbox" ${c.prod?'checked':''} onchange="invCatDraft[${i}].prod=this.checked"> production material</label></div><div class="sacts"><button class="btn sm ghost" onclick="invCatDraft.splice(${i},1);renderInvCatsSettings()">Remove</button></div></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No categories yet. Add one.</div>';}
@@ -8575,7 +9861,7 @@ function saveInvCats(){const cats=(invCatDraft||[]).map(c=>({name:(c.name||'').t
   const old=invCats();cats.forEach(c=>{const o=old.find(x=>x.name===c.name);c.sub=o?o.sub:[];});
   SETTINGS.invCats=cats;save('layi_dash_settings',SETTINGS);invCatDraft=null;renderInvCatsSettings();renderSupplies();flashSaved('invCatSaveBtn','Save categories');}
 
-function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();alert('Settings saved.');}
+function saveSettings(){SETTINGS.currency=fv('setCurrency')||'NGN';if(ownsThisStudio())SETTINGS.ownerPassword=SETTINGS.ownerPassword||'layi2025';save('layi_dash_settings',SETTINGS);logAudit('Settings updated','');renderAll();alert('Settings saved.');}
 /* True when the studio has put anything of its own in. Used to decide whether a
    destructive action needs a real warning. */
 function hasOwnData(){
@@ -8585,7 +9871,21 @@ function hasOwnData(){
   }catch(e){return false;}
 }
 function clearAll(){if(!confirm('This deletes ALL orders, customers, transactions, appointments, supplies, suppliers, bills, staff, accounts, tasks, attendance, leave, the company log and pots from this browser. Continue?'))return;save('layi_dash_orders',[]);setTxns([]);setAppts([]);setSupplies([]);setProducts([]);setSuppliers([]);setBills([]);setCustomers({});setStaff([]);setPots([]);setTasks([]);setAnns([]);setAttendance([]);setLeave([]);setLog([]);setAudit([]);renderAll();go('activity');}
-const BACKUP_KEYS=['layi_dash_orders','layi_dash_txns','layi_dash_appts','layi_dash_supplies','layi_dash_products','layi_dash_suppliers','layi_dash_bills','layi_dash_customers','layi_dash_staff','layi_dash_pots','layi_dash_roles','layi_dash_users','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_log','layi_dash_audit','layi_dash_campaigns','layi_dash_settings','layi_theme'];
+/* FOUR KEYS WERE MISSING FROM THIS LIST, and a backup that quietly drops
+   a quarter of the work is worse than no backup because nobody finds out
+   until they restore it. layi_dash_orders_done is the worst of them: it
+   is where an order goes the moment it is delivered and paid, so this
+   list held the unfinished work and left out the finished work — most of
+   a studio’s history by year two. It arrived when the orders store was
+   split in two and nothing pointed at the list that needed splitting too.
+
+   Device-local keys stay out on purpose: the outbox is unsent writes, the
+   media URLs are expiring tokens, the storage figure and the current
+   studio are caches of things the server owns.
+
+   layi_dash_faults is out for a different reason — it is a queue of
+   crash reports waiting for a session, ours rather than the studio’s. */
+const BACKUP_KEYS=['layi_dash_orders','layi_dash_orders_done','layi_dash_txns','layi_dash_appts','layi_dash_supplies','layi_dash_products','layi_dash_suppliers','layi_dash_bills','layi_dash_customers','layi_dash_staff','layi_dash_pots','layi_dash_roles','layi_dash_users','layi_dash_tasks','layi_dash_anns','layi_dash_attendance','layi_dash_leave','layi_dash_shifts','layi_dash_planner','layi_dash_log','layi_dash_audit','layi_dash_campaigns','layi_dash_feedback','layi_dash_settings','layi_theme'];
 function exportData(){
   const bundle={_app:'The Label Board',_version:1,_exportedAt:new Date().toISOString(),data:{}};
   BACKUP_KEYS.forEach(k=>{const v=store.get(k);if(v!=null)bundle.data[k]=v;});
@@ -8594,6 +9894,80 @@ function exportData(){
   a.href=url;a.download='label-board-backup-'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
+/* WHAT THIS DEVICE HOLDS IS NOT THE STUDIO’S DATA.
+   A manager’s device never held the costs. A workroom device never held
+   a phone number. No device holds more than the last six hundred lines
+   of the audit trail. exportData() above is a browser backup and stays
+   one; this is the owner asking the server for everything, which is what
+   somebody means when they say they want their data.
+
+   It works after the studio has been closed too, for the thirty days,
+   because that is when people think to ask. */
+async function exportStudioFromServer(){
+  if(!(supa&&liveMode&&myBusinessId)){
+    alert('This needs a connection. Use Export backup for what is on this device.');return;
+  }
+  const btn=document.getElementById('srvExportBtn');
+  if(btn){btn.disabled=true;btn.textContent='Gathering\u2026';}
+  try{
+    const {data,error}=await supa.rpc('export_studio',{p_business:myBusinessId});
+    if(error)throw error;
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download='label-board-studio-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    logAudit('Exported the studio from the server','');
+  }catch(e){
+    alert('Could not build the export: '+((e&&e.message)||'unknown error'));
+  }
+  if(btn){btn.disabled=false;btn.textContent='\u2913 Download everything';}
+}
+
+/* ===== CLOSING =====================================================
+   Closing is not deleting, and the wording has to carry that or nobody
+   will believe it. Thirty days, everything kept, reopen at any point,
+   and the export above still works the whole time. The database enforces
+   all three; this screen only has to say so honestly. */
+async function closeThisStudio(){
+  if(!(supa&&liveMode&&myBusinessId)){alert('This needs a connection.');return;}
+  if(!ownsThisStudio()){alert('Only the owner can close the studio.');return;}
+  const reason=prompt('Closing '+((SETTINGS.company&&SETTINGS.company.name)||'this studio')+'.\n\nEverything is kept for 30 days and you can reopen it at any point in that time. Nobody will be able to sign in meanwhile.\n\nWhy are you closing? (optional)');
+  if(reason===null)return;
+  if(!confirm('Close the studio now? Everyone signed out, nothing deleted for 30 days.'))return;
+  try{
+    const {data,error}=await supa.rpc('close_studio',{p_business:myBusinessId,p_reason:reason||null});
+    if(error)throw error;
+    const when=(data&&data.purge_after)?new Date(data.purge_after).toLocaleDateString('en-GB'):'in 30 days';
+    alert('The studio is closed. Everything is kept until '+when+'. Sign in again as the person who closed it to reopen it or download the data.');
+    location.reload();
+  }catch(e){
+    alert('Could not close the studio: '+((e&&e.message)||'unknown error'));
+  }
+}
+
+/* The other half of the same decision, and the reason this one asks
+   twice: deleting the account is the only step here that cannot be
+   undone by us. The studio it owns is still only closed. */
+async function deleteMyAccount(){
+  if(!(supa&&liveMode)){alert('This needs a connection.');return;}
+  if(!confirm('Delete your account?\n\nYou will be removed from every studio you are in. Any studio you are the only owner of will be CLOSED, not deleted \u2014 it is kept for 30 days.\n\nDownload your data first if you want a copy.'))return;
+  if(!confirm('Last check. This cannot be undone by us. Delete the account?'))return;
+  try{
+    let {data,error}=await supa.rpc('delete_my_account',{p_close_solely_owned:false});
+    if(error&&/only owner/i.test(String(error.message||""))){
+      if(!confirm(String(error.message)+'\n\nClose it as you go? It is kept for 30 days.'))return;
+      ({data,error}=await supa.rpc('delete_my_account',{p_close_solely_owned:true}));
+    }
+    if(error)throw error;
+    try{await supa.auth.signOut();}catch(e){}
+    try{TENANT_KEYS.forEach(function(k){store.del(k);});}catch(e){}
+    alert('Your account is gone. Thank you for trying The Label Board.');
+    location.reload();
+  }catch(e){
+    alert('Could not delete the account: '+((e&&e.message)||'unknown error'));
+  }
+}
+
 function importData(input){
   const file=input.files&&input.files[0];if(!file)return;
   const reader=new FileReader();
@@ -10606,7 +11980,9 @@ function beCancelAdd(){beSync();beDraft.adding=false;beDraft._newlabel='';render
    off a rail is one type doing two things, not two types. */
 function beToggleNewMode(m){beSync();const a=beDraft._newmodes=beDraft._newmodes||[];const i=a.indexOf(m);if(i>=0)a.splice(i,1);else a.push(m);renderBranchEdit();}
 function beSetNewCraft(c){beSync();beDraft._newcraft=(beDraft._newcraft===c?'':c);renderBranchEdit();}
-function beAddType(){beSync();const label=(beDraft._newlabel||'').trim();if(!label){alert('Give the new type a name.');return;}
+function beAddType(){
+  if(!ownerOnlySetting('what the studio does'))return;
+beSync();const label=(beDraft._newlabel||'').trim();if(!label){alert('Give the new type a name.');return;}
   const modes=(beDraft._newmodes||[]).slice();
   const key=label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('type-'+Date.now());
   const acts=branchActivities().slice();
@@ -10623,7 +11999,7 @@ function beAddType(){beSync();const label=(beDraft._newlabel||'').trim();if(!lab
   beDraft.does=doesToggleCraft((beDraft.does||[]).filter(k=>craftOf(k)!==key),key);
   logAudit('Studio activity added',label+(modes.length?' ('+modes.map(modeLabel).join(' + ')+')':' (label only)')+(base?' · like '+base.label:''));
   beDraft.adding=false;beDraft._newlabel='';beDraft._newcraft='';renderBranchEdit();}
-function beRemoveType(key){beSync();if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;
+function beRemoveType(key){if(!ownerOnlySetting('what the studio does'))return;beSync();if(!confirm('Remove \u201c'+activityLabel(key)+'\u201d from the list of options?'))return;
   const acts=branchActivities().filter(a=>a.key!==key);SETTINGS.branchActivities=acts;save('layi_dash_settings',SETTINGS);logAudit('Studio activity removed',activityLabel(key));
   beDraft.does=beDraft.does.filter(k=>craftOf(k)!==key);renderBranchEdit();}
 function renderBranchEdit(){
@@ -10653,6 +12029,8 @@ function renderBranchEdit(){
     <div class="modal-foot">${(b.id&&getBranches().length>1)?`<button class="btn danger sm" onclick="deleteBranch('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="${b.id?`openBranchPreview('${String(b.name).replace(/'/g,"\\'")}')`:'closeModal()'}">Cancel</button><button class="btn" onclick="saveBranchEdit()">${b.id?'Save changes':'Add branch'}</button></div>`);
 }
 function saveBranchEdit(){
+  if(!ownerOnlySetting('the branches'))return;
+
   if(!can('setBranches')||!beDraft)return;beSync();
   const id=beDraft.id;const name=(beDraft.name||'').trim();if(!name){alert('Give the branch a name.');return;}
   if(!beDraft.does.length){alert('Tick at least one thing this studio does.');return;}
@@ -10666,6 +12044,7 @@ function saveBranchEdit(){
   beDraft=null;branchDraft=null;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();renderAll();closeModal();openBranchReport();
 }
 function deleteBranch(id){
+  if(!ownerOnlySetting('the branches'))return;
   if(!can('setBranches'))return;const branches=getBranches();if(branches.length<=1){alert('Keep at least one branch.');return;}
   const b=branches.find(x=>x.id===id);if(!b)return;
   if(!confirm('Delete '+b.name+'? Its orders, sales, stock and staff will move to '+(branches.find(x=>x.id!==id)||{}).name+'.'))return;
@@ -11745,7 +13124,34 @@ function getLog(){return load('layi_dash_log',[]);}
 function setLog(v){save('layi_dash_log',v);}
 function getAudit(){return load('layi_dash_audit',[]);}
 function setAudit(v){save('layi_dash_audit',v);}
-function logAudit(action,detail){try{const list=getAudit();list.push({id:uid('au'),at:new Date().toISOString(),by:(currentUser?currentUser.name:'System'),role:(currentRole()?currentRole().name:''),action:action,detail:detail||'',branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:''});if(list.length>600)list.splice(0,list.length-600);setAudit(list);}catch(e){}}
+/* THE TRAIL GOES SOMEWHERE NOBODY CAN EDIT.
+   It still writes the local list, because the Audit screen reads it and
+   because a phone with no signal must still record what happened. But the
+   copy that matters goes to public.audit_log, which has an INSERT policy
+   and no UPDATE or DELETE policy at all: not for a manager, not for the
+   owner, not for us. A history the people in it can rewrite is a
+   decoration.
+
+   The row names no actor: the database stamps auth.uid() itself, so a
+   client claiming to be somebody else is overruled rather than believed. */
+function logAudit(action,detail){
+  try{
+    const list=getAudit();
+    list.push({id:uid('au'),at:new Date().toISOString(),by:(currentUser?currentUser.name:'System'),role:(currentRole()?currentRole().name:''),action:action,detail:detail||'',branch:(activeBranchView&&activeBranchView!=='all')?activeBranchView:''});
+    if(list.length>600)list.splice(0,list.length-600);
+    setAudit(list);
+  }catch(e){}
+  try{
+    if(supa&&liveMode&&myBusinessId){
+      outboxQueue({kind:'audit',key:'audit:'+uid('a'),payload:{
+        business_id:myBusinessId,
+        action:String(action||''),
+        detail:String(detail||''),
+        actor_label:(currentUser&&currentUser.name)||''
+      }});
+    }
+  }catch(e){}
+}
 function openLogEntry(id){if(!can('team'))return;const e=id?getLog().find(x=>x.id===id):null;
   openModal(`<h3>${e?'Edit entry':'New log entry'}</h3><div class="msub">Note something worth remembering about the business</div>
     <div class="row2">
@@ -13694,12 +15100,16 @@ function openRole(id){if(!can('users'))return;const r=id?getRoles().find(x=>x.id
     ${body}
     <div class="modal-foot">${r&&!r.builtin?`<button class="btn danger sm" onclick="delRole('${r.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveRole('${r?r.id:''}')">${r?'Update':'Create'}</button></div>`);}
 function togglePerm(k){if(!rolePermDraft)return;if(rolePermOwner&&(k==='users'||k==='settings'))return;rolePermDraft[k]=rolePermDraft[k]?0:1;const pill=document.getElementById('pmpill_'+k);if(pill){const on=!!rolePermDraft[k];pill.className='perm-pill'+(on?' on':'');pill.textContent=on?'On':'Off';}}
-function saveRole(id){const name=(fv('ro_name')||'').trim();if(!name){alert('Role name required.');return;}const perms={};PERM_KEYS.forEach(k=>{perms[k]=rolePermDraft&&rolePermDraft[k]?1:0;});
+function saveRole(id){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+const name=(fv('ro_name')||'').trim();if(!name){alert('Role name required.');return;}const perms={};PERM_KEYS.forEach(k=>{perms[k]=rolePermDraft&&rolePermDraft[k]?1:0;});
   const list=getRoles();
   if(id){const r=list.find(x=>x.id===id);if(r.id==='owner'){perms.users=1;perms.settings=1;perms.allOrders=1;}r.name=name;r.perms=perms;}
   else{list.push({id:uid('role'),name,perms,builtin:false});}
   logAudit('Role saved',name);setRoles(list);closeModal();renderRoles();if(currentUser){enterApp();go('settings');}}
-function resetRoles(){if(!can('users'))return;if(!confirm('Reset all roles and permissions back to the built-in defaults? Custom roles you added will be removed.'))return;logAudit('Roles reset to defaults','');setRoles(defaultRoles());renderRoles();if(currentUser){enterApp();go('settings');}}
+function resetRoles(){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+if(!can('users'))return;if(!confirm('Reset all roles and permissions back to the built-in defaults? Custom roles you added will be removed.'))return;logAudit('Roles reset to defaults','');setRoles(defaultRoles());renderRoles();if(currentUser){enterApp();go('settings');}}
 function delRole(id){const r=roleById(id);if(r&&r.builtin){alert('Built-in roles cannot be deleted.');return;}if(getUsers().some(u=>u.roleId===id)){alert('Some accounts use this role. Reassign them first.');return;}if(!confirm('Delete this role?'))return;setRoles(getRoles().filter(x=>x.id!==id));closeModal();renderRoles();}
 function permState(r,k){return permVal(r,k);}
 function permChip(r,p){const on=permState(r,p.k);return `<span class="perm-chip ${on?'on':''}" onclick="toggleRolePerm('${r.id}','${p.k}')"${p.hint?` title="${esc(p.hint)}"`:''}>${esc(p.l)}</span>`;}
@@ -13709,12 +15119,16 @@ function roleCard(r){const init=(r.name[0]||'?').toUpperCase();
     <div class="role-band">Pages this role can open</div><div class="perm-pills">${PERM_PAGES.map(p=>permChip(r,p)).join('')}</div>
     <div class="role-band">What this role can do</div><div class="perm-pills">${PERM_FUNCS.map(p=>permChip(r,p)).join('')}</div></div>`;}
 function renderRoles(){const el=document.getElementById('rolesList');if(!el)return;el.innerHTML=getRoles().map(roleCard).join('');}
-function toggleRolePerm(roleId,k){const list=getRoles();const r=list.find(x=>x.id===roleId);if(!r||r.id==='owner')return;if(!r.perms)r.perms={};const cur=permState(r,k);r.perms[k]=cur?0:1;setRoles(list);logAudit('Permission changed',r.name+' · '+(PERM_LABELS[k]||k)+' '+(r.perms[k]?'on':'off'));renderRoles();if(currentUser&&currentUser.roleId===roleId){enterApp();go('settings');}}
+function toggleRolePerm(roleId,k){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+const list=getRoles();const r=list.find(x=>x.id===roleId);if(!r||r.id==='owner')return;if(!r.perms)r.perms={};const cur=permState(r,k);r.perms[k]=cur?0:1;setRoles(list);logAudit('Permission changed',r.name+' · '+(PERM_LABELS[k]||k)+' '+(r.perms[k]?'on':'off'));renderRoles();if(currentUser&&currentUser.roleId===roleId){enterApp();go('settings');}}
 function renameRole(id){const r=getRoles().find(x=>x.id===id);if(!r||r.id==='owner')return;const name=(prompt('Role name:',r.name)||'').trim();if(!name)return;const list=getRoles();list.find(x=>x.id===id).name=name;setRoles(list);logAudit('Role renamed',name);renderRoles();}
-function addRole(){if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):','')||'').trim();if(!name)return;const list=getRoles();list.push({id:uid('role'),name:name,perms:Object.assign(allPerms(0),{allOrders:1}),builtin:false});setRoles(list);logAudit('Role created',name);renderRoles();}
+function addRole(){
+  if(!ownerOnlySetting('what a role is allowed to do'))return;
+if(!can('users'))return;const name=(prompt('New role name (e.g. Senior Tailor):','')||'').trim();if(!name)return;const list=getRoles();list.push({id:uid('role'),name:name,perms:Object.assign(allPerms(0),{allOrders:1}),builtin:false});setRoles(list);logAudit('Role created',name);renderRoles();}
 
 (function init(){const s=load('layi_dash_settings',null);if(s)SETTINGS=Object.assign({},DEFAULTS,s);
-  try{const bs=document.getElementById('buildStamp');if(bs)bs.textContent='Build '+APP_VERSION;}catch(e){}
+  try{renderAbout();}catch(e){}
   applyStages();
   getRoles();getUsers();migrateRoles();
   try{migrateBranchOwnership();}catch(e){console.warn('branch migration:',e);}
@@ -13738,16 +15152,150 @@ function addRole(){if(!can('users'))return;const name=(prompt('New role name (e.
   try{ if(typeof startAuthArrival==='function')startAuthArrival(); }catch(e){}})();
 </script>
 <script>
-// Progressive Web App: register the offline/install worker.
-// Guarded so it is a no-op on file:// (navigator has no serviceWorker) and in the
-// headless audit sandbox, and never throws if registration is unavailable.
+/* ===== KEEPING AN INSTALLED APP UP TO DATE ==========================
+   The old version of this block was four lines: register and hope. It is
+   the reason a phone sat on an older release. Three things were wrong and
+   all three are fixed here and in sw.js.
+
+   1. THE WORKER TOOK OVER MID-SESSION. sw.js called skipWaiting() on
+      install, so a new worker became the controller while the tab carried
+      on running the old html. Nothing reloaded, so nothing changed on
+      screen — for weeks, on an installed app that is never really closed.
+      Now the worker waits and the page decides.
+
+   2. NOTHING EVER CHECKED. An installed app can go days without a
+      navigation, and a service worker is only re-fetched on one. So the
+      page now asks: when it starts, every time it comes back to the front,
+      and every half hour it stays open.
+
+   3. NOBODY WAS TOLD. There is a pill now, and an About panel that shows
+      the running build beside the cached one.
+
+   WHAT IT WILL NOT DO IS RELOAD WHILE SOMEBODY IS TYPING. An update is a
+   reload, and a reload in the middle of an order form loses the form. So
+   it applies itself only when the app is in the background, and otherwise
+   waits to be tapped — and re-checks even then. The outbox is deliberately
+   NOT part of that test: it lives in localStorage and survives a reload,
+   which is the whole reason it was built that way. */
+let SW_REG=null,SW_WAITING=null,SW_CACHE_VERSION="",_updateReloading=false;
+
+/* Would reloading right now cost somebody something they cannot get back? */
+function updateIsSafeNow(){
+  try{
+    const el=document.activeElement;
+    if(el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.isContentEditable))return false;
+    if(document.querySelector('.modal.open,.sheet.open,dialog[open]'))return false;
+    return true;
+  }catch(e){return true;}
+}
+function refreshUpdatePill(){
+  try{const el=document.getElementById('updatePill');
+    if(el)el.style.display=SW_WAITING?'inline-flex':'none';}catch(e){}
+  try{renderAbout();}catch(e){}
+}
+function renderAbout(){
+  const b=document.getElementById('buildStamp');
+  if(b)b.textContent='Build '+APP_VERSION;
+  const sw=document.getElementById('swStamp');
+  if(sw){
+    sw.textContent=SW_CACHE_VERSION?('Offline copy '+SW_CACHE_VERSION):'Offline copy not installed';
+    sw.style.color=(SW_CACHE_VERSION&&SW_CACHE_VERSION!==APP_VERSION)?'var(--amber)':'var(--text-faint)';
+  }
+  const n=document.getElementById('updateNote');
+  if(n){
+    if(SW_WAITING){
+      n.style.display='';
+      n.innerHTML='<div style="color:var(--accent);font-size:13px;margin-bottom:8px">A new version of The Label Board is ready on this device.</div>'
+        +'<button class="btn" onclick="applyUpdate()">Update now</button>';
+    }else{n.style.display='none';n.innerHTML='';}
+  }
+}
+
+/* Ask the worker which build it is holding. A one-shot MessageChannel, so
+   two overlapping questions cannot answer each other. */
+function askWorkerVersion(){
+  try{
+    const c=navigator.serviceWorker.controller;if(!c)return;
+    const ch=new MessageChannel();
+    ch.port1.onmessage=function(e){
+      if(e.data&&e.data.type==='VERSION'){SW_CACHE_VERSION=String(e.data.version||'');try{renderAbout();}catch(x){}}
+    };
+    c.postMessage({type:'VERSION'},[ch.port2]);
+  }catch(e){}
+}
+
+function noteWaiting(w){
+  if(!w)return;
+  SW_WAITING=w;
+  refreshUpdatePill();
+  /* IN THE BACKGROUND IS THE CHEAPEST MOMENT. Nobody is looking, nothing
+     is half-typed, and they come back to the new version already running. */
+  if(document.visibilityState==='hidden'&&updateIsSafeNow())applyUpdate(true);
+}
+
+function applyUpdate(quiet){
+  try{
+    if(!SW_WAITING)return;
+    if(!updateIsSafeNow()){
+      if(!quiet)toast('Finish what you are typing and tap Update again.');
+      return;
+    }
+    try{store.set('layi_dash_updated_from',APP_VERSION);}catch(e){}
+    _updateReloading=true;
+    SW_WAITING.postMessage({type:'SKIP_WAITING'});
+    if(!quiet)toast('Updating\u2026');
+    /* If controllerchange never arrives — an old browser, a worker that
+       failed to activate — reload anyway rather than leaving a pill that
+       does nothing when tapped. */
+    setTimeout(function(){if(_updateReloading)location.reload();},2500);
+  }catch(e){}
+}
+
 try {
   if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      /* Only when WE asked. A controllerchange we did not ask for is the
+         first worker taking control on a fresh install, and reloading then
+         would bounce somebody out of the sign-in they just completed. */
+      if (_updateReloading) { _updateReloading = false; location.reload(); }
+      else { askWorkerVersion(); }
+    });
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("/sw.js").catch(function () {});
+      navigator.serviceWorker.register("/sw.js").then(function (reg) {
+        SW_REG = reg;
+        askWorkerVersion();
+        if (reg.waiting && navigator.serviceWorker.controller) noteWaiting(reg.waiting);
+        reg.addEventListener("updatefound", function () {
+          const w = reg.installing;
+          if (!w) return;
+          w.addEventListener("statechange", function () {
+            /* installed WITH a controller already present means this is a
+               replacement rather than a first install. */
+            if (w.state === "installed" && navigator.serviceWorker.controller) noteWaiting(w);
+          });
+        });
+        setInterval(function () { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
+      }).catch(function () {});
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState !== "visible") return;
+      try { if (SW_REG) SW_REG.update(); } catch (e) {}
+      askWorkerVersion();
     });
   }
 } catch (e) {}
+
+/* And say so once, afterwards, so an update is something that visibly
+   happened rather than something somebody has to go and check. */
+try{
+  const from=store.get('layi_dash_updated_from');
+  if(from&&from!==APP_VERSION){
+    store.del('layi_dash_updated_from');
+    setTimeout(function(){try{toast('Updated to '+APP_VERSION);}catch(e){}},1200);
+  }else if(from){
+    store.del('layi_dash_updated_from');
+  }
+}catch(e){}
 </script>
 </body>
 </html>
