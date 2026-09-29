@@ -206,7 +206,7 @@ section('6. A device that holds none of it cannot blank the studio’s');
 section('7. The list the app strips by matches the list the database strips by');
 {
   const appList = run('ORDER_PROTECTED.slice().sort().join(",")');
-  const sql = fs.readFileSync('supabase/migrations/20260929240000_orders_migration_and_reconciliation.sql', 'utf8');
+  const sql = fs.readFileSync('supabase/migrations/20260929231000_orders_migration_and_reconciliation.sql', 'utf8');
   const body = (sql.match(/v_doc := p_order([\s\S]*?);/) || [])[1] || '';
   const sqlList = (body.match(/'([a-zA-Z]+)'/g) || []).map(x => x.replace(/'/g, '')).sort().join(',');
   ok('the two lists are the same, so nothing is stripped in one place and kept in the other',
