@@ -187,3 +187,18 @@ as $$
       , 'hex')
   from generate_series(1, greatest(1, (p_n + 15) / 16));
 $$;
+
+-- Supabase's own auth.jwt(), same shape: the request's claims as jsonb, or
+-- null when there are none. Added when account deletion began requiring a
+-- recently-issued token, which is read from the iat claim — a thing the
+-- policies could not see while this shim only offered uid() and role().
+create or replace function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')
+  )::jsonb
+$$;

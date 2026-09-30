@@ -66,11 +66,19 @@ for (const f of readdirSync(migDir).filter(f => f.endsWith('.sql')).sort()) {
 }
 console.log('Built from the migrations alone.');
 
-async function asRole(role, userId, sql, params = []) {
+/* iat, because confirm_account_deletion() requires a token issued in the
+   last ten minutes and reads it from auth.jwt(). Without one, every
+   impersonated session looks like one resumed from last week. `extra` is how
+   a test says "and this one WAS resumed from last week". */
+async function asRole(role, userId, sql, params = [], extra = {}) {
   await db.exec('begin');
   try {
+    const claims = Object.assign(
+      userId ? { sub: userId, role } : { role },
+      { iat: Math.floor(Date.now() / 1000) },
+      extra);
     await db.query("select set_config('request.jwt.claims', $1, true)",
-      [JSON.stringify(userId ? { sub: userId, role } : { role })]);
+      [JSON.stringify(claims)]);
     await db.exec('set local role ' + role);
     const res = await db.query(sql, params);
     await db.exec('commit');
@@ -80,7 +88,7 @@ async function asRole(role, userId, sql, params = []) {
     return { rows: [], error: e.message.split('\n')[0] };
   }
 }
-const asUser = (user, sql, params = []) => asRole('authenticated', user, sql, params);
+const asUser = (user, sql, params = [], extra = {}) => asRole('authenticated', user, sql, params, extra);
 const admin = async (sql, params = []) => (await db.query(sql, params)).rows;
 
 /* ---- one studio with four people in it, and a second studio nearby ---- */
@@ -467,7 +475,51 @@ section('A person can leave, unless leaving breaks a studio');
   ok('an ordinary signup already owns a studio of its own', own.length === 1,
      JSON.stringify(own.map(x => x.name)));
 
-  const sole = await asUser(U2.lola, `select public.delete_my_account()`);
+  /* DELETING AN ACCOUNT IS TWO STEPS NOW. The first shows what would go and
+     deletes nothing; the second needs the account's own email typed out and
+     a token issued in the last ten minutes. Everything this section asserts
+     about sole ownership is unchanged — it happens at the confirmation
+     rather than at a single call. */
+  const emailOf = async (u) => (await admin(`select email from auth.users where id=$1`, [u]))[0].email;
+  const del = async (u, closeMine) => {
+    const ask = await asUser(u, `select public.request_account_deletion() as j`);
+    if (ask.error) return ask;
+    return await asUser(u, `select public.confirm_account_deletion($1,$2) as j`,
+      [await emailOf(u), !!closeMine]);
+  };
+
+  section('Asking is not doing');
+  {
+    const ask = await asUser(U2.lola, `select public.request_account_deletion() as j`);
+    ok('asking returns what would go', !ask.error && !!ask.rows[0]?.j, ask.error || '');
+    ok('  including the studios that would close',
+       (ask.rows[0]?.j?.studios_that_would_close || []).length >= 1,
+       JSON.stringify(ask.rows[0]?.j));
+    const still = await admin(`select count(*) c from public.memberships where user_id=$1 and status='active'`, [U2.lola]);
+    ok('  and deletes nothing', Number(still[0].c) === 2, still[0].c + ' memberships');
+
+    const wrong = await asUser(U2.lola, `select public.confirm_account_deletion($1,true) as j`,
+      ['somebody.else@example.test']);
+    ok('confirming with the wrong address does nothing', !!wrong.error, 'it deleted');
+    ok('  and says so plainly', /not the email address/.test(wrong.error || ''), wrong.error);
+
+    const stale = await asUser(U2.lola, `select public.confirm_account_deletion($1,true) as j`,
+      [await emailOf(U2.lola)], { iat: 1 });
+    ok('confirming from a session resumed long ago does nothing', !!stale.error, 'it deleted');
+    ok('  and asks them to sign in again', /sign in again/.test(stale.error || ''), stale.error);
+
+    await asUser(U2.lola, `select public.cancel_account_deletion()`);
+    const gone = await asUser(U2.lola, `select public.confirm_account_deletion($1,true) as j`,
+      [await emailOf(U2.lola)]);
+    ok('and a cancelled request cannot be confirmed', !!gone.error, 'it deleted');
+    ok('  it says to ask first', /ask first/.test(gone.error || ''), gone.error);
+
+    const oneStep = await asUser(U2.lola, `select public.delete_my_account(true)`);
+    ok('the old one-call door is shut', !!oneStep.error, 'it deleted');
+    ok('  and points at the two-step one', /two steps/.test(oneStep.error || ''), oneStep.error);
+  }
+
+  const sole = await del(U2.lola, false);
   ok('somebody who solely owns a studio cannot just delete their account', !!sole.error, 'it deleted');
   ok('and is told both ways out rather than left guessing',
      /only owner/.test(sole.error || '') && /close it as you go/.test(sole.error || ''), sole.error);
@@ -475,7 +527,7 @@ section('A person can leave, unless leaving breaks a studio');
   ok('and is still where she was afterwards', Number(stillThere[0].c) === 2, stillThere[0].c + ' memberships');
 
   /* the same request, with the answer to the question it asked */
-  const staff = await asUser(U2.sade, `select public.delete_my_account(true) as j`);
+  const staff = await del(U2.sade, true);
   ok('a staff member can leave once she says to close her own studio', !staff.error, staff.error);
   ok('and is told which studios were closed on the way out',
      (staff.rows[0]?.j?.studios_closed || []).length === 1,
@@ -499,12 +551,12 @@ section('A person can leave, unless leaving breaks a studio');
 
   /* the other way out: hand the studio over */
   await admin(`insert into public.memberships (user_id,business_id,role,status) values ($1,$2,'owner','active')`, [U2.yemi, B3]);
-  const handed = await asUser(U2.lola, `select public.delete_my_account() as j`);
+  const handed = await del(U2.lola, false);
   ok('handing the shared studio over is still not enough on its own',
      !!handed.error, 'it deleted');
   ok('because her own studio is still hers', /Lola/.test(handed.error || ''), handed.error);
 
-  const now = await asUser(U2.lola, `select public.delete_my_account(true) as j`);
+  const now = await del(U2.lola, true);
   ok('closing only what is solely hers lets her go', !now.error, now.error);
   const closed = now.rows[0]?.j?.studios_closed || [];
   ok('and exactly one studio was closed, hers', closed.length === 1 && /Lola/.test(closed[0]),
@@ -516,7 +568,7 @@ section('A person can leave, unless leaving breaks a studio');
   const shared = (await admin(`select status from public.businesses where id=$1`, [B3]))[0];
   ok('and is still open', shared.status === 'active', shared.status);
 
-  const anon = await asRole('anon', null, `select public.delete_my_account()`);
+  const anon = await asRole('anon', null, `select public.request_account_deletion()`);
   ok('an anonymous caller deletes nobody', !!anon.error, 'it deleted');
 }
 

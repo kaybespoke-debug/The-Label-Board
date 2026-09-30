@@ -1,3 +1,6 @@
+col account_deletion_requests.preview
+col account_deletion_requests.requested_at
+col account_deletion_requests.user_id
 col account_directory.banned
 col account_directory.belongs_to
 col account_directory.confirmed
@@ -545,6 +548,7 @@ col transactions.method
 col transactions.note
 col transactions.order_id
 col transactions.recorded_by
+fn app.account_deletion_preview() -> jsonb
 fn app.attach_referral(p_business uuid, p_code text) -> text
 fn app.audit(p_business uuid, p_action text, p_detail text, p_entity text, p_entity_id text, p_entity_label text, p_branch uuid) -> void
 fn app.audit_branches() -> trigger
@@ -650,12 +654,14 @@ fn app.write_perm_for_key(p_key text) -> text
 fn public.accept_invitation(p_invitation_id uuid) -> TABLE(joined_business uuid, joined_name text, joined_role text)
 fn public.account_for_recovery(p_email text) -> TABLE(confirmed boolean, recently_sent boolean)
 fn public.can(p_business uuid, p_perm text) -> boolean
+fn public.cancel_account_deletion() -> jsonb
 fn public.cancel_subscription(p_business uuid) -> jsonb
 fn public.cancel_team_invitation(p_invitation_id uuid) -> boolean
 fn public.cancel_trial(p_business uuid) -> date
 fn public.claim_referral_code(p_code text) -> uuid
 fn public.close_studio(p_business uuid, p_reason text) -> jsonb
 fn public.cohort_taken(p_cohort text) -> integer
+fn public.confirm_account_deletion(p_email text, p_close_solely_owned boolean) -> jsonb
 fn public.convert_trial_to_paid(p_business uuid, p_plan text, p_cycle text, p_price numeric, p_paid_on date, p_reference text) -> uuid
 fn public.create_team_invitation(p_business uuid, p_email text, p_role text, p_branch uuid, p_invited_by uuid, p_expires_in interval) -> TABLE(invitation_id uuid, nonce text, expires_at timestamp with time zone)
 fn public.delete_my_account(p_close_solely_owned boolean) -> jsonb
@@ -689,12 +695,14 @@ fn public.platform_enquiries(p_state text) -> SETOF enquiries
 fn public.platform_partner_summary() -> TABLE(id uuid, code text, name text, business_name text, email text, phone text, city text, status text, joined_on date, user_id uuid, pending_email text, referrals bigint, referrals_paying bigint, referrals_lapsed bigint, rate_pct numeric, earned_total numeric, pending_amount numeric, owed_amount numeric, paid_amount numeric, last_payout_on date, last_payout_ref text)
 fn public.platform_referral_risk() -> TABLE(partner_id uuid, partner_name text, partner_code text, business_id uuid, business_name text, kind text, detail text, at timestamp with time zone)
 fn public.platform_tenant_summary() -> TABLE(id uuid, name text, slug text, plan text, status text, created_at timestamp with time zone, members bigint, branches bigint, orders bigint, orders_30d bigint, cohort text, last_active_at timestamp with time zone, seats_used bigint, max_studios integer, max_seats integer, closed_at timestamp with time zone, purge_after timestamp with time zone)
+fn public.preview_account_deletion() -> jsonb
 fn public.purge_studio(p_business uuid) -> jsonb
 fn public.reconcile_my_orders(p_business uuid) -> jsonb
 fn public.reconcile_my_payments(p_business uuid) -> jsonb
 fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text) -> uuid
 fn public.recount_storage_usage() -> void
 fn public.reopen_studio(p_business uuid) -> jsonb
+fn public.request_account_deletion() -> jsonb
 fn public.resume_subscription(p_business uuid) -> jsonb
 fn public.retire_my_order_blob(p_business uuid) -> jsonb
 fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text) -> void
@@ -706,6 +714,8 @@ fn public.settle_checkout(p_event_id text, p_tx_ref text, p_fw_tx_id text, p_amo
 fn public.start_free_trial(p_business uuid, p_days integer) -> date
 fn public.studio_payments(p_business uuid) -> TABLE(id uuid, business_id uuid, business_name text, amount numeric, currency text, status text, payment_method text, reference text, paid_on timestamp with time zone, notes text)
 fn public.submit_enquiry(p_kind text, p_name text, p_email text, p_phone text, p_business text, p_message text, p_source_page text, p_extra jsonb, p_trap text) -> boolean
+pol account_deletion_requests.adr_delete
+pol account_deletion_requests.adr_select
 pol app_state.app_state_delete
 pol app_state.app_state_insert
 pol app_state.app_state_select

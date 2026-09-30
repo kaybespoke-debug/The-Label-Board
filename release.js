@@ -38,7 +38,8 @@ const DB = [
   'partner_commission_harness', 'referral_fraud_harness', 'plan_feature_harness',
   'trial_harness', 'account_directory_harness', 'storage_rls_harness',
   'lifecycle_harness', 'restore_harness', 'subscription_harness', 'cross_app_harness',
-  'upgrade_harness', 'orders_migration_harness', 'money_concurrency_harness', 'partner_portal_harness',
+  'upgrade_harness', 'orders_migration_harness', 'money_concurrency_harness',
+  'recovery_drill', 'partner_portal_harness',
   'team_invite_harness',
 ].map(n => ['node', ['supabase/tests/' + n + '.mjs'], n.replace(/_/g, ' ')]);
 
