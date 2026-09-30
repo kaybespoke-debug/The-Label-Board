@@ -5,7 +5,68 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 29 September 2026 (twenty-second session)
+Last updated: 30 September 2026 (twenty-second session)
+
+## 30 September 2026 — the audit remediation, finished and on production
+
+All five audit blockers are closed and on production, with the schema
+fingerprint matching the repo and staging exactly (`7d63446c…`, 895 objects).
+
+| | what it was | where it is |
+|---|---|---|
+| **P1** | every member could read the owner's password and everybody's PIN | closed, layi-v63 |
+| **P2** | one order blob per studio defeated seeCost and seeContact | closed, layi-v64 |
+| **P3** | a queued write went to the studio on screen, not the one it was made in | closed, layi-v65 |
+| **P4** | `public.partner_me()` was 42P13; no partner could sign in | closed |
+| **P5** | five of ten security mutations were caught by nobody | closed, all five caught |
+| **money** | two devices recording two payments produced one | closed, layi-v66 |
+| **recovery** | never rehearsed | rehearsed; it found a real defect |
+| **deletion** | one call, immediate, irreversible | two steps and a fresh sign-in |
+
+**Production data, reconciled identifier by identifier before anything was
+deleted:** 56 orders worth ₦8,954,600, ₦1,720,000 of cost, ₦1,996,000 of
+commission, 14 delivery addresses, and 76 payments worth ₦7,457,600 (in
+₦5,123,600 / out ₦2,334,000). Both legacy blobs retired, both retirements
+recorded in the studios' own history.
+
+**`node release.js`** is now the one command: 30 checks offline, or
+`--staging` for 41 including the real-session probes and the mutation drill.
+
+### Two defects found by the new tests rather than by an incident
+
+- **The export lost two tables.** `order_commissions` and `order_contacts`
+  were created by P2 and never added to `export_studio`. A restored studio
+  would have come back complete in every visible respect and without a single
+  commission or delivery address. Found by actually performing a recovery.
+  The drill now requires every studio-scoped table to be exported or excluded
+  by name with a reason.
+- **The same order in both lists.** Studio a3b0c40c had 40 order entries and
+  28 identifiers — twelve orders in both the active and the finished key, byte
+  for byte. Every figure previously reported for production was inflated by
+  them. Identical copies are deduplicated; copies that DIFFER refuse.
+
+### Still outstanding, none of them blockers
+
+- **Repository is still public.** Approved to go private, held on one check
+  only: that the Netlify GitHub App keeps access. GitHub → Settings →
+  Integrations, then each of the four Netlify sites. `AUDIT_2026-09-23.md`
+  is on `origin/main` and has been since 23 September.
+- **Third-party PII remains in git history** — four commits, earliest 17
+  September, on all three remote branches. HEAD is clean. Recommendation:
+  go private and do NOT rewrite; a rewrite touches 207 of main's 376 commits,
+  breaks every clone, and cannot un-publish what is already out.
+- **Leaked-password protection is off.** Dashboard only: Authentication →
+  Policies. It affects sign-up and password change only; nobody is locked out
+  and no existing password is re-checked.
+- **Flutterwave** remains externally blocked. Inert in the schema, no secrets,
+  no checkout buttons.
+- **`money` and `receivables` are still `ui_only`** in the catalogue, and
+  honestly so: `orders.total` is readable by any member who can read the
+  order. Narrowing that is a product decision, not a bug.
+- **`team_admin_harness` is 45/4**, the deliberate Phase 1B invitation
+  switch. Known and expected.
+
+
 
 ## 29 September 2026 — the independent audit, and P1 on production
 
