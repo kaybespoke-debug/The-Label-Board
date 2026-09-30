@@ -87,6 +87,95 @@ rather than inherited.
 
 
 
+## The four import bugs, 30 September — SHIPPED as layi-v67
+
+From AUDIT_FEATURE_GAPS.md, fixed and shipped the night before October’s studios
+start importing.
+
+### Three corrections asked for on review, and one bug they uncovered
+
+**Delivered history is finished work, balance or no balance.** A live order that is
+delivered and still owed for stays in the open half on purpose: it is still being chased
+and archiving it would stop it syncing. History is the opposite, so it goes to finished
+and its balance still counts, because load() merges both halves before anything reads
+them.
+
+**Nothing imported is chased until an owner says so.** A new group, From imported
+history — review, with three answers per balance. Chase moves it into the ordinary list
+and leaves it history, so it never reaches the production board. Mark settled posts a
+payment dated TODAY, never backdated into a year the studio has already closed, with a
+note saying the original predates this app. Write off posts an expense categorised Bad
+debt and zeroes the balance through a new writeOff field, so revenue never moves and the
+order never looks paid.
+
+**SheetJS is pinned to 0.18.5 with an SRI hash and crossOrigin, so the CDN cannot hand
+this app a different file than it was built against.** There is no Content-Security-
+Policy on this site at all today; if one is added it must allow cdn.jsdelivr.net, which
+the Supabase client already needs. A failed load now writes the reason onto the import
+card rather than only into an alert.
+
+**The bug that fell out of it: every imported order was being filed as a RETAIL SALE.**
+webOrderToStudio infers retail when no measurements came with a line, which is right for
+a website and wrong for a spreadsheet of past bespoke work. So a studio’s whole back
+catalogue landed outside isClientOrder(): out of the bespoke half of every report, out
+of client work, and invisible to the review group, which is how it was found. The caller
+now says which it is instead of the mapper guessing. It also means an earlier claim here
+was passing for the wrong reason: imported records were absent from the production board
+because they were sales, not because they were history. They are orders now, and the
+flag is what keeps them off it.
+
+**1. History is a flag, not a word in a notes field.** `isHistorical(r)` reads a real
+`historical:true` on every record the importers create. `importStageFor()` maps a status
+onto THIS studio’s stages (a shoemaker’s board is not a tailor’s), so delivered work
+files itself as finished instead of landing on the bench. An unrecognised status stays at
+the first stage AND is named in the summary, because the owner cannot fix what nobody
+told them about. History is out of the production board, the chase list, attention and
+the WhatsApp seam, and moves no stock. It stays in every money total, at its own dates.
+
+**A balance on an imported order is still a balance.** It stays in what the studio is
+owed and comes out of who to ring. Two questions that happened to be answered from one
+array; they are two arrays now.
+
+**2. Imported money reaches the books.** `importOrderPayments()` turns a deposit into a
+transaction dated when the money arrived, tagged to a new `Imported` channel, idempotent
+on the order reference rather than on date-and-amount, because two clients can pay the
+same deposit on the same day and neither is a duplicate. `importedMoneyOverlap()` warns
+when a finances file covers money the orders file already brought in, rather than
+silently doubling it.
+
+**A worse bug found on the way.** `/paid|complete|settled/` was unanchored, and
+"unpaid" contains "paid". A row the studio had explicitly marked unpaid came in paid in
+full: revenue inflated and a debt hidden, in one move. Anchored, and the negatives are
+named.
+
+**3. Excel is real now.** The screen always claimed it; the picker took `.csv` and
+nothing else. SheetJS loads from the CDN the Supabase client already uses, only when
+somebody picks a spreadsheet, and offline says to save as CSV rather than spinning. All
+six importers already had templates; that is asserted now so it stays true.
+
+**4. A code that matches.** Product and variant editors have an optional SKU, which is
+the field `webDecrementStock()` was always reading and nothing ever wrote. Without one it
+falls back to the product name and the variant label, and anything still unmatched is
+recorded in `webUnmatchedLines()` instead of failing silently.
+
+**5. The summary** says records in, how many filed as history, finished versus board,
+payments created, money added per year, rows skipped and why, and any status it could
+not place.
+
+`audit_import.js` grew a block covering all of it. `node verify.js`, `audit_safearea`
+and `audit_web` are green.
+
+### The repair script has nothing to repair
+
+`tools/repair_imported_orders.js`, dry run by default, `--apply` to write, `--business`
+to scope, `--fixture` to prove the logic without a service-role key.
+
+**Checked against the live project read-only on 30 September: of 56 orders across nine
+businesses, zero carry any import marker.** No studio has imported orders yet, so there
+is nothing to fix. The script is insurance for anything imported between now and the fix
+reaching them.
+
+
 ## 30 September 2026 — the audit remediation, finished and on production
 
 All five audit blockers are closed and on production, with the schema

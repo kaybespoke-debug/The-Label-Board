@@ -1821,6 +1821,15 @@ function orderIsSettled(o){
   const deli=STAGES.indexOf('Delivered');
   if(deli<0)return false;
   if((+o.stageIndex||0)<deli)return false;           // still on the board
+  /* A LIVE order that is delivered and still owed for stays in the open half on purpose:
+     it is still being chased, still changing, and archiving it would stop it syncing.
+
+     History is the opposite. An imported job that was delivered in 2024 is not going to
+     change again, and nothing is chasing it until an owner says so. Its balance still
+     counts everywhere, because load() merges both halves back together before anything
+     reads them: moving it out of the working set costs it nothing and saves rewriting it
+     on every stage move for the rest of the studio's life. */
+  if(isHistorical(o))return true;
   if(orderOutstanding(o)>0)return false;             // delivered, but still owed for
   return true;
 }
@@ -2270,6 +2279,67 @@ function batchPct(o){if(!o.batch||!o.batch.on)return Math.round((((o.stageIndex|
    both ends is how an RTW brand's numbers end up wrong by the cost of goods. */
 function isBatch(o){return !!(o&&o.batch&&o.batch.on);}
 function isRun(o){return !!(o&&o.kind==='run');}
+/* ---- History is not work -------------------------------------------------------------
+   A studio arriving from another app brings years of finished jobs with it. Before this
+   there was nothing on the record to say so: an order delivered in 2024 came in at the
+   first production stage, sat on the board as work for the bench, went into the chase
+   list, and read as overdue against a date two years gone. The only marker was the word
+   "Imported" in a notes field, which no logic read.
+
+   So imported records carry a real flag. It changes nothing about what they are worth:
+   they count in every report, at their own dates. It changes what the app DOES about
+   them, which is nothing. Nobody is chased, nothing is nudged, no message is sent and no
+   cloth moves for a job that finished before the studio had this app. */
+function isHistorical(r){return !!(r&&r.historical===true);}
+/* The stage an imported status means, matched against THIS studio's stages rather than a
+   fixed list, because a shoemaker's board is not a tailor's. Exact name first, then the
+   words people actually type in a spreadsheet. `known` is false when nothing matched, so
+   the import can tell the owner which rows it had to guess at instead of guessing
+   quietly. */
+const IMPORT_STAGE_WORDS=[
+  [['delivered','completed','complete','collected','picked up','pickup','fulfilled','closed','done','finished','shipped'],'Delivered'],
+  [['dispatched','sent out','with courier','out for delivery','in transit'],'Dispatched'],
+  [['ready','ready for delivery','awaiting collection','awaiting pickup','for collection'],'Ready for Delivery'],
+  [['qc','quality','quality check','checking','inspection'],'Quality Check'],
+  [['finishing','finish','hemming','pressing'],'Finishing'],
+  [['fitting','fit','first fitting'],'Fitting'],
+  [['sewing','stitching','stitch','in progress','wip','production','making','being made','at the tailor'],'Stitching'],
+  [['cutting','cut','cut out'],'Cutting'],
+  [['fabric received','fabric in','materials received','material in'],'Fabric Received'],
+  [['received','new','pending','order received','booked','placed','confirmed','open'],'Order Received']
+];
+/* Payment words are not stages. A column that says "paid" is telling us about money, and
+   reading it as a stage would put a finished job at the front of the board. */
+const IMPORT_PAY_WORDS=['paid','unpaid','partial','part payment','part','deposit','settled','outstanding','owing','balance','due'];
+function importStageFor(text){
+  const raw=String(text||'').trim();
+  if(!raw)return {index:0,known:false,blank:true,raw:''};
+  const t=raw.toLowerCase();
+  if(IMPORT_PAY_WORDS.indexOf(t)>=0)return {index:0,known:false,blank:false,raw:raw,payWord:true};
+  const exact=STAGES.findIndex(function(st){return st.toLowerCase()===t;});
+  if(exact>=0)return {index:exact,known:true,blank:false,raw:raw};
+  for(let i=0;i<IMPORT_STAGE_WORDS.length;i++){
+    const words=IMPORT_STAGE_WORDS[i][0],target=IMPORT_STAGE_WORDS[i][1];
+    if(words.indexOf(t)<0)continue;
+    let at=STAGES.indexOf(target);
+    /* The studio may have renamed or removed that stage. Delivered always exists (it is
+       the tail); anything else falls back to the nearest stage that does. */
+    if(at<0)at=(target==='Delivered')?Math.max(0,STAGES.length-1):0;
+    return {index:at,known:true,blank:false,raw:raw};
+  }
+  return {index:0,known:false,blank:false,raw:raw};
+}
+/* The orders worth chasing. One list, because the file already learned this lesson once:
+   "every receivables list, every chase, every total owed and every overdue nudge reads
+   through here, so saying it once keeps a quote out of all of them." History is the
+   second thing that has to be kept out of all of them. */
+function chaseOrders(){return getOrders().filter(function(o){
+  return isClientOrder(o)&&(!isHistorical(o)||o.chaseOk===true)&&inBranch(o)&&orderOutstanding(o)>0;});}
+/* The imported balances nobody has decided about yet. They are real money and they are
+   shown as such; what they are not is a list to work through this afternoon, because
+   some of them were settled in cash years ago and never written down. */
+function historyToReview(){return getOrders().filter(function(o){
+  return isClientOrder(o)&&isHistorical(o)&&o.chaseOk!==true&&inBranch(o)&&orderOutstanding(o)>0;});}
 /* Somebody is paying for it: not a counter sale, not a run for the shelf. Every list about
    money owed, customers, invoices and receivables means THIS. */
 function isClientOrder(o){const k=o&&o.kind;return !!o&&k!=='sale'&&k!=='run';}
@@ -2380,6 +2450,9 @@ function migrate(o){
   o.delivery=o.delivery||{enabled:false,fee:0,location:'',company:'',tracking:'',status:'Pending'};
   o.potContribs=Array.isArray(o.potContribs)?o.potContribs:[];
   o.stockUsed=Array.isArray(o.stockUsed)?o.stockUsed:[];
+  o.historical=o.historical===true;   // a record of work that finished before this app
+  o.writeOff=Math.max(0,+o.writeOff||0);  // a balance the studio has given up on
+  o.chaseOk=o.chaseOk===true;             // an imported balance an owner chose to chase
   o.batch=(o.batch&&o.batch.on)?{on:true,qty:Math.max(1,+o.batch.qty||1),reached:normalizeReached(o.batch.reached,Math.max(1,+o.batch.qty||1))}:{on:false};
   if(o.batch.on)o.stageIndex=batchFrontier(o);
   o.stageIndex=Math.max(0,Math.min(STAGES.length-1,+o.stageIndex||0));
@@ -2546,7 +2619,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v66';
+const APP_VERSION='layi-v67';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3726,22 +3799,58 @@ function normalizeWebOrder(raw){raw=raw||{};
   return {order,items};
 }
 // When a website RETAIL sale comes in, take the sold pieces out of studio stock. Matches a
-// studio product by its id, its studio_ref/SKU, or a variant SKU; draws from stock safely.
-function webDecrementStock(productId,qty,branch){
-  if(!productId)return false;const list=getProducts();
-  const p=list.find(x=>x.id===productId||x.studio_ref===productId||x.sku===productId||(x.variants||[]).some(v=>v.sku===productId||v.id===productId));
-  if(!p)return false;
-  let need=+qty||1;const vs=p.variants||[];const match=vs.find(v=>v.sku===productId||v.id===productId);
+/* ---- Matching a website line to something on the shelf --------------------------------
+   This used to read `p.sku` and `v.sku`, and neither field was ever created by the
+   product editor: the only codes it could match on were the internal id and a
+   studio_ref set by the website integration. So for a studio that had not connected a
+   site, every line silently matched nothing and no stock moved.
+
+   The fields exist now, and they are optional, so the fallback matters more than the
+   lookup: a product with no code is matched on its NAME, and a variant on its size and
+   colour. Anything still unmatched is recorded rather than dropped, because stock that
+   quietly does not move is worse than stock that visibly did not. */
+function _skuEq(a,b){return !!a&&!!b&&String(a).trim().toLowerCase()===String(b).trim().toLowerCase();}
+var _webUnmatched=[];
+function webUnmatchedLines(){return _webUnmatched.slice();}
+function clearWebUnmatched(){_webUnmatched=[];}
+function webDecrementStock(productId,qty,branch,hint){
+  if(!productId&&!(hint&&hint.name))return false;const list=getProducts();
+  let p=productId?list.find(x=>x.id===productId||_skuEq(x.studio_ref,productId)||_skuEq(x.sku,productId)||(x.variants||[]).some(v=>_skuEq(v.sku,productId)||v.id===productId)):null;
+  // No code, or a code nobody recognises: fall back to the name on the line.
+  if(!p&&hint&&hint.name){const want=String(hint.name).trim().toLowerCase();
+    p=list.find(x=>String(x.name||'').trim().toLowerCase()===want);}
+  if(!p){_webUnmatched.push({productId:productId||'',name:(hint&&hint.name)||'',qty:+qty||1,reason:'no product matched'});return false;}
+  let need=+qty||1;const vs=p.variants||[];
+  let match=vs.find(v=>_skuEq(v.sku,productId)||v.id===productId);
+  // and a variant by what it is called, when the line said so
+  if(!match&&hint&&hint.variant){const wv=String(hint.variant).trim().toLowerCase();
+    match=vs.find(v=>variantLabel(v).trim().toLowerCase()===wv);}
   const ordered=match?[match].concat(vs.filter(v=>v!==match)):vs;
   let changed=false;
   // A sale takes stock out of the branch that made it, not out of a pool.
   const selling=(branch&&branch!=='all')?branch:branchOfOr(null,activeBranchView!=='all'?activeBranchView:'');
   ordered.forEach(v=>{if(need<=0)return;const have=variantQty(v,selling);const take=Math.min(need,have);if(take>0){setVariantQty(v,selling,have-take);need-=take;changed=true;}});
   if(changed)setProducts(list);
+  /* Matched the product but the shelf could not cover it. Recorded, because a studio
+     that is oversold needs to know which line did it. */
+  if(need>0)_webUnmatched.push({productId:productId||'',name:p.name||'',qty:+qty||1,short:need,reason:'not enough in stock'});
   return changed;
 }
-function webOrderToStudio(row,items){
-  row=row||{};items=items||[];
+/* ---- What kind of record a line becomes ----------------------------------------------
+   For a WEBSITE order the inference is sound: measurements came with it, so somebody is
+   having something made; no measurements, so it came off the rail. That is how a shop
+   works and it has been right since it was written.
+
+   It is wrong for a CSV of past work. "Orders & past productions" is a studio's back
+   catalogue of bespoke jobs, and almost none of it will carry measurements in a
+   spreadsheet. Inferring retail from that filed every past commission as a shop sale:
+   out of the bespoke half of every report, out of client work entirely, and out of
+   anything that reads isClientOrder(). Found on 30 September while wiring up the review
+   group, which could not see a single imported balance because none of them were orders.
+
+   So the caller says which it is when it knows, and only guesses when it does not. */
+function webOrderToStudio(row,items,opts){
+  row=row||{};items=items||[];opts=opts||{};
   const ref=String(row.ref||row.id||'').trim();
   const total=+row.total_ngn||0;
   const paid=(row.payment_status==='paid')?total:0;   // a reported bank transfer is a claim, not money in
@@ -3751,24 +3860,80 @@ function webOrderToStudio(row,items){
   const label=items.map(i=>i.name).filter(Boolean).join(', ');
   if(row.is_consultation) return {type:'appointment',record:{id:'wa-'+ref,client:row.customer_name||'Website enquiry',date:String(row.deadline||createdAt).slice(0,10),time:'',type:'Consultation',status:'Scheduled',note:((row.notes||'')+' · booked on the website').trim(),branch,source:'website',webRef:ref}};
   const common={id:'web-'+ref,client:row.customer_name||'Website customer',email:row.email||'',whatsapp:row.phone||'',branch,channel:'online',source:'website',webRef:ref,createdAt,paid,discount:0,currency:'NGN',fx:1,notes:row.notes||''};
-  if(Object.keys(meas).length) // measurements captured ⇒ made-to-measure, not off-the-rail
+  if(Object.keys(meas).length||opts.forceOrder===true) // measurements captured, or the caller knows it is made work
     return {type:'order',record:Object.assign({},common,{meas,outfits:items.map(it=>({name:it.name||'Piece',type:it.name||'Other',price:+it.price_ngn||0,photos:[],style:it.colour||'',finish:''})),value:total,garment:label||'Website order',due:row.deadline||'',stageIndex:0,costs:[],commissions:[],potContribs:[]})};
   return {type:'sale',record:Object.assign({},common,{kind:'sale',saleItems:items.map(it=>({productId:it.product_id||'',name:it.name||'Item',qty:+it.qty||1,unitPrice:+it.price_ngn||0,unitCost:0})),value:total,garment:label||'Website sale'})};
 }
 // Apply a batch. Idempotent: a website ref already imported is skipped, so re-running is safe.
-function importWebOrders(rows){
+function importWebOrders(rows,opts){
+  opts=opts||{};
+  const hist=opts.historical===true;
   const orders=getOrders(),appts=getAppts();
   const haveO=new Set(orders.map(o=>o.id)),haveA=new Set(appts.map(a=>a.id));
   let added=0,skipped=0,asAppt=0;
-  (rows||[]).forEach(r=>{const n=normalizeWebOrder(r.order||r);const items=(r.items&&r.items.length)?normalizeWebOrder({items:r.items}).items:n.items;const m=webOrderToStudio(n.order,items);
+  (rows||[]).forEach(r=>{const n=normalizeWebOrder(r.order||r);const items=(r.items&&r.items.length)?normalizeWebOrder({items:r.items}).items:n.items;const m=webOrderToStudio(n.order,items,{forceOrder:opts.forceOrder===true});
+    if(hist)m.record.historical=true;
     if(m.type==='appointment'){if(haveA.has(m.record.id)){skipped++;return;}appts.push(m.record);haveA.add(m.record.id);asAppt++;added++;}
     else{if(haveO.has(m.record.id)){skipped++;return;}orders.push(m.record);haveO.add(m.record.id);added++;
       // A website sale is routed to a studio; its stock comes out of that studio,
       // never out of whichever branch the person importing happens to be viewing.
-      if(m.record.kind==='sale')(m.record.saleItems||[]).forEach(it=>webDecrementStock(it.productId,it.qty,branchOf(m.record))); // web retail sale → take out of stock
+      // History moves no cloth: the shelf it would come off was counted years ago.
+      if(m.record.kind==='sale'&&!hist)(m.record.saleItems||[]).forEach(it=>webDecrementStock(it.productId,it.qty,branchOf(m.record),{name:it.name,variant:it.variant})); // web retail sale → take out of stock
     }});
   if(added){save('layi_dash_orders',orders);setAppts(appts);logAudit('Imported website orders',added+' record(s)');if(typeof renderAll==='function')renderAll();}
   return {added,skipped,appointments:asAppt};
+}
+/* ---- The money an imported order already took ----------------------------------------
+   The headline finance figures in this app are CASH basis: Revenue, Money in, Cash flow
+   and Net profit all read recorded transactions. The orders importer used to write the
+   deposit onto the order and stop, so a studio importing three years of history got
+   correct balances and an empty revenue chart, with nothing on screen to say why.
+
+   So a deposit becomes a transaction, dated when the money actually arrived rather than
+   when the file was uploaded, and flagged historical like the order it came from.
+
+   Idempotent on the ORDER REFERENCE, not on date-and-amount. Two clients can pay the same
+   deposit on the same day and neither is a duplicate; the same order imported twice
+   always is. */
+function importOrderPayments(entries){
+  const t=getTxns();
+  const seen={};t.forEach(function(x){if(x.importRef)seen[x.importRef]=1;});
+  const byYear={};let created=0;
+  (entries||[]).forEach(function(e){
+    const o=getOrders().find(function(x){return x.id===e.id;});
+    if(!o||!isHistorical(o))return;
+    const amt=+((e.m&&e.m.deposit))||0;
+    if(amt<=0)return;
+    if(seen[o.id])return;                       // already imported once
+    seen[o.id]=1;
+    const base=amt*ofx(o);
+    const at=(e.m&&e.m.paidAt)||o.createdAt||new Date().toISOString();
+    t.push({id:uid('t'),dir:'in',label:(o.client||'Client')+' \u00b7 imported payment ('+o.id+')',
+      amount:base,ccy:ocur(o),amtCcy:amt,at:at,orderId:o.id,branch:branchOf(o),method:'',
+      channel:importChannelFor(e.m&&e.m.channel),historical:true,importRef:o.id});
+    const y=String(at).slice(0,4);byYear[y]=(byYear[y]||0)+base;created++;
+  });
+  if(created)setTxns(t);
+  return {created:created,byYear:byYear};
+}
+/* A channel the Money In hub already understands, or Imported when the file did not say. */
+function importChannelFor(raw){
+  const v=String(raw||'').trim();
+  if(!v)return 'Imported';
+  const hit=IN_CHANNELS.find(function(c){return c.toLowerCase()===v.toLowerCase();});
+  return hit||'Imported';
+}
+/* What the finances file is about to add that the orders file may already have added.
+   It does not block, because a studio may genuinely have both; it says so and lets them
+   decide, which is the only honest thing to do without knowing their books. */
+function importedMoneyOverlap(from,to){
+  const a=String(from||'').slice(0,10),b=String(to||'').slice(0,10);
+  const hits=getTxns().filter(function(t){
+    if(!t.historical||!t.importRef||t.dir!=='in')return false;
+    const d=String(t.at||'').slice(0,10);
+    return (!a||d>=a)&&(!b||d<=b);
+  });
+  return {count:hits.length,total:hits.reduce(function(n,t){return n+(+t.amount||0);},0)};
 }
 /* ===== REALTIME ===== Other devices' changes stream in live and re-render, with an echo
    guard (a change whose data already matches local — e.g. our own write — is ignored). */
@@ -3880,7 +4045,10 @@ function moneyInByCurrency(period,custom){
 }
 /* One currency is not a breakdown, it is the only column. */
 function manyCurrencies(by){return Object.keys(by||{}).length>1;}
-const orderOutstanding=o=>isQuote(o)?0:Math.max(0,orderNet(o)-(+o.paid||0));        // order currency
+/* Written off is not paid. The money never arrived and never will, so it stops being
+   owed here and shows up as a loss in the expenses instead, which is the only place a bad
+   debt belongs. */
+const orderOutstanding=o=>isQuote(o)?0:Math.max(0,orderNet(o)-(+o.paid||0)-(+o.writeOff||0));        // order currency
 const orderOutstandingBase=o=>orderOutstanding(o)*ofx(o);             // base ₦
 /* ---- Work sent out ------------------------------------------------------------------
    Beading, monogramming, embroidery, soling, printing. The piece leaves the workroom, sits
@@ -7114,6 +7282,10 @@ function deleteOrder(){if(!can('del')||!editingOrderId)return;if(!confirm('Delet
 
 /* ===== DETAIL VIEW ===== */
 function orderAttention(o){
+  /* Before anything else, and for the same reason the quote check below comes first: an
+     imported record is history. It is not late, it has failed no check, and nobody is
+     going to go and do anything about it. */
+  if(isHistorical(o))return null;
   const READY=STAGES.indexOf('Ready for Delivery'),QC=STAGES.indexOf('Quality Check'),DISP=STAGES.indexOf('Dispatched'),DELI=STAGES.indexOf('Delivered');
   const du=daysUntil(o.due);const out=orderOutstanding(o);
   /* First, and it short-circuits everything below. A quote is not late, has failed no
@@ -8777,7 +8949,7 @@ function delTxn(id){if(!can('money'))return;if(!confirm('Remove this entry?'))re
    (where the sale came from) and a method (how they paid). A payment logged by hand is
    cat:'manual' with no orderId, so it counts as CASH RECEIVED but never touches the
    accrual P&L in financeTotals — no double counting an order's billed value. */
-const IN_CHANNELS=['Studio','Website','WhatsApp','Instagram','Referral','Other'];
+const IN_CHANNELS=['Studio','Website','WhatsApp','Instagram','Referral','Imported','Other'];
 const IN_METHODS=['Transfer','Cash','Card','POS'];
 const CHAN_COLORS={Studio:'#7fa3b3',Website:'#c9a86a',WhatsApp:'#7fae7a',Instagram:'#cf7b6b',Referral:'#b58bd6',Other:'#9a9186'};
 function normChannel(c){
@@ -10117,7 +10289,11 @@ syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim())
   clean.forEach(b=>{if(b.id&&prevById[b.id]&&prevById[b.id]!==b.name)renameBranchRefs(prevById[b.id],b.name);});
   SETTINGS.branches=clean;save('layi_dash_settings',SETTINGS);logAudit('Branches updated',clean.map(b=>b.name).join(', '));branchDraft=null;renderBranchesSettings();renderAll();flashSaved('branchSaveBtn','Save branches');}
 function flashSaved(id,base){const el=document.getElementById(id);if(!el)return;el.textContent='✓ Saved';el.disabled=true;setTimeout(()=>{el.disabled=false;el.textContent=base;},1500);}
-function toast(msg){var t=document.getElementById('layiToast');if(!t){t=document.createElement('div');t.id='layiToast';t.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,.28);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:80vw;text-align:center';document.body.appendChild(t);}t.textContent=msg;requestAnimationFrame(function(){t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});clearTimeout(t._h);t._h=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(8px)';},2300);}
+/* A toast is a nicety. It must never be able to break the thing that triggered it:
+   recording a payment and then throwing on the way to saying so would leave the studio
+   looking at an error over money that was actually saved. */
+function toast(msg){try{_toast(msg);}catch(e){}}
+function _toast(msg){var t=document.getElementById('layiToast');if(!t){t=document.createElement('div');t.id='layiToast';t.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,.28);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:80vw;text-align:center';document.body.appendChild(t);}t.textContent=msg;requestAnimationFrame(function(){t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});clearTimeout(t._h);t._h=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(8px)';},2300);}
 function renderLogoPreview(){const el=document.getElementById('logoPreview');if(!el)return;const logo=(SETTINGS.company||{}).logo;el.innerHTML=logo?`<img src="${logo}" style="width:100%;height:100%;object-fit:contain">`:'none';}
 async function uploadLogo(input){if(!ownerOnlySetting('the company logo')){input.value='';return;}const f=input.files&&input.files[0];if(!f)return;try{const data=await compressImage(f,400,0.85);SETTINGS.company=Object.assign({},SETTINGS.company,{logo:data});save('layi_dash_settings',SETTINGS);renderLogoPreview();fillSettings();applyBranding();}catch(e){alert('Could not load that image.');}input.value='';}
 function clearLogo(){
@@ -10180,7 +10356,11 @@ async function waAutoSend(kind,o){var c=waCfg();if(!c.events||!c.events[kind])re
    guard closes the hole before there is one: without it, switching the sender
    on at go-live would quietly hand every Basic studio automated chasing, which
    is the one thing Pro is sold on. */
-function waOnEvent(kind,o){try{if(kind==='reminder'&&!planIncludes('chase'))return;if(waAutoReady())waAutoSend(kind,o);}catch(e){}}
+/* The last gate before a message leaves. Belt and braces: the importers do not call this
+   at all, but a client being messaged about a job they collected in 2024 is the kind of
+   mistake that costs a studio its reputation rather than an afternoon, so it is refused
+   here as well as not asked for there. */
+function waOnEvent(kind,o){try{if(kind==='reminder'&&!planIncludes('chase'))return;if(isHistorical(o))return;if(waAutoReady())waAutoSend(kind,o);}catch(e){}}
 function renderWASettings(){var c=waCfg();var t=document.getElementById('wa_auto');if(!t)return;t.checked=!!c.auto;
   var ev=document.getElementById('wa_events');if(ev){var rows=[['confirm','When an order is confirmed'],['ready','When it is ready for collection or delivery'],['reminder','Payment reminders']];
     ev.innerHTML=rows.map(function(r){return '<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text-dim);cursor:pointer"><input type="checkbox" '+((c.events&&c.events[r[0]])?'checked':'')+' onchange="onWAEvent(\''+r[0]+'\',this.checked)"> '+r[1]+'</label>';}).join('');ev.style.display=c.auto?'':'none';}
@@ -10267,27 +10447,70 @@ const IMPORTERS=[
  {key:'orders',hue:'#2563a8',title:'Orders & past productions',sub:'Open and completed jobs, with status',preview:['client','item','price'],
   template:'client,item,price,deposit,due date,status,date\n"A. Bakare","Agbada set",85000,40000,2025-02-20,partial,2025-01-30\n',
   apply:function(rows,head){var iName=impCol(head,['client','customer','name','client name']),iItem=impCol(head,['item','garment','product','description','order']),iTotal=impCol(head,['price','total','amount','value','order value']),iDep=impCol(head,['deposit','paid','amount paid','part payment']),iDue=impCol(head,['due','due date','deadline','delivery date']),iStatus=impCol(head,['status','payment status','paid status']),iDate=impCol(head,['date','order date','created','created at']),iRef=impCol(head,['ref','reference','order no','order number','invoice','id']);
-   var batch=[];
+   /* A second column, because one 'status' cannot answer two questions. Most exports put
+      the money word there (paid / partial); some put the production word (delivered /
+      cutting). If a studio has both, they are read separately. */
+   var iStage=impCol(head,['stage','production status','order status','progress','fulfilment','fulfillment','job status','state']);
+   var iChan=impCol(head,['channel','source','came from','where from']);
+   var iPaidOn=impCol(head,['paid date','payment date','date paid','paid on']);
+   var batch=[],meta={},unknown=[];
    for(var r=1;r<rows.length;r++){var row=rows[r];var name=impCell(row,iName),item=impCell(row,iItem);if(!name&&!item)continue;
     var total=impNum(impCell(row,iTotal)),dep=impNum(impCell(row,iDep)),st=impCell(row,iStatus).toLowerCase();
-    var paid=(/paid|complete|settled/.test(st)||(total>0&&dep>=total))?'paid':(dep>0?'partial':'unpaid');
+    /* "unpaid" contains "paid". An unanchored test read it as settled, so a row the
+       studio had explicitly marked unpaid came in paid in full: revenue inflated and a
+       debt hidden, from one missing pair of anchors. */
+    var stClean=st.replace(/[^a-z ]/g,'').trim();
+    var saysPaid=/^(paid|paid in full|fully paid|complete|completed|settled|closed)$/.test(stClean);
+    var saysUnpaid=/^(unpaid|not paid|no payment|owing|outstanding|pending)$/.test(stClean);
+    var paid=(!saysUnpaid&&(saysPaid||(total>0&&dep>=total)))?'paid':(dep>0?'partial':'unpaid');
     var ref=impCell(row,iRef)||('csv-'+nameKey(name)+'-'+item.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,10)+'-'+impDate(impCell(row,iDate)));
-    batch.push({order:{ref:ref,customer_name:name||'Customer',total:total,payment_status:paid,_deposit:dep,items:[{name:item||'Order',price:total}],deadline:impCell(row,iDue)?impDate(impCell(row,iDue)):'',created_at:impCell(row,iDate)?impDate(impCell(row,iDate)):new Date().toISOString(),notes:'Imported'}});}
-   var res=importWebOrders(batch);
-   if(res.added){var ords=getOrders(),byRef={},changed=false;batch.forEach(function(b){byRef['web-'+b.order.ref]=b.order;});
-    ords.forEach(function(o){var b=byRef[o.id];if(b){var d=+b._deposit||0;if(d>0&&d<(+o.value||0)&&(+o.paid||0)!==d){o.paid=d;changed=true;}}});
-    if(changed)save('layi_dash_orders',ords);}
-   if(typeof renderAll==='function')renderAll();return {added:res.added||0,updated:0,skipped:res.skipped||0};}},
+    /* The stage column wins; failing that, the status column may be a production word
+       rather than a money one, and importStageFor() knows the difference. */
+    var stg=importStageFor(iStage>=0?impCell(row,iStage):'');
+    /* A word we could not place is worth reporting even if the next column then answers
+       the question. Losing it is how a typo in a stage column goes unnoticed. */
+    var stray=(!stg.known&&!stg.blank&&!stg.payWord)?stg.raw:'';
+    if(!stg.known&&iStatus>=0){
+      var alt=importStageFor(impCell(row,iStatus));
+      if(alt.known)stg=alt;
+      else if(!stray&&!alt.blank&&!alt.payWord)stray=alt.raw;
+    }
+    if(stray&&unknown.indexOf(stray)<0)unknown.push(stray);
+    var createdAt=impCell(row,iDate)?impDate(impCell(row,iDate)):new Date().toISOString();
+    meta['web-'+ref]={deposit:dep,stage:stg.index,createdAt:createdAt,
+      channel:(iChan>=0?impCell(row,iChan):''),paidAt:(iPaidOn>=0&&impCell(row,iPaidOn))?impDate(impCell(row,iPaidOn)):createdAt};
+    batch.push({order:{ref:ref,customer_name:name||'Customer',total:total,payment_status:paid,_deposit:dep,items:[{name:item||'Order',price:total}],deadline:impCell(row,iDue)?impDate(impCell(row,iDue)):'',created_at:createdAt,notes:'Imported'}});}
+   /* A row in this file is a job the studio made, not something off the rail. */
+   var res=importWebOrders(batch,{historical:true,forceOrder:true});
+   /* Second pass over what actually landed: the deposit, the stage, and the money. */
+   var ords=getOrders(),changed=false,toFinished=0,onBoard=0;
+   ords.forEach(function(o){var m=meta[o.id];if(!m||!isHistorical(o))return;
+    var d=+m.deposit||0;
+    if(d>0&&d<(+o.value||0)&&(+o.paid||0)!==d){o.paid=d;changed=true;}
+    if((+o.stageIndex||0)!==m.stage){o.stageIndex=m.stage;changed=true;}
+    if(m.stage>=STAGES.indexOf('Delivered')&&STAGES.indexOf('Delivered')>=0){o.deliveredAt=o.deliveredAt||m.createdAt;changed=true;}
+   });
+   if(changed)save('layi_dash_orders',ords);
+   /* Where each one ended up. orderIsSettled() decides it, so this counts the answer
+      rather than predicting it: delivered and nothing owed goes to finished orders, and
+      anything else stays live. */
+   getOrders().forEach(function(o){if(!meta[o.id]||!isHistorical(o))return;
+    if(orderIsSettled(o))toFinished++;else onBoard++;});
+   var money=importOrderPayments(Object.keys(meta).map(function(k){return {id:k,m:meta[k]};}));
+   if(typeof renderAll==='function')renderAll();
+   return {added:res.added||0,updated:0,skipped:res.skipped||0,historical:res.added||0,
+     toFinished:toFinished,onBoard:onBoard,txns:money.created,revenueByYear:money.byYear,
+     unknownStatuses:unknown};}},
  {key:'stock',hue:'#c47d12',title:'Stock & inventory',sub:'Fabrics, trims and ready-to-wear pieces',preview:['item','category','quantity','cost'],
   template:'item,category,quantity,unit,cost,reorder,note\n"Ankara Blue floral","Fabric",12,yards,2500,4,"Bestseller"\n',
   apply:function(rows,head){var list=getSupplies(),added=0,updated=0;var cats=(typeof invCatNames==='function'?invCatNames():[])||[];
-   var iName=impCol(head,['name','item','item name','material','product','description']),iCat=impCol(head,['category','cat','type','group']),iSub=impCol(head,['subcategory','subcat','sub-category','variety','brand']),iQty=impCol(head,['quantity','qty','stock','count','units','on hand']),iUnit=impCol(head,['unit','uom','measure']),iCost=impCol(head,['cost','unit cost','price','buy price','cost price']),iRe=impCol(head,['reorder','low stock','low-stock at','minimum','min','reorder at']),iNote=impCol(head,['note','notes','comment']);
+   var iSku=impCol(head,['sku','code','product code','item code','ref']),iName=impCol(head,['name','item','item name','material','product','description']),iCat=impCol(head,['category','cat','type','group']),iSub=impCol(head,['subcategory','subcat','sub-category','variety','brand']),iQty=impCol(head,['quantity','qty','stock','count','units','on hand']),iUnit=impCol(head,['unit','uom','measure']),iCost=impCol(head,['cost','unit cost','price','buy price','cost price']),iRe=impCol(head,['reorder','low stock','low-stock at','minimum','min','reorder at']),iNote=impCol(head,['note','notes','comment']);
    if(iName<0)return {error:'Your file needs an "item" (or "name") column.'};
    for(var r=1;r<rows.length;r++){var row=rows[r];var name=impCell(row,iName);if(!name)continue;
     var cat=impCell(row,iCat);var mCat=cats.find(function(c){return c.toLowerCase()===cat.toLowerCase();})||cat||cats[0]||'General';
     var ex=list.find(function(s){return (s.name||'').toLowerCase()===name.toLowerCase()&&(s.cat||'')===mCat;});
     var qty=impNum(impCell(row,iQty));
-    var data={name:name,cat:mCat,subcat:impCell(row,iSub),qty:qty,unit:impCell(row,iUnit)||'pcs',reorder:impNum(impCell(row,iRe)),cost:impNum(impCell(row,iCost)),supplierId:'',note:impCell(row,iNote),photo:'',updatedAt:new Date().toISOString()};
+    var data={name:name,cat:mCat,subcat:impCell(row,iSub),qty:qty,unit:impCell(row,iUnit)||'pcs',reorder:impNum(impCell(row,iRe)),cost:impNum(impCell(row,iCost)),sku:(iSku>=0?impCell(row,iSku):''),supplierId:'',note:impCell(row,iNote),photo:'',updatedAt:new Date().toISOString()};
     if(ex){Object.assign(ex,data);updated++;}else{list.push(Object.assign({id:uid('s'),moves:[]},data));added++;}}
    setSupplies(list);if(typeof renderSupplies==='function')renderSupplies();return {added:added,updated:updated};}},
  {key:'staff',hue:'#6d5dd3',title:'Staff & profiles',sub:'Your team, roles and pay details',preview:['name','role','salary'],
@@ -10317,13 +10540,19 @@ const IMPORTERS=[
   template:'date,type,amount,category,note\n2025-01-15,income,50000,sales,"Order deposit"\n2025-01-16,expense,12000,supply,"Thread & trims"\n',
   apply:function(rows,head){var t=getTxns(),added=0,dup=0;
    var iDate=impCol(head,['date','when','day']),iType=impCol(head,['type','direction','dir','kind','in/out']),iAmt=impCol(head,['amount','value','total','sum']),iCat=impCol(head,['category','cat','account']),iMethod=impCol(head,['method','payment method','paid by','how','mode','channel']),iNote=impCol(head,['note','notes','label','description','details','memo']);
-   var seen={};t.forEach(function(x){seen[(x.at||'')+'|'+(x.amount||'')+'|'+String(x.label||'').toLowerCase()]=1;});
+   var seen={},dates=[];t.forEach(function(x){seen[(x.at||'')+'|'+(x.amount||'')+'|'+String(x.label||'').toLowerCase()]=1;});
    for(var r=1;r<rows.length;r++){var row=rows[r];var amt=impNum(impCell(row,iAmt));if(!amt)continue;
     var typ=impCell(row,iType).toLowerCase();var dir=/in|income|credit|sale|revenue|received|deposit/.test(typ)?'in':(/out|expense|debit|cost|paid|purchase|bill/.test(typ)?'out':(amt<0?'out':'in'));
     var label=impCell(row,iNote)||impCell(row,iCat)||(dir==='in'?'Income':'Expense');var at=impDate(impCell(row,iDate));var abs=Math.abs(amt);
     var k=at+'|'+abs+'|'+label.toLowerCase();if(seen[k]){dup++;continue;}seen[k]=1;
-    t.push({id:uid('t'),dir:dir,label:label,amount:abs,at:at,cat:(impCell(row,iCat)||'other').toLowerCase(),method:(iMethod>=0?impCell(row,iMethod):'')});added++;}
-   setTxns(t);if(typeof renderFinance==='function'&&(typeof can!=='function'||can('money')))renderFinance();return {added:added,updated:0,dup:dup};}}
+    t.push({id:uid('t'),dir:dir,label:label,amount:abs,at:at,cat:(impCell(row,iCat)||'other').toLowerCase(),method:(iMethod>=0?impCell(row,iMethod):'')});added++;dates.push(String(at).slice(0,10));}
+   setTxns(t);if(typeof renderFinance==='function'&&(typeof can!=='function'||can('money')))renderFinance();
+   /* The orders file may already have brought this money in as deposits. We cannot know
+      whether these rows are the same money, so we say what is already there for the same
+      span and let the studio decide, rather than silently doubling their revenue. */
+   var span=dates.sort();
+   var ov=(added&&span.length)?importedMoneyOverlap(span[0],span[span.length-1]):{count:0,total:0};
+   return {added:added,updated:0,dup:dup,overlap:ov};}}
 ];
 function impById(key){return IMPORTERS.find(function(x){return x.key===key;});}
 function openImportMigrate(){_impState={};openModal(
@@ -10347,15 +10576,121 @@ function renderImpCards(){var el=document.getElementById('impCards');if(!el)retu
       var n=st.rows.length-1;
       prev='<div class="imp-prev"><div class="imp-prevh">Preview: first rows of '+esc(st.name||'your file')+', columns matched automatically</div><div class="scroll"><table><tr>'+ths+'</tr>'+trs+'</table></div></div>'+
         '<div class="imp-actions"><button class="btn" onclick="impRun(\''+im.key+'\')">Import '+n+' row'+(n===1?'':'s')+'</button><button class="btn ghost sm" onclick="impClear(\''+im.key+'\')">Cancel</button></div>';
+    } else if(st.blocked){
+      prev='<div class="imp-note" style="border-left-color:var(--amber)"><b>Could not read that spreadsheet.</b> '+esc(st.blocked)+'</div>';
     } else if(st.result){
-      var rz=st.result;prev='<div class="imp-note" style="border-left-color:var(--green)">Imported '+(rz.added||0)+' new'+(rz.updated?' and updated '+rz.updated:'')+(rz.skipped?', '+rz.skipped+' already there':'')+(rz.dup?', '+rz.dup+' duplicate row'+(rz.dup===1?'':'s')+' skipped':'')+'.</div>';
+      prev=importSummaryHTML(st.result);
     }
     return '<div class="imp-card"><div class="imp-head"><span class="imp-ico" style="color:'+im.hue+';background:color-mix(in srgb,'+im.hue+' 16%,transparent)">'+IMP_ICO[im.key]+'</span><div><div class="imp-t">'+esc(im.title)+'</div><div class="imp-s">'+esc(im.sub)+'</div></div>'+badge+'</div>'+
-      '<div class="imp-actions"><button class="btn ghost sm" onclick="impTpl(\''+im.key+'\')">⤓ Template</button><label class="btn sm" style="cursor:pointer;margin:0">⤒ Choose file<input type="file" accept=".csv,text/csv" style="display:none" onchange="impPick(\''+im.key+'\',this)"></label></div>'+
+      '<div class="imp-actions"><button class="btn ghost sm" onclick="impTpl(\''+im.key+'\')">⤓ Template</button><label class="btn sm" style="cursor:pointer;margin:0">⤒ Choose file<input type="file" accept=".csv,text/csv,.xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none" onchange="impPick(\''+im.key+'\',this)"></label></div>'+
       prev+'</div>';
   }).join('');}
+/* ---- What the import actually did -----------------------------------------------------
+   A count of rows added was never enough. The three things a studio needs to see are the
+   ones that used to be invisible: how much of this was filed as history rather than put
+   on the bench, how much money it put into the books and in which years, and which rows
+   it could not place. The last one matters most: a status the app did not recognise is
+   the owner's to fix, and they cannot fix what they were not told about. */
+function importSummaryHTML(rz){
+  rz=rz||{};
+  var L=[];
+  var add=function(label,value,tone){L.push('<div class="bd-row"><span class="bl">'+label+'</span><span class="bv"'+(tone?' style="color:'+tone+'"':'')+'>'+value+'</span></div>');};
+  add('Records brought in',String(rz.added||0));
+  if(rz.updated)add('Existing records updated',String(rz.updated));
+  if(rz.historical)add('Filed as history',String(rz.historical));
+  if(rz.toFinished!=null||rz.onBoard!=null){
+    add('Went to finished orders',String(rz.toFinished||0));
+    add('Left on the board',String(rz.onBoard||0),(rz.onBoard>0?'var(--amber)':''));
+  }
+  if(rz.txns!=null)add('Payments recorded',String(rz.txns||0));
+  var years=rz.revenueByYear?Object.keys(rz.revenueByYear).sort():[];
+  years.forEach(function(y){add('Money added, '+y,cur(rz.revenueByYear[y]),'var(--green)');});
+  if(rz.skipped)add('Skipped, already imported',String(rz.skipped));
+  if(rz.dup)add('Skipped, duplicate rows in the file',String(rz.dup));
+  var notes='';
+  if(rz.unknownStatuses&&rz.unknownStatuses.length){
+    notes+='<div class="imp-note" style="border-left-color:var(--amber)"><b>'+rz.unknownStatuses.length+' status'+(rz.unknownStatuses.length===1?'':'es')+' not recognised:</b> '+
+      rz.unknownStatuses.map(esc).join(', ')+'. Those orders were left at the first stage. Open them and set the stage yourself, or re-import with a stage column the app knows.</div>';
+  }
+  if(rz.overlap&&rz.overlap.count){
+    notes+='<div class="imp-note" style="border-left-color:var(--amber)"><b>Check this is not the same money twice.</b> Your orders file already brought in '+rz.overlap.count+
+      ' payment'+(rz.overlap.count===1?'':'s')+' totalling '+cur(rz.overlap.total)+' in the same period. If these rows are those payments again, undo this with a restore from backup.</div>';
+  }
+  return '<div class="imp-note" style="border-left-color:var(--green)"><b>Done.</b> Nothing here is on the production board and nobody will be chased about it.</div>'+
+    '<div style="margin:10px 0">'+L.join('')+'</div>'+notes;
+}
 function impTpl(key){var im=impById(key);if(!im)return;var blob=new Blob([im.template],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='layi_'+key+'_template.csv';a.click();}
-function impPick(key,input){var f=input.files&&input.files[0];if(!f)return;var reader=new FileReader();reader.onload=function(){try{var rows=parseCSV(String(reader.result));if(rows.length<2){alert('That file has no data rows.');input.value='';return;}var head=rows[0].map(function(h){return String(h).trim().toLowerCase();});_impState[key]={rows:rows,head:head,name:f.name};renderImpCards();}catch(e){alert('Could not read that CSV. Please make sure it is a plain .csv file.');}input.value='';};reader.readAsText(f);}
+/* ---- Reading a spreadsheet ------------------------------------------------------------
+   The screen has always said "Works with a CSV or Excel export". It was half true: the
+   picker took .csv and nothing else, so a studio with an .xlsx could not even select the
+   file after being told it would work. Studios keep their books in Excel and Google
+   Sheets, so the claim is made true rather than removed.
+
+   SheetJS is fetched only when somebody actually picks a spreadsheet, from the same CDN
+   the Supabase client already comes from. It is never on the path for a CSV, so the
+   normal import costs nothing, and an offline studio is told plainly to save as CSV
+   instead of watching a spinner. */
+var _xlsxLoading=null;
+function loadSheetJS(){
+  if(typeof XLSX!=='undefined'&&XLSX&&XLSX.read)return Promise.resolve(XLSX);
+  if(_xlsxLoading)return _xlsxLoading;
+  _xlsxLoading=new Promise(function(res,rej){
+    try{
+      var sc=document.createElement('script');
+      /* Pinned to an exact version and checked against its hash, so the CDN cannot hand
+         this app a different file than the one it was built against. There is no
+         Content-Security-Policy on this site today; if one is ever added it has to allow
+         cdn.jsdelivr.net, which the Supabase client already needs. */
+      sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      sc.integrity='sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
+      sc.crossOrigin='anonymous';
+      sc.onload=function(){(typeof XLSX!=='undefined'&&XLSX&&XLSX.read)?res(XLSX):rej(new Error('loaded but empty'));};
+      sc.onerror=function(){_xlsxLoading=null;rej(new Error('offline'));};
+      document.head.appendChild(sc);
+    }catch(e){_xlsxLoading=null;rej(e);}
+  });
+  return _xlsxLoading;
+}
+function isSpreadsheetName(n){return /\.(xlsx|xlsm|xls)$/i.test(String(n||''));}
+/* One sheet, as rows of plain strings, which is exactly what parseCSV returns. Everything
+   downstream then cannot tell the two apart. `raw:false` keeps dates and numbers as the
+   text the studio sees in the cell rather than Excel's serial numbers. */
+function sheetToRows(wb){
+  var name=wb.SheetNames&&wb.SheetNames[0];if(!name)return [];
+  var rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''});
+  return (rows||[]).map(function(r){return (r||[]).map(function(c){return String(c==null?'':c);});})
+    .filter(function(r){return r.some(function(x){return String(x).trim()!=='';});});
+}
+function impRowsReady(key,rows,name,input){
+  if(!rows||rows.length<2){alert('That file has no data rows.');if(input)input.value='';return;}
+  var head=rows[0].map(function(h){return String(h).trim().toLowerCase();});
+  _impState[key]={rows:rows,head:head,name:name};renderImpCards();
+  if(input)input.value='';
+}
+function impPick(key,input){
+  var f=input.files&&input.files[0];if(!f)return;
+  if(isSpreadsheetName(f.name)){
+    loadSheetJS().then(function(){
+      var reader=new FileReader();
+      reader.onload=function(){
+        try{impRowsReady(key,sheetToRows(XLSX.read(new Uint8Array(reader.result),{type:'array'})),f.name,input);}
+        catch(e){alert('Could not read that spreadsheet. Try saving it as CSV and importing that.');input.value='';}
+      };
+      reader.readAsArrayBuffer(f);
+    }).catch(function(){
+      _impState[key]={blocked:'Reading a spreadsheet needs a connection the first time, and this device is offline or the reader could not be verified. Open the file in Excel or Google Sheets, choose Save as CSV, and import that instead \u2014 it brings in exactly the same data.'};
+      renderImpCards();
+      input.value='';
+    });
+    return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{impRowsReady(key,parseCSV(String(reader.result)),f.name,input);}
+    catch(e){alert('Could not read that file. Please make sure it is a plain .csv or an Excel file.');input.value='';}
+  };
+  reader.readAsText(f);
+}
 function impClear(key){delete _impState[key];renderImpCards();}
 function impRun(key){var im=impById(key),st=_impState[key];if(!im||!st||!st.rows)return;var res;try{res=im.apply(st.rows,st.head);}catch(e){alert('Import failed: '+e);return;}
   if(res&&res.error){alert(res.error);return;}
@@ -11467,11 +11802,11 @@ function renderProducts(){
       </div>
     </div>`;}).join('')}</div>`:'<div class="kv" style="color:var(--text-faint)">No products match your search.</div>';
 }
-function blankVariant(){return {id:uid('v'),size:'',color:'',qty:0};}
+function blankVariant(){return {id:uid('v'),size:'',color:'',qty:0,sku:''};}
 function openProduct(id){
   if(!can('products'))return;
   const p=id?getProducts().find(x=>x.id===id):null;
-  productDraft=p?JSON.parse(JSON.stringify(p)):{id:'',name:'',category:'',price:0,cost:0,photo:'',note:'',variants:[blankVariant()],active:true};
+  productDraft=p?JSON.parse(JSON.stringify(p)):{id:'',name:'',category:'',sku:'',price:0,cost:0,photo:'',note:'',variants:[blankVariant()],active:true};
   if(!productDraft.variants||!productDraft.variants.length)productDraft.variants=[blankVariant()];
   renderProductModal();
 }
@@ -11487,10 +11822,11 @@ function renderProductModal(){
     <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add a row per size and/or colour you stock. Leave both blank for a one-size item.</div>
     ${vrows}
     <button class="btn ghost sm" style="width:100%;margin:4px 0 6px" onclick="addVariant()">＋ Add size / colour</button>
+    <div class="field"><label>Product code / SKU (optional)</label><input class="fld" id="pp_sku" value="${esc(p.sku||'')}" placeholder="e.g. LIN-SHIRT-01"><div class="sd" style="color:var(--text-faint);margin-top:4px">Used to match orders coming in from your website. Leave it blank and they match on the name.</div></div>
     <div class="field"><label>Note (optional)</label><input class="fld" id="pp_note" value="${esc(p.note||'')}" placeholder="Fabric, fit, care, anything"></div>
     <div class="modal-foot">${p.id?`<button class="btn danger sm" onclick="delProduct('${p.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveProduct()">Save</button></div>`);
 }
-function syncProductDraft(){const p=productDraft;if(!p)return;if(fv('pp_name')!==undefined)p.name=fv('pp_name');if(fvOther('pp_category')!==undefined)p.category=fvOther('pp_category');if(fv('pp_price')!==undefined)p.price=amt('pp_price');if(fv('pp_cost')!==undefined)p.cost=amt('pp_cost');if(fv('pp_note')!==undefined)p.note=fv('pp_note');p.variants.forEach((v,i)=>{if(fv('pv_size_'+i)!==undefined)v.size=fv('pv_size_'+i);if(fv('pv_color_'+i)!==undefined)v.color=fv('pv_color_'+i);if(fv('pv_qty_'+i)!==undefined)setVariantQty(v,stockBranch(),Math.max(0,+fv('pv_qty_'+i)||0));});}
+function syncProductDraft(){const p=productDraft;if(!p)return;if(fv('pp_name')!==undefined)p.name=fv('pp_name');if(fv('pp_sku')!==undefined)p.sku=(fv('pp_sku')||'').trim();if(fvOther('pp_category')!==undefined)p.category=fvOther('pp_category');if(fv('pp_price')!==undefined)p.price=amt('pp_price');if(fv('pp_cost')!==undefined)p.cost=amt('pp_cost');if(fv('pp_note')!==undefined)p.note=fv('pp_note');p.variants.forEach((v,i)=>{if(fv('pv_size_'+i)!==undefined)v.size=fv('pv_size_'+i);if(fv('pv_color_'+i)!==undefined)v.color=fv('pv_color_'+i);if(fv('pv_qty_'+i)!==undefined)setVariantQty(v,stockBranch(),Math.max(0,+fv('pv_qty_'+i)||0));});}
 function addVariant(){syncProductDraft();productDraft.variants.push(blankVariant());renderProductModal();}
 function removeVariant(i){syncProductDraft();productDraft.variants.splice(i,1);if(!productDraft.variants.length)productDraft.variants=[blankVariant()];renderProductModal();}
 /* Product photos were the last ones still kept inline. That matters twice over: they ride
@@ -12026,8 +12362,11 @@ function renderOwnerFinance(){
   if(!full){
     // Receivables-only view (e.g. Client Relations): who owes, what's paid in, who to chase — no profit/expenses.
     const owe=getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&orderOutstanding(o)>0);
-    const chaseClients=new Set(owe.map(o=>nameKey(o.client))).size;
-    const overdueClients=new Set(owe.filter(o=>{const du=daysUntil(o.due);return du!==null&&du<0;}).map(o=>nameKey(o.client))).size;
+    /* Owed is owed, imported or not. Chasing is a different question: nobody rings a
+       client about a job that was finished and filed before the studio had this app. */
+    const chase=owe.filter(o=>!isHistorical(o));
+    const chaseClients=new Set(chase.map(o=>nameKey(o.client))).size;
+    const overdueClients=new Set(chase.filter(o=>{const du=daysUntil(o.due);return du!==null&&du<0;}).map(o=>nameKey(o.client))).size;
     el.innerHTML=[
       stat('Owed to us',cur(outstanding),owe.length?(owe.length+' unpaid order'+(owe.length===1?'':'s')):'all collected',outstanding>0?'warn':'up',`openDashOutstanding()`),
       stat('Paid in',cur(inPer),'received \u00b7 '+plabel,inPer>0?'up':'',`openDashFlow('in')`),
@@ -12093,7 +12432,7 @@ function renderCreDash(){
   const custCount=Object.keys(getCustomers()).length;
   const owe=canReceivables()?getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&orderOutstanding(o)>0):[];
   const oweTotal=owe.reduce((s,o)=>s+orderOutstandingBase(o),0);
-  const chaseClients=new Set(owe.map(o=>nameKey(o.client))).size;
+  const chaseClients=new Set(owe.filter(o=>!isHistorical(o)).map(o=>nameKey(o.client))).size;
   const cards=[
     {cls:'green',label:'Appointments today',val:String(apptsToday.length),sub:'fittings & consults',click:"openApptList()"},
     {cls:'gold',label:'Ready to collect',val:String(ready.length),sub:'clients to call',click:"dashDrill('ready')"},
@@ -12986,7 +13325,7 @@ function isMyJob(o){const sid=currentUser&&currentUser.staffId;if(!sid)return fa
    is making next season's rail. */
 /* Quotes are not on the board. Nothing has been agreed, so nothing has been started, and a
    board full of maybes is a board nobody trusts. */
-function prodOrders(){const all=getOrders().filter(o=>(isClientOrder(o)&&!isQuote(o))||isRun(o)).filter(inBranch);return ownJobsOnly()?all.filter(o=>isMyJob(o)&&o.stageIndex<STAGES.indexOf('Dispatched')):all;}
+function prodOrders(){const all=getOrders().filter(o=>((isClientOrder(o)&&!isQuote(o))||isRun(o))&&!isHistorical(o)).filter(inBranch);return ownJobsOnly()?all.filter(o=>isMyJob(o)&&o.stageIndex<STAGES.indexOf('Dispatched')):all;}
 function prodFilterTo(f){prodFilter=f;document.querySelectorAll('#view-production .chip[data-f]').forEach(c=>c.classList.toggle('active',c.dataset.f===f));renderProduction();}
 function orderPace(o){const ups=(o.updates||[]).filter(u=>u.at).map(u=>new Date(u.at)).sort((a,b)=>a-b);if(ups.length>=2){const span=(ups[ups.length-1]-ups[0])/864e5,steps=ups.length-1;if(steps>0&&span>0)return Math.max(0.5,span/steps);}return 2;}
 function stageAgeDays(o){let start=o.stageStartedAt;if(!start){const cur=STAGES[o.stageIndex];const u=(o.updates||[]).filter(x=>x.stage===cur&&x.at).map(x=>x.at).sort().slice(-1)[0];if(u)start=u;}if(!start)start=o.createdAt;if(!start)return null;return Math.max(0,Math.floor((Date.now()-new Date(start))/864e5));}
@@ -13356,7 +13695,7 @@ function openDashOutstanding(){openBreakdown('outstanding');}
 // Who to chase: clients with an unpaid balance, most overdue first, with a WhatsApp reminder + record-payment.
 function openChaseList(){
   if(!canReceivables())return;
-  const owe=getOrders().filter(o=>isClientOrder(o)&&inBranch(o)&&orderOutstanding(o)>0);
+  const owe=chaseOrders();
   const byC={};owe.forEach(o=>{const k=nameKey(o.client);if(!byC[k])byC[k]={name:o.client,owed:0,orders:[],worstDu:9999};byC[k].owed+=orderOutstandingBase(o);byC[k].orders.push(o);const du=daysUntil(o.due);if(du!==null&&du<byC[k].worstDu)byC[k].worstDu=du;});
   const list=Object.keys(byC).map(k=>Object.assign({key:k},byC[k])).sort((a,b)=>a.worstDu-b.worstDu);
   const total=list.reduce((s,c)=>s+c.owed,0);
@@ -13378,7 +13717,84 @@ function openChaseList(){
     const open=getCustomers()[c.key]?`openCustomer('${c.key}')`:`openDetail('${firstId}')`;
     return `<div class="bd-row" style="cursor:pointer" onclick="closeModal();${open}"><span class="bl"><b>${esc(c.name)}</b> <span style="color:var(--text-faint)">\u00b7 ${c.orders.length} order${c.orders.length>1?'s':''} \u00b7 ${badge}</span></span><span style="display:flex;align-items:center;gap:8px;white-space:nowrap"><b style="color:${late?'var(--red)':'var(--amber)'}">${cur(c.owed)}</b>${waBtn}${payBtn}</span></div>`;
   }).join(''):'<div class="kv" style="color:var(--text-faint)">Nobody owes anything right now \u2014 all balances are settled.</div>';
+  const hr=historyToReview();
+  const hrRow=hr.length?`<div class="bd-row" style="cursor:pointer;border-top:1px solid var(--line);margin-top:8px" onclick="closeModal();openHistoryReview()"><span class="bl"><b>From imported history \u2014 review</b> <span style="color:var(--text-faint)">\u00b7 ${hr.length} balance${hr.length===1?'':'s'}, not being chased</span></span><span class="bv" style="color:var(--text-faint)">${cur(hr.reduce((s,o)=>s+orderOutstandingBase(o),0))} \u203a</span></div>`:'';
   openModal(`<h3>Balances to chase</h3><div class="msub">${activeBranchView==='all'?'all studios':esc(activeBranchView)} \u00b7 ${list.length} client${list.length===1?'':'s'} \u00b7 ${cur(total)} outstanding</div>${listSearch('Search client…','.bd-row',list.length)}${rows}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+}
+/* ---- What to do with a balance that came in from a spreadsheet -----------------------
+   An imported balance is one of three things and only the owner knows which: still owed,
+   settled in cash years ago and never written down, or never coming. Guessing any of them
+   is wrong, so the app does none of it automatically and asks instead. */
+function reviewChase(id){
+  if(!canReceivables())return;
+  const list=rawOrders(),o=list.find(x=>x.id===id);if(!o)return;
+  o.chaseOk=true;save('layi_dash_orders',list);
+  logAudit('Imported balance moved to the chase list',(o.id||'')+' \u00b7 '+(o.client||''));
+  if(typeof toast==='function')toast('Now in the chase list');
+  renderAll();openHistoryReview();
+}
+function reviewSettled(id){
+  if(!can('money'))return;
+  const list=rawOrders(),o=list.find(x=>x.id===id);if(!o)return;
+  const owed=orderOutstanding(o);if(owed<=0)return;
+  const at=new Date().toISOString();
+  /* Dated TODAY, not back at the order, because that is when the studio decided it: a
+     payment invented into a year that is already closed would change books they have
+     filed. The note says where it came from. */
+  const t=getTxns();
+  t.push({id:uid('t'),dir:'in',label:(o.client||'Client')+' \u00b7 settled on review ('+o.id+')',
+    amount:owed*ofx(o),ccy:ocur(o),amtCcy:owed,at:at,orderId:o.id,branch:branchOf(o),method:'',
+    channel:'Imported',historical:true,
+    note:'Imported balance marked settled on review. The original payment predates this app.'});
+  setTxns(t);
+  o.paid=(+o.paid||0)+owed;save('layi_dash_orders',list);
+  logAudit('Imported balance marked settled',(o.id||'')+' \u00b7 '+cur(owed*ofx(o)));
+  if(typeof toast==='function')toast('Marked settled');
+  renderAll();openHistoryReview();
+}
+function reviewWriteOff(id){
+  if(!can('money'))return;
+  const list=rawOrders(),o=list.find(x=>x.id===id);if(!o)return;
+  const owed=orderOutstanding(o);if(owed<=0)return;
+  if(!confirm('Write off '+curO(owed,o)+' from '+(o.client||'this client')+'? It becomes a loss in your expenses and stops being money owed.'))return;
+  const t=getTxns();
+  /* An expense, never a negative sale. Revenue is what arrived; a write-off is what did
+     not, and putting it anywhere near revenue would make a bad year look like a good one
+     with a correction in it. */
+  t.push({id:uid('t'),dir:'out',label:(o.client||'Client')+' \u00b7 bad debt written off ('+o.id+')',
+    amount:owed*ofx(o),at:new Date().toISOString(),orderId:o.id,branch:branchOf(o),
+    cat:'bad debt',category:'Bad debt',method:'',writeOff:true});
+  setTxns(t);
+  o.writeOff=(+o.writeOff||0)+owed;save('layi_dash_orders',list);
+  logAudit('Imported balance written off',(o.id||'')+' \u00b7 '+cur(owed*ofx(o)));
+  if(typeof toast==='function')toast('Written off to expenses');
+  renderAll();openHistoryReview();
+}
+/* The group itself. Deliberately its own screen rather than a section inside the chase
+   list, because everything in the chase list is something to do today and nothing in here
+   is until somebody says so. */
+function openHistoryReview(){
+  if(!canReceivables())return;
+  const list=historyToReview().sort((a,b)=>orderOutstandingBase(b)-orderOutstandingBase(a));
+  const total=list.reduce((s,o)=>s+orderOutstandingBase(o),0);
+  const rows=list.length?list.map(function(o){
+    const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'';
+    const acts=[
+      '<button class="btn sm ghost" onclick="event.stopPropagation();reviewChase(\''+o.id+'\')">Chase</button>',
+      can('money')?'<button class="btn sm ghost" onclick="event.stopPropagation();reviewSettled(\''+o.id+'\')">Mark settled</button>':'',
+      can('money')?'<button class="btn sm ghost" style="color:var(--red)" onclick="event.stopPropagation();reviewWriteOff(\''+o.id+'\')">Write off</button>':''
+    ].filter(Boolean).join('');
+    return '<div class="bd-row" style="align-items:flex-start;flex-wrap:wrap;gap:8px">'+
+      '<span class="bl" style="flex:1;min-width:150px"><b>'+esc(o.client||'Client')+'</b>'+
+      '<span style="color:var(--text-faint)"> \u00b7 '+esc(o.id)+(when?' \u00b7 '+esc(when):'')+'</span></span>'+
+      '<span class="bv" style="color:var(--amber)">'+curO(orderOutstanding(o),o)+'</span>'+
+      '<span style="flex:1 0 100%;display:flex;gap:6px;flex-wrap:wrap">'+acts+'</span></div>';
+  }).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing from an import is waiting on a decision.</div>';
+  openModal('<h3>From imported history \u2014 review</h3>'+
+    '<div class="msub">'+list.length+' balance'+(list.length===1?'':'s')+' \u00b7 '+cur(total)+' \u00b7 nothing here is being chased</div>'+
+    '<div class="kv" style="color:var(--text-faint);margin-bottom:10px">These came in with your history. Some were settled in cash and never written down. Decide each one: chase it, mark it settled, or write it off.</div>'+
+    rows+
+    '<div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Close</button></div>');
 }
 // Cash-basis profit for a period+branch: what came in, what went out, and what's left — with every line drillable.
 function openProfitBreakdown(period,custom){

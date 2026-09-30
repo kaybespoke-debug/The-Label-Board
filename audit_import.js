@@ -97,6 +97,245 @@ const mixed=run("(function(){var a=[];for(var i=0;i<300;i++){a.push(uid('t'));a.
 if(mixed.length!==new Set(mixed).size)F('two different kinds of record were given the same id');
 if(!run("uid('t')").indexOf('t-')===0)F('an id no longer says what kind of record it is');
 
+/* ===================================================================================
+   HISTORY IS NOT WORK, 30 September
+
+   Four bugs, found by audit and fixed before October's studios start importing. Three of
+   them share a shape: the importer wrote a record that looked live, and every other part
+   of the app believed it.
+
+     - an order delivered in 2024 arrived at the first production stage, so it sat on the
+       board as work, in the chase list, and overdue against a date long gone
+     - its deposit was written onto the order and never became a transaction, and the
+       headline money figures in this app are CASH basis, so a studio importing three
+       years of history got correct balances and an empty revenue chart
+     - "unpaid" contains "paid", and the test was not anchored, so a row the studio had
+       explicitly marked unpaid came in paid in full
+
+   The fourth was a lookup reading fields nothing wrote. All four are asserted here, at
+   the level that matters: not that the code says the right words, but that a file with
+   real statuses in it produces the right records, the right money and the right silence.
+   =================================================================================== */
+{
+const HCSV=[
+ 'client,item,price,deposit,status,stage,date,ref',
+ '"Hist A","Agbada",85000,85000,paid,delivered,2024-02-20,HA-1',
+ '"Hist B","Kaftan",60000,20000,partial,cutting,2024-06-11,HA-2',
+ '"Hist C","Gele",15000,0,unpaid,,2025-01-05,HA-3',
+ '"Hist D","Two piece",120000,50000,partial,"wibble",2025-03-09,HA-4'
+].join('\n');
+const hres=run("(function(){var r=parseCSV("+JSON.stringify(HCSV)+");return impById('orders').apply(r,r[0]);})()");
+const H=id=>run("JSON.stringify(getOrders().find(function(o){return o.id==='web-"+id+"';})||null)");
+const ord=id=>{const j=H(id);return j==='null'?null:JSON.parse(j);};
+
+// --- the flag is real, not a word in a notes field
+['HA-1','HA-2','HA-3','HA-4'].forEach(function(id){
+  const o=ord(id);
+  if(!o)F('imported order '+id+' was not created');
+  else if(o.historical!==true)F('imported order '+id+' carries no historical flag, so every screen treats it as live work');
+});
+if(run("typeof isHistorical")!=='function')F('there is no way to ask whether a record is history');
+
+// --- status becomes a stage, and an unknown one says so instead of guessing quietly
+{const a=ord('HA-1'),b=ord('HA-2'),c=ord('HA-3'),d=ord('HA-4');
+ const at=i=>run("STAGES["+i+"]");
+ if(a&&at(a.stageIndex)!=='Delivered')F('a delivered order was not filed as delivered (got '+at(a.stageIndex)+')');
+ if(b&&at(b.stageIndex)!=='Cutting')F('an in-progress status did not map to its stage (got '+(b?at(b.stageIndex):'?')+')');
+ if(c&&(+c.stageIndex||0)!==0)F('a blank status did not stay at the first stage');
+ if(d&&(+d.stageIndex||0)!==0)F('an unrecognised status did not stay at the first stage');
+ if(!(hres.unknownStatuses||[]).length)F('an unrecognised status was swallowed; the owner is never told which rows to fix');
+ else if(hres.unknownStatuses.indexOf('wibble')<0)F('the unrecognised status reported is not the one in the file: '+JSON.stringify(hres.unknownStatuses));
+ // a payment word in the status column is money, not a stage
+ if(run("importStageFor('paid').known")!==false)F('\"paid\" is being read as a production stage');
+ if(run("importStageFor('delivered').index")!==run("STAGES.indexOf('Delivered')"))F('delivered does not map to Delivered');
+}
+
+// --- "unpaid" is not "paid"
+{const c=ord('HA-3');
+ if(c&&(+c.paid||0)!==0)F('an order the studio marked unpaid was imported as paid '+c.paid+'; \"unpaid\" contains \"paid\" and the test was not anchored');
+ const a=ord('HA-1');
+ if(a&&(+a.paid||0)!==85000)F('an order marked paid did not come in paid');
+ const b=ord('HA-2');
+ if(b&&(+b.paid||0)!==20000)F('a part payment was not kept (got '+(b?b.paid:'?')+')');
+}
+
+// --- delivered and settled goes to finished orders, not the board
+if((hres.toFinished||0)<1)F('a delivered, fully paid import did not reach finished orders');
+if(run("prodOrders().filter(function(o){return isHistorical(o);}).length")!==0)
+  F('history is on the production board, which is the bench being handed years of finished work');
+if(run("chaseOrders().filter(function(o){return isHistorical(o);}).length")!==0)
+  F('history is in the chase list, so a client will be rung about a job they collected in 2024');
+if(run("getOrders().filter(function(o){return isHistorical(o)&&orderAttention(o)!==null;}).length")!==0)
+  F('history is raising attention, so it reads as late or failed');
+// and no message can leave about one, whatever calls it
+if(!/function waOnEvent\(kind,o\)\{try\{[^}]*isHistorical\(o\)\)return;/.test(html))
+  F('the WhatsApp seam does not refuse a historical record, so a client can be messaged about an old job');
+
+// --- the money reaches the books, at its own date
+{/* scoped to this file's own refs: an earlier case in this gate imports an order too */
+ const tx=JSON.parse(run("JSON.stringify(getTxns().filter(function(t){return t.historical&&/^web-HA-/.test(t.importRef||'');}))"));
+ if(tx.length!==3)F('expected 3 payments from 4 imported orders (one has no deposit), got '+tx.length);
+ const a=tx.find(t=>t.importRef==='web-HA-1');
+ if(!a)F('a paid imported order created no payment, so its money never reaches Revenue');
+ else{
+   if(String(a.at).slice(0,10)!=='2024-02-20')F('an imported payment is dated when the file was uploaded, not when the money arrived (got '+String(a.at).slice(0,10)+')');
+   if(+a.amount!==85000)F('an imported payment has the wrong amount');
+   if(a.dir!=='in')F('an imported payment is not money in');
+   if(a.channel!=='Imported')F('an imported payment is not tagged as imported (got '+a.channel+')');
+ }
+ if(tx.some(t=>t.importRef==='web-HA-3'))F('an unpaid order created a payment out of nothing');
+ if(run("IN_CHANNELS.indexOf('Imported')")<0)F('Imported is not a channel the Money In hub knows, so the money lands under Other');
+ if(!(hres.revenueByYear&&hres.revenueByYear['2024']))F('the summary does not say how much money each year gained');
+}
+
+// --- re-running changes nothing at all
+{const before=run("getTxns().length"),bo=run("getOrders().length");
+ const again=run("(function(){var r=parseCSV("+JSON.stringify(HCSV)+");return impById('orders').apply(r,r[0]);})()");
+ if(again.added!==0)F('re-importing the same orders added '+again.added+' again');
+ if(again.txns!==0)F('re-importing created '+again.txns+' duplicate payment(s)');
+ if(run("getTxns().length")!==before)F('re-importing changed the number of transactions');
+ if(run("getOrders().length")!==bo)F('re-importing changed the number of orders');
+}
+
+// --- the finances file warns rather than silently doubling the same money
+if(run("typeof importedMoneyOverlap")!=='function')F('nothing checks whether a finances file is re-adding money the orders file already brought in');
+else{const ov=JSON.parse(run("JSON.stringify(importedMoneyOverlap('2024-01-01','2025-12-31'))"));
+ if(!ov.count)F('the overlap check cannot see payments the orders file created');
+ const fcsv='date,type,amount,note\n2024-02-20,income,85000,"Hist A deposit"\n';
+ const fres=run("(function(){var r=parseCSV("+JSON.stringify('date,type,amount,note\n2024-02-20,income,85000,"Hist A deposit"\n')+");return impById('fin').apply(r,r[0]);})()");
+ if(!fres.overlap||!fres.overlap.count)F('importing finances over the same period said nothing about the money already there');
+}
+
+// --- the summary tells the owner all of it
+{const html2=run("importSummaryHTML("+JSON.stringify(hres)+")");
+ [['Filed as history','how much was filed as history'],['finished orders','what went to finished orders'],
+  ['Left on the board','what stayed on the board'],['Payments recorded','how many payments were created'],
+  ['Money added, 2024','what each year gained'],['not recognised','which statuses it could not place']]
+  .forEach(function(pair){if(html2.indexOf(pair[0])<0)F('the post-import summary does not say '+pair[1]);});}
+}
+
+/* --- A spreadsheet is a file a studio actually has ---------------------------------- */
+if(!/accept="[^"]*\.xlsx/.test(html))F('the import picker still refuses an Excel file while the screen says it accepts one');
+['loadSheetJS','sheetToRows','isSpreadsheetName','impRowsReady'].forEach(function(fn){
+  if(run('typeof '+fn)!=='function')F('spreadsheet import is missing '+fn+'()');
+});
+if(run("isSpreadsheetName('books.xlsx')")!==true||run("isSpreadsheetName('books.csv')")!==false)
+  F('a spreadsheet is not told apart from a CSV by its name');
+// every importer offers a template to start from
+imps.forEach(function(i){if(!i.hasTpl)F(i.key+' has no downloadable template');});
+
+/* --- A code that matches, and a name when there is no code -------------------------- */
+if(run("blankVariant().sku")!=='')F('a new size/colour cannot carry a code');
+if(!/id="pp_sku"/.test(html))F('the product editor has no SKU field, while the website matcher reads one');
+{run("setProducts([{id:'p-sku',name:'Linen Shirt',category:'Shirt',sku:'LIN-01',price:1000,cost:400,variants:[{id:'v1',size:'M',color:'Blue',qty:5,sku:'LIN-01-M'}],active:true}]);");
+ run("clearWebUnmatched();");
+ if(run("webDecrementStock('LIN-01-M',1,'all')")!==true)F('a variant SKU does not match, and that is the field the matcher was always reading');
+ if(run("webDecrementStock('LIN-01',1,'all')")!==true)F('a product SKU does not match');
+ // the fallback: no code on the line, only the name
+ if(run("webDecrementStock('',1,'all',{name:'Linen Shirt'})")!==true)F('a line with no code does not fall back to matching on the product name');
+ // and what it cannot place is recorded rather than dropped
+ run("clearWebUnmatched();webDecrementStock('NOPE-99',1,'all',{name:'Not a product'});");
+ if(run("webUnmatchedLines().length")!==1)F('a website line that matched nothing was dropped silently');
+ else if(run("webUnmatchedLines()[0].reason")!=='no product matched')F('an unmatched line does not say why');
+}
+
+/* ===================================================================================
+   WHAT TO DO WITH AN IMPORTED BALANCE, 30 September
+
+   An imported balance is one of three things and only the owner knows which: still owed,
+   settled in cash years ago and never written down, or never coming. The app guesses
+   none of them. It shows the money, chases nobody, and offers the three answers.
+   =================================================================================== */
+{
+const RCSV=[
+ 'client,item,price,deposit,status,stage,date,ref',
+ '"Rev A","Agbada",100000,100000,paid,delivered,2024-01-10,RV-1',
+ '"Rev B","Kaftan",150000,90000,partial,collected,2024-05-02,RV-2',
+ '"Rev C","Gele",80000,10000,partial,cutting,2024-09-09,RV-3'
+].join('\n');
+run("(function(){var r=parseCSV("+JSON.stringify(RCSV)+");return impById('orders').apply(r,r[0]);})()");
+const g=id=>{const j=run("JSON.stringify(getOrders().find(function(o){return o.id==='web-"+id+"';})||null)");return j==='null'?null:JSON.parse(j);};
+
+/* --- delivered history is finished work, balance or no balance ------------------- */
+{const b=g('RV-2');
+ if(!b)F('the review fixture did not import');
+ else{
+   if(run("STAGES["+b.stageIndex+"]")!=='Delivered')F('a collected order did not map to Delivered');
+   if(run("orderIsSettled(getOrders().find(function(o){return o.id==='web-RV-2';}))")!==true)
+     F('a delivered imported order with a balance is still on the live side; delivered history is finished work');
+ }
+ // and the balance is still counted, because load() merges both halves back
+ const owed=run("getOrders().filter(function(o){return o.id==='web-RV-2';}).reduce(function(n,o){return n+orderOutstanding(o);},0)");
+ if(owed!==60000)F('the balance on a finished imported order stopped being owed (got '+owed+')');
+ // a LIVE order that is delivered and still owed for must NOT be archived; that rule stands
+ const deli=run("STAGES.indexOf('Delivered')");
+ if(run("orderIsSettled({stageIndex:"+deli+",value:1000,paid:0,outfits:[{price:1000}]})")!==false)
+   F('a live delivered order that is still owed for is being archived, which stops it syncing');
+}
+
+/* --- nothing is chased until somebody says so ------------------------------------- */
+if(run("typeof historyToReview")!=='function')F('there is no group for imported balances waiting on a decision');
+if(run("historyToReview().length")<2)F('imported balances are not reaching the review group');
+if(run("chaseOrders().filter(function(o){return isHistorical(o);}).length")!==0)
+  F('an imported balance is being chased before anybody chose to chase it');
+['reviewChase','reviewSettled','reviewWriteOff','openHistoryReview'].forEach(function(fn){
+  if(run('typeof '+fn)!=='function')F('the review group is missing '+fn+'()');
+});
+
+/* --- Chase: it joins the ordinary list, and only it ------------------------------- */
+{const before=run("chaseOrders().length");
+ run("reviewChase('web-RV-3');");
+ if(run("chaseOrders().length")!==before+1)F('choosing to chase an imported balance did not add it to the chase list');
+ if(run("chaseOrders().filter(function(o){return o.id==='web-RV-3';}).length")!==1)F('the wrong order joined the chase list');
+ if(run("historyToReview().filter(function(o){return o.id==='web-RV-3';}).length")!==0)F('a balance that is now being chased is still waiting on a decision');
+ if(!run("getOrders().find(function(o){return o.id==='web-RV-3';}).historical"))F('choosing to chase stopped it being history, so it is back on the production board');
+ if(run("prodOrders().filter(function(o){return o.id==='web-RV-3';}).length")!==0)F('a chased imported balance went onto the production board');
+}
+
+/* --- Mark settled: a payment today, not one invented into a closed year ----------- */
+{const owedBefore=run("orderOutstanding(getOrders().find(function(o){return o.id==='web-RV-2';}))");
+ const nBefore=run("getTxns().length");
+ run("reviewSettled('web-RV-2');");
+ if(run("getTxns().length")!==nBefore+1)F('marking an imported balance settled recorded no payment');
+ const t=JSON.parse(run("JSON.stringify(getTxns()[getTxns().length-1])"));
+ if(t.dir!=='in')F('a settled balance was not recorded as money in');
+ if(+t.amount!==owedBefore)F('the settling payment is not the amount that was owed');
+ if(String(t.at).slice(0,10)!==new Date().toISOString().slice(0,10))
+   F('the settling payment was backdated into a year the studio has already closed');
+ if(!/settled/i.test(String(t.note||'')+String(t.label||'')))F('the settling payment does not say what it is');
+ if(run("orderOutstanding(getOrders().find(function(o){return o.id==='web-RV-2';}))")!==0)
+   F('a balance marked settled is still owed');
+}
+
+/* --- Write off: a loss in the expenses, and nowhere near revenue ------------------ */
+{run("(function(){var r=parseCSV('client,item,price,deposit,status,date,ref\\n\"Rev D\",\"Suit\",200000,0,unpaid,2024-03-03,RV-4');return impById('orders').apply(r,r[0]);})()");
+ const owed=run("orderOutstanding(getOrders().find(function(o){return o.id==='web-RV-4';}))");
+ if(owed!==200000)F('the write-off fixture did not import with a balance (got '+owed+')');
+ const inBefore=run("getTxns().filter(function(t){return t.dir==='in';}).reduce(function(n,t){return n+(+t.amount||0);},0)");
+ run("reviewWriteOff('web-RV-4');");
+ const t=JSON.parse(run("JSON.stringify(getTxns()[getTxns().length-1])"));
+ if(t.dir!=='out')F('a write-off was not recorded as money out');
+ if(+t.amount!==owed)F('the write-off is not the amount that was owed');
+ if(!/bad debt/i.test(String(t.category||'')+String(t.cat||'')))F('a write-off is not categorised as a bad debt');
+ const inAfter=run("getTxns().filter(function(t){return t.dir==='in';}).reduce(function(n,t){return n+(+t.amount||0);},0)");
+ if(inAfter!==inBefore)F('writing off a debt changed revenue; it is a loss, not a negative sale');
+ if(run("orderOutstanding(getOrders().find(function(o){return o.id==='web-RV-4';}))")!==0)
+   F('a written-off balance is still being counted as owed');
+ if(run("getOrders().find(function(o){return o.id==='web-RV-4';}).paid")>0)
+   F('a write-off was recorded as though the client had paid');
+}
+}
+
+/* --- The spreadsheet reader is pinned, checked, and says so when it cannot load --- */
+if(!/xlsx@0\.18\.5\/dist\/xlsx\.full\.min\.js/.test(html))
+  F('the spreadsheet reader is not pinned to an exact version, so the CDN decides what this app runs');
+if(!/sc\.integrity='sha384-/.test(html))
+  F('the spreadsheet reader is loaded without an integrity hash, so a changed file on the CDN would run unchallenged');
+if(!/sc\.crossOrigin='anonymous'/.test(html))
+  F('integrity cannot be checked without crossOrigin, so the hash is decoration');
+if(!/st\.blocked/.test(html))
+  F('a spreadsheet that cannot be read leaves the screen saying nothing');
+
 console.log('Import / migrate audit:');
 console.log('  importers: '+imps.map(i=>i.key).join(', '));
 console.log('  customers: +'+c1.added+' new, re-run updated '+c2.updated+'; order deposit kept: '+(ord?ord.paid:'n/a'));
