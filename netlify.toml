@@ -14,8 +14,12 @@
 #
 # On admin-deploy it reads publish = "admin". If a merge brings that version
 # here, this site stops serving the customer app and starts serving the admin
-# console to every studio on the platform. Git will not warn you: main is an
-# ancestor of admin-deploy, so the merge is clean.
+# console to every studio on the platform. Git will not warn you, because
+# nothing about the merge is broken: it is a clean merge of a real branch.
+#
+# (This used to say main was an ancestor of admin-deploy. As of 30 September
+# it is not: work moved to main and main is 29 commits ahead. The warning
+# below stands either way, which is why only the reason changed.)
 #
 # Merging admin-deploy into main, safely:
 #

@@ -65,40 +65,73 @@ explains what each gate exists to catch.
 
 ## Branches and deploys
 
-- `main` publishes `site/` — **the customer app ships from here** — and also
-  `web/`, the public website at thelabelboard.com
-- `admin-deploy` publishes `admin/` — the operator console — and `partners/`,
-  the partner portal
+**Work on `main`. Release from `main`. There is no merge step any more.**
 
-This file used to say `web/` was not connected to Netlify. It is, and has been
-since the domain settled: a push to `main` rebuilds the marketing site as well
-as the app. That was believed for a whole session and cost a wrong answer, so
-check a claim like this against the Netlify dashboard rather than against this
-paragraph.
+- `main` publishes `site/`, the customer app, and `web/`, the marketing site
+  at thelabelboard.com. A push rebuilds both.
+- `admin-deploy` publishes `admin/`, the operator console. It is **not a
+  working branch**, and has not been one since the middle of September.
 
-Day-to-day work happens on `admin-deploy`. Releasing the customer app means
-merging it into `main`.
+This section used to say the opposite: that day-to-day work happened on
+`admin-deploy` and reaching `main` meant a merge. It stopped being true and
+the file did not notice, so on 30 September a session read it, committed to
+the branch it named, and had the push refused as out of place. By then `main`
+was **29 commits ahead** of `admin-deploy`, including `Release layi-v66`. The
+repo had been working this way for a fortnight.
 
-**The one thing to get right when you do.** The root `netlify.toml` is
-deliberately different on the two branches: `publish = "site"` on `main`,
-`publish = "admin"` on `admin-deploy`. Git will not warn you, because `main`
-is an ancestor of `admin-deploy` and the merge is clean — it simply
-fast-forwards the admin config over main's, and the customer app's site starts
-serving the admin console to every studio.
+That is the second time this file has described a deploy arrangement that had
+already changed. Check a claim like this against `git log` and the Netlify
+dashboard before you act on it, not against this paragraph.
 
-So merge like this:
+### What `admin-deploy` is still for
+
+One thing: its `netlify.toml` says `publish = "admin"`, so the console's
+Netlify site has a branch that serves the console rather than the customer
+app. That is the whole of it.
+
+Measured on 30 September, `admin-deploy` holds **no content that `main` does
+not**, except that one line:
+
+- `admin/` and `partners/` are byte-identical on both branches, so the console
+  and the portal are not running behind. Nothing published from this branch is
+  stale.
+- no file exists on `admin-deploy` that is missing from `main`.
+- `admin-deploy` is 29 commits behind on `site/`, `web/`, `supabase/` and the
+  docs. That costs nothing to what it publishes, but it does mean **anyone
+  reading the repo while checked out on `admin-deploy` is reading a fortnight
+  of stale documentation.** Read the docs on `main`.
+
+`partners/` is listed in the old text as publishing from here too. That could
+not be confirmed from the repo: a `netlify.toml` sets one publish directory
+and this one sets `admin`, so the portal's site must have its own directory
+set in the dashboard. Check there before relying on it either way.
+
+### If you ever do merge the two
+
+The root `netlify.toml` is deliberately different: `publish = "site"` on
+`main`, `publish = "admin"` on `admin-deploy`. Git will not warn you. A clean
+merge takes the admin config over main's, and the customer app's site starts
+serving the operator console to every studio.
 
 ```bash
 git checkout main && git merge --no-ff --no-commit admin-deploy && git checkout HEAD -- netlify.toml && git commit
 ```
 
-Both copies of the file carry the same warning and the same recipe, so you do
-not have to remember it. The permanent fix is to set each site's publish
-directory in the Netlify dashboard and delete the file — a settings change on
-live sites, so it is Kayode's call, not a commit.
+Both copies of the file carry the same warning and the same recipe. The
+permanent fix is to set each site's publish directory in the Netlify dashboard
+and delete the file, which is a settings change on live sites and so Kayode's
+call rather than a commit.
 
-Bump `CACHE` in `site/sw.js` before every release, or installed phones keep
-serving the old version.
+### Releasing
+
+1. `node verify.js`, and `node audit_safearea.js` after any stylesheet or
+   table change
+2. Bump `APP_VERSION` in `site/layi_dashboard.html` **and** `CACHE` in
+   `site/sw.js` to the same value. `audit_build_stamp` fails if they disagree,
+   because a version that disagrees with the service worker reports a fix as
+   landed while the browser is still serving the build before it. Installed
+   phones keep the old version until `CACHE` moves.
+3. Commit on `main` and push. Netlify does the rest.
 
 ## The database
 
