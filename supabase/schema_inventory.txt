@@ -15,6 +15,23 @@ col account_directory.operator_role
 col account_directory.partner_code
 col account_directory.studio
 col account_directory.studio_role
+col app.backup_runs.attempted
+col app.backup_runs.detail
+col app.backup_runs.failed
+col app.backup_runs.finished_at
+col app.backup_runs.id
+col app.backup_runs.started_at
+col app.backup_runs.succeeded
+col app.studio_backups.business_id
+col app.studio_backups.bytes
+col app.studio_backups.export_version
+col app.studio_backups.id
+col app.studio_backups.payload
+col app.studio_backups.sha256
+col app.studio_backups.taken_at
+col app.unprotected_tables.is_tenant_table
+col app.unprotected_tables.schema_name
+col app.unprotected_tables.table_name
 col app_state.business_id
 col app_state.data
 col app_state.key
@@ -556,6 +573,7 @@ fn app.audit_business() -> trigger
 fn app.audit_invitation() -> trigger
 fn app.audit_membership() -> trigger
 fn app.audit_permissions() -> trigger
+fn app.backup_health() -> TABLE(business_id uuid, studio text, backups integer, newest timestamp with time zone, hours_old numeric, bytes bigint, intact boolean)
 fn app.bump_order_rev() -> trigger
 fn app.can(p_business uuid, p_perm text) -> boolean
 fn app.can_here(p_business uuid, p_perm text, p_branch uuid) -> boolean
@@ -578,6 +596,7 @@ fn app.enforce_table_feature() -> trigger
 fn app.ensure_billing_record(p_business uuid) -> uuid
 fn app.error_reports_recently(p_business uuid) -> integer
 fn app.export_studio(p_business uuid) -> jsonb
+fn app.export_studio_raw(p_business uuid) -> jsonb
 fn app.feature_refusal(p_feature text) -> text
 fn app.flag(p_key text) -> boolean
 fn app.guard_business_identity() -> trigger
@@ -646,9 +665,11 @@ fn app.stamp_transaction() -> trigger
 fn app.storage_cap_for(p_business uuid) -> bigint
 fn app.storage_has_room(p_business uuid) -> boolean
 fn app.strip_credentials_from_state() -> trigger
+fn app.take_studio_backups(p_retain integer) -> jsonb
 fn app.tlb_staff_id() -> uuid
 fn app.trial_days() -> integer
 fn app.usage_for(p_business uuid) -> TABLE(studios integer, seats integer, max_studios integer, max_seats integer)
+fn app.verify_studio_backup(p_id uuid) -> jsonb
 fn app.void_pending_on_churn() -> trigger
 fn app.write_perm_for_key(p_key text) -> text
 fn public.accept_invitation(p_invitation_id uuid) -> TABLE(joined_business uuid, joined_name text, joined_role text)

@@ -147,7 +147,15 @@ if(Math.round(sumBr)!==Math.round(allV))
 
 /* 6) The panel exists, is filled, and stays away when it would say nothing. ---------- */
 if(html.indexOf('id="dashMethodPanel"')<0)F('there is nowhere on the dashboard for the split to show');
-run("demoLogin();currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';");
+/* THE PANEL IS PERIOD-SCOPED, AND THIS CHECK IS NOT ABOUT THE CALENDAR.
+   What the dashboard draws is methodMix(dashApptPeriod, dashApptCustom), so
+   on any day when none of the demo's made-to-measure work falls inside the
+   current month the panel is right and this gate failed anyway. That is how
+   it came to be red against production code with nothing wrong with the
+   product — a check that depends on today's date tells you about today.
+   Rendered over all time, it tests what it meant to: that the panel names
+   each way of working it has data for. */
+run("demoLogin();currentUser=getUsers().find(u=>u.roleId==='owner');activeBranchView='all';dashApptPeriod='all';dashApptCustom='';");
 // renderActivity() is the dashboard renderer. Calling it is the point: the panel is built
 // there, so a check that only read methodMix() would pass with nothing on screen.
 let threwDash='';

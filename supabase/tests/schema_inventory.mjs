@@ -34,11 +34,13 @@ const snapshot = join(repo, 'supabase/schema_inventory.txt');
 
 const LIVE_SQL = `with l as (
   select 'col ' || table_name || '.' || column_name as t from information_schema.columns where table_schema='public'
+  union all select 'col app.' || table_name || '.' || column_name from information_schema.columns where table_schema='app'
   union all select 'fn app.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') -> ' || pg_get_function_result(p.oid)
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app'
   union all select 'fn public.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') -> ' || pg_get_function_result(p.oid)
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'
   union all select 'pol ' || tablename || '.' || policyname from pg_policies where schemaname='public'
+  union all select 'pol app.' || tablename || '.' || policyname from pg_policies where schemaname='app'
   union all select 'trg ' || c.relname || '.' || t.tgname from pg_trigger t join pg_class c on c.oid=t.tgrelid
     join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not t.tgisinternal
 )
@@ -61,6 +63,12 @@ const lines = [];
 const add = (rows, fn) => { for (const r of rows) lines.push(fn(r)); };
 add((await db.query(`select table_name t, column_name c from information_schema.columns
   where table_schema='public'`)).rows, r => 'col ' + r.t + '.' + r.c);
+/* THE app SCHEMA WAS NOT IN THIS COUNT, and it holds tables now. The nightly
+   backups live in app.studio_backups and app.backup_runs, deliberately out
+   of PostgREST's reach — which also put them out of the drift check's reach.
+   A fingerprint that cannot see a table cannot tell you when it disappears. */
+add((await db.query(`select table_name t, column_name c from information_schema.columns
+  where table_schema='app'`)).rows, r => 'col app.' + r.t + '.' + r.c);
 /* THE RETURN TYPE IS PART OF A FUNCTION'S IDENTITY, and leaving it out cost
    the partner portal. public.partner_me() was declared to return eleven
    columns while the function it selected from returned fourteen; every
@@ -77,6 +85,8 @@ add((await db.query(`select p.proname p, pg_get_function_identity_arguments(p.oi
   r => 'fn public.' + r.p + '(' + r.a + ') -> ' + r.r);
 add((await db.query(`select tablename t, policyname p from pg_policies where schemaname='public'`)).rows,
   r => 'pol ' + r.t + '.' + r.p);
+add((await db.query(`select tablename t, policyname p from pg_policies where schemaname='app'`)).rows,
+  r => 'pol app.' + r.t + '.' + r.p);
 add((await db.query(`select c.relname t, g.tgname g from pg_trigger g join pg_class c on c.oid=g.tgrelid
   join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not g.tgisinternal`)).rows,
   r => 'trg ' + r.t + '.' + r.g);

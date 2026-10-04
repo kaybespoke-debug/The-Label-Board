@@ -39,7 +39,7 @@ const DB = [
   'trial_harness', 'account_directory_harness', 'storage_rls_harness',
   'lifecycle_harness', 'restore_harness', 'subscription_harness', 'cross_app_harness',
   'upgrade_harness', 'orders_migration_harness', 'money_concurrency_harness',
-  'recovery_drill', 'partner_portal_harness',
+  'recovery_drill', 'backup_harness', 'partner_portal_harness',
   'team_invite_harness',
 ].map(n => ['node', ['supabase/tests/' + n + '.mjs'], n.replace(/_/g, ' ')]);
 
@@ -48,7 +48,15 @@ const INVENTORY = [
 ];
 
 /* Real sessions against staging. These are the ones that were never in a
-   release command, which is the whole reason the mutations survived. */
+   release command, which is the whole reason the mutations survived.
+
+   THEY SHARE FIXTURES AND MUST NOT RUN CONCURRENTLY with each other or with
+   anything else pointed at staging. They sign the same seeded people into
+   the same seeded studios and clean up after themselves; two at once is two
+   suites clearing each other's members mid-run. A "per-key permissions"
+   failure that passes when run alone is almost always this. They run in
+   series here deliberately — do not be tempted to parallelise them for the
+   ten minutes it would save. */
 const STAGING_PROBES = [
   ['node', ['tools/credential_probe.js'], 'no credential reachable by a membership'],
   ['node', ['tools/sensitive_data_probe.js'], 'costs, contacts and an honest audit trail'],
