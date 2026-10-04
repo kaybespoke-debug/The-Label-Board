@@ -5,7 +5,87 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 30 September 2026 (twenty-second session)
+Last updated: 4 October 2026 (twenty-third session)
+
+## 4 October 2026 — operational resilience
+
+The audit remediation left one measured weakness: the restore was proven and
+the RPO was "whenever somebody last pressed the button". That is closed.
+
+**Nightly exports, live on production.** Every active studio, 02:40 UTC, in
+the format `restore_harness` and `recovery_drill` already restore from.
+Checksummed, fourteen nights per studio, pruned per studio. In the `app`
+schema with force-RLS, no policy and no grant. First round: 9 studios, 9
+verified, 562 kB. `backup_harness` is 51 checks and restores a studio from
+one of the AUTOMATIC copies rather than a hand-made one.
+
+`node release.js` is the one command: **31 offline, 42 with `--staging`**.
+
+**What the backups are not:** they live inside the project they back up.
+Supabase deletes a project's backups with the project, so this covers a
+studio wrecked by a bad import — far likelier — and not the provider
+disappearing. **Off-provider copies need a destination decision** (S3, R2,
+Backblaze); the seam reads from `app.studio_backups`.
+
+**`REBUILD.md`** is new: what to do when the project itself is gone. Supabase
+settings, the storage bucket's limits, the ten Edge Function secret NAMES and
+where each goes, the four Netlify sites and the `netlify.toml` trap, Resend,
+DNS including the mail records, and the order to do it in. No secret values.
+
+**Storage recovery is proven** by `tools/storage_recovery_probe.js`: objects
+backed up with their paths, lost, restored byte for byte, walls intact on
+both sides. The tenant association IS the path, so there is nothing else to
+map. Production storage currently holds **0 objects**.
+
+### Measured recovery position
+
+| | automatic? | RPO |
+|---|---|---|
+| Schema | yes, from git | n/a |
+| Studio data | **yes, nightly** | **≤ 24h**, plus Supabase's own daily backup |
+| Platform backup | yes, Pro plan | 24h, **7-day retention** |
+| Storage objects | no | manual, and currently empty |
+| Accounts | no | platform backup only |
+| External config | no | REBUILD.md |
+
+### Three things found by the new tooling
+
+- **The failure-report path was broken and silent.** The backup job wrote
+  `source='backup'`, which both check constraints on `error_reports` refuse,
+  and an `exception when others then null` swallowed it — the round reported
+  its failure count correctly and reported nothing anywhere a person looks.
+- **The mutation drill wrote into `supabase/migrations/`.** A drill killed
+  halfway left SQL that drops the `seeCost` policy sitting in the directory
+  every apply reads. Never committed; now written to a scratch path instead.
+- **`audit_method` was red against production's own code** and had nothing to
+  do with this work: it asserts on a period-scoped panel without setting the
+  period, so it failed on any day the demo's made-to-measure orders fell
+  outside the current month.
+
+### Money and receivables — recommendation, not implemented
+
+Measured on production: **all 56 orders carry `value`, `paid` and `discount`
+inside `orders.doc`**, which every member who can open Orders reads, along
+with `outfits[].price` and `saleItems[].unitPrice`. `orders.total` is a plain
+readable column.
+
+So of the four categories: **internal cost and margin are enforced** (behind
+`seeCost`), **the payment ledger is enforced** (`transactions`, behind
+`receivables`), and **selling price and per-order balance are not enforced at
+all**.
+
+The agreed role model already answers it — `headprod` has `orders` but not
+`money`; `staff` has `money` but not `receivables` — so the gap is between
+the stated model and the enforcement, not a product question. **But making it
+real is a P2-sized release**, not a tweak: price lives in four places plus a
+column, and gating it changes what every role sees on the order list. It is
+Kayode's call when, not whether.
+
+One genuine inconsistency to settle first: **`accountant` holds `receivables`
+in one studio out of eight** — a seeding difference, and it should be decided
+rather than inherited.
+
+
 
 ## 30 September 2026 — the audit remediation, finished and on production
 
