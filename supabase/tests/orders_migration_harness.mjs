@@ -48,7 +48,20 @@ for (const f of readdirSync(join(repo, 'supabase/migrations')).filter(f => f.end
   try { await db.exec(readFileSync(join(repo, 'supabase/migrations', f), 'utf8')); }
   catch (e) { console.error('  ' + f + ': FAILED — ' + e.message); process.exit(1); }
 }
-console.log('Built from the migrations alone.');
+/* A MUTATION, IF ONE WAS HANDED TO US. tools/mutation_drill.js breaks the
+   security on purpose and requires this suite to go red for it. It used to do
+   that by dropping a .sql file into supabase/migrations — which meant a drill
+   killed halfway left SQL that WEAKENS SECURITY sitting in the directory every
+   apply reads, including a production one. It hands us a path now, and nothing
+   is ever written where a migration could be mistaken for a real one. */
+if (process.env.TLB_MUTATION_SQL) {
+  try {
+    await db.exec(readFileSync(process.env.TLB_MUTATION_SQL, 'utf8'));
+    console.log('Built from the migrations, plus a deliberate mutation.');
+  } catch (e) { console.error('the mutation would not apply: ' + e.message); process.exit(1); }
+} else {
+  console.log('Built from the migrations alone.');
+}
 
 const q = async (sql, p = []) => (await db.query(sql, p)).rows;
 const one = async (sql, p = []) => { const r = await q(sql, p); return r.length ? Object.values(r[0])[0] : null; };

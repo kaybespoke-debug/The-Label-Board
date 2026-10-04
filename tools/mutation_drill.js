@@ -24,9 +24,15 @@ const fs = require('fs');
 const path = require('path');
 
 const repo = process.cwd();
-const MIG = path.join(repo, 'supabase/migrations');
-const STAMP = '20260930999999_mutation_drill_TEMPORARY.sql';
-const STAMP_PATH = path.join(MIG, STAMP);
+/* NOT IN supabase/migrations. The mutations deliberately weaken security, and
+   a drill killed halfway used to leave one there — in the directory every
+   apply reads, named so it sorts last, so the next person to run the
+   migrations would have applied it. It never reached git, because the drill's
+   own guard refused to start and said so, but "it was caught" is not the same
+   as "it was safe". The file goes somewhere no migration runner looks, and
+   the suites are told where by TLB_MUTATION_SQL. */
+const SCRATCH = process.env.TEMP || process.env.TMPDIR || '/tmp';
+const STAMP_PATH = path.join(SCRATCH, 'tlb-mutation-drill.sql');
 
 let pass = 0; const fails = [];
 const ok = (n, c, d = '') => { if (c) { pass++; console.log('  PASS  ' + n); } else { fails.push(n + (d ? ' — ' + d : '')); console.log('  FAIL  ' + n + (d ? ' — ' + d : '')); } };
@@ -75,18 +81,31 @@ const MUTATIONS = [
   },
 ];
 
-function runSuite(file) {
-  const r = spawnSync('node', [file], { encoding: 'utf8', shell: process.platform === 'win32' });
+function runSuite(file, mutationPath) {
+  const r = spawnSync('node', [file], {
+    encoding: 'utf8', shell: process.platform === 'win32',
+    env: Object.assign({}, process.env,
+      mutationPath ? { TLB_MUTATION_SQL: mutationPath } : { TLB_MUTATION_SQL: '' }),
+  });
   return r.status === 0;
 }
 
 /* The mutation is a migration file that sorts last, so it is applied after
    everything it is meant to undo. It is deleted in a finally, and the drill
    refuses to start if one is already lying about from a crashed run. */
-if (fs.existsSync(STAMP_PATH)) {
-  console.error('A mutation file from a previous run is still here:\n  ' + STAMP_PATH +
-                '\nDelete it before running the drill. It must never be committed.');
-  process.exit(1);
+/* A leftover is now harmless — nothing reads that directory — so it is
+   cleared rather than refused. The guard that matters is below: the drill
+   also refuses to run if a mutation file has somehow appeared among the real
+   migrations, which is the state that was dangerous. */
+if (fs.existsSync(STAMP_PATH)) fs.unlinkSync(STAMP_PATH);
+{
+  const stray = fs.readdirSync(path.join(repo, 'supabase/migrations'))
+                  .filter(f => /mutation_drill|TEMPORARY/i.test(f));
+  if (stray.length) {
+    console.error('There is a mutation file among the real migrations:\n  ' +
+      stray.join('\n  ') + '\nDelete it before doing anything else. It weakens security and it must never be applied or committed.');
+    process.exit(1);
+  }
 }
 
 console.log('=== BREAKING THE SECURITY ON PURPOSE ===\n');
@@ -107,8 +126,9 @@ try {
   for (const m of MUTATIONS) {
     fs.writeFileSync(STAMP_PATH,
       '-- TEMPORARY. Written by tools/mutation_drill.js and deleted by it.\n' +
-      '-- If you are reading this in git, something went wrong.\n' + m.sql + '\n');
-    const green = runSuite(m.caught_by);
+      '-- It is deliberately insecure. If you are reading this anywhere that\n' +
+      '-- applies migrations, something went wrong.\n' + m.sql + '\n');
+    const green = runSuite(m.caught_by, STAMP_PATH);
     fs.unlinkSync(STAMP_PATH);
     ok('"' + m.name + '" is caught by ' + path.basename(m.caught_by),
        !green, 'the suite passed with the security deliberately broken');
