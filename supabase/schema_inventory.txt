@@ -190,6 +190,44 @@ col feedback_replies.business_id
 col feedback_replies.feedback_id
 col feedback_replies.id
 col feedback_replies.side
+col material_costs.avg_cost
+col material_costs.branch_id
+col material_costs.business_id
+col material_costs.last_paid
+col material_costs.last_paid_at
+col material_costs.material_id
+col material_costs.updated_at
+col material_move_costs.business_id
+col material_move_costs.move_id
+col material_move_costs.total_cost
+col material_move_costs.unit_cost
+col material_moves.app_key
+col material_moves.at
+col material_moves.branch_id
+col material_moves.business_id
+col material_moves.created_at
+col material_moves.id
+col material_moves.kind
+col material_moves.material_id
+col material_moves.note
+col material_moves.qty
+col material_moves.ref
+col materials.app_id
+col materials.branch_id
+col materials.business_id
+col materials.cat
+col materials.code
+col materials.created_at
+col materials.id
+col materials.name
+col materials.note
+col materials.photo
+col materials.qty
+col materials.reorder
+col materials.subcat
+col materials.supplier_id
+col materials.unit
+col materials.updated_at
 col memberships.branch_id
 col memberships.business_id
 col memberships.closed_from
@@ -622,10 +660,12 @@ fn app.is_platform_admin() -> boolean
 fn app.is_tlb_owner() -> boolean
 fn app.limits_for(p_business uuid) -> TABLE(max_studios integer, max_seats integer)
 fn app.lock_business_seats(p_business uuid) -> void
+fn app.material_cost_changed() -> trigger
 fn app.may_read_key(p_business uuid, p_key text) -> boolean
 fn app.may_write_key(p_business uuid, p_key text) -> boolean
 fn app.media_business_of(p_name text) -> uuid
 fn app.media_usage_sync() -> trigger
+fn app.migrate_materials_to_rows(p_business uuid) -> jsonb
 fn app.migrate_orders_to_rows(p_business uuid) -> TABLE(blob_orders integer, rows_before integer, rows_after integer, blob_total numeric, rows_total numeric, costs_written integer, matched boolean)
 fn app.migrate_payments_to_rows(p_business uuid) -> TABLE(blob_payments integer, rows_before integer, rows_after integer, blob_total numeric, rows_total numeric, matched boolean)
 fn app.my_billing(p_business uuid) -> jsonb
@@ -650,7 +690,9 @@ fn app.plan_allows(p_business uuid, p_feature text) -> boolean
 fn app.plan_storage_bytes(p_plan text) -> bigint
 fn app.provision_studio() -> trigger
 fn app.purge_studio(p_business uuid) -> jsonb
+fn app.recalc_material_average(p_material uuid) -> void
 fn app.recheck_referral_on_payment_method() -> trigger
+fn app.reconcile_materials(p_business uuid) -> jsonb
 fn app.reconcile_orders(p_business uuid) -> jsonb
 fn app.reconcile_payments(p_business uuid) -> jsonb
 fn app.referral_code_for(p_name text) -> text
@@ -702,6 +744,8 @@ fn public.expire_finished_terms(p_on date) -> integer
 fn public.expire_finished_trials(p_on date) -> integer
 fn public.export_studio(p_business uuid) -> jsonb
 fn public.import_studio(p_json jsonb) -> jsonb
+fn public.material_cost_of(p_material uuid) -> TABLE(avg_cost numeric, last_paid numeric, last_paid_at timestamp with time zone)
+fn public.migrate_my_materials(p_business uuid) -> jsonb
 fn public.migrate_my_orders(p_business uuid) -> TABLE(blob_orders integer, rows_before integer, rows_after integer, blob_total numeric, rows_total numeric, costs_written integer, matched boolean)
 fn public.my_billing(p_business uuid) -> jsonb
 fn public.my_commission_summary() -> TABLE(referral_id uuid, business_name text, plan text, cycle text, subscribed_on date, lapsed_on date, is_active boolean, rate_pct numeric, months_credited integer, term_ends_on date, earned_total numeric, earned_cleared numeric, earned_paid numeric)
@@ -729,6 +773,7 @@ fn public.platform_referral_risk() -> TABLE(partner_id uuid, partner_name text, 
 fn public.platform_tenant_summary() -> TABLE(id uuid, name text, slug text, plan text, status text, created_at timestamp with time zone, members bigint, branches bigint, orders bigint, orders_30d bigint, cohort text, last_active_at timestamp with time zone, seats_used bigint, max_studios integer, max_seats integer, closed_at timestamp with time zone, purge_after timestamp with time zone)
 fn public.preview_account_deletion() -> jsonb
 fn public.purge_studio(p_business uuid) -> jsonb
+fn public.reconcile_my_materials(p_business uuid) -> jsonb
 fn public.reconcile_my_orders(p_business uuid) -> jsonb
 fn public.reconcile_my_payments(p_business uuid) -> jsonb
 fn public.record_studio_payment(p_business uuid, p_amount numeric, p_method text, p_reference text, p_note text) -> uuid
@@ -787,6 +832,22 @@ pol feedback.feedback_insert
 pol feedback.feedback_select
 pol feedback_replies.feedback_replies_insert
 pol feedback_replies.feedback_replies_select
+pol material_costs.material_costs_delete
+pol material_costs.material_costs_insert
+pol material_costs.material_costs_select
+pol material_costs.material_costs_update
+pol material_move_costs.material_move_costs_delete
+pol material_move_costs.material_move_costs_insert
+pol material_move_costs.material_move_costs_select
+pol material_move_costs.material_move_costs_update
+pol material_moves.material_moves_delete
+pol material_moves.material_moves_insert
+pol material_moves.material_moves_select
+pol material_moves.material_moves_update
+pol materials.materials_delete
+pol materials.materials_insert
+pol materials.materials_select
+pol materials.materials_update
 pol memberships.memberships_delete
 pol memberships.memberships_insert
 pol memberships.memberships_select
@@ -907,6 +968,7 @@ trg businesses.businesses_seed_roles
 trg customer_contacts.customer_contacts_unpaid_guard
 trg customers.customers_unpaid_guard
 trg error_reports.error_reports_stamp
+trg material_move_costs.material_move_costs_recalc
 trg memberships.audit_memberships
 trg memberships.memberships_default_role
 trg memberships.memberships_last_owner_guard

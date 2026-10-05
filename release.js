@@ -40,7 +40,7 @@ const DB = [
   'lifecycle_harness', 'restore_harness', 'subscription_harness', 'cross_app_harness',
   'upgrade_harness', 'orders_migration_harness', 'money_concurrency_harness',
   'recovery_drill', 'backup_harness', 'partner_portal_harness',
-  'team_invite_harness',
+  'team_invite_harness', 'materials_harness',
 ].map(n => ['node', ['supabase/tests/' + n + '.mjs'], n.replace(/_/g, ' ')]);
 
 const INVENTORY = [
