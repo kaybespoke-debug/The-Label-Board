@@ -267,7 +267,23 @@ section('After: the studio still works, which is the whole question');
        String(acc && acc.is_system));
     ok('on the staff tier, carrying no authority of its own',
        acc && acc.tier === 'staff', String(acc && acc.tier));
-    ok('with the whole shipped permission set', Number(acc && acc.n) === 16, (acc && acc.n) + ' permissions');
+    /* Asked of the function rather than written as a number, so adding a
+       permission to the role we ship does not need this line edited — and
+       so a studio that was backfilled is held to exactly the same set a
+       studio seeded by the trigger gets. */
+    const want = await one(`select array_length(app.system_role_permissions('accountant'),1) n`);
+    ok('with the whole shipped permission set',
+       Number(acc && acc.n) === Number(want.n), (acc && acc.n) + ' of ' + want.n + ' permissions');
+    const reads = await one(`select
+        count(*) filter (where p.permission_key = 'orders')      as can_read,
+        count(*) filter (where p.permission_key = 'orders.edit') as can_edit,
+        count(*) filter (where p.permission_key = 'del')         as can_delete
+      from public.business_role_permissions p
+      join public.business_roles r on r.id = p.role_id
+      where r.business_id=$1 and r.key='accountant'`, [BIZ]);
+    ok('reading the orders it reconciles', Number(reads.can_read) === 1, JSON.stringify(reads));
+    ok('and changing none of them', Number(reads.can_edit) === 0 && Number(reads.can_delete) === 0,
+       JSON.stringify(reads));
     const rec = await one(`select count(*) c from public.business_role_permissions p
       join public.business_roles r on r.id = p.role_id
       where r.business_id=$1 and r.key='accountant' and p.permission_key='receivables'`, [BIZ]);

@@ -1,30 +1,15 @@
 # Recovery
 
-> **Until 19 October 2026: a backup taken before 5 October needs the money
-> copied forward by hand.** Those are version 3 files — the price and the paid
-> figure are inside each order's `doc`, and `app.import_studio` puts them back
-> untouched while nothing reads them, so the studio returns with every order
-> showing a dash. Nothing is lost. After restoring, run the copy with the
-> release's own helpers, then reconcile the two sums against the file before
-> stripping:
->
-> ```sql
-> insert into public.order_pricing (order_id, business_id, branch_id, value, discount, detail)
-> select o.id, o.business_id, o.branch_id,
->        coalesce((o.doc->>'value')::numeric,0), coalesce((o.doc->>'discount')::numeric,0),
->        app.order_pricing_detail(o.doc)
->   from public.orders o where o.business_id = :biz and app.order_has_pricing(o.doc)
->   on conflict (order_id) do nothing;
-> insert into public.order_settlement (order_id, business_id, branch_id, paid, detail)
-> select o.id, o.business_id, o.branch_id,
->        coalesce((o.doc->>'paid')::numeric,0), app.order_settlement_detail(o.doc)
->   from public.orders o where o.business_id = :biz and app.order_has_settlement(o.doc)
->   on conflict (order_id) do nothing;
-> update public.orders set doc = app.order_doc_without_secrets(doc) where business_id = :biz;
-> ```
->
-> OUTSTANDING.md has the permanent fix — teaching `app.import_studio` to do
-> this itself from the file's `_version`. Once that lands, delete this note.
+**A backup taken before 5 October restores correctly, and you do not have to
+do anything about it.** Those are version 3 files, with the selling price and
+the paid figure inside each order's document rather than in `order_pricing`
+and `order_settlement`. `app.import_studio` reads the file's `_version` and,
+below 4, copies them across with `app.order_pricing_detail` and
+`app.order_settlement_detail` and then strips them with
+`app.order_doc_without_secrets` — while the user triggers are still off, so no
+revision is bumped. The result it returns names the format it read.
+`restore_harness` builds a genuine version 3 file and restores it through the
+real path on every run.
 
 What to do when data is gone. Four situations, in the order they are likely,
 and each one has a command rather than a plan.

@@ -89,16 +89,27 @@ await admin(`insert into public.profiles (id,name,role_id,business_id) values
 /* real work: three orders, two of them with a cost, two clients, one of whom
    has contact details, money in and money out, and a settings blob */
 const orderIds = [];
-for (const [ref, total, cost] of [['L-0001', 45000, 18000], ['L-0002', 120000, 52000], ['L-0003', 9000, 0]]) {
+/* A DISCOUNT AND A PART PAYMENT ON PURPOSE. All three figures have to come
+   back out of an older backup, and a fixture where the discount is zero and
+   nothing has been paid cannot tell a carry-forward that works from one
+   that silently writes nothing. */
+for (const [ref, total, discount, paid, cost] of [
+  ['L-0001', 45000,  5000, 20000, 18000],
+  ['L-0002', 120000,     0, 60000, 52000],
+  ['L-0003', 9000,    1500,     0,     0],
+]) {
   const r = await admin(`insert into public.orders (business_id,branch_id,app_id,ref,doc)
     values ($1,$2,$3,$3,$4) returning id`,
     [BIZ, BR, ref, JSON.stringify({ id: ref })]);
   orderIds.push(r[0].id);
   /* THE PRICE IS A ROW OF ITS OWN SINCE OCTOBER. orders.total was the
      selling price in a plain column every member with `orders` could
-     read; it is order_pricing.value now, behind `money`. */
-  await admin(`insert into public.order_pricing (order_id,business_id,branch_id,value) values ($1,$2,$3,$4)`,
-    [r[0].id, BIZ, BR, total]);
+     read; it is order_pricing.value now, behind `money`, and what has been
+     paid is order_settlement.paid behind `receivables`. */
+  await admin(`insert into public.order_pricing (order_id,business_id,branch_id,value,discount)
+    values ($1,$2,$3,$4,$5)`, [r[0].id, BIZ, BR, total, discount]);
+  if (paid) await admin(`insert into public.order_settlement (order_id,business_id,branch_id,paid)
+    values ($1,$2,$3,$4)`, [r[0].id, BIZ, BR, paid]);
   if (cost) await admin(`insert into public.order_costs (order_id,business_id,branch_id,cost) values ($1,$2,$3,$4)`,
     [r[0].id, BIZ, BR, cost]);
 }
@@ -345,6 +356,128 @@ section('It refuses to restore over a studio that is still there');
   ok('and says why', /still here/.test(again.error || ''), again.error);
   const counts = (await admin(`select count(*) c from public.orders where business_id=$1`, [BIZ]))[0];
   ok('and nothing was doubled by the attempt', Number(counts.c) === 3, counts.c + ' orders');
+}
+
+// =====================================================================
+section('A backup taken before the price moved still knows the price');
+// =====================================================================
+// Eighteen production backups were version 3 files: the money is in each
+// order's document, where it always was, and there is no order_pricing
+// array in the file at all. The restore runs with every user trigger
+// switched off, so a version 3 file would put those documents back
+// untouched and nothing would read them — a studio complete in every
+// visible respect with every order showing a dash.
+//
+// This is the second time in a fortnight that an export has been complete
+// except for the money; the first was the commissions. So app.import_studio
+// reads the file's _version and carries it forward itself, rather than
+// leaving a step in a runbook for somebody to remember at four in the
+// morning.
+//
+// The same studio, purged and restored again, because that IS the recovery
+// path. Rewriting every identifier to build a second studio would be
+// testing a shape nobody will ever restore.
+{
+  /* A genuine version 3 file, built from the version 4 one the way
+     app.export_studio_raw built them before October: the money back inside
+     each document, and the two arrays gone. */
+  const v3 = JSON.parse(JSON.stringify(file));
+  v3._version = 3;
+  const priceOf = {}, paidOf = {};
+  for (const p of v3.order_pricing || []) priceOf[p.order_id] = p;
+  for (const t of v3.order_settlement || []) paidOf[t.order_id] = t;
+  for (const o of v3.orders || []) {
+    const p = priceOf[o.id], t = paidOf[o.id];
+    if (p) o.doc = Object.assign({}, o.doc, { value: Number(p.value), discount: Number(p.discount) });
+    if (t) o.doc = Object.assign({}, o.doc, { paid: Number(t.paid) });
+  }
+  const SRC = {
+    orders: (v3.orders || []).length,
+    ids: (v3.orders || []).map(o => o.app_id).sort(),
+    price: (v3.order_pricing || []).reduce((a, p) => a + Number(p.value || 0), 0),
+    discount: (v3.order_pricing || []).reduce((a, p) => a + Number(p.discount || 0), 0),
+    paid: (v3.order_settlement || []).reduce((a, p) => a + Number(p.paid || 0), 0),
+  };
+  delete v3.order_pricing;
+  delete v3.order_settlement;
+
+  ok('the version 3 file carries the money in the documents and nowhere else',
+     SRC.price > 0 && SRC.paid > 0
+     && (v3.orders || []).every(o => o.doc && o.doc.value != null)
+     && !v3.order_pricing && !v3.order_settlement,
+     JSON.stringify(SRC));
+  ok('  and a discount worth checking', SRC.discount > 0, String(SRC.discount));
+
+  /* purge the studio the version 4 file restored, so the version 3 one has
+     somewhere to go — the real path, not a contrivance. A studio has to be
+     closed before it can be purged, which is the rule the first purge in
+     this file goes through too. */
+  await asUser(U.ada, `select public.close_studio($1,'the version 3 drill')`, [BIZ]);
+  await admin(`update public.businesses set purge_after = now() - interval '1 day' where id=$1`, [BIZ]);
+  const p2 = await asUser(U.op, `select public.purge_studio($1)`, [BIZ]);
+  ok('the studio is purged again', !p2.error, p2.error);
+  const gone = await admin(`select count(*) c from public.businesses where id=$1`, [BIZ]);
+  ok('  and really gone', Number(gone[0].c) === 0, gone[0].c + ' left');
+
+  const r = await asUser(U.op, `select public.import_studio($1::jsonb) as j`, [JSON.stringify(v3)]);
+  ok('the version 3 file restores', !r.error, r.error);
+
+  if (!r.error) {
+    const j = r.rows[0] && r.rows[0].j;
+    ok('  and the restore says which format it read',
+       j && Number(j.export_version) === 3, JSON.stringify(j && j.export_version));
+
+    const got = (await admin(`select
+        (select count(*) from public.orders where business_id=$1) orders,
+        (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) price,
+        (select coalesce(sum(discount),0) from public.order_pricing where business_id=$1) discount,
+        (select coalesce(sum(paid),0) from public.order_settlement where business_id=$1) paid,
+        (select count(*) from public.order_pricing where business_id=$1) priced,
+        (select count(*) from public.order_settlement where business_id=$1) settled,
+        (select count(*) from public.orders where business_id=$1
+          and (doc ?| array['value','discount','paid','potContribs']
+               or (doc->'delivery') ? 'fee')) leftover`, [BIZ]))[0];
+
+    ok('  every order came back', Number(got.orders) === SRC.orders,
+       got.orders + ' of ' + SRC.orders);
+    const ids = (await admin(`select app_id from public.orders where business_id=$1 order by app_id`, [BIZ]))
+      .map(x => x.app_id);
+    ok('  with the same identifiers, not merely the same count',
+       JSON.stringify(ids) === JSON.stringify(SRC.ids),
+       JSON.stringify(ids) + ' vs ' + JSON.stringify(SRC.ids));
+
+    ok('  THE SELLING PRICE is preserved exactly',
+       Number(got.price) === SRC.price, got.price + ' vs ' + SRC.price);
+    ok('  THE DISCOUNT is preserved exactly',
+       Number(got.discount) === SRC.discount, got.discount + ' vs ' + SRC.discount);
+    ok('  WHAT HAD BEEN PAID is preserved exactly',
+       Number(got.paid) === SRC.paid, got.paid + ' vs ' + SRC.paid);
+    ok('  and every order that had money has a row for it',
+       Number(got.priced) === (v3.orders || []).filter(o => o.doc && o.doc.value != null).length,
+       got.priced + ' priced, ' + got.settled + ' settled');
+
+    ok('  and the documents carry none of it any more',
+       Number(got.leftover) === 0, got.leftover + ' documents still have money in them');
+
+    /* AND THE BALANCE, WHICH IS THE POINT OF KEEPING BOTH. It is
+       value - discount - paid, so it only exists if both halves came
+       across, and it is what a studio actually looks at. */
+    const bal = (await admin(`select
+        coalesce(sum(p.value - p.discount - coalesce(s.paid,0)),0) as owed
+      from public.order_pricing p
+      left join public.order_settlement s on s.order_id = p.order_id
+      where p.business_id=$1`, [BIZ]))[0];
+    ok('  so the outstanding balance is the one the file described',
+       Number(bal.owed) === SRC.price - SRC.discount - SRC.paid,
+       bal.owed + ' vs ' + (SRC.price - SRC.discount - SRC.paid));
+
+    /* and the walls are still up on what came back */
+    const reach = await asUser(U.ada, `select value from public.order_pricing where business_id=$1`, [BIZ]);
+    ok('  the owner reads the restored prices', reach.rows.length > 0, reach.error);
+    const outsider = await asUser(U.op, `select value from public.order_pricing where business_id=$1`, [BIZ]);
+    ok('  and an operator with no membership does not',
+       outsider.rows.length === 0, 'saw ' + outsider.rows.length);
+  }
 }
 
 // =====================================================================

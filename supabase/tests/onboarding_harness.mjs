@@ -296,9 +296,15 @@ section('A new studio gets the Accountant role we ship');
     [acc.id])).map(r => r.permission_key);
 
   const EXPECTED = [
-    'allOrders', 'attendance', 'customers', 'customers.manage', 'expenses',
-    'finance', 'finance.record_payment', 'funds', 'money', 'payroll',
-    'receivables', 'sales', 'seeContact', 'seeCost', 'seeProfit', 'tasks',
+    /* `orders` is the READ key on public.orders and nothing else — writing
+       takes orders.edit, deleting takes del, and the accountant holds
+       neither. It was added once the role proof found an accountant being
+       handed what an order sold for without being able to see which
+       order. */
+    'orders', 'allOrders', 'attendance', 'customers', 'customers.manage',
+    'expenses', 'finance', 'finance.record_payment', 'funds', 'money',
+    'payroll', 'receivables', 'sales', 'seeContact', 'seeCost', 'seeProfit',
+    'tasks',
   ].sort();
 
   /* THE DECISION, on its own line, because it is the one this section was
@@ -319,10 +325,19 @@ section('A new studio gets the Accountant role we ship');
      are kept in. The list is explicit rather than derived, so widening the
      accountant has to be a deliberate edit to this test. */
   const FORBIDDEN = ['team', 'team.view', 'editStaff', 'users', 'settings', 'audit',
-                     'billing.view', 'billing.manage', 'ownership.transfer'];
+                     'billing.view', 'billing.manage', 'ownership.transfer',
+                     /* and reading an order is not the same as changing one */
+                     'orders.edit', 'del', 'update', 'canQC', 'canDispatch',
+                     'products', 'products.manage', 'setCatalog', 'setWorkflow'];
   const leaked = FORBIDDEN.filter(k => held.includes(k));
-  ok('and no owner, admin or team-management authority', leaked.length === 0,
-     'leaked: ' + leaked.join(', '));
+  ok('and no owner, admin, team-management or order-editing authority',
+     leaked.length === 0, 'leaked: ' + leaked.join(', '));
+
+  /* THE PAIR THAT MATTERS, SAID TWICE. The role reads orders and cannot
+     touch them, which is the whole shape of this decision. */
+  ok('it can read the orders it is reconciling', held.includes('orders'));
+  ok('and cannot change one', !held.includes('orders.edit'));
+  ok('nor delete one', !held.includes('del'));
 
   /* An owner can rename it — a studio may well say "Bookkeeper" — but not
      delete it or move its tier, which is what is_system means here and is

@@ -1981,7 +1981,7 @@ function defaultRoles(){return [
   {id:'manager',name:'Manager',builtin:true,perms:{orders:1,products:1,del:1,update:1,canQC:1,canDispatch:1,money:1,seeProfit:1,seeCost:1,seeContact:1,ownTasksOnly:0,finance:1,payroll:1,appts:1,supplies:1,customers:1,marketing:1,logistics:1,team:1,editStaff:1,tasks:1,attendance:1,settings:0,users:0,allOrders:1,audit:1}},
   {id:'cre',name:'Client Relations',builtin:true,perms:{orders:1,products:1,del:1,update:1,canQC:1,canDispatch:1,money:1,receivables:1,expenses:0,funds:0,sales:1,seeProfit:0,seeCost:0,seeContact:1,finance:0,appts:1,supplies:1,customers:1,marketing:1,logistics:1,team:0,attendance:1,settings:0,users:0,allOrders:1,audit:0,branchSwitch:0}},
   {id:'tailor',name:'Tailor / Workroom',builtin:true,perms:{orders:0,products:0,del:0,update:1,canQC:0,canDispatch:0,money:0,seeProfit:0,seeCost:0,seeContact:0,ownTasksOnly:1,finance:0,appts:0,supplies:0,customers:0,logistics:0,team:0,tasks:1,attendance:1,settings:0,users:0,allOrders:0,audit:0}},
-  {id:'accountant',name:'Accountant',builtin:true,perms:{orders:0,products:0,del:0,update:0,canQC:0,canDispatch:0,money:1,receivables:1,seeProfit:1,seeCost:1,seeContact:1,ownTasksOnly:0,finance:1,payroll:1,appts:0,supplies:0,customers:1,logistics:0,team:0,tasks:1,attendance:1,settings:0,users:0,allOrders:1,audit:0}},
+  {id:'accountant',name:'Accountant',builtin:true,perms:{orders:1,products:0,del:0,update:0,canQC:0,canDispatch:0,money:1,receivables:1,seeProfit:1,seeCost:1,seeContact:1,ownTasksOnly:0,finance:1,payroll:1,appts:0,supplies:0,customers:1,logistics:0,team:0,tasks:1,attendance:1,settings:0,users:0,allOrders:1,audit:0}},
 ];}
 function canSeeProfit(){const r=currentRole();if(!r||!r.perms)return false;return r.perms.seeProfit!==undefined?!!r.perms.seeProfit:can('money');}
 function canSeeCost(){const r=currentRole();if(!r||!r.perms)return false;return r.perms.seeCost!==undefined?!!r.perms.seeCost:can('money');}
@@ -2643,7 +2643,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v68';
+const APP_VERSION='layi-v69';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -5553,7 +5553,7 @@ function enterApp(){
   show('msPayroll',can('payroll'));show('msPots',can('funds'));
   document.getElementById('payLockIco').style.display='none';document.getElementById('potLockIco').style.display='none';
   show('navSettings',canAnySettings());show('msSettings',canAnySettings());
-  show('newOrderBtn',can('orders'),'inline-block');show('apptAdd',can('appts'),'inline');show('dashFitAdd',can('appts'),'inline');
+  show('newOrderBtn',can('orders.edit'),'inline-block');show('apptAdd',can('appts'),'inline');show('dashFitAdd',can('appts'),'inline');
   show('navSupplies',can('supplies'));show('msSupplies',can('supplies'));
   show('navMarketing',can('marketing'));
   show('navSuppliers',can('supplies'));show('msSuppliers',can('supplies'));
@@ -6725,7 +6725,7 @@ function itemSectionNote(o,d){
    "2 doors is okay" — approved the same day. */
 let orderDoor=null;
 function newOrder(){
-  if(!can('orders'))return;
+  if(!can('orders.edit'))return;
   openModal(`<h3>New</h3>
     <button type="button" class="door lead" onclick="openOrder(null,'invoice')">
       <span class="door-h">${OSEC_ICO.quote}Invoice</span>
@@ -6766,7 +6766,7 @@ async function pickContact(){
   }catch(e){/* the picker was dismissed, which is not an error */}
 }
 function openOrder(id,door){
-  if(!can('orders'))return;
+  if(!can('orders.edit'))return;
   orderDoor=id?null:(door==='invoice'?'invoice':'order');
   editingOrderId=id||null;
   if(id){draft=JSON.parse(JSON.stringify(getOrders().find(x=>x.id===id)));
@@ -6786,7 +6786,7 @@ function openOrder(id,door){
 }
 function addCost(){syncOrderDraft();draft.costs.push({label:'',amount:0});reRenderOrder();}
 function duplicateOrder(id){
-  if(!can('orders'))return;
+  if(!can('orders.edit'))return;
   const src=getOrders().find(x=>x.id===id);if(!src)return;
   closeModal();
   editingOrderId=null;
@@ -7501,7 +7501,7 @@ function openDetail(id){
   const clientPhotos=o.clientPhotos.length?`<div class="field"><label>Client photos</label><div class="photo-grid">${o.clientPhotos.map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"></div>`).join('')}</div></div>`:'';
   const outfits=o.outfits.map((of,i)=>`
     <div class="detail-out">
-      <div class="doh"><div>${isGroup(o)?'<b>'+esc(of.person||('Person '+(i+1)))+'</b> · ':''}${esc(of.name||of.type||'Item '+(i+1))}${(of.name&&of.type)?` <span style="color:var(--text-faint);font-size:12px">· ${esc(of.type)}</span>`:''}${isGroup(o)?` <span class="badge b-gold" style="font-size:11px">${esc(STAGES[+of.stageIndex||0])}</span>`:''}</div>${can('orders')?`<div class="dop">${cur(of.price)}</div>`:''}</div>
+      <div class="doh"><div>${isGroup(o)?'<b>'+esc(of.person||('Person '+(i+1)))+'</b> · ':''}${esc(of.name||of.type||'Item '+(i+1))}${(of.name&&of.type)?` <span style="color:var(--text-faint);font-size:12px">· ${esc(of.type)}</span>`:''}${isGroup(o)?` <span class="badge b-gold" style="font-size:11px">${esc(STAGES[+of.stageIndex||0])}</span>`:''}</div>${can('money')?`<div class="dop">${cur(of.price)}</div>`:''}</div>
       ${of.photos.length?`<div class="photo-grid">${of.photos.map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"></div>`).join('')}</div>`:''}
       ${(of.materials&&of.materials.length)?`<div class="kv"><b>Materials:</b> ${of.materials.map(m=>esc(m)).join(' · ')}</div>`:''}
       ${of.style?`<div class="kv"><b>Styling:</b> ${esc(of.style)}</div>`:''}
@@ -7570,8 +7570,8 @@ function openDetail(id){
       ${can('update')&&hasOwnPieces(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each ${isGroup(o)?'person':'piece'}</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openQC('${o.id}')">Quality check</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openUpdate('${o.id}')">Post update</button>`:''}
-      ${can('orders')?`<button class="btn ghost sm" onclick="duplicateOrder('${o.id}')">Duplicate</button>`:''}
-      ${can('orders')?`<button class="btn ghost sm" onclick="openOrder('${o.id}')">Edit</button>`:''}
+      ${can('orders.edit')?`<button class="btn ghost sm" onclick="duplicateOrder('${o.id}')">Duplicate</button>`:''}
+      ${can('orders.edit')?`<button class="btn ghost sm" onclick="openOrder('${o.id}')">Edit</button>`:''}
     </div>
     ${attBanner}
     ${contact}
@@ -8294,7 +8294,7 @@ function saveUpdate(){
   closeModal();renderAll();
 }
 
-function setSatisfaction(id,n){if(!can('orders'))return;const list=rawOrders();const o=list.find(x=>x.id===id);if(!o)return;o.satisfaction=(+o.satisfaction===n)?0:n;save('layi_dash_orders',list);openDetail(id);renderTeam();}
+function setSatisfaction(id,n){if(!can('orders.edit'))return;const list=rawOrders();const o=list.find(x=>x.id===id);if(!o)return;o.satisfaction=(+o.satisfaction===n)?0:n;save('layi_dash_orders',list);openDetail(id);renderTeam();}
 /* ===== QUALITY CONTROL ===== */
 let qcDraft=null;
 function qcBadge(o){if(!o.qc||!o.qc.status||o.qc.status==='pending')return '';return o.qc.status==='passed'?'<span class="sup-status ok">✓ QC passed</span>':'<span class="sup-status out">↻ Needs rework</span>';}

@@ -62,50 +62,37 @@ stop its owner deleting it.
 
 `node release.js` is **31 offline, 43 with `--staging`**.
 
-### A fortnight of backups are version 3, and that has a window
+### Both of yesterday's open questions are closed
 
-`app.export_studio_raw` is version 4 from today. The fourteen nights already
-in `app.studio_backups` are version 3 files: the money is in each order's
-document, where it always was, and there is no `order_pricing` array in the
-file at all. `app.import_studio` restores with every user trigger switched
-off, so a version 3 file puts those documents back untouched and nothing
-reads them — the studio comes back complete in every visible respect with
-**every order showing a dash**.
+**A version 3 backup restores safely.** `app.import_studio` reads the file's
+`_version` and, below 4, copies `doc.value`/`doc.paid` into `order_pricing`
+and `order_settlement` with the release's own helpers and then strips them
+with `app.order_doc_without_secrets` — all while the user triggers are still
+off, so no revision is bumped. `restore_harness` builds a genuine version 3
+file from the version 4 one, purges the studio and restores it through the
+real path, then checks the price, the discount, what had been paid, the
+order count, the identifiers one by one, the outstanding balance, that the
+documents carry none of it any more, and that the walls are up on what came
+back. Its fixture now carries a discount and a part payment on purpose,
+because a fixture where both are zero cannot tell a carry-forward that works
+from one that writes nothing.
 
-Nothing is lost. The figures are still in `orders.doc`, and the symptom is
-loud rather than silent. But it is the second time in a fortnight that an
-export has been complete except for the money; the first was the commissions.
+**The accountant can see the orders it reconciles.** `orders` was confirmed
+to be the read key and nothing else — `orders_select` asks for it,
+`orders_insert`/`orders_update` ask for `orders.edit`, `orders_delete` asks
+for `del` — so it was granted to the role we ship, additively, and the eight
+custom accountant roles were left alone. It gained no `orders.edit`, no
+`del`, no `update`, no production or team or settings or billing authority,
+and the migration raises if it ever does.
 
-**The fix, not bundled into this release on purpose** — a money release
-carrying a second behavioural change, proved in one cycle, is the riskier
-trade. `app.import_studio` should read the file's `_version` and, below 4,
-copy `doc.value`/`doc.paid` into the two tables with
-`app.order_pricing_detail` and `app.order_settlement_detail` and then strip
-them with `app.order_doc_without_secrets`, while the triggers are still off.
-Roughly twenty lines, all of it reusing what the release already installed,
-and `restore_harness` proves it by rebuilding a version 3 file from the
-version 4 one.
+The app was the other half. It gated New Order, Edit, Duplicate and
+`setSatisfaction` on `can('orders')` — the read key — so **every `viewer` in
+all nine studios has been shown buttons the server refuses**, with a failed
+save and a retrying outbox entry and nothing to explain it. Those four now
+ask for `orders.edit`. One per-outfit price was behind `can('orders')` too
+and now asks for `money`. `audit_order_split` holds all of it.
 
-**The window closes by itself on 19 October**, when the fourteenth
-post-release night rolls the oldest version 3 copy out of retention. Until
-then, a restore from a pre-5-October night needs the money copied forward by
-hand first. `RECOVERY.md` should say so until the fix lands.
-
-### The one thing the role proof found that nobody has decided
-
-**An accountant cannot read `public.orders`.** It holds `allOrders` and not
-`orders`, which is exactly what the app has shipped for years — an accountant
-works from Finance, Sales and Payroll rather than the Orders list — and the
-production role has never held it either. So it is not new and it is not a
-leak. But it does mean an accountant is handed what an order sold for and what
-has been paid on it **without being able to see which order that is**: no
-reference, no client, no date. For a role whose job is reconciliation that
-reads like an oversight rather than a boundary.
-
-Granting `orders` is a page permission and a product decision, so it was left
-alone. It is Kayode's call: either add `orders` (read-only; `orders.edit` stays
-out) or decide the accountant genuinely works from the money screens and the
-`allOrders` key on it is the thing that is meaningless.
+Remediation is closed with this release. What follows is product work.
 
 ## 4 October 2026 — operational resilience
 

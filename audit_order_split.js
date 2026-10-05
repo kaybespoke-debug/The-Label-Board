@@ -289,6 +289,55 @@ section('7. The list the app strips by matches the list the database strips by')
     appList === sqlList, 'app: ' + appList + '\n            sql: ' + sqlList);
 }
 
+section('8. Reading an order and changing one are different permissions');
+/* The database has always said so:
+
+     orders_select  can_here(..., 'orders', ...)
+     orders_insert  can_here(..., 'orders.edit', ...)
+     orders_update  can_here(..., 'orders.edit', ...)
+     orders_delete  can_here(..., 'del', ...)
+
+   This file gated New Order, Edit and Duplicate on can('orders') — the
+   READ key — so every `viewer` in all nine studios was shown those buttons
+   and the server refused them: a save that fails, an outbox entry that
+   retries, and nothing to tell the person why. It mattered the moment the
+   accountant gained `orders` so it could see which order a figure belonged
+   to.
+
+   Static, because these are affordances rather than data: the question is
+   which key the source asks for, and a rendered screen cannot answer it
+   without a browser. */
+{
+  const src = fs.readFileSync('site/layi_dashboard.html', 'utf8');
+  const flat = src.replace(/\s+/g, ' ');
+
+  for (const [what, probe] of [
+    ['newOrder()',        /function newOrder\(\)\s*\{ if\(!can\('orders\.edit'\)\)return;/],
+    ['the order form',    /function openOrder\(id,door\)\s*\{ if\(!can\('orders\.edit'\)\)return;/],
+    ['duplicateOrder()',  /function duplicateOrder\(id\)\s*\{ if\(!can\('orders\.edit'\)\)return;/],
+    ['setSatisfaction()', /function setSatisfaction\(id,n\)\{if\(!can\('orders\.edit'\)\)return;/],
+    ['the New Order button', /show\('newOrderBtn',can\('orders\.edit'\)/],
+    ['the Edit button',      /can\('orders\.edit'\)\?.{0,60}openOrder\('\$\{o\.id\}'\)">Edit/],
+    ['the Duplicate button', /can\('orders\.edit'\)\?.{0,60}duplicateOrder\('\$\{o\.id\}'\)">Duplicate/],
+  ]) {
+    ok(what + ' asks for orders.edit, not orders', probe.test(flat), 'it still asks for the read key');
+  }
+
+  /* and the per-outfit price asks the money question rather than the
+     order question */
+  ok('the per-outfit price asks for money',
+     /can\('money'\)\?.{0,40}class="dop">\$\{cur\(of\.price\)\}/.test(flat),
+     'it is still gated on can(orders)');
+
+  /* THE ACCOUNTANT, FROM THE APP'S OWN DEFINITION. It is the role this
+     section was written for: it reads orders and cannot touch them. */
+  const def = (src.match(/\{id:'accountant',name:'Accountant',builtin:true,perms:\{[^}]*\}/) || [''])[0];
+  ok('the app ships an accountant to compare with', def.length > 0);
+  ok('  which can open the Orders list', /orders:1/.test(def), def.slice(0, 120));
+  ok('  and still cannot delete an order', /\bdel:0/.test(def), def.slice(0, 120));
+  ok('  and holds receivables in its own right', /receivables:1/.test(def), def.slice(0, 120));
+}
+
 console.log('\n' + '='.repeat(62));
 console.log(pass + ' passed, ' + fails.length + ' failed');
 for (const f of fails) console.log('  - ' + f);
