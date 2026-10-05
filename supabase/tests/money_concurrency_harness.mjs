@@ -124,8 +124,13 @@ section('1. The blob: two devices, one surviving payment');
    ===================================================================== */
 section('2. Rows: two devices, two payments');
 {
-  const order = await one(`insert into public.orders (business_id,branch_id,app_id,total,status)
-    values ($1,$2,'ORD-MONEY',125000,'open') returning id`, [BIZ, BRANCH]);
+  const order = await one(`insert into public.orders (business_id,branch_id,app_id,status)
+    values ($1,$2,'ORD-MONEY','open') returning id`, [BIZ, BRANCH]);
+  /* WHAT THE ORDER IS WORTH IS A ROW OF ITS OWN SINCE OCTOBER, behind
+     `money`, because orders.total was the selling price in a plain column
+     every member with `orders` could read. */
+  await db.query(`insert into public.order_pricing (order_id,business_id,branch_id,value)
+    values ($1,$2,$3,125000)`, [order, BIZ, BRANCH]);
 
   /* Same sequence, same staleness, no coordination between the devices. */
   const wa = await asUser(OWNER, `insert into public.transactions (business_id,branch_id,order_id,kind,amount,app_id)
@@ -169,9 +174,15 @@ section('2. Rows: two devices, two payments');
 
   section('5. The balance is the order minus what was paid');
   {
-    const bal = await one(`select o.total - coalesce((select sum(t.amount) from public.transactions t
+    /* AND THE BALANCE TAKES BOTH PERMISSIONS, which is the point of the
+       October split: the value comes from order_pricing (`money`) and what
+       was paid from transactions (`receivables`). Nobody holding one of
+       them can arrive at this number, and nothing had to be written to
+       enforce that. */
+    const bal = await one(`select p.value - coalesce((select sum(t.amount) from public.transactions t
         where t.order_id = o.id and t.kind='sale'),0)
-      from public.orders o where o.id=$1`, [order]);
+      from public.orders o join public.order_pricing p on p.order_id = o.id
+      where o.id=$1`, [order]);
     ok('125,000 of work less 125,000 paid leaves nothing owing', Number(bal) === 0, String(bal));
   }
 
@@ -214,7 +225,7 @@ section('8. The 76 payments on production, in the shape they are actually in');
   await db.query(`insert into public.memberships (business_id,user_id,role,status)
     values ($1,$2,'owner','active') on conflict do nothing`, [MB, MU]);
   const mbranch = await one(`insert into public.branches (business_id,name) values ($1,'Abuja outlet') returning id`, [MB]);
-  await db.query(`insert into public.orders (business_id,app_id,total,status) values ($1,'L-0001',200000,'open')`, [MB]);
+  await db.query(`insert into public.orders (business_id,app_id,status) values ($1,'L-0001','open')`, [MB]);
 
   const TX = [
     {id:'t-a1', dir:'in',  cat:'order',   amount:110000, at:'2026-02-05', branch:'Abuja outlet', orderId:'L-0001',

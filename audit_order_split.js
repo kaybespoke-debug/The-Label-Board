@@ -1,12 +1,16 @@
 /* =====================================================================
-   AN ORDER SPLITS INTO FOUR ON THE WAY OUT AND COMES BACK AS ONE.
+   AN ORDER SPLITS INTO SIX ON THE WAY OUT AND COMES BACK AS ONE.
 
    P2 moved the order out of one blob and into a row plus three satellites
-   that each ask a permission first. This checks the DEVICE half of that:
-   that the split is complete, that it is lossless, and above all that the
-   part which travels unprotected — orders.doc, which every member of the
-   studio can read — carries none of the seven things the split exists to
-   protect.
+   that each ask a permission first. October added two more: what the client
+   is charged, behind `money`, and what they have paid, behind
+   `receivables`. Those two were the last money left in the document that
+   every member of the studio can read, and the price was ALSO in a plain
+   orders.total column and in a view granted to anybody with a login.
+
+   This checks the DEVICE half: that the split is complete, that it is
+   lossless, and above all that the part which travels unprotected carries
+   none of the things the split exists to protect.
 
    WHY THIS GATE EXISTS. The list of protected fields was wrong twice, in
    two different files, in the same way: written against a field shape no
@@ -97,15 +101,24 @@ sb.__O = ORDER;
 
 /* the four functions exist at all */
 section('The split exists');
-for (const fn of ['orderDoc', 'orderCostRow', 'orderCommissionRow', 'orderContactRow', 'customerIdForName']) {
+for (const fn of ['orderDoc', 'orderCostRow', 'orderCommissionRow', 'orderContactRow',
+                  'orderPricingRow', 'orderSettlementRow', 'customerIdForName']) {
   ok(fn + '() is defined', run('typeof ' + fn) === 'function');
 }
 if (fails.length) { console.log('\n' + pass + ' passed, ' + fails.length + ' failed'); process.exit(1); }
+
+/* SIGNED IN AS THE OWNER. orderSettlementRow asks can('finance.record_payment')
+   before it builds anything — reading what is owed and deciding something has
+   been paid are different jobs, and the policy on order_settlement says so —
+   so the gate has to be somebody for the answer to mean anything. */
+run("save('layi_dash_roles',defaultRoles());currentUser={id:'u-gate',name:'Gate',roleId:'owner'};");
 
 const doc = run('orderDoc(__O)');
 const cost = run('orderCostRow(__O)');
 const comm = run('orderCommissionRow(__O)');
 const contact = run('orderContactRow(__O)');
+const price = run('orderPricingRow(__O)');
+const settle = run('orderSettlementRow(__O)');
 
 /* ---------------------------------------------------------------------
    1. What travels unprotected must carry nothing protected
@@ -121,27 +134,37 @@ for (const [what, probe] of [
   ['a postal address', /Awolowo/],
   ['a unit cost inside a sold item', /unitCost/],
   ['a delivery address inside the delivery block', /Bode Thomas/],
+  ['the price the client is charged', /"value"\s*:/],
+  ['the discount', /"discount"\s*:/],
+  ['what they have paid', /"paid"\s*:/],
+  ['what they have paid towards a fund', /potContribs/],
+  ['a selling price inside a sold item', /unitPrice/],
+  ['a selling price inside an outfit', /"price"\s*:/],
+  ['the delivery fee', /"fee"\s*:/],
 ]) {
   ok('carries no ' + what, !probe.test(docJson), 'found it in doc');
 }
 
 section('2. And everything else survived');
 ok('the stage', doc.stageIndex === 4);
-ok('the money the client is charged', doc.value === 250000 && doc.discount === 5000);
-ok('what they have paid', doc.paid === 100000);
 ok('the production history', Array.isArray(doc.updates) && doc.updates.length === 1);
 ok('the QC record', doc.qc && doc.qc.status === 'passed');
-ok('the item line, with its selling price', Array.isArray(doc.saleItems)
-  && doc.saleItems.length === 1 && doc.saleItems[0].unitPrice === 15000 && doc.saleItems[0].qty === 2);
-ok('the courier, the fee and the tracking number', doc.delivery
-  && doc.delivery.company === 'GIG' && doc.delivery.fee === 3500 && doc.delivery.tracking === 'GIG-7');
-ok('the outfits, their prices and their measurements', Array.isArray(doc.outfits)
-  && doc.outfits[0].price === 250000 && doc.outfits[0].meas && doc.outfits[0].meas.Chest === '40');
-ok('the stock used, the fund contributions and the photos',
-  Array.isArray(doc.stockUsed) && Array.isArray(doc.potContribs) && Array.isArray(doc.clientPhotos));
+/* THE ITEM LINE WITHOUT ITS PRICE. The line itself is what the workroom
+   makes and the till rings up; what it sells for is the money question. */
+ok('the item line, and what it is', Array.isArray(doc.saleItems)
+  && doc.saleItems.length === 1 && doc.saleItems[0].label === 'Cap' && doc.saleItems[0].qty === 2);
+ok('the courier and the tracking number, without the fee', doc.delivery
+  && doc.delivery.company === 'GIG' && doc.delivery.tracking === 'GIG-7'
+  && doc.delivery.fee === undefined);
+ok('the outfits and their measurements, without their prices', Array.isArray(doc.outfits)
+  && doc.outfits[0].name === 'Main' && doc.outfits[0].price === undefined
+  && doc.outfits[0].meas && doc.outfits[0].meas.Chest === '40');
+ok('the stock used and the photos',
+  Array.isArray(doc.stockUsed) && Array.isArray(doc.clientPhotos));
 ok('and the original order object was not mutated',
   ORDER.costs.length === 2 && ORDER.delivery.location === '14 Bode Thomas, Surulere'
-  && ORDER.saleItems[0].unitCost === 6000,
+  && ORDER.saleItems[0].unitCost === 6000 && ORDER.value === 250000
+  && ORDER.outfits[0].price === 250000 && ORDER.delivery.fee === 3500,
   'orderDoc() edited the caller’s order, which would delete it from the device');
 
 /* ---------------------------------------------------------------------
@@ -170,18 +193,45 @@ ok('  the email', contact && contact.detail.email === 'client@example.test');
 ok('  the WhatsApp number', contact && contact.detail.whatsapp === '+234 800 000 0000');
 ok('  and the postal address', contact && contact.detail.address === '9 Awolowo Road');
 
+section('4a. What goes behind money');
+ok('a pricing row is produced', !!price);
+ok('  carrying the value', price && Number(price.value) === 250000, price && String(price.value));
+ok('  and the discount', price && Number(price.discount) === 5000, price && String(price.discount));
+ok('  the price of each outfit', price && price.detail.outfit_prices.length === 1
+  && price.detail.outfit_prices[0].price === 250000);
+ok('  the selling price of each item', price && price.detail.item_prices.length === 1
+  && price.detail.item_prices[0].unitPrice === 15000 && price.detail.item_prices[0].qty === 2);
+ok('  and the delivery fee', price && price.detail.delivery_fee === 3500,
+  price && JSON.stringify(price.detail.delivery_fee));
+
+section('4b. What goes behind receivables');
+ok('a settlement row is produced', !!settle);
+ok('  carrying what has been paid', settle && Number(settle.paid) === 100000, settle && String(settle.paid));
+ok('  and what was paid towards a fund', settle && settle.detail.pot_contribs.length === 1
+  && settle.detail.pot_contribs[0].amount === 1000);
+
+/* THE BALANCE IS NOT STORED ANYWHERE, and that is the point: it is
+   value - discount - paid, so it takes BOTH permissions to arrive at it.
+   Nobody has to enforce that; it falls out of the split. */
+ok('and the balance is in neither of them, because it needs both',
+  JSON.stringify(price).indexOf('balance') === -1
+  && JSON.stringify(settle).indexOf('balance') === -1);
+
 /* ---------------------------------------------------------------------
    5. Nothing is silently dropped
    --------------------------------------------------------------------- */
-section('5. Every field of the order reached one of the four');
+section('5. Every field of the order reached one of the six');
 {
   const inDoc = new Set(Object.keys(doc));
   const inCost = new Set(['costs', 'cost']);
   const inItems = new Set();
   const inComm = new Set(['commissions', 'directorOn', 'directorPct', 'directorAmount', 'referrerId', 'referralAmount']);
   const inContact = new Set(['email', 'whatsapp', 'address']);
+  const inPrice = new Set(['value', 'discount']);
+  const inSettle = new Set(['paid', 'potContribs']);
   const lost = Object.keys(ORDER).filter(k =>
-    !inDoc.has(k) && !inCost.has(k) && !inComm.has(k) && !inContact.has(k) && !inItems.has(k));
+    !inDoc.has(k) && !inCost.has(k) && !inComm.has(k) && !inContact.has(k)
+    && !inItems.has(k) && !inPrice.has(k) && !inSettle.has(k));
   ok('no field of the order went nowhere', lost.length === 0, 'lost: ' + lost.join(', '));
 }
 
@@ -195,18 +245,44 @@ section('6. A device that holds none of it cannot blank the studio’s');
   delete bare.directorOn; delete bare.directorPct; delete bare.directorAmount;
   delete bare.referrerId; delete bare.referralAmount;
   delete bare.email; delete bare.whatsapp; delete bare.address;
-  if (bare.saleItems) bare.saleItems = bare.saleItems.map(i => { const c = { ...i }; delete c.unitCost; return c; });
-  if (bare.delivery) { bare.delivery = { ...bare.delivery }; delete bare.delivery.location; }
+  delete bare.value; delete bare.discount; delete bare.paid; delete bare.potContribs;
+  if (bare.saleItems) bare.saleItems = bare.saleItems.map(i => {
+    const c = { ...i }; delete c.unitCost; delete c.unitPrice; return c; });
+  if (bare.outfits) bare.outfits = bare.outfits.map(x => { const c = { ...x }; delete c.price; return c; });
+  if (bare.delivery) { bare.delivery = { ...bare.delivery }; delete bare.delivery.location; delete bare.delivery.fee; }
   sb.__B = bare;
   ok('no cost row is sent', run('orderCostRow(__B)') === null);
   ok('no commission row is sent', run('orderCommissionRow(__B)') === null);
   ok('no contact row is sent', run('orderContactRow(__B)') === null);
+  /* THE ONE THAT WOULD HAVE COST A STUDIO ITS PRICES. A tailor who may not
+     see what an order sold for holds no value on their device. If the
+     builder returned {value:0} their ordinary save would set every order
+     they can see to nothing. */
+  ok('no pricing row is sent, so a price cannot be blanked to zero',
+    run('orderPricingRow(__B)') === null);
+  ok('and no settlement row either', run('orderSettlementRow(__B)') === null);
+}
+
+section('6b. Recording a payment is a different permission from reading one');
+{
+  /* A full order, held by somebody who may read receivables but may not
+     record a payment. The policy on order_settlement refuses their write,
+     so the app must not make one: a refusal that repeats for ever is an
+     outbox that never drains. */
+  run("currentUser={id:'u-gate',name:'Gate',roleId:'tailor'};");
+  ok('a tailor sends no settlement row', run('orderSettlementRow(__O)') === null);
+  /* and the price is NOT gated this way on purpose: whether a pricing
+     write is allowed is the policy's business, and what the device holds
+     is the honest signal. A tailor holds no price, which section 6
+     already proves. */
+  run("currentUser={id:'u-gate',name:'Gate',roleId:'owner'};");
+  ok('and the owner sends one again', run('orderSettlementRow(__O)') !== null);
 }
 
 section('7. The list the app strips by matches the list the database strips by');
 {
   const appList = run('ORDER_PROTECTED.slice().sort().join(",")');
-  const sql = fs.readFileSync('supabase/migrations/20260929231000_orders_migration_and_reconciliation.sql', 'utf8');
+  const sql = fs.readFileSync('supabase/migrations/20261004120000_the_price_is_a_permission.sql', 'utf8');
   const body = (sql.match(/v_doc := p_order([\s\S]*?);/) || [])[1] || '';
   const sqlList = (body.match(/'([a-zA-Z]+)'/g) || []).map(x => x.replace(/'/g, '')).sort().join(',');
   ok('the two lists are the same, so nothing is stripped in one place and kept in the other',
@@ -216,5 +292,5 @@ section('7. The list the app strips by matches the list the database strips by')
 console.log('\n' + '='.repeat(62));
 console.log(pass + ' passed, ' + fails.length + ' failed');
 for (const f of fails) console.log('  - ' + f);
-if (!fails.length) console.log('\nAn order leaves the device in four pieces, the unprotected piece\ncarries nothing worth protecting, and no piece is lost.');
+if (!fails.length) console.log('\nAn order leaves the device in six pieces, the unprotected piece\ncarries nothing worth protecting, and no piece is lost.');
 process.exit(fails.length ? 1 : 0);

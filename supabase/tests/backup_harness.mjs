@@ -108,8 +108,13 @@ for (const [biz, u] of [[A, UA], [B, UB]]) {
   const c = await one(`insert into public.customers (business_id,branch_id,name) values ($1,$2,'A Client') returning id`, [biz, br]);
   await db.query(`insert into public.customer_contacts (customer_id,business_id,branch_id,phone)
     values ($1,$2,$3,'+234 800 111 2222')`, [c, biz, br]);
-  const o = await one(`insert into public.orders (business_id,branch_id,customer_id,app_id,total,status,doc)
-    values ($1,$2,$3,'BK-1',150000,'open','{"garment":"Agbada"}'::jsonb) returning id`, [biz, br, c]);
+  const o = await one(`insert into public.orders (business_id,branch_id,customer_id,app_id,status,doc)
+    values ($1,$2,$3,'BK-1','open','{"garment":"Agbada"}'::jsonb) returning id`, [biz, br, c]);
+  /* THE PRICE IS A ROW OF ITS OWN SINCE OCTOBER. orders.total was the
+     selling price in a plain column every member with `orders` could
+     read; it is order_pricing.value now, behind `money`. */
+  await db.query(`insert into public.order_pricing (order_id,business_id,branch_id,value) values ($1,$2,$3,150000)`, [o, biz, br]);
+  await db.query(`insert into public.order_settlement (order_id,business_id,branch_id,paid) values ($1,$2,$3,90000)`, [o, biz, br]);
   await db.query(`insert into public.order_costs (order_id,business_id,branch_id,cost) values ($1,$2,$3,40000)`, [o, biz, br]);
   await db.query(`insert into public.order_commissions (order_id,business_id,branch_id,total) values ($1,$2,$3,15000)`, [o, biz, br]);
   await db.query(`insert into public.order_contacts (order_id,business_id,branch_id,detail)
@@ -295,7 +300,8 @@ section('8. A studio is restored from an automatic backup, not a hand-made one')
 
   const BEFORE = (await q(`select
       (select count(*) from public.orders where business_id=$1) orders,
-      (select coalesce(sum(total),0) from public.orders where business_id=$1) money,
+      (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) money,
+      (select coalesce(sum(paid),0) from public.order_settlement where business_id=$1) paid,
       (select coalesce(sum(cost),0) from public.order_costs where business_id=$1) costs,
       (select coalesce(sum(total),0) from public.order_commissions where business_id=$1) commissions,
       (select count(*) from public.order_contacts where business_id=$1) contacts,
@@ -320,7 +326,8 @@ section('8. A studio is restored from an automatic backup, not a hand-made one')
 
   const AFTER = (await q(`select
       (select count(*) from public.orders where business_id=$1) orders,
-      (select coalesce(sum(total),0) from public.orders where business_id=$1) money,
+      (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) money,
+      (select coalesce(sum(paid),0) from public.order_settlement where business_id=$1) paid,
       (select coalesce(sum(cost),0) from public.order_costs where business_id=$1) costs,
       (select coalesce(sum(total),0) from public.order_commissions where business_id=$1) commissions,
       (select count(*) from public.order_contacts where business_id=$1) contacts,

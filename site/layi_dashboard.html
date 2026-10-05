@@ -1981,7 +1981,7 @@ function defaultRoles(){return [
   {id:'manager',name:'Manager',builtin:true,perms:{orders:1,products:1,del:1,update:1,canQC:1,canDispatch:1,money:1,seeProfit:1,seeCost:1,seeContact:1,ownTasksOnly:0,finance:1,payroll:1,appts:1,supplies:1,customers:1,marketing:1,logistics:1,team:1,editStaff:1,tasks:1,attendance:1,settings:0,users:0,allOrders:1,audit:1}},
   {id:'cre',name:'Client Relations',builtin:true,perms:{orders:1,products:1,del:1,update:1,canQC:1,canDispatch:1,money:1,receivables:1,expenses:0,funds:0,sales:1,seeProfit:0,seeCost:0,seeContact:1,finance:0,appts:1,supplies:1,customers:1,marketing:1,logistics:1,team:0,attendance:1,settings:0,users:0,allOrders:1,audit:0,branchSwitch:0}},
   {id:'tailor',name:'Tailor / Workroom',builtin:true,perms:{orders:0,products:0,del:0,update:1,canQC:0,canDispatch:0,money:0,seeProfit:0,seeCost:0,seeContact:0,ownTasksOnly:1,finance:0,appts:0,supplies:0,customers:0,logistics:0,team:0,tasks:1,attendance:1,settings:0,users:0,allOrders:0,audit:0}},
-  {id:'accountant',name:'Accountant',builtin:true,perms:{orders:0,products:0,del:0,update:0,canQC:0,canDispatch:0,money:1,seeProfit:1,seeCost:1,seeContact:1,ownTasksOnly:0,finance:1,payroll:1,appts:0,supplies:0,customers:1,logistics:0,team:0,tasks:1,attendance:1,settings:0,users:0,allOrders:1,audit:0}},
+  {id:'accountant',name:'Accountant',builtin:true,perms:{orders:0,products:0,del:0,update:0,canQC:0,canDispatch:0,money:1,receivables:1,seeProfit:1,seeCost:1,seeContact:1,ownTasksOnly:0,finance:1,payroll:1,appts:0,supplies:0,customers:1,logistics:0,team:0,tasks:1,attendance:1,settings:0,users:0,allOrders:1,audit:0}},
 ];}
 function canSeeProfit(){const r=currentRole();if(!r||!r.perms)return false;return r.perms.seeProfit!==undefined?!!r.perms.seeProfit:can('money');}
 function canSeeCost(){const r=currentRole();if(!r||!r.perms)return false;return r.perms.seeCost!==undefined?!!r.perms.seeCost:can('money');}
@@ -2233,7 +2233,7 @@ function can(k){return permVal(currentRole(),k);}
 function canAnySettings(){return can('settings')||can('users')||can('setCatalog')||can('setData')||can('setCompany')||can('setWorkflow')||can('setBranches');}
 function userLabel(){return currentUser?currentUser.name:'—';}
 function fmtNum(n){n=Number(n||0);const neg=n<0;n=Math.abs(n);const parts=(n%1?n.toFixed(2):String(Math.round(n))).split('.');parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');return(neg?'-':'')+parts.join('.');}
-const cur=n=>(CUR_SYM[SETTINGS.currency]||SETTINGS.currency)+fmtNum(n);
+const cur=n=>isWithheld(n)?NOT_SHOWN:(CUR_SYM[SETTINGS.currency]||SETTINGS.currency)+fmtNum(n);
 /* Record ids. Two records made in the same millisecond used to be told apart by three
    random base-36 characters — 46,656 values, which is a birthday problem, not a margin:
    a burst of 60 records collided 4% of the time and a 200-row CSV import 32% of the time.
@@ -2583,7 +2583,31 @@ const getAttendance=()=>load('layi_dash_attendance',[]);
 const setAttendance=v=>save('layi_dash_attendance',v);
 const CURRENCIES=['NGN','GBP','USD','EUR'];
 const CUR_SYM={NGN:'₦',GBP:'£',USD:'$',EUR:'€'};
-function curC(n,ccy){return (CUR_SYM[ccy]||(ccy?ccy+' ':''))+fmtNum(n||0);}
+/* WITHHELD IS NOT ZERO, AND THE SCREEN HAS TO SAY SO.
+
+   Since the price and the paid figure became rows of their own, a person
+   without `money` pulls an order with no `value` on it at all, and a
+   person without `receivables` gets no `paid`. That is deliberate: a cost
+   defaulted to zero reads as free, and a price defaulted to zero reads as
+   a gift. But every money formatter in here did `n||0`, so an absent
+   figure printed as ₦0 — a wrong number stated with complete confidence,
+   which is worse than an honest refusal.
+
+   So null and undefined print a dash, and a real zero still prints ₦0.
+   One change, and the two hundred places that show an amount tell the
+   truth without any of them having to know about permissions. */
+const NOT_SHOWN='\u2014';
+function isWithheld(n){return n===null||n===undefined||n==='';}
+/* A dash in a column of figures is clear. A dash where the headline total
+   should be is not, so the one place that carries the whole answer says
+   what the answer is: not that it is nothing, that it is not yours. */
+function notShown(what){
+  return '<span style="font-family:inherit;font-size:13px;color:var(--text-faint);font-weight:400">'
+       + 'Not shown' + (what?' \u00b7 '+esc(what)+' is not part of your role':'') + '</span>';
+}
+function curC(n,ccy){
+  if(isWithheld(n))return NOT_SHOWN;
+  return (CUR_SYM[ccy]||(ccy?ccy+' ':''))+fmtNum(n||0);}
 function ocur(o){return (o&&o.currency)||SETTINGS.currency;}
 function ofx(o){return (o&&o.currency&&o.currency!==SETTINGS.currency)?(+o.fx||1):1;}
 function curO(n,o){return curC(n,ocur(o));}          // amount shown in the order's own currency
@@ -3224,27 +3248,46 @@ function customerIdForName(name){
      costs[] + saleItems[].unitCost  -> order_costs        seeCost
      commissions[] + director/referral -> order_commissions  seeCost
      delivery.location + email/whatsapp/address -> order_contacts  seeContact
+     value + discount + outfits[].price + saleItems[].unitPrice
+       + delivery.fee                -> order_pricing      money
+     paid + potContribs[]            -> order_settlement   receivables
+
+   The last two arrived in October. P2 protected what the studio SPENDS
+   and left what the client PAYS in the document, readable by anybody who
+   could open Orders — while the role model had said for months that
+   headprod has orders and not money, and staff has money and not
+   receivables. orders.total carried the price a second time, in a plain
+   column, and so did a view nobody was using.
 
    THIS LIST IS THE SAME LIST AS app.order_doc_without_secrets in
-   20260929240000. If one changes the other must, or the database will
+   20261004120000. If one changes the other must, or the database will
    strip something the app still thinks it sent, and it will be lost. */
 const ORDER_PROTECTED=["costs","cost","commissions",
   "directorAmount","directorPct","directorOn","referralAmount","referrerId",
-  "email","whatsapp","address","phone"];
+  "email","whatsapp","address","phone",
+  "value","discount","paid","potContribs"];
 function orderDoc(o){
   const d=Object.assign({},o);
   ORDER_PROTECTED.forEach(function(k){delete d[k];});
   delete d._rev;
-  /* a cost hiding inside each sold item */
+  /* a cost hiding inside each sold item, and the price beside it */
   if(Array.isArray(d.saleItems)){
     d.saleItems=d.saleItems.map(function(i){
       if(!i||typeof i!=="object")return i;
-      const c=Object.assign({},i);delete c.unitCost;return c;});
+      const c=Object.assign({},i);delete c.unitCost;delete c.unitPrice;return c;});
   }
-  /* and an address hiding inside the delivery block; the courier, the fee
-     and the tracking number are ordinary order information and stay */
+  /* and a price inside each outfit */
+  if(Array.isArray(d.outfits)){
+    d.outfits=d.outfits.map(function(x){
+      if(!x||typeof x!=="object")return x;
+      const c=Object.assign({},x);delete c.price;return c;});
+  }
+  /* and an address hiding inside the delivery block, and the fee with it;
+     the courier and the tracking number are ordinary order information
+     and stay */
   if(d.delivery&&typeof d.delivery==="object"){
-    d.delivery=Object.assign({},d.delivery);delete d.delivery.location;
+    d.delivery=Object.assign({},d.delivery);
+    delete d.delivery.location;delete d.delivery.fee;
   }
   return d;
 }
@@ -3277,6 +3320,43 @@ function orderCommissionRow(o){
     director:{on:o.directorOn,pct:o.directorPct,amount:o.directorAmount},
     referral:{referrerId:o.referrerId,amount:o.referralAmount}}};
 }
+/* WHAT THE CLIENT PAYS. null when this device holds no price at all,
+   which is what somebody without `money` has: no value, no discount, no
+   line prices. They must not be able to overwrite the studio's with a
+   row worth nothing. A price of zero is a different thing and says so. */
+function orderPricingRow(o){
+  const hasValue=o.value!=null&&o.value!=="";
+  const hasDisc=o.discount!=null&&o.discount!=="";
+  const outfits=(Array.isArray(o.outfits)?o.outfits:[])
+    .filter(function(x){return x&&x.price!=null&&x.price!=="";});
+  const items=(Array.isArray(o.saleItems)?o.saleItems:[])
+    .filter(function(i){return i&&i.unitPrice!=null&&i.unitPrice!=="";});
+  const fee=(o.delivery&&o.delivery.fee!=null&&o.delivery.fee!=="")?o.delivery.fee:null;
+  if(!hasValue&&!hasDisc&&!outfits.length&&!items.length&&fee==null)return null;
+  const detail={
+    outfit_prices:outfits.map(function(x){return {name:x.name,price:x.price};}),
+    item_prices:items.map(function(i){return {productId:i.productId,variantId:i.variantId,
+      label:i.label,qty:i.qty,unitPrice:i.unitPrice};})};
+  if(fee!=null)detail.delivery_fee=fee;
+  return {value:Number(o.value)||0,discount:Number(o.discount)||0,detail:detail};
+}
+
+/* AND WHAT HAS ARRIVED. Read with `receivables`, changed with
+   `finance.record_payment` — the same pair that already governs the
+   payments ledger, because the order's paid figure is that same money.
+   So this one asks the permission before it builds anything: a person who
+   may see what is owed but not record a payment holds `paid` on their
+   device, and sending it back would be refused and sit in the outbox for
+   ever. */
+function orderSettlementRow(o){
+  if(!can('finance.record_payment'))return null;
+  const hasPaid=o.paid!=null&&o.paid!=="";
+  const pots=(Array.isArray(o.potContribs)?o.potContribs:[])
+    .filter(function(p){return p&&(p.potId||p.amount!=null);});
+  if(!hasPaid&&!pots.length)return null;
+  return {paid:Number(o.paid)||0,detail:{pot_contribs:pots}};
+}
+
 function orderContactRow(o){
   const d={};
   const loc=o.delivery&&o.delivery.location;
@@ -3314,11 +3394,14 @@ async function pushOrderRows(p_business,p_list){
        studio was carrying the damage; it would have appeared on the first
        one that was. */
     let settled=false;try{settled=orderIsSettled(o);}catch(e){settled=false;}
+    /* NO total. The column is gone: it was the selling price in a plain
+       readable column beside a document that no longer carries it, which
+       is the one thing the October release could not leave behind. The
+       price is order_pricing.value and nowhere else. */
     const row={
       business_id:biz,app_id:String(o.id),
       branch_id:branchIdForName(o.branch),
       customer_id:customerIdForName(o.client),
-      total:Number(o.value||0),
       status:settled?"done":"open",
       assigned_to:(o.makerId||null)||null,
       doc:orderDoc(o)
@@ -3346,7 +3429,8 @@ async function pushOrderRows(p_business,p_list){
          refused by the policy as well; this is the half that means an
          ordinary save by an ordinary person is not even an attempt. */
       const cost=orderCostRow(o),comm=orderCommissionRow(o),contact=orderContactRow(o);
-      if(cost||comm||contact){
+      const price=orderPricingRow(o),settle=orderSettlementRow(o);
+      if(cost||comm||contact||price||settle){
         const {data:got}=await supa.from('orders').select('id')
           .eq('business_id',biz).eq('app_id',String(o.id)).maybeSingle();
         if(got){
@@ -3359,6 +3443,13 @@ async function pushOrderRows(p_business,p_list){
           if(contact)await supa.from('order_contacts').upsert({order_id:got.id,
             business_id:biz,branch_id:row.branch_id,
             detail:contact.detail},{onConflict:'order_id'});
+          if(price)await supa.from('order_pricing').upsert({order_id:got.id,
+            business_id:biz,branch_id:row.branch_id,
+            value:price.value,discount:price.discount,
+            detail:price.detail},{onConflict:'order_id'});
+          if(settle)await supa.from('order_settlement').upsert({order_id:got.id,
+            business_id:biz,branch_id:row.branch_id,
+            paid:settle.paid,detail:settle.detail},{onConflict:'order_id'});
         }
       }
     }catch(e){if(!firstError)firstError=String(e&&e.message||e);}
@@ -3524,7 +3615,7 @@ async function pullOrders(){
        willing to give it to. An absent one is a REFUSAL and is left absent
        rather than defaulted, because a cost defaulted to zero reads as
        free and a missing commission reads as nobody being owed. */
-    let costs={},comms={},contacts={};
+    let costs={},comms={},contacts={},prices={},settles={};
     try{
       const {data:cs}=await supa.from('order_costs').select('order_id,cost,detail').eq('business_id',myBusinessId);
       (cs||[]).forEach(function(c){costs[c.order_id]=c;});
@@ -3537,11 +3628,18 @@ async function pullOrders(){
       const {data:ts}=await supa.from('order_contacts').select('order_id,detail').eq('business_id',myBusinessId);
       (ts||[]).forEach(function(t){contacts[t.order_id]=t;});
     }catch(e){}
+    try{
+      const {data:ps}=await supa.from('order_pricing').select('order_id,value,discount,detail').eq('business_id',myBusinessId);
+      (ps||[]).forEach(function(p){prices[p.order_id]=p;});
+    }catch(e){}
+    try{
+      const {data:ss}=await supa.from('order_settlement').select('order_id,paid,detail').eq('business_id',myBusinessId);
+      (ss||[]).forEach(function(x){settles[x.order_id]=x;});
+    }catch(e){}
     const list=rows.map(function(r){
       const o=Object.assign({},r.doc||{});
       o.id=r.app_id||o.id;
       o._rev=r.rev;
-      if(r.total!=null)o.value=Number(r.total);
       if(r.branch_id)o.branch=branchNameForId(r.branch_id)||o.branch;
       if(r.assigned_to)o.makerId=r.assigned_to;
       /* Put the protected parts back exactly where the thirty three readers
@@ -3567,6 +3665,37 @@ async function pullOrders(){
         o.directorOn=dir.on;o.directorPct=dir.pct;o.directorAmount=dir.amount;
         const ref=(k.detail&&k.detail.referral)||{};
         o.referrerId=ref.referrerId||"";o.referralAmount=ref.amount||0;
+      }
+      /* THE PRICE, IF THEY MAY SEE IT. Absent is a refusal and is left
+         absent: o.value stays undefined rather than becoming 0, because a
+         zero reads as free and this person is not being told the price. */
+      const pr=prices[r.id];
+      if(pr){
+        o.value=Number(pr.value);
+        if(Number(pr.discount))o.discount=Number(pr.discount);
+        const d=pr.detail||{};
+        const op=d.outfit_prices||[];
+        if(op.length&&Array.isArray(o.outfits)){
+          o.outfits=o.outfits.map(function(x,n){
+            const m=op[n];
+            return (m&&x&&typeof x==="object")?Object.assign({},x,{price:m.price}):x;});
+        }
+        const ip=d.item_prices||[];
+        if(ip.length&&Array.isArray(o.saleItems)){
+          o.saleItems=o.saleItems.map(function(i,n){
+            const m=ip[n];
+            return (m&&i&&typeof i==="object")?Object.assign({},i,{unitPrice:m.unitPrice}):i;});
+        }
+        if(d.delivery_fee!=null){
+          o.delivery=Object.assign({},o.delivery||{},{fee:d.delivery_fee});
+        }
+      }
+      /* and what has been paid, on the same terms */
+      const st=settles[r.id];
+      if(st){
+        o.paid=Number(st.paid);
+        const pc=(st.detail&&st.detail.pot_contribs)||[];
+        if(pc.length)o.potContribs=pc;
       }
       const t=contacts[r.id];
       if(t&&t.detail){
@@ -7464,7 +7593,7 @@ function openDetail(id){
     </div>
     <div class="opane" data-pane="timeline" style="display:none">${buildOrderTimeline(o)}</div>
     <div class="opane" data-pane="payments" style="display:none">
-      ${can('orders')?`<div class="total-line"><span>${can('money')?'Paid '+curO(o.paid,o):'Order value'}</span><b>${curO(o.value,o)}${can('money')&&owed>0?` <span style="font-size:13px;color:var(--amber)">(${curO(owed,o)} due)</span>`:''}</b></div>${ocur(o)!==SETTINGS.currency?`<div class="kv" style="color:var(--text-faint);text-align:right">Invoiced in ${ocur(o)} · ≈ ${cur(orderNetBase(o))} at 1 ${ocur(o)} = ${fmtNum(ofx(o))} ${SETTINGS.currency}</div>`:''}`:''}
+      ${can('orders')?`<div class="total-line"><span>${(canReceivables()&&!isWithheld(o.paid))?'Paid '+curO(o.paid,o):'Order value'}</span><b>${can('money')?curO(o.value,o):notShown('what an order sells for')}${(can('money')&&canReceivables()&&owed>0)?` <span style="font-size:13px;color:var(--amber)">(${curO(owed,o)} due)</span>`:''}</b></div>${ocur(o)!==SETTINGS.currency?`<div class="kv" style="color:var(--text-faint);text-align:right">Invoiced in ${ocur(o)} · ≈ ${cur(orderNetBase(o))} at 1 ${ocur(o)} = ${fmtNum(ofx(o))} ${SETTINGS.currency}</div>`:''}`:''}
       ${can('money')?`<div class="field" style="margin-top:6px"><label>Payments received</label>${(()=>{const ps=getTxns().filter(t=>t.orderId===o.id&&t.dir==='in').sort((a,b)=>String(a.at).localeCompare(String(b.at)));return ps.length?ps.map(t=>`<div class="bd-row"><span class="bl">${esc(t.label||'Payment')} <span style="color:var(--text-faint)">· ${new Date(t.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}</span></span><span class="bv" style="color:var(--green)">+${cur(t.amount)}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No payments recorded yet.</div>';})()}</div>`:''}
       ${(can('money')&&owed>0)?`<button class="btn" style="margin-top:10px" onclick="openPayment('${o.id}')">Record payment</button>`:''}
       ${commInfo}
@@ -9467,7 +9596,7 @@ function planStop(what,noun){
 }
 /* Currency for a price we quote, which is always in the plan's own currency
    rather than the studio's. A London studio still pays in naira today. */
-function cur2(n){return '\u20a6'+fmtNum(n||0);}
+function cur2(n){return isWithheld(n)?NOT_SHOWN:'\u20a6'+fmtNum(n||0);}
 /* One tier per plan, at exactly the plan's own figure. storageTierName() picks
    the largest tier that fits inside the plan's allowance, so a tier ladder
    that does not line up silently enforces a SMALLER limit than the plan sells:
@@ -12049,7 +12178,7 @@ function periodInlineHTML(period,customDate,setter,customSetter){return `<span c
 var salesPeriod='month';var salesCustom='';
 function setSalesPeriod(p){salesPeriod=p;renderSales();}
 function setSalesCustom(d){salesCustom=d;renderSales();}
-function curk(n){n=+n||0;const s=SETTINGS.currency==='NGN'?'₦':(SETTINGS.currency==='GBP'?'£':(SETTINGS.currency==='USD'?'$':''));if(n>=1e6)return s+(n/1e6).toFixed(n>=1e7?0:1)+'m';if(n>=1e3)return s+Math.round(n/1e3)+'k';return s+Math.round(n);}
+function curk(n){if(isWithheld(n))return NOT_SHOWN;n=+n||0;const s=SETTINGS.currency==='NGN'?'₦':(SETTINGS.currency==='GBP'?'£':(SETTINGS.currency==='USD'?'$':''));if(n>=1e6)return s+(n/1e6).toFixed(n>=1e7?0:1)+'m';if(n>=1e3)return s+Math.round(n/1e3)+'k';return s+Math.round(n);}
 const TREND_GRADS=['linear-gradient(180deg,#3fae6a,rgba(63,174,106,.30))','linear-gradient(180deg,#e0b760,rgba(224,183,96,.30))','linear-gradient(180deg,#e07b8e,rgba(224,123,142,.30))','linear-gradient(180deg,#5fb0d0,rgba(95,176,208,.30))'];
 const TREND_PALETTE=['#3fae6a','#e0b760','#e07b8e','#5fb0d0','#9b7fd0','#6fa3a0','#c98f6a','#7fae7a'];
 // grouped bars + trend line(s). series: [{color,lineColor?,values:[],barColors?}]

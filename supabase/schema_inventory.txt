@@ -222,12 +222,19 @@ col order_items.order_id
 col order_items.price
 col order_items.product_id
 col order_items.qty
-col order_summary.branch_id
-col order_summary.business_id
-col order_summary.id
-col order_summary.item_count
-col order_summary.ref
-col order_summary.total
+col order_pricing.branch_id
+col order_pricing.business_id
+col order_pricing.detail
+col order_pricing.discount
+col order_pricing.order_id
+col order_pricing.updated_at
+col order_pricing.value
+col order_settlement.branch_id
+col order_settlement.business_id
+col order_settlement.detail
+col order_settlement.order_id
+col order_settlement.paid
+col order_settlement.updated_at
 col orders.app_id
 col orders.assigned_to
 col orders.branch_id
@@ -239,7 +246,6 @@ col orders.id
 col orders.ref
 col orders.rev
 col orders.status
-col orders.total
 col orders.updated_at
 col orders.updated_by
 col partner_accounts.account_name
@@ -631,7 +637,11 @@ fn app.order_commission_total(p_order jsonb) -> numeric
 fn app.order_cost_total(p_order jsonb) -> numeric
 fn app.order_doc_carries_no_secrets() -> trigger
 fn app.order_doc_without_secrets(p_order jsonb) -> jsonb
+fn app.order_has_pricing(p_order jsonb) -> boolean
+fn app.order_has_settlement(p_order jsonb) -> boolean
 fn app.order_item_cost_total(p_order jsonb) -> numeric
+fn app.order_pricing_detail(p_order jsonb) -> jsonb
+fn app.order_settlement_detail(p_order jsonb) -> jsonb
 fn app.partner_account_reverify() -> trigger
 fn app.partner_me() -> TABLE(id uuid, code text, name text, business_name text, email text, phone text, city text, tax_id text, tier text, status text, joined_on date, kind text, business_id uuid, payout_frozen boolean)
 fn app.perm_for_key(p_key text) -> text
@@ -665,6 +675,7 @@ fn app.stamp_transaction() -> trigger
 fn app.storage_cap_for(p_business uuid) -> bigint
 fn app.storage_has_room(p_business uuid) -> boolean
 fn app.strip_credentials_from_state() -> trigger
+fn app.system_role_permissions(p_key text) -> text[]
 fn app.take_studio_backups(p_retain integer) -> jsonb
 fn app.tlb_staff_id() -> uuid
 fn app.trial_days() -> integer
@@ -796,6 +807,14 @@ pol order_items.order_items_delete
 pol order_items.order_items_insert
 pol order_items.order_items_select
 pol order_items.order_items_update
+pol order_pricing.order_pricing_delete
+pol order_pricing.order_pricing_select
+pol order_pricing.order_pricing_update
+pol order_pricing.order_pricing_write
+pol order_settlement.order_settlement_delete
+pol order_settlement.order_settlement_select
+pol order_settlement.order_settlement_update
+pol order_settlement.order_settlement_write
 pol orders.orders_delete
 pol orders.orders_insert
 pol orders.orders_select

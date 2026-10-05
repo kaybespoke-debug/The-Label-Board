@@ -250,7 +250,29 @@ section('After: the studio still works, which is the whole question');
      permissions at all, and an app that reads can() for everything shows an
      owner an empty studio. */
   const roles = await one(`select count(*) c from public.business_roles where business_id=$1`, [BIZ]);
-  ok('the studio was given its four roles', Number(roles.c) === 4, roles.c + ' roles');
+  ok('the studio was given its five roles', Number(roles.c) === 5, roles.c + ' roles');
+
+  /* THE ACCOUNTANT ARRIVES BY BACKFILL, NOT BY TRIGGER. Every other suite
+     builds the schema and then makes studios, so the trigger seeds them and
+     the backfill runs against nothing. This studio existed first, which is
+     the only way to prove the half of the migration that production will
+     actually execute. */
+  {
+    const acc = await one(`select id, tier, is_system,
+        (select count(*) from public.business_role_permissions p where p.role_id = r.id) as n
+      from public.business_roles r where r.business_id=$1 and r.key='accountant'`, [BIZ]);
+    ok('an accountant was added to a studio that predates it', !!acc && !!acc.id,
+       acc ? 'found' : 'no accountant role');
+    ok('as a role we ship rather than a custom one', acc && acc.is_system === true,
+       String(acc && acc.is_system));
+    ok('on the staff tier, carrying no authority of its own',
+       acc && acc.tier === 'staff', String(acc && acc.tier));
+    ok('with the whole shipped permission set', Number(acc && acc.n) === 16, (acc && acc.n) + ' permissions');
+    const rec = await one(`select count(*) c from public.business_role_permissions p
+      join public.business_roles r on r.id = p.role_id
+      where r.business_id=$1 and r.key='accountant' and p.permission_key='receivables'`, [BIZ]);
+    ok('including receivables, which is what the decision was', Number(rec.c) === 1, String(rec.c));
+  }
   const perms = await one(`select count(*) c from public.business_role_permissions p
     join public.business_roles r on r.id = p.role_id where r.business_id=$1 and r.key='owner'`, [BIZ]);
   ok('and the owner role was granted its permissions', Number(perms.c) > 0, perms.c + ' permissions');

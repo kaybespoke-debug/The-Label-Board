@@ -256,6 +256,196 @@ section('Signing up twice does not build two studios');
   ok('and the profile lookup still returns exactly one row', prof[0].n === 1, String(prof[0].n));
 }
 
+// ---------------------------------------------------------------------
+section('A new studio gets the Accountant role we ship');
+// ---------------------------------------------------------------------
+// The customer app has shipped an Accountant as a BUILT-IN role for a long
+// time; the database knew only four system roles, so every studio's
+// accountant arrived as a custom role carrying whatever its old
+// layi_dash_roles blob happened to hold. Across nine production studios that
+// produced three different accountants and one studio with none at all —
+// not a customisation, a seeding difference. This is the test that a studio
+// created from here on gets the same one every time.
+{
+  const uid = await signUp('ledger@example.com', { business_name: 'Ledger Works' });
+  const biz = (await q(
+    `select b.id from businesses b join profiles p on p.business_id = b.id where p.id = $1`,
+    [uid]))[0];
+  ok('the new studio exists to have roles at all', !!biz, 'no business row');
+
+  const roles = await q(
+    `select id, key, name, tier, is_system from business_roles where business_id = $1 order by key`,
+    [biz.id]);
+  ok('it is seeded with five roles, not four',
+     roles.length === 5, roles.map(r => r.key).join(', '));
+
+  const acc = roles.find(r => r.key === 'accountant');
+  ok('one of them is the accountant', !!acc, roles.map(r => r.key).join(', '));
+  ok('it is a role we ship rather than a custom one', acc && acc.is_system === true,
+     String(acc && acc.is_system));
+  ok('named Accountant', acc && acc.name === 'Accountant', String(acc && acc.name));
+
+  /* The tier is the anchor for every authority check that is not a
+     permission. An accountant reads the studio's money; it does not run the
+     studio, so it sits on the staff tier like any other member. */
+  ok('on the staff tier, so it carries no inherent authority',
+     acc && acc.tier === 'staff', String(acc && acc.tier));
+
+  const held = (await q(
+    `select permission_key from business_role_permissions where role_id = $1 order by 1`,
+    [acc.id])).map(r => r.permission_key);
+
+  const EXPECTED = [
+    'allOrders', 'attendance', 'customers', 'customers.manage', 'expenses',
+    'finance', 'finance.record_payment', 'funds', 'money', 'payroll',
+    'receivables', 'sales', 'seeContact', 'seeCost', 'seeProfit', 'tasks',
+  ].sort();
+
+  /* THE DECISION, on its own line, because it is the one this section was
+     written for: an accountant chases what the studio is owed. Before this
+     it was true only where a fallback happened to infer it — one studio in
+     eight — and the server is about to start enforcing on the key itself
+     rather than on whatever the app inferred. */
+  ok('the accountant can see receivables', held.includes('receivables'),
+     'holds: ' + held.join(', '));
+
+  ok('and holds exactly the shipped set, no more and no less',
+     JSON.stringify(held) === JSON.stringify(EXPECTED),
+     'missing: ' + (EXPECTED.filter(k => !held.includes(k)).join(', ') || 'none') +
+     ' | extra: ' + (held.filter(k => !EXPECTED.includes(k)).join(', ') || 'none'));
+
+  /* What it must never be handed. Each of these would turn a role that
+     reads the books into one that can change who reads them, or what they
+     are kept in. The list is explicit rather than derived, so widening the
+     accountant has to be a deliberate edit to this test. */
+  const FORBIDDEN = ['team', 'team.view', 'editStaff', 'users', 'settings', 'audit',
+                     'billing.view', 'billing.manage', 'ownership.transfer'];
+  const leaked = FORBIDDEN.filter(k => held.includes(k));
+  ok('and no owner, admin or team-management authority', leaked.length === 0,
+     'leaked: ' + leaked.join(', '));
+
+  /* An owner can rename it — a studio may well say "Bookkeeper" — but not
+     delete it or move its tier, which is what is_system means here and is
+     the same deal the other four get. */
+  ok('an owner cannot delete the role out from under the books',
+     acc.is_system === true);
+}
+
+// ---------------------------------------------------------------------
+section('And so does every studio that already existed');
+// ---------------------------------------------------------------------
+// Everything above runs through the trigger. The studios that were already
+// there when the migration landed went through the backfill instead, which
+// is a different code path and the one that had to leave a changed role
+// alone. Every studio in this database, however it got here, ends up with
+// one.
+{
+  const without = await q(
+    `select b.name from businesses b
+       where not exists (select 1 from business_roles r
+                         where r.business_id = b.id and r.key = 'accountant')`);
+  ok('no studio is left without an accountant', without.length === 0,
+     without.map(b => b.name).join(', '));
+
+  const short = await q(
+    `select b.name, r.key from businesses b
+       join business_roles r on r.business_id = b.id and r.key = 'accountant' and r.is_system
+      where exists (select 1 from unnest(app.system_role_permissions('accountant')) k
+                    where k not in (select permission_key from business_role_permissions p
+                                    where p.role_id = r.id))`);
+  ok('and every accountant we ship holds the whole set', short.length === 0,
+     short.map(b => b.name).join(', '));
+
+  /* The app and the database have to agree about this role, because in live
+     mode getRoles() returns the DATABASE's copy and defaultRoles() is what
+     a studio gets before it ever connects. The same accountant either way. */
+  const html = readFileSync(join(repo, 'site/layi_dashboard.html'), 'utf8');
+  const def = (html.match(/\{id:'accountant',name:'Accountant',builtin:true,perms:\{[^}]*\}/) || [''])[0];
+  ok('the app ships an accountant definition to compare with', def.length > 0);
+  ok('and it grants receivables in its own right, not by inference',
+     /receivables:1/.test(def), def.slice(0, 160));
+}
+
+// ---------------------------------------------------------------------
+section('An accountant a studio changed for itself is left alone');
+// ---------------------------------------------------------------------
+// The backfill takes over the accountant roles that arrived from the old
+// blob, which on production are byte-identical to the one we ship. A studio
+// that has since ticked a box on its own is a different thing: taking that
+// role over would make it undeletable, and the set we ship does not contain
+// whatever they added, so "standardise it" would have to mean either
+// revoking their change or keeping a role that is no longer the one we
+// ship. Neither is ours to choose, so it stays theirs.
+//
+// Re-applying the migration is also the test that it is idempotent, which
+// is what makes it safe to run against a project twice.
+{
+  const MIG = '20261004110000_the_accountant_is_a_role_we_ship.sql';
+  const sql = readFileSync(join(repo, 'supabase/migrations', MIG), 'utf8');
+
+  const mk = async (slug) => {
+    await db.exec(`insert into businesses (name, slug, plan, status)
+                   values ('${slug}', '${slug}', 'trial', 'active')`);
+    const id = (await q(`select id from businesses where slug = $1`, [slug]))[0].id;
+    // the trigger has just given it the accountant we ship; put it back to
+    // what the blob import left behind, which is what the backfill meets.
+    await db.exec(`delete from business_role_permissions p
+                    using business_roles r
+                    where p.role_id = r.id and r.business_id = '${id}' and r.key = 'accountant'`);
+    await db.exec(`update business_roles set is_system = false
+                    where business_id = '${id}' and key = 'accountant'`);
+    return id;
+  };
+
+  /* One studio with the eleven permissions seven production studios have,
+     and nothing else: untouched, so it becomes the role we ship. */
+  const plain = await mk('as-imported');
+  await db.exec(`insert into business_role_permissions (role_id, permission_key)
+    select r.id, k from business_roles r
+    cross join lateral unnest(array['allOrders','attendance','customers','customers.manage',
+      'finance','finance.record_payment','money','payroll','seeContact','seeCost','seeProfit']) k
+    where r.business_id = '${plain}' and r.key = 'accountant'`);
+
+  /* One studio that gave its accountant the Studio settings page, which is
+     not in the set we ship and could only have been a person ticking it. */
+  const theirs = await mk('changed-it');
+  await db.exec(`insert into business_role_permissions (role_id, permission_key)
+    select r.id, k from business_roles r
+    cross join lateral unnest(array['money','finance','seeCost','settings']) k
+    where r.business_id = '${theirs}' and r.key = 'accountant'`);
+
+  await db.exec(sql);
+
+  const of = async (biz) => (await q(
+    `select r.is_system, (select count(*)::int from business_role_permissions p
+        where p.role_id = r.id) as n,
+       (select count(*)::int from business_role_permissions p
+        where p.role_id = r.id and p.permission_key = 'receivables') as rec,
+       (select count(*)::int from business_role_permissions p
+        where p.role_id = r.id and p.permission_key = 'settings') as settings
+      from business_roles r where r.business_id = $1 and r.key = 'accountant'`, [biz]))[0];
+
+  const p = await of(plain);
+  ok('an accountant that is still the imported one is taken over', p.is_system === true,
+     String(p.is_system));
+  ok('and brought up to the whole shipped set', p.n === 16, p.n + ' permissions');
+  ok('so it gains receivables', p.rec === 1, String(p.rec));
+
+  const t = await of(theirs);
+  ok('an accountant the studio changed stays a custom role', t.is_system === false,
+     String(t.is_system));
+  ok('and keeps the permission they gave it', t.settings === 1, String(t.settings));
+  ok('and is not quietly widened to the shipped set', t.n === 4, t.n + ' permissions');
+  ok('so nothing was revoked from it either', t.n >= 4, t.n + ' permissions');
+
+  /* and running it a second time changes nothing at all */
+  await db.exec(sql);
+  const p2 = await of(plain), t2 = await of(theirs);
+  ok('applying the migration twice is the same as applying it once',
+     p2.n === p.n && t2.n === t.n && p2.is_system === true && t2.is_system === false,
+     JSON.stringify({ plain: p2.n, theirs: t2.n }));
+}
+
 console.log('\n' + '='.repeat(62));
 console.log(pass + ' passed, ' + failures.length + ' failed');
 if (failures.length) {

@@ -90,10 +90,15 @@ await admin(`insert into public.profiles (id,name,role_id,business_id) values
    has contact details, money in and money out, and a settings blob */
 const orderIds = [];
 for (const [ref, total, cost] of [['L-0001', 45000, 18000], ['L-0002', 120000, 52000], ['L-0003', 9000, 0]]) {
-  const r = await admin(`insert into public.orders (business_id,branch_id,app_id,ref,total,doc)
-    values ($1,$2,$3,$3,$4,$5) returning id`,
-    [BIZ, BR, ref, total, JSON.stringify({ id: ref, total })]);
+  const r = await admin(`insert into public.orders (business_id,branch_id,app_id,ref,doc)
+    values ($1,$2,$3,$3,$4) returning id`,
+    [BIZ, BR, ref, JSON.stringify({ id: ref })]);
   orderIds.push(r[0].id);
+  /* THE PRICE IS A ROW OF ITS OWN SINCE OCTOBER. orders.total was the
+     selling price in a plain column every member with `orders` could
+     read; it is order_pricing.value now, behind `money`. */
+  await admin(`insert into public.order_pricing (order_id,business_id,branch_id,value) values ($1,$2,$3,$4)`,
+    [r[0].id, BIZ, BR, total]);
   if (cost) await admin(`insert into public.order_costs (order_id,business_id,branch_id,cost) values ($1,$2,$3,$4)`,
     [r[0].id, BIZ, BR, cost]);
 }
@@ -135,7 +140,7 @@ const beforeCounts = (await admin(`select
   (select count(*) from public.memberships where business_id=$1) members,
   (select count(*) from public.business_roles where business_id=$1) roles,
   (select count(*) from public.audit_log where business_id=$1) audit,
-  (select coalesce(sum(total),0) from public.orders where business_id=$1) order_total,
+  (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) order_total,
   (select coalesce(sum(cost),0) from public.order_costs where business_id=$1) cost_total,
   (select coalesce(sum(amount),0) from public.transactions where business_id=$1) money`, [BIZ]))[0];
 
@@ -224,7 +229,7 @@ section('The restore');
     (select count(*) from public.app_state where business_id=$1) state,
     (select count(*) from public.memberships where business_id=$1) members,
     (select count(*) from public.business_roles where business_id=$1) roles,
-    (select coalesce(sum(total),0) from public.orders where business_id=$1) order_total,
+    (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) order_total,
     (select coalesce(sum(cost),0) from public.order_costs where business_id=$1) cost_total,
     (select coalesce(sum(amount),0) from public.transactions where business_id=$1) money`, [BIZ]))[0];
 
@@ -315,7 +320,7 @@ section('And the studio works again');
   /* No reopening step, and that is the measurement: the studio the file came
      from was working, so the studio the file produced is working, with nobody
      having to know a second command. */
-  const o = await asUser(U.ada, `select id, total from public.orders where business_id=$1`, [BIZ]);
+  const o = await asUser(U.ada, `select id from public.orders where business_id=$1`, [BIZ]);
   ok('the owner sees their three orders', o.rows.length === 3, 'saw ' + o.rows.length);
   const c = await asUser(U.ada, `select cost from public.order_costs where business_id=$1`, [BIZ]);
   ok('and the costs', c.rows.length === 2, 'saw ' + c.rows.length);

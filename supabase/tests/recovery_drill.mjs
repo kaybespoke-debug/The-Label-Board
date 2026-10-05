@@ -118,9 +118,16 @@ const cust = await one(`insert into public.customers (business_id,branch_id,name
 await db.query(`insert into public.customer_contacts (customer_id,business_id,branch_id,phone,email)
   values ($1,$2,$3,'+234 802 000 0000','o@drill.test')`, [cust, BIZ, LAGOS]);
 
-const ord = await one(`insert into public.orders (business_id,branch_id,customer_id,app_id,total,status,doc)
-  values ($1,$2,$3,'D-0001',250000,'open','{"garment":"Agbada","stageIndex":3}'::jsonb) returning id`,
+const ord = await one(`insert into public.orders (business_id,branch_id,customer_id,app_id,status,doc)
+  values ($1,$2,$3,'D-0001','open','{"garment":"Agbada","stageIndex":3}'::jsonb) returning id`,
   [BIZ, LAGOS, cust]);
+/* THE PRICE IS A ROW OF ITS OWN SINCE OCTOBER. orders.total was the
+   selling price in a plain column every member with `orders` could
+   read; it is order_pricing.value now, behind `money`. */
+await db.query(`insert into public.order_pricing (order_id,business_id,branch_id,value)
+  values ($1,$2,$3,250000)`, [ord, BIZ, LAGOS]);
+await db.query(`insert into public.order_settlement (order_id,business_id,branch_id,paid)
+  values ($1,$2,$3,100000)`, [ord, BIZ, LAGOS]);
 await db.query(`insert into public.order_costs (order_id,business_id,branch_id,cost,detail)
   values ($1,$2,$3,75000,'{"lines":[{"label":"Aso-oke","amount":75000}]}'::jsonb)`, [ord, BIZ, LAGOS]);
 await db.query(`insert into public.order_commissions (order_id,business_id,branch_id,total,detail)
@@ -172,7 +179,7 @@ const BEFORE = (await q(`select
   (select count(*) from public.customers where business_id=$1) customers,
   (select count(*) from public.customer_contacts where business_id=$1) contacts,
   (select count(*) from public.orders where business_id=$1) orders,
-  (select coalesce(sum(total),0) from public.orders where business_id=$1) order_money,
+  (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) order_money,
   (select coalesce(sum(cost),0) from public.order_costs where business_id=$1) costs,
   (select coalesce(sum(total),0) from public.order_commissions where business_id=$1) commissions,
   (select count(*) from public.order_contacts where business_id=$1) order_contacts,
@@ -214,7 +221,7 @@ const AFTER = (await q(`select
   (select count(*) from public.customers where business_id=$1) customers,
   (select count(*) from public.customer_contacts where business_id=$1) contacts,
   (select count(*) from public.orders where business_id=$1) orders,
-  (select coalesce(sum(total),0) from public.orders where business_id=$1) order_money,
+  (select coalesce(sum(value),0) from public.order_pricing where business_id=$1) order_money,
   (select coalesce(sum(cost),0) from public.order_costs where business_id=$1) costs,
   (select coalesce(sum(total),0) from public.order_commissions where business_id=$1) commissions,
   (select count(*) from public.order_contacts where business_id=$1) order_contacts,
@@ -231,8 +238,10 @@ for (const k of Object.keys(BEFORE)) {
 
 section('4. And the studio works, asked as the people who work there');
 {
-  const o = await asUser(OWNER, `select app_id, total from public.orders where business_id=$1`, [BIZ]);
-  ok('the owner sees their orders', o.rows.length === 1 && Number(o.rows[0].total) === 250000,
+  const o = await asUser(OWNER, `select o.app_id, p.value as total from public.orders o
+     join public.order_pricing p on p.order_id = o.id where o.business_id=$1`, [BIZ]);
+  ok('the owner sees their orders, and what they are worth',
+     o.rows.length === 1 && Number(o.rows[0].total) === 250000,
      JSON.stringify(o.rows));
   const c = await asUser(MANAGER, `select cost from public.order_costs where business_id=$1`, [BIZ]);
   ok('the manager still sees costs, so the roles came back too', c.rows.length === 1,
@@ -247,8 +256,8 @@ section('4. And the studio works, asked as the people who work there');
      h.rows.length === Number(BEFORE.history) &&
      h.rows.some(r => /Something that happened/.test(r.action)),
      h.rows.length + ' lines, expected ' + BEFORE.history);
-  const w = await asUser(OWNER, `insert into public.orders (business_id,branch_id,app_id,total,status)
-    values ($1,$2,'D-AFTER',1,'open') returning app_id`, [BIZ, LAGOS]);
+  const w = await asUser(OWNER, `insert into public.orders (business_id,branch_id,app_id,status)
+    values ($1,$2,'D-AFTER','open') returning app_id`, [BIZ, LAGOS]);
   ok('and the studio can take a new order, which is what recovered means',
      w.rows.length === 1, w.error || 'nothing written');
 }

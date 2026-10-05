@@ -69,6 +69,39 @@ const MUTATIONS = [
     caught_by: 'supabase/tests/intra_tenant_harness.mjs',
   },
   {
+    /* THE OCTOBER PAIR. These two policies are the whole of the money
+       boundary: without them a head of production reads what every order
+       sold for, and a staff member reads what every client still owes.
+       Both were readable by anybody with `orders` until this release, so
+       a gate that cannot tell the difference is a gate that would have
+       passed then too. */
+    name: 'order_pricing readable without money',
+    sql: `drop policy if exists order_pricing_select on public.order_pricing;
+          create policy order_pricing_select on public.order_pricing for select to authenticated
+            using (app.in_scope(business_id, null));`,
+    caught_by: 'supabase/tests/orders_migration_harness.mjs',
+  },
+  {
+    name: 'order_settlement readable without receivables',
+    sql: `drop policy if exists order_settlement_select on public.order_settlement;
+          create policy order_settlement_select on public.order_settlement for select to authenticated
+            using (app.in_scope(business_id, null));`,
+    caught_by: 'supabase/tests/orders_migration_harness.mjs',
+  },
+  {
+    /* And the one that would put the money back where it came from. The
+       trigger is what makes a stale client harmless: it strips the price
+       out of the document on the way in, every write, for ever. */
+    name: 'the order document may carry the price again',
+    sql: `create or replace function app.order_doc_carries_no_secrets()
+          returns trigger language plpgsql security invoker
+          set search_path = public, pg_temp as $fn$
+          begin
+            return new;
+          end $fn$;`,
+    caught_by: 'supabase/tests/orders_migration_harness.mjs',
+  },
+  {
     name: 'the audit trail can be edited',
     sql: `drop policy if exists audit_log_update on public.audit_log;
           create policy audit_log_update on public.audit_log for update to authenticated
@@ -145,6 +178,6 @@ try {
 console.log('\n' + '='.repeat(62));
 console.log(pass + ' passed, ' + fails.length + ' failed');
 for (const f of fails) console.log('  - ' + f);
-if (!fails.length) console.log('\nEvery one of the five breaks something. The gates are load-bearing.');
+if (!fails.length) console.log('\nEvery one of the ' + MUTATIONS.length + ' breaks something. The gates are load-bearing.');
 console.log('\nno mutation file left behind: ' + !fs.existsSync(STAMP_PATH));
 process.exit(fails.length ? 1 : 0);

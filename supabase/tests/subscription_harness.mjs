@@ -309,8 +309,8 @@ section('Not paying means read only, and not gone');
 {
   await admin(`insert into public.app_state (business_id,key,data) values
     ($1,'layi_dash_settings','{"biz":"Sub Studio"}'::jsonb)`, [BIZ]);
-  await admin(`insert into public.orders (business_id,app_id,doc,total) values
-    ($1,'L-0001','{"id":"L-0001"}'::jsonb,45000)`, [BIZ]);
+  await admin(`insert into public.orders (business_id,app_id,doc) values
+    ($1,'L-0001','{"id":"L-0001"}'::jsonb)`, [BIZ]);
   await admin(`update public.businesses set status='suspended' where id=$1`, [BIZ]);
 
   /* THE FLAG IS DOWN IN A FRESH DATABASE, and that is deliberate: locking a

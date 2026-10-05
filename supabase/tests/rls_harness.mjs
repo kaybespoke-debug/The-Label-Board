@@ -181,8 +181,12 @@ async function seed() {
       'insert into products(business_id, name, price) values ($1,$2,$3) returning id',
       [biz, 'Product ' + k, 1000]))[0].id;
     ids['ord' + k] = (await asAdmin(
-      'insert into orders(business_id, branch_id, customer_id, ref, total) values ($1,$2,$3,$4,$5) returning id',
-      [biz, br, ids['cust' + k], 'REF-' + k, 1000]))[0].id;
+      'insert into orders(business_id, branch_id, customer_id, ref) values ($1,$2,$3,$4) returning id',
+      [biz, br, ids['cust' + k], 'REF-' + k]))[0].id;
+    /* the price is a row of its own since October, behind `money` */
+    await asAdmin(
+      'insert into order_pricing(order_id, business_id, branch_id, value) values ($1,$2,$3,1000)',
+      [ids['ord' + k], biz, br]);
     ids['item' + k] = (await asAdmin(
       'insert into order_items(business_id, order_id, product_id, qty, price) values ($1,$2,$3,1,1000) returning id',
       [biz, ids['ord' + k], ids['prod' + k]]))[0].id;
@@ -280,8 +284,17 @@ for (const t of TENANT_TABLES) {
 {
   const r = await asAnon('select * from businesses');
   ok('anon cannot read businesses', r.rows.length === 0);
-  const s = await asAnon('select * from order_summary');
-  ok('anon cannot read the order_summary view', s.rows.length === 0);
+  /* order_summary is GONE, and that is the assertion now. It was a
+     security_invoker view granted to authenticated that selected
+     orders.total — the selling price, published to anybody with a login,
+     and read by no file in this repository. Protecting the price in
+     order_pricing while leaving that view standing would have protected
+     nothing, so October dropped it. */
+  const s = await asAdmin(`select count(*)::int n from pg_class c
+    join pg_namespace ns on ns.oid = c.relnamespace
+    where ns.nspname = 'public' and c.relname = 'order_summary'`);
+  ok('the order_summary view is gone rather than merely filtered',
+     Number(s[0].n) === 0, 'it is still there');
 }
 
 // =====================================================================
@@ -316,10 +329,12 @@ section('3. A member sees their own business and no more');
   ok('joining orders to items exposes only own rows', joined.rows.length === 1,
     'got ' + joined.rows.length);
 
-  // The view.
-  const view = await asUser(U.aOwner, 'select * from order_summary');
-  ok('order_summary view is filtered to own business', view.rows.length === 1,
-    'got ' + view.rows.length);
+  /* THE PRICE, WHICH IS A TABLE OF ITS OWN NOW. The owner holds `money`,
+     so they get it; the sweep below proves nobody outside the studio does. */
+  const price = await asUser(U.aOwner, 'select value from order_pricing');
+  ok('an owner reads the price of their own orders and no others',
+     price.rows.length === 1 && Number(price.rows[0].value) === 1000,
+     price.error || 'got ' + price.rows.length);
 
   // A user with no membership at all.
   const nobody = await asUser(U.outsider, 'select count(*)::int n from orders');
@@ -339,10 +354,10 @@ section('4. Writes cannot cross the boundary');
 
   // Updating another tenant's row.
   const upd = await asUser(U.aOwner,
-    'update orders set total = 999999 where id = $1 returning id', [ids.ordB]);
+    `update orders set ref = 'STOLEN' where id = $1 returning id`, [ids.ordB]);
   ok('Studio A cannot UPDATE a Studio B row', upd.rows.length === 0);
-  const check = await asAdmin('select total from orders where id = $1', [ids.ordB]);
-  ok('  Studio B row is unchanged', Number(check[0].total) === 1000, 'total is ' + check[0].total);
+  const check = await asAdmin('select ref from orders where id = $1', [ids.ordB]);
+  ok('  Studio B row is unchanged', check[0].ref === 'REF-B', 'ref is ' + check[0].ref);
 
   // The WITH CHECK case: moving your own row into another tenant.
   const move = await asUser(U.aOwner,

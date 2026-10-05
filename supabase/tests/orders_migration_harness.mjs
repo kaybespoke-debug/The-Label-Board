@@ -92,13 +92,22 @@ const U = {
   nocost:  '22222222-0000-0000-0000-000000000005',
   nocontact: '22222222-0000-0000-0000-000000000006',
   outsider:  '22222222-0000-0000-0000-000000000007',
+  /* THE TWO THE MUTATION DRILL ASKED FOR. Every role in the cast above
+     holds `money`, so when the price moved behind it there was nobody in
+     the suite the policy could refuse, and breaking the policy on purpose
+     did not turn the suite red. A test that only ever sees the permitted
+     side cannot tell a working rule from an open table. */
+  nomoney:   '22222222-0000-0000-0000-000000000008',
+  nodebts:   '22222222-0000-0000-0000-000000000009',
 };
 const OTHER = '33333333-3333-3333-3333-333333333333';
 
 await db.query(`insert into auth.users (id,email) values
   ($1,'owner@p2.test'),($2,'manager@p2.test'),($3,'staff@p2.test'),($4,'viewer@p2.test'),
-  ($5,'nocost@p2.test'),($6,'nocontact@p2.test'),($7,'outsider@p2.test')`,
-  [U.owner, U.manager, U.staff, U.viewer, U.nocost, U.nocontact, U.outsider]);
+  ($5,'nocost@p2.test'),($6,'nocontact@p2.test'),($7,'outsider@p2.test'),
+  ($8,'nomoney@p2.test'),($9,'nodebts@p2.test')`,
+  [U.owner, U.manager, U.staff, U.viewer, U.nocost, U.nocontact, U.outsider,
+   U.nomoney, U.nodebts]);
 await db.query(`insert into public.businesses (id,name,slug,plan,status) values
   ($1,'The Blob Studio','blob-studio','pro','active'),
   ($2,'Somebody Else','somebody-else','pro','active')`, [BIZ, OTHER]);
@@ -125,7 +134,7 @@ await db.query(`insert into public.memberships (business_id,user_id,role,status)
    at all — the refusal and an empty table look identical. So the manager here
    is granted both, and becomes the control that CAN see, against which the two
    custom roles are each manager minus exactly one permission. */
-for (const p of ['seeCost', 'seeContact']) {
+for (const p of ['seeCost', 'seeContact', 'money', 'receivables']) {
   await db.query(`insert into public.business_role_permissions (role_id, permission_key)
     select id, $2 from public.business_roles where business_id=$1 and key='manager'
     on conflict do nothing`, [BIZ, p]);
@@ -146,10 +155,16 @@ async function customRole(key, name, drop) {
 }
 const roleNoCost    = await customRole('nocost',    'Floor manager (no costs)',   'seeCost');
 const roleNoContact = await customRole('nocontact', 'Floor manager (no contact)', 'seeContact');
+/* A head of production is exactly this: runs the workroom, has never been
+   meant to see what the studio charges. And somebody who may price an
+   order but not see what is still owed on it. */
+const roleNoMoney   = await customRole('nomoney',   'Workroom head (no prices)',  'money');
+const roleNoDebts   = await customRole('nodebts',   'Floor manager (no debts)',   'receivables');
 /* memberships.role is the TIER and role_id is the actual role. Both of
    these are managers by tier, each pointing at a role that is a manager
    minus one permission. */
-for (const [u, r] of [[U.nocost, roleNoCost], [U.nocontact, roleNoContact]]) {
+for (const [u, r] of [[U.nocost, roleNoCost], [U.nocontact, roleNoContact],
+                      [U.nomoney, roleNoMoney], [U.nodebts, roleNoDebts]]) {
   await db.query(`insert into public.memberships (business_id,user_id,role,role_id,status)
     values ($1,$2,'manager',$3,'active')`, [BIZ, u, r]);
 }
@@ -297,7 +312,8 @@ section('4. It is idempotent');
    ===================================================================== */
 section('5. After: who can read what');
 const CAST = [['the owner', U.owner], ['a manager', U.manager], ['a staff member', U.staff],
-               ['a viewer', U.viewer], ['a role without seeCost', U.nocost], ['a role without seeContact', U.nocontact]];
+               ['a viewer', U.viewer], ['a role without seeCost', U.nocost], ['a role without seeContact', U.nocontact],
+               ['a role without money', U.nomoney], ['a role without receivables', U.nodebts]];
 /* Asked of the database rather than assumed. The default roles are not what
    a reasonable person guesses: a manager does NOT hold seeCost, and a staff
    member DOES hold seeContact. Writing the answers here by hand is how a
@@ -310,13 +326,19 @@ const holds = async (uid, perm) => (await one(
        where m.business_id=$1 and m.user_id=$2 and m.role='owner'`, [BIZ, uid])) > 0;
 
 for (const [who, uid] of CAST) {
-  const r = await asMember(uid, `select app_id, total, status from public.orders where business_id=$1 order by app_id`, [BIZ]);
+  const r = await asMember(uid, `select app_id, status from public.orders where business_id=$1 order by app_id`, [BIZ]);
   ok(who + ' still reads the orders', r.rows.length === 5, r.error || (r.rows.length + ' rows'));
 }
+/* FIVE SATELLITES, FIVE PERMISSIONS, ASKED THE SAME WAY. The last two
+   arrived in October: what the studio CHARGES behind `money` and what has
+   been PAID behind `receivables`, which the role model had said for months
+   and the database had never done. */
 for (const [what, table, col, perm] of [
   ['the costs',             'order_costs',       'cost',   'seeCost'],
   ['the commissions',       'order_commissions', 'total',  'seeCost'],
   ['the delivery addresses','order_contacts',    'detail', 'seeContact'],
+  ['what the order sold for','order_pricing',    'value',  'money'],
+  ['what has been paid',    'order_settlement',  'paid',   'receivables'],
 ]) {
   for (const [who, uid] of CAST) {
     const may = await holds(uid, perm);
@@ -334,20 +356,37 @@ for (const [who, uid] of CAST) {
   ok(who + ' gets a document with no cost, commission or address in it',
      !/"costs"|"commissions"|"unitCost"|Bode Thomas|Balogun|"directorAmount"|"referralAmount"/.test(blob),
      blob.slice(0, 160));
+  /* AND NO MONEY EITHER. This is the assertion the October release exists
+     for: the document is the part every member with `orders` can read, and
+     until now it carried the price, the discount and what had been paid. */
+  ok(who + ' gets a document with no price and no payment in it',
+     !/"value"|"discount"|"paid"|"potContribs"|"unitPrice"|"fee"/.test(blob),
+     blob.slice(0, 160));
 }
 ok('and the ordinary order information survived', await (async () => {
   const r = await asMember(U.staff, `select doc from public.orders where business_id=$1 and app_id='O-1001'`, [BIZ]);
   const d = r.rows[0] && r.rows[0].doc;
   const doc = typeof d === 'string' ? JSON.parse(d) : d;
+  /* The item line and the courier stay; their PRICES do not. What a line
+     is and what it sells for are different questions and answer to
+     different permissions. */
   return !!doc && doc.garment === 'Agbada' && doc.stageIndex === 3
       && Array.isArray(doc.updates) && doc.updates.length === 1
       && Array.isArray(doc.saleItems) && doc.saleItems.length === 1
-      && doc.saleItems[0].unitPrice === 50000
-      && doc.delivery && doc.delivery.tracking === 'GIG-1' && doc.delivery.fee === 3500;
-})(), 'the stage, the history, the item price and the courier must all still be there');
+      && doc.saleItems[0].unitPrice === undefined
+      && doc.delivery && doc.delivery.tracking === 'GIG-1' && doc.delivery.fee === undefined;
+})(), 'the stage, the history, the item line and the courier must all still be there, without their prices');
+
+ok('and the price went to the table that asks for money', await (async () => {
+  const r = await asMember(U.owner, `select p.value from public.order_pricing p
+    join public.orders o on o.id = p.order_id
+    where p.business_id=$1 and o.app_id='O-1001'`, [BIZ]);
+  return r.rows.length === 1 && Number(r.rows[0].value) > 0;
+})(), 'order_pricing holds nothing for O-1001');
 
 section('7. Nobody reaches another studio, whatever they hold');
-for (const t of ['orders', 'order_costs', 'order_commissions', 'order_contacts']) {
+for (const t of ['orders', 'order_costs', 'order_commissions', 'order_contacts',
+                 'order_pricing', 'order_settlement']) {
   const r = await asMember(U.outsider, `select * from public.${t} where business_id=$1`, [BIZ]);
   ok('an owner of another studio reads nothing from ' + t, r.rows.length === 0, r.error || (r.rows.length + ' rows'));
 }
@@ -373,8 +412,7 @@ section('8. And the old key is not a way back in');
      'write said: ' + (sneak.error || 'accepted') + ', doc now carries it: ' + after);
 }
 
-/* =====================================================================
-   */
+
 console.log('\n' + '='.repeat(62));
 section('8b. The same order in both lists');
 {
@@ -464,7 +502,7 @@ section('9. Retiring the source, which refuses unless the copy is proven');
   /* An unmigrated studio must NOT be refused, or this release breaks every
      studio that has not moved yet. */
   const FRESH = '44444444-4444-4444-4444-444444444444';
-  const fuser = '22222222-0000-0000-0000-000000000009';
+  const fuser = '22222222-0000-0000-0000-00000000000f';
   await db.query(`insert into auth.users (id,email) values ($1,'fresh@p2.test')`, [fuser]);
   await db.query(`insert into public.businesses (id,name,slug,plan,status)
     values ($1,'Not Moved Yet','not-moved-yet','pro','active')`, [FRESH]);
@@ -517,10 +555,86 @@ section('10. And the catalogue stops overstating itself');
   const by = Object.fromEntries(rows.map(r => [r.key, r.enforceable]));
   ok('seeCost is enforced by the database now', by.seeCost === 'database', JSON.stringify(by));
   ok('and seeContact', by.seeContact === 'database', JSON.stringify(by));
-  ok('money is still honestly marked ui_only, because it still is',
-     by.money === 'ui_only', JSON.stringify(by));
-  ok('and so is receivables', by.receivables === 'ui_only', JSON.stringify(by));
+  /* AND THESE TWO STOPPED BEING DECORATIONS IN OCTOBER. They were marked
+     ui_only honestly: the app hid the amounts and an ordinary HTTP request
+     was not refused. The price and the paid figure are rows of their own
+     now, so the catalogue says what the database does. */
+  ok('money is enforced by the database now too', by.money === 'database', JSON.stringify(by));
+  ok('and so is receivables', by.receivables === 'database', JSON.stringify(by));
 }
+/* =====================================================================
+   11. TWO PRICES FOR ONE ORDER STOPS THE MIGRATION
+   ===================================================================== */
+section('11. The migration refuses rather than choosing between two prices');
+{
+  /* The October migration copies the price out of orders.doc and out of the
+     orders.total column, then drops the column. On production the two agreed
+     on all 56 orders — doc.value is the app's field and total was written
+     from it. Staging had two that did NOT agree: fixture rows with the price
+     in doc.total and doc.value left at zero.
+
+     Picking one would have been a migration deciding what an order sold
+     for. It refuses instead, and this is the proof: the column is put back,
+     an order is given two different prices, and the migration must stop
+     with that order named.
+
+     Putting the column back is honest about what it is — the only way to
+     reach a code path whose whole purpose is the upgrade, in a suite that
+     starts from the finished schema. */
+  const MIG = '20261004120000_the_price_is_a_permission.sql';
+  const sql = readFileSync(join(repo, 'supabase/migrations', MIG), 'utf8');
+
+  /* The column back, and the document carrying a price again. The triggers
+     come off for the insert because one of them is the whole point of the
+     release: app.order_doc_carries_no_secrets strips `value` out of every
+     document on the way in, so with it running there is no way to build
+     the state the upgrade actually meets. */
+  await db.exec(`alter table public.orders add column if not exists total numeric`);
+  await db.exec(`alter table public.orders disable trigger user`);
+  await db.query(`insert into public.orders (business_id, app_id, status, doc, total)
+    values ($1, 'O-TWO-PRICES', 'open', '{"id":"O-TWO-PRICES","value":100000}'::jsonb, 250000)`, [BIZ]);
+  await db.exec(`alter table public.orders enable trigger user`);
+
+  const carried = await one(`select doc->>'value' from public.orders where app_id='O-TWO-PRICES'`);
+  ok('the order really does carry two different prices',
+     Number(carried) === 100000, 'doc.value is ' + String(carried));
+
+  let refused = null;
+  try { await db.exec(sql); }
+  catch (e) { refused = e.message; }
+
+  ok('the migration stops', !!refused, 'it applied anyway, and silently chose a price');
+  ok('and says there are two prices for one order',
+     !!refused && /two different prices/i.test(refused), String(refused).slice(0, 180));
+  ok('and names the order rather than the count',
+     !!refused && /O-TWO-PRICES/.test(refused), String(refused).slice(0, 240));
+  ok('and shows both numbers, so somebody can decide',
+     !!refused && /100000/.test(refused) && /250000/.test(refused), String(refused).slice(0, 240));
+
+  /* NOTHING WAS COPIED AND NOTHING WAS STRIPPED. A migration that refuses
+     halfway is worse than one that refuses: the price would be gone from
+     the document and absent from the table. */
+  const still = await one(`select doc->>'value' from public.orders where app_id='O-TWO-PRICES'`);
+  ok('and the order still has its price, because the refusal left everything alone',
+     Number(still) === 100000, 'doc.value is ' + String(still));
+  const none = await one(`select count(*)::int from public.order_pricing p
+    join public.orders o on o.id = p.order_id where o.app_id='O-TWO-PRICES'`);
+  ok('and no pricing row was written for it', Number(none) === 0, String(none));
+
+  /* and with the ambiguity resolved it applies, which is the other half:
+     a guard that never lets anything through is not a guard. */
+  await db.exec(`update public.orders set total = 100000 where app_id = 'O-TWO-PRICES'`);
+  let after = null;
+  try { await db.exec(sql); } catch (e) { after = e.message; }
+  ok('and once the two agree it applies', !after, String(after).slice(0, 180));
+  const priced = await one(`select p.value from public.order_pricing p
+    join public.orders o on o.id = p.order_id where o.app_id = 'O-TWO-PRICES'`);
+  ok('with the agreed price in the row', Number(priced) === 100000, String(priced));
+  const stripped = await one(`select count(*)::int from public.orders
+    where app_id='O-TWO-PRICES' and doc ? 'value'`);
+  ok('and only then is it taken out of the document', Number(stripped) === 0, String(stripped));
+}
+
 console.log(pass + ' passed, ' + failures.length + ' failed');
 for (const f of failures) console.log('  - ' + f);
 if (!failures.length) {
