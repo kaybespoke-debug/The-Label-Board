@@ -68,14 +68,14 @@ const one = async (uid, call) => (await fn('as-user', { as_user_id: uid, calls: 
   {
     const intoAbuja = await one(pinned.user_id, {
       method: 'POST', path: '/rest/v1/orders', prefer: 'return=representation',
-      body: { business_id: BIZ, branch_id: ABUJA, app_id: 'o-sneak-1', total: 1, doc: { id: 'o-sneak-1' } },
+      body: { business_id: BIZ, branch_id: ABUJA, app_id: 'o-sneak-1', doc: { id: 'o-sneak-1' } },
     });
     ok('Lagos cannot create an order in Abuja', intoAbuja.status >= 400,
        'status ' + intoAbuja.status);
 
     const intoNull = await one(pinned.user_id, {
       method: 'POST', path: '/rest/v1/orders', prefer: 'return=representation',
-      body: { business_id: BIZ, branch_id: null, app_id: 'o-sneak-2', total: 1, doc: { id: 'o-sneak-2' } },
+      body: { business_id: BIZ, branch_id: null, app_id: 'o-sneak-2', doc: { id: 'o-sneak-2' } },
     });
     /* THIS IS B3 AND IT FAILED THE FIRST TIME. A null branch means "the
        whole business", and app.in_scope(business, null) is true for a
@@ -89,7 +89,7 @@ const one = async (uid, call) => (await fn('as-user', { as_user_id: uid, calls: 
 
     const intoMine = await one(pinned.user_id, {
       method: 'POST', path: '/rest/v1/orders', prefer: 'return=representation',
-      body: { business_id: BIZ, branch_id: LAGOS, app_id: 'o-lagos-2', total: 2, doc: { id: 'o-lagos-2' } },
+      body: { business_id: BIZ, branch_id: LAGOS, app_id: 'o-lagos-2', doc: { id: 'o-lagos-2' } },
     });
     ok('and CAN create one in their own branch', intoMine.status < 300, 'status ' + intoMine.status);
   }
@@ -146,14 +146,21 @@ const one = async (uid, call) => (await fn('as-user', { as_user_id: uid, calls: 
   {
     const wideAll = await one(wide.user_id, { method: 'POST', path: '/rest/v1/rpc/can', body: { p_business: BIZ, p_perm: 'orders' } });
     ok('both hold the orders permission', wideAll.body === true);
-    const sumPinned = await one(pinned.user_id, { method: 'GET', path: `/rest/v1/orders?business_id=eq.${BIZ}&select=total` });
-    const sumWide = await one(wide.user_id, { method: 'GET', path: `/rest/v1/orders?business_id=eq.${BIZ}&select=total` });
-    const tot = rows => (rows || []).reduce((a, r) => a + Number(r.total || 0), 0);
+    /* THE MONEY MOVED IN OCTOBER. orders.total was the selling price in a
+       plain column every member with `orders` could read; it is
+       order_pricing.value now, behind `money`. So the aggregate this
+       section is about is read from there \u2014 which also puts branch scope
+       on the new table under the same test it was always under. */
+    const sumPinned = await one(pinned.user_id, { method: 'GET', path: `/rest/v1/order_pricing?business_id=eq.${BIZ}&select=value` });
+    const sumWide = await one(wide.user_id, { method: 'GET', path: `/rest/v1/order_pricing?business_id=eq.${BIZ}&select=value` });
+    const tot = rows => (Array.isArray(rows) ? rows : []).reduce((a, r) => a + Number(r.value || 0), 0);
     ok('and the same query returns a different total for each',
        tot(sumPinned.body) !== tot(sumWide.body),
        tot(sumPinned.body) + ' vs ' + tot(sumWide.body));
-  ok('  the pinned one being their branch alone', tot(sumPinned.body) === 50002,
-     'got ' + tot(sumPinned.body) + ' \u2014 50000 and 2, and nothing branchless');
+    ok('  the pinned one being their branch alone', tot(sumPinned.body) === 50000,
+       'got ' + tot(sumPinned.body) + ' \u2014 the Lagos order, and nothing branchless');
+    ok('  and the wide one being the whole studio', tot(sumWide.body) === 120000,
+       'got ' + tot(sumWide.body) + ' \u2014 Lagos and Abuja together');
   }
 
   // -------------------------------------------------------------------

@@ -257,7 +257,7 @@ const SRC_CONTACTS = [...ACTIVE, ...DONE].filter(o => o.delivery.location).lengt
     section('4. And the document itself carries nothing protected');
     for (const k of ['owner', 'manager', 'staff', 'viewer', 'nocost', 'nocontact']) {
       const r = await call(who[k].user_id, {
-        method: 'GET', path: '/rest/v1/orders?business_id=eq.' + BIZ + '&select=app_id,total,status,doc' });
+        method: 'GET', path: '/rest/v1/orders?business_id=eq.' + BIZ + '&select=app_id,status,doc' });
       const j = JSON.stringify(r.body || '');
       ok(k + ' reads the orders but no cost, commission or address is in them',
          rows(r).length === 4 && !/"costs"|"commissions"|"unitCost"|"directorAmount"/.test(j) && !j.includes(TAG + ' Bode'),
@@ -318,9 +318,14 @@ const SRC_CONTACTS = [...ACTIVE, ...DONE].filter(o => o.delivery.location).lengt
        stale.status >= 400 && /out of date/.test(JSON.stringify(stale.body || '')),
        'status ' + stale.status + ' ' + JSON.stringify(stale.body || '').slice(0, 140));
 
+    /* THE PRICE MOVED IN OCTOBER. orders.total was a second copy of the
+       selling price, in a plain column every member with the orders
+       permission could read. It is order_pricing.value now, behind money. */
     const orders = await call(who.owner.user_id, {
-      method: 'GET', path: '/rest/v1/orders?business_id=eq.' + BIZ + '&select=app_id,total' });
-    const sum = rows(orders).reduce((a, o) => a + Number(o.total || 0), 0);
+      method: 'GET', path: '/rest/v1/orders?business_id=eq.' + BIZ + '&select=app_id' });
+    const priced = await call(who.owner.user_id, {
+      method: 'GET', path: '/rest/v1/order_pricing?business_id=eq.' + BIZ + '&select=value' });
+    const sum = rows(priced).reduce((a, o) => a + Number(o.value || 0), 0);
     ok('and every order is still there, worth what it was',
        rows(orders).length === 4 && sum === SRC_VALUE, rows(orders).length + ' orders, ' + sum);
   }

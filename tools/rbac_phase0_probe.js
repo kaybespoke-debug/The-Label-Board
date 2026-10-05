@@ -202,7 +202,7 @@ const grantsMoney = roles => {
     const res = await one(WHO[role].id, {
       method: 'POST', path: '/rest/v1/orders?on_conflict=business_id,app_id',
       prefer: 'resolution=merge-duplicates,return=representation',
-      body: { business_id: BIZ, app_id: stamp, total: 0, status: 'open',
+      body: { business_id: BIZ, app_id: stamp, status: 'open',
               doc: { id: stamp, client: 'Phase 0 probe' } },
     });
     const back = (await one(WHO.owner.id, {

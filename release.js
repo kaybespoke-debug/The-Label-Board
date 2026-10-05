@@ -25,7 +25,7 @@ const STAGING = args.includes('--staging');
 
 /* Offline: no network, no credentials, runs anywhere. */
 const APP = [
-  ['node', ['verify.js'], 'the customer app, 24 gates'],
+  ['node', ['verify.js'], 'the customer app, 25 gates'],
   ['node', ['audit_safearea.js'], 'nothing pinned under a phone’s furniture'],
   ['node', ['audit_web.js'], 'the public website'],
   ['node', ['audit_partners.js'], 'the partner portal, statically'],
@@ -67,6 +67,7 @@ const STAGING_PROBES = [
   ['node', ['tools/branch_scope_probe.js'], 'branch scope'],
   ['node', ['tools/order_migration_probe.js'], 'orders relational, six roles'],
   ['node', ['tools/forged_tenant_probe.js'], 'a forged tenant is a claim, not authority'],
+  ['node', ['tools/money_role_probe.js'], 'the price and the paid figure, five roles'],
   ['node', ['tools/auth_recovery_probe.js'], 'sign-in and recovery'],
 ];
 

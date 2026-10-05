@@ -5,7 +5,78 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 4 October 2026 (twenty-third session)
+Last updated: 5 October 2026 (twenty-fourth session)
+
+## 5 October 2026 — what the client pays is a permission too
+
+P2 took the costs, the commissions and the contact details out of the order
+document. It left the things the client pays exactly where they were. Measured
+on production, all 56 orders: `doc.value`, `doc.discount`, `doc.paid`,
+`doc.outfits[].price`, `doc.saleItems[].unitPrice`, `doc.delivery.fee` and
+`doc.potContribs[].amount` — every one readable by anybody who could open
+Orders. `orders.total` held the selling price a second time, in a plain column.
+And `public.order_summary`, a `security_invoker` view granted to every login,
+published it a third time; no file in this repository read it.
+
+The role model had said otherwise for months — `headprod` has `orders` and not
+`money`, `staff` has `money` and not `receivables` — so this was never a
+product question. Both keys were honestly marked `ui_only` in the catalogue.
+
+**Two more satellites, the shape `order_costs` already is:**
+
+| | holds | read | write |
+|---|---|---|---|
+| `order_pricing` | value, discount, line prices, delivery fee | `money` | `money` + `orders.edit` |
+| `order_settlement` | paid, pot contributions | `receivables` | `finance.record_payment` |
+
+`orders.total` is dropped, `order_summary` with it, and `order_items.price`
+moved from `in_scope` to `money`. `money` and `receivables` are now recorded as
+`database` in the catalogue, because they are.
+
+**Balance and margin are protected by their inputs, not by a field.** Balance
+is value − discount − paid, so it needs both `money` and `receivables`. Margin
+needs `money` and `seeCost`. Nothing had to be written to enforce either; it
+falls out of the split. `seeProfit` therefore stays `ui_only` and the
+catalogue comment says why.
+
+**A withheld figure is not zero.** Every money formatter read
+`fmtNum(n||0)`, so a price the server withholds would have printed as ₦0 — a
+confident wrong number on the screen where somebody decides whether an order
+has been paid for. All five now tell absent from zero; the one place the
+figure IS the answer says *Not shown · what an order sells for is not part of
+your role*. `audit_withheld_money.js` is the gate.
+
+**Two prices for one order stops the migration.** `doc.value` and
+`orders.total` agreed on all 56 production orders, ₦8,954,600 both sides.
+Staging had two that did not — fixture rows with the price in `doc.total` —
+and the guard caught them. Choosing between two prices is not a migration's
+decision.
+
+**The accountant is the fifth role we ship.** Eight production studios had one
+and the ninth had none; seven held eleven permissions and one held fifteen; no
+studio held anything outside the set the app ships. A seeding difference, not a
+customisation. It is a system role now, on the `staff` tier, with `receivables`
+explicit rather than inherited from a fallback — and the backfill still refuses
+to take over an accountant a studio has changed, because promoting it would
+stop its owner deleting it.
+
+`node release.js` is **31 offline, 43 with `--staging`**.
+
+### The one thing the role proof found that nobody has decided
+
+**An accountant cannot read `public.orders`.** It holds `allOrders` and not
+`orders`, which is exactly what the app has shipped for years — an accountant
+works from Finance, Sales and Payroll rather than the Orders list — and the
+production role has never held it either. So it is not new and it is not a
+leak. But it does mean an accountant is handed what an order sold for and what
+has been paid on it **without being able to see which order that is**: no
+reference, no client, no date. For a role whose job is reconciliation that
+reads like an oversight rather than a boundary.
+
+Granting `orders` is a page permission and a product decision, so it was left
+alone. It is Kayode's call: either add `orders` (read-only; `orders.edit` stays
+out) or decide the accountant genuinely works from the money screens and the
+`allOrders` key on it is the thing that is meaningless.
 
 ## 4 October 2026 — operational resilience
 

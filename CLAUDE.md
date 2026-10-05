@@ -24,6 +24,21 @@ One gate spans all three front ends rather than belonging to any of them:
 node audit_safearea.js
 ```
 
+One more spans the app and the database rather than belonging to either:
+
+```bash
+node audit_withheld_money.js
+```
+
+A figure somebody may not see is **absent** from their device, not zero. The
+price lives in `order_pricing` behind `money` and what has been paid in
+`order_settlement` behind `receivables`, so a role without them pulls an order
+with no `value` on it at all. Every money formatter in the app read
+`fmtNum(n||0)` until October, which would have printed that as ₦0 — a
+confident wrong number on the screen where somebody decides whether an order
+has been paid for. Run it after touching any money formatter or any order
+screen.
+
 Nothing may be pinned to an edge of the screen without allowing for what the
 phone puts there, and no table may push the whole page sideways. Both are
 invisible on a desktop browser, which is where all of this gets built, and both
@@ -59,7 +74,7 @@ a loose `layi_dashboard.html` outside `site/`, it is stale — do not edit it.
 node verify.js
 ```
 
-Twenty-three gates. Green before you start, green before you ship. A change
+Twenty-five gates. Green before you start, green before you ship. A change
 that turns a gate red is a regression: fix the cause, not the test. `HANDOFF.md`
 explains what each gate exists to catch.
 
