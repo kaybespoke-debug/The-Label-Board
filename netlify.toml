@@ -42,3 +42,58 @@
   from = "/"
   to = "/layi_dashboard.html"
   status = 200
+
+# ============================================================================
+# SECURITY HEADERS
+#
+# The app had none. The admin console, the partner portal and the marketing
+# site all set X-Frame-Options and Referrer-Policy; the one app holding
+# clients' names, addresses, phone numbers, measurements and photographs set
+# nothing. Confirmed against the live response on 5 October: HSTS from
+# Netlify and not another header on it.
+#
+# WHAT THIS CSP BUYS, AND WHAT IT DOES NOT. Be clear about the second part.
+#
+# script-src carries 'unsafe-inline' because it has to: the app is one file
+# with its scripts inline and roughly 691 lines carrying onclick / oninput /
+# onchange attributes. Inline event handlers are blocked by CSP unless
+# 'unsafe-inline' is present, and a nonce cannot cover an attribute. So this
+# policy does NOT stop injected inline script. Fixing that means moving every
+# handler to addEventListener, which is a real piece of work and not a header
+# change.
+#
+# It does stop the two things that actually hurt here:
+#
+#   frame-ancestors 'none' — a signed-in studio can no longer be framed, so
+#   clickjacking a real action out of somebody is off the table.
+#
+#   connect-src — an injected script cannot post a studio's client list,
+#   measurements or photographs to an address of its choosing. Exfiltration
+#   is the whole point of stealing this data, and this is the line that stops
+#   it even while 'unsafe-inline' stands.
+#
+# THE ALLOW-LIST, and why each entry is here:
+#   cdn.jsdelivr.net      the Supabase client (:1686) and SheetJS, pinned
+#                         with an SRI hash, loaded only on an import
+#   fonts.googleapis.com  the stylesheet
+#   fonts.gstatic.com     the font files
+#   *.supabase.co         REST, auth, realtime (wss), storage signed URLs and
+#                         the Edge Functions, for production AND staging,
+#                         because the same file is served to both hosts
+#   data: and blob:       inline photos before they upload, and the CSV / JSON
+#                         downloads built with URL.createObjectURL
+#
+# NOT restricted on purpose: publickey-credentials-get. Leaving it out of
+# Permissions-Policy keeps the default of 'self', and setting it to () would
+# break biometric unlock. camera=() is safe because photos come from
+# <input type="file">, which is not gated by it, and nothing calls
+# getUserMedia.
+# ============================================================================
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://eskubrbgbcbaejynjxvh.supabase.co https://pakxhimjhrcpqvtsqwqz.supabase.co; media-src 'self' data: blob:; connect-src 'self' https://eskubrbgbcbaejynjxvh.supabase.co wss://eskubrbgbcbaejynjxvh.supabase.co https://pakxhimjhrcpqvtsqwqz.supabase.co wss://pakxhimjhrcpqvtsqwqz.supabase.co https://cdn.jsdelivr.net; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
