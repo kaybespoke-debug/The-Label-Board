@@ -62,6 +62,35 @@ stop its owner deleting it.
 
 `node release.js` is **31 offline, 43 with `--staging`**.
 
+### A fortnight of backups are version 3, and that has a window
+
+`app.export_studio_raw` is version 4 from today. The fourteen nights already
+in `app.studio_backups` are version 3 files: the money is in each order's
+document, where it always was, and there is no `order_pricing` array in the
+file at all. `app.import_studio` restores with every user trigger switched
+off, so a version 3 file puts those documents back untouched and nothing
+reads them — the studio comes back complete in every visible respect with
+**every order showing a dash**.
+
+Nothing is lost. The figures are still in `orders.doc`, and the symptom is
+loud rather than silent. But it is the second time in a fortnight that an
+export has been complete except for the money; the first was the commissions.
+
+**The fix, not bundled into this release on purpose** — a money release
+carrying a second behavioural change, proved in one cycle, is the riskier
+trade. `app.import_studio` should read the file's `_version` and, below 4,
+copy `doc.value`/`doc.paid` into the two tables with
+`app.order_pricing_detail` and `app.order_settlement_detail` and then strip
+them with `app.order_doc_without_secrets`, while the triggers are still off.
+Roughly twenty lines, all of it reusing what the release already installed,
+and `restore_harness` proves it by rebuilding a version 3 file from the
+version 4 one.
+
+**The window closes by itself on 19 October**, when the fourteenth
+post-release night rolls the oldest version 3 copy out of retention. Until
+then, a restore from a pre-5-October night needs the money copied forward by
+hand first. `RECOVERY.md` should say so until the fix lands.
+
 ### The one thing the role proof found that nobody has decided
 
 **An accountant cannot read `public.orders`.** It holds `allOrders` and not
