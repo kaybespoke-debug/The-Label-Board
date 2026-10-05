@@ -45,13 +45,13 @@ the auto-restored session, which is a boot-path change, not a two-line one.
 | B2 | 1 | Unsynced offline edits are replaced on reconnect (same cause as B1) | — | open — step 5 |
 | B3 | 2 | No security headers on the customer app: no CSP, framable | S | **CLOSED** — `layi-v71` + `eb80c86` |
 | B4 | 2 | No in-app privacy policy or terms, and no DPA for studios | M | open — documents with Kayode |
-| B5 | 2 | Leaked-password protection is off on production Auth | S | **confirmed available on Pro and off.** One toggle, and it is yours |
-| B6 | 2 | Email delivery unconfirmed — password reset depends on it | S to check | **worse than first listed.** See B6 |
+| B5 | 2 | Leaked-password protection is off on production Auth | S | **yours.** Not expressible in config.toml and no CLI command — see B5 |
+| B6 | 2 | Email delivery unconfirmed — password reset depends on it | S to check | **cause found; the app stopped lying in `layi-v72`.** One command left, yours |
 | B7 | 3 | Material cost never reaches an order, so margin is overstated | L | database half built, applied nowhere — step 5 |
 | B8 | 3 | Money In by channel reports every payment as "Studio" | M | open — step 6 |
 | B9 | 3 | Two payment forms, two different method lists | S | open — step 6 |
-| B10 | 4 | Team invitations are off — only the owner can have an account | M–L | open — step 4, design first |
-| B11 | 4 | Face ID unlock can never work on the live app | S → M | **cause confirmed, and the S option does not exist.** See B11 |
+| B10 | 4 | Team invitations are off — only the owner can have an account | ~~M–L~~ **S** | **built already.** Held shut by a stale comment and a missing key — `TEAM_INVITATIONS_DESIGN.md` |
+| B11 | 4 | Face ID unlock can never work on the live app | S → M | **no longer claimed: hidden in `layi-v72`.** Passkeys still to build |
 | B12 | 4 | Stock-used recipes can never be applied | M | open — step 6 |
 
 
@@ -334,6 +334,14 @@ paperwork and the linking that is absent, not the capability.
 ## B5 — Leaked-password protection is off on production Auth
 **Category 2. Effort: S. Confirmed again on 5 October; still off.**
 
+**I could not turn this on, and you asked to be told.** It is not in
+`config.toml`, so `supabase config push` cannot declare it; the CLI has no
+command for it; and the CLI keeps its access token in the Windows credential
+store rather than a file or an environment variable, so there is no
+Management API call available from here either. It is a dashboard toggle:
+**Authentication, Passwords, Leaked password protection.** Fifteen seconds,
+and nothing needs buying because the organisation is on Pro.
+
 The Supabase advisor `auth_leaked_password_protection` returns WARN on the
 live project, re-read today. Compromised passwords are not checked against
 HaveIBeenPwned.
@@ -394,6 +402,64 @@ invite-only pilot: a reset and an invitation each cost one email. The first
 paid tier is **$20 a month** for 50,000. **Nothing needs buying to launch.
 The domain needs verifying and the key needs setting.** Checked 5 October
 2026.
+
+### What shipped in `layi-v72`, 5 October
+
+The cause was mundane and the diagnosis is now certain. **`RESEND_API_KEY`
+was set on the STAGING project on 28 September and never on production**,
+which holds only the seven secrets Supabase provides. The exact name is
+right, the Resend account is set up, and the key is simply on the wrong
+project. It was never set in Netlify either, and it could not have helped if
+it had been: a Netlify environment variable cannot reach a Supabase Edge
+Function.
+
+`auth-recover` now follows one rule, **loud about ourselves, silent about
+them**:
+
+- **No provider configured** is identically true for every address on earth,
+  so it answers `503 mail_not_configured`, the app repeats the sentence, and
+  a row lands in `error_reports`. Saying it discloses nothing; not saying it
+  strands an owner locked out of their own business.
+- **A failure for one particular address** is the list this function exists
+  to withhold, so it still answers the same sentence as everything else and
+  goes to `error_reports` with the provider's reply **redacted of anything
+  shaped like an address** — Resend quotes the request back in some of its
+  errors, and that table is read by a platform admin.
+- `generateLink` failures are reported too. No link is as complete a lockout
+  as no email.
+
+And `forgotPassword()` now **reads the answer**, which it did not: it awaited
+the fetch, discarded the reply, and printed "a link is on its way" whatever
+came back.
+
+**Verified on production after deploying**, not reasoned about:
+
+| Checked | Result |
+|---|---|
+| A real address and a fake one | **byte-identical** `503` bodies — no disclosure |
+| `error_reports` | two rows, `auth-recover/not-configured`, and a regex over the message confirms **neither contains an address** |
+| Staging, which has the key | ordinary path unchanged: `200`, "If that address has an account…" |
+| The live app, driven in a browser | the sign-in screen now reads *"We cannot send email at the moment, so no link has gone out."* |
+
+**Still yours, and it is one command.** The production project needs the key.
+Until then the honest refusal is the correct behaviour, not a workaround.
+
+### What still has to happen
+
+1. `RESEND_API_KEY` set on the production project — one command, yours,
+   because the value is not readable from here and asking for it in chat is
+   not how a key should travel.
+2. **Supabase Auth's own SMTP pointed at Resend.** This is separate and it
+   matters: `auth-recover` bypasses Supabase's mailer, but email
+   confirmations, email-change confirmations and the operator console's
+   invitations (`admin-api`, which falls back to `inviteUserByEmail` when
+   there is no Resend key) all still go through it. Those are the zero.
+   `smtp.resend.com`, port 465, user `resend`, password = the same API key.
+3. One real reset to a live mailbox, which I will run the moment 1 is done.
+
+Note for later: with Supabase's built-in mailer the rate limit is **2 emails
+per hour** — the CLI's own config template confirms it, and it is documented
+as for testing only. Custom SMTP is what lifts it.
 
 ## B7 — Material cost never reaches an order, so margin is overstated
 **Category 3, gets money wrong. Effort: L. (Phase 1 items 1–2, as agreed.)**
@@ -473,6 +539,35 @@ then never wired up"*, verified against production at the time.
 `public.accept_invitation` exists. The `team-admin` Edge Function exists,
 is owner-gated, and already handles listing and editing.
 
+### CORRECTION, 5 October: the reason given above is a fortnight stale
+
+The sentence *"the provisioning trigger cannot attach an account to a
+business that already exists"* is copied from the app's own comment, and it
+stopped being true on **25 September**. Read from production today,
+`app.provision_studio()` opens with a block that recognises an invited
+teammate by a **one-time server nonce** checked against
+`team_invitations.nonce_hash`, and returns before creating anything —
+`-- no business, no profile, no membership`. It then clears the hash, so the
+same pair cannot identify a second insert.
+
+`accept_invitation` is complete too: it requires a confirmed account whose
+address matches the invitation, refuses an expired or already-used one with
+the same message for all three so nothing is disclosed, **enforces the plan
+seat limit**, and writes the profile and membership with the invitation's
+role, `role_id` and branch. The app already reads `?invitation=<id>` and
+calls it.
+
+So **nothing about invitations needs building.** What holds it shut is the
+missing production Resend key (B6, the same root cause) and two switches
+waiting on one real end-to-end run. `TEAM_INVITATIONS_DESIGN.md` has the
+whole walk-through, the four stale `team_admin_harness` assertions that need
+rewriting rather than deleting, and the one design question left — what
+"remove from the studio" should do to the person's account.
+
+**Effort revised from M–L to S.** This is the rarest item on the list: the
+work was done, done well, and what stood in front of it was a comment nobody
+went back to check. That is twice this week.
+
 ## B11 — Face ID unlock can never work on the live app
 **Category 4, claims something that doesn't work. Cause confirmed 5 October.
 Effort: S to hide, M to make honest, M–L to make real.**
@@ -527,6 +622,26 @@ That is a boot-path change. Get it wrong and a studio cannot get into its
 own records, which is the one failure worse than the current dishonesty.
 **It was deliberately not bundled with the header release**, where the
 worst case is reverting one config file.
+
+### SHIPPED in `layi-v72`, 5 October: it is no longer claimed
+
+One decider, `biometricCanWorkHere()`, which returns exactly the condition
+the unlock itself enforces — so the gate and the unlock cannot disagree. It
+hides all three surfaces: the sign-in button, the Settings row (the whole
+row, not a greyed-out checkbox, which still advertises a feature), and the
+**unasked banner** that appeared once per device right after signing in,
+which is how a studio came to believe the feature existed. The banner is
+checked BEFORE `layi_bio_asked` is stamped, so nobody’s one offer is burnt
+when there is a real unlock to make.
+
+**Nothing was deleted.** The credential handle stays in `layi_biometric`
+untouched — hiding a feature is reversible, throwing away an enrolment is
+not, and renaming a `layi_*` key wipes live data on real devices.
+
+Verified on the live app: `biometricCanWorkHere()` is `false`, and both the
+button and the Settings row report `display: none`. Gated by
+`audit_auth_truth.js`, whose mutation drill confirms each of the three
+surfaces fails the gate if its guard is removed.
 
 ### What was NOT shipped, and why
 
