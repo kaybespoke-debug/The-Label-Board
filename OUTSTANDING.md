@@ -5,7 +5,163 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 5 October 2026 (twenty-fourth session)
+Last updated: 5 October 2026 (twenty-fifth session)
+
+## 5 October 2026 — the launch checklist, and a gate that read the wrong file
+
+`LAUNCH_CHECKLIST.md` is the agreed definition of launch-ready: twelve
+blockers, each one qualifying only if it loses data, leaks data, gets money
+wrong, or claims something that does not work. It is now **kept current as
+items close** — status, the release it shipped in, and how it was verified —
+rather than being a snapshot of one afternoon.
+
+Steps 0 to 3 of the agreed programme are done and the work stopped at the
+review point.
+
+### B3, security headers: closed, and the way it closed is the lesson
+
+The customer app had no security headers at all — no CSP, no
+X-Frame-Options, no Referrer-Policy — while the admin console, the partner
+portal and the marketing site all had theirs. It is the only one of the four
+holding clients' names, addresses, phone numbers, measurements and
+photographs.
+
+**`layi-v71` shipped the headers into a `netlify.toml` the live site does
+not read, the gate read that same file, reported 35 green, and the deploy
+changed nothing a browser could see.** `APP_VERSION` and the service worker
+on `app.thelabelboard.com` both read `layi-v71`; the live response carried
+HSTS and not one other header.
+
+Every app folder's `netlify.toml` says `publish = "."`, which only resolves
+when the Netlify site has a base directory set, **so each of the four sites
+reads its own folder's file and the root one is never read.** The live
+responses had been saying so all along and were not checked until after the
+deploy: `thelabelboard.com` serves `web/netlify.toml`'s `SAMEORIGIN` and
+`strict-origin-when-cross-origin` rather than the root file's `DENY` and
+`no-referrer`, and the portal serves `partners/netlify.toml`'s.
+
+Fixed in `eb80c86`: the block lives in `site/netlify.toml`, the root copy is
+kept as a mirror because that is the copy the docs describe and a merge from
+`admin-deploy` could bring either forward, and **`audit_headers.js` now
+reads the file that ships and fails if the two copies disagree.** 35 checks
+to 39.
+
+**This puts a question mark over the `admin-deploy` merge warning** in
+`CLAUDE.md` and in both copies of `netlify.toml`, which says a clean merge
+would make the customer app's site serve the operator console to every
+studio. If the root file is never read, that cannot happen the way it is
+written. **Settle it from the Netlify dashboard rather than from another
+guess** — which is the same instruction `CLAUDE.md` already gives about this
+very paragraph, and which was not followed.
+
+What the policy buys and does not: `script-src` carries `'unsafe-inline'`
+because the app has roughly 691 inline handler attributes and a nonce cannot
+cover an attribute, so it does **not** stop injected inline script. It does
+stop framing, and `connect-src` stops an injected script posting a studio's
+client list anywhere of its choosing. Verified live after the deploy: all
+five headers served, **service worker still activated**, 48 font faces,
+SheetJS 0.18.5 on demand with its SRI hash, `data:` images, Supabase
+reachable, `publickey-credentials-get` still allowed, and a cross-origin
+`fetch` refused. `frame-src 'none'` costs nothing: the app has **zero**
+iframes and the video room is a `meet.jit.si` link in a new tab.
+
+**Not yet closed by observation: one real print from a phone.** Invoices,
+receipts and payslips `document.write` into an `about:blank` window, which
+inherits the policy. It cannot be driven in the browser pane, which blocks
+pop-ups, so it was established by reading `invoiceInner` and `payslipInner`
+for every URL and `src` shape — `data:` URLs and signed `supabase.co` URLs,
+both allowed, no script, font or stylesheet in it to refuse. Solid, but read
+rather than seen.
+
+### B6, password reset: it has never worked, and the failure looks like success
+
+Listed in the audit as "unverified". Having looked, it is worse.
+`auth-recover` does not use Supabase SMTP — it posts to the **Resend HTTP
+API** — and **when `RESEND_API_KEY` is unset it returns success to the
+caller and sends nothing.** The studio is told to check their inbox and no
+mail was ever attempted.
+
+The live project records **one** reset ever requested, on 13 September, and
+**zero** confirmation emails ever sent. The function now live was deployed
+29 September, so nothing has gone through today's path even once.
+
+Resend's free tier is 3,000 a month with a hard cap of 100 a day, far beyond
+an invite-only pilot, so nothing needs buying. The domain needs verifying,
+the key needs setting, and **`auth-recover` needs to stop reporting success
+when it cannot send** — that last part is the only engineering in it, and it
+is unbuilt.
+
+This gates invitations as well as reset, so it belongs before the
+team-invitation work.
+
+### B11, Face ID: cause confirmed, and the cheap fix does not exist
+
+`git log -S` dates `localLoginAllowed()` and the `biometricUnlock` guard to
+`e0273d6`, 29 September, which shipped as **layi-v62**, with **layi-v61**
+live immediately before. So it worked through v61 and has been dead on the
+live app since v62.
+
+**The old one never unlocked a session.** It looked up a **local account** in
+`getUsers()` and set `currentUser` directly, with no Supabase session
+anywhere — which is exactly why the v62 credential fix killed it. It rode
+the same local-account path as username/PIN sign-in. Collateral damage, not
+a biometric regression. Signing out is not what breaks it; it is broken for
+everyone.
+
+**And there is nowhere to put an honest button.** The app auto-enters from a
+stored session, so a returning signed-in user never sees the login screen
+the unlock button lives on. Making the promise true needs a **lock screen
+over the already-restored session** — a new boot state. Get it wrong and a
+studio cannot reach its own records, which is worse than the current
+dishonesty, so **none of step 3(b) shipped with the header release** and
+that was deliberate.
+
+Passkeys are available and real: `signInWithPasskey()` and
+`registerPasskey()`, experimental, explicit client opt-in, supabase-js
+**2.105.0 or newer** (the app loads a floating `@2` from jsdelivr **with no
+SRI hash**, worth pinning on its own merits), and three project settings.
+**The RP ID must be `app.thelabelboard.com` and is chosen once** — changing
+it invalidates every enrolled passkey, and the bare domain would let the
+marketing site share the credential.
+
+Recommendation on the record: hide it in the next release, then build
+passkeys rather than the lock screen. The lock screen costs nearly as much
+and still asks for a password after every sign-out, which is the thing
+Kayode noticed.
+
+### Step 0, and what the probe actually proves
+
+The checklist now separates findings **verified by running something** from
+findings **verified by reading code**, because those are not the same claim.
+Twelve ran; seven were read, and all seven are of the form "this function
+has no call site" or "this flag is false", which no query can answer.
+
+`tools/money_role_probe.js` re-run for real: **77 checks, 0 failed**, five
+real staging sessions asking PostgREST with no app in the line. Owner and
+accountant reach a margin; head production, staff and viewer cannot, and not
+because a field was blanked — margin needs `money` and `seeCost` and no role
+can assemble it from one half. An embedded read does not carry a refused
+table in on a permitted one, and a zero-row `PATCH` is checked by re-reading
+the figures rather than by trusting the 204.
+
+The one thing it does not prove is that any of it is reachable: five roles
+enforced at the API and no way to give anybody a second account.
+
+### Waiting on Kayode, not on work
+
+1. **Leaked-password protection** — confirmed available on Pro and still
+   off, re-read 5 October. One toggle on production Auth, left alone on
+   purpose.
+2. **`RESEND_API_KEY` on production, and the verified sending domain.**
+3. **Which of the three biometric options** — hide, lock screen, passkeys.
+
+### Still to do on the programme
+
+Steps 4 to 6 and B4 are untouched: team-invitation design, then the sync
+blob problem with material cost, then the channel, the recipes and the two
+method lists, with the privacy and DPA documents running alongside.
+`20261005120000_a_material_cost_is_a_see_cost_thing.sql` remains
+**committed and applied nowhere**, waiting for the step 5 review.
 
 ## 5 October 2026 — what the client pays is a permission too
 

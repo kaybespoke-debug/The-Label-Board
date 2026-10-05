@@ -123,6 +123,25 @@ set in the dashboard. Check there before relying on it either way.
 
 ### If you ever do merge the two
 
+**Read this first, 5 October: the root `netlify.toml` may not be read by any
+site at all.** All four app folders carry their own `netlify.toml` saying
+`publish = "."`, which only resolves when the Netlify site has a base
+directory set — and the live responses say that is what is happening.
+`thelabelboard.com` serves `web/netlify.toml`'s `SAMEORIGIN` and
+`strict-origin-when-cross-origin`, not the root file's `DENY` and
+`no-referrer`; the partner portal serves `partners/netlify.toml`'s; and the
+customer app served **no security header at all** on the day the root file
+set five of them. That cost a release: `layi-v71` put the headers in the
+root file, `audit_headers.js` read the same file and passed, and nothing
+reached a browser until the block was moved into `site/netlify.toml`.
+
+So the warning below describes a disaster that probably cannot happen the
+way it is written. It is left standing because "probably" is not good
+enough for a change that would serve the operator console to every studio,
+and because this file has twice described a deploy arrangement that had
+already changed. **Settle it in the Netlify dashboard before relying on it
+either way** — which is what this section already told you to do.
+
 The root `netlify.toml` is deliberately different: `publish = "site"` on
 `main`, `publish = "admin"` on `admin-deploy`. Git will not warn you. A clean
 merge takes the admin config over main's, and the customer app's site starts
