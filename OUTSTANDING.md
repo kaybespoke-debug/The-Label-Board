@@ -94,6 +94,49 @@ and now asks for `money`. `audit_order_split` holds all of it.
 
 Remediation is closed with this release. What follows is product work.
 
+## 5 October 2026 — a status check, and four small corrections
+
+`STATUS_PHASE1_CHECK.md` is the read-only answer to what already exists for
+the five Phase 1 items, taken from the code and the live database rather than
+from screen labels. Two findings worth repeating here:
+
+**The recipe feature is unreachable, not partly built.**
+`applyRecipesToOrder()` is written and correct and **nothing calls it**. The
+slot where its button belongs is `${recipesExist()?``:''}` — an empty template
+that renders nothing whichever way the test goes, and it has been that way
+since the first commit. Recipes can be entered in Settings and can never
+reach an order by any route. There is also no variance calculation anywhere in
+the app for materials; the only "Variance" is attendance hours against an
+eight-hour day.
+
+**Margin is overstated on every bespoke order that consumed materials.**
+Stock really comes off the shelf when an order is saved, and a movement is
+logged against the order reference, but **no cost follows it onto the job**.
+The typed cost list beside the stock picker is the only material cost an order
+has. Shop sales do it properly — they copy the product's cost onto the line at
+the moment of sale — so the capability exists and has never been extended to
+materials. The materials' money is not lost: it is booked as a purchase
+expense against the studio when the stock is received.
+
+And one question for Phase 1 that decides whether it contains a migration:
+**is a material's cost price a `seeCost` thing?** The materials blob is behind
+the `supplies` permission and a blob is all-or-nothing, so anyone who may see
+stock sees the unit cost. If that must sit behind `seeCost` as an order's cost
+now does, materials have to become rows with a satellite, exactly as the order
+money did in v68. If not, Phase 1 can be done inside the current blobs.
+
+**Released as layi-v70**, four corrections, no behaviour beyond them:
+the Backup panel no longer claims the data lives only in the browser; the
+iPhone home-screen name, the Company name placeholder and the push
+notification title say Label Board rather than LAYI; `maximum-scale` and
+`user-scalable=no` are gone from the viewport, with every text control raised
+to 16px on a phone so iOS still does not auto-zoom on focus — the old rule
+covered only `.fld`, so the measurement grid at 14px and the date fields at
+13px zoomed anyway; and the hardcoded `£` is out of the Finance nav markup.
+That last one was already invisible in practice: `paintNavIcons()` replaces it
+with a neutral money glyph on entry, so the pound only ever flashed before the
+app painted.
+
 ## 4 October 2026 — operational resilience
 
 The audit remediation left one measured weakness: the restore was proven and

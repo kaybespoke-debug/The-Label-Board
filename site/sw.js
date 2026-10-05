@@ -1,4 +1,4 @@
-/* LAYI Studio service worker.
+/* The Label Board service worker.
    Purpose: make the app installable and usable offline, WITHOUT ever serving a
    stale build to an online user. Strategy:
      - navigations  -> network-first (fresh deploy wins), fall back to cached shell offline
@@ -7,7 +7,7 @@
        re-signed url is not a fresh miss (bounded, evicts oldest first)
      - other cross-origin (Supabase API, Google Fonts) -> untouched, straight to network
    Bump CACHE on any change to force a clean swap. */
-const CACHE = 'layi-v69';
+const CACHE = 'layi-v70';
 /* Photos live in their own cache, versioned on its own, because it must
    survive a shell release: see the fetch handler below. */
 const MEDIA_CACHE = 'layi-media-v1';
@@ -198,8 +198,8 @@ self.addEventListener('fetch', function (e) {
    these handlers show the alert and focus the app when tapped. No effect until then. */
 self.addEventListener('push', function (e) {
   var data = {};
-  try { data = e.data ? e.data.json() : {}; } catch (err) { data = { title: 'LAYI', body: (e.data && e.data.text && e.data.text()) || '' }; }
-  var title = data.title || 'LAYI Studio';
+  try { data = e.data ? e.data.json() : {}; } catch (err) { data = { title: 'Label Board', body: (e.data && e.data.text && e.data.text()) || '' }; }
+  var title = data.title || 'Label Board';
   var opts = { body: data.body || '', icon: '/icon-192.png', badge: '/icon-192.png', data: { url: data.url || '/' } };
   e.waitUntil(self.registration.showNotification(title, opts));
 });

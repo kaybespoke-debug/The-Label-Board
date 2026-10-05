@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="LAYI">
+<meta name="apple-mobile-web-app-title" content="Label Board">
 <meta name="theme-color" content="#010817">
 <meta name="color-scheme" content="light dark">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -746,7 +746,17 @@ body.modal-open{overflow:hidden}
   .toolbar .btn.sm{flex:1}
   /* comfortable tap targets */
   .qbtn{width:40px;height:40px}
-  input.fld,textarea.fld,select.fld{font-size:16px} /* prevents iOS zoom-on-focus */
+  /* iOS ZOOMS THE WHOLE PAGE when a focused input is under 16px, and the
+     old fix for that was user-scalable=no, which also stopped somebody
+     pinching to read their own invoice. This is the real fix, and it has
+     to cover EVERY text control: .fld was the only one covered before, so
+     the measurement grid at 14px and the date fields at 13px still zoomed.
+     16px is the iOS threshold, not a design choice. */
+  input.fld,textarea.fld,select.fld,
+  input[type=text],input[type=number],input[type=email],input[type=tel],
+  input[type=password],input[type=search],input[type=url],input[type=date],
+  input[type=time],input[type=datetime-local],input[type=month],
+  textarea,select{font-size:16px}
   .more-sheet{display:flex;flex-direction:column;position:fixed;right:12px;left:12px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:31;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;transform:translateY(12px);opacity:0;pointer-events:none;transition:.2s}
   .more-sheet.show{transform:none;opacity:1;pointer-events:auto}
   .ms-item{padding:15px 18px;color:var(--text);font-size:15px;border-bottom:1px solid var(--line-soft);display:flex;gap:12px;align-items:center;cursor:pointer}
@@ -1086,7 +1096,7 @@ body.modal-open{overflow:hidden}
       <div class="nav-item" data-view="leave" id="navLeave" onclick="go('leave')"><span class="ni">⎙</span> Leave <span class="nav-badge" id="badgeLeave"></span></div>
       <div class="nav-item" data-view="companylog" id="navCompanylog" onclick="go('companylog')"><span class="ni">❏</span> Company log</div>
       <div class="nav-group">Finance</div>
-      <div class="nav-item" data-view="finance" id="navFinance" onclick="go('finance')"><span class="ni">£</span> Finance <span class="lock" id="finLockIco">🔒</span></div>
+      <div class="nav-item" data-view="finance" id="navFinance" onclick="go('finance')"><span class="ni"></span> Finance <span class="lock" id="finLockIco">🔒</span></div>
       <div class="nav-item" data-view="expenses" id="navExpenses" onclick="go('expenses')"><span class="ni">⊟</span> Expenses <span class="lock" id="expLockIco">🔒</span></div>
       <div class="nav-item" data-view="payroll" id="navPayroll" onclick="go('payroll')"><span class="ni">⛁</span> Payroll <span class="lock" id="payLockIco">🔒</span></div>
       <div class="nav-item" data-view="pots" id="navPots" onclick="go('pots')"><span class="ni">⛃</span> Funds <span class="lock" id="potLockIco">🔒</span></div>
@@ -1435,7 +1445,7 @@ body.modal-open{overflow:hidden}
           <div class="panel-head"><h3>Company details</h3></div>
           <p class="page-sub" style="margin-bottom:14px">Used on invoices and receipts you send to customers.</p>
           <div class="field"><label>Logo</label><div style="display:flex;align-items:center;gap:14px"><div id="logoPreview" style="width:64px;height:64px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Upload logo</button><button class="btn ghost sm" onclick="clearLogo()">Remove</button><input type="file" id="logoFile" accept="image/*" style="display:none" onchange="uploadLogo(this)"></div></div>
-          <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="LAYI"></div>
+          <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="Your studio name"></div>
           <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@yourlabel.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
           <div class="field"><label>Address</label><textarea class="fld" id="co_address" rows="3" style="min-height:76px" placeholder="Lagos, Nigeria&#10;Stotfold, UK"></textarea><div class="sd" style="color:var(--text-faint);margin-top:5px">Trade from more than one place? Put each on its own line. Every line prints on the invoice.</div></div>
           <div class="field"><label>Business registration (RC / TIN)</label><input class="fld" id="co_reg" placeholder="RC123456"></div>
@@ -1572,7 +1582,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Backup &amp; restore</h3></div>
-          <p class="page-sub" style="margin-bottom:16px">Your data lives only in this browser, so back it up regularly. Restoring the file on any device brings everything back exactly as it was.</p>
+          <p class="page-sub" style="margin-bottom:16px">Your work syncs to our servers, so it is safe if this device is lost, and we keep a nightly copy of every studio. A backup is the extra copy you hold yourself, which is worth having before you import anything or make a big change. Restoring the file on any device brings everything back exactly as it was.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn" onclick="exportData()">⤓ Export backup</button>
             <button class="btn ghost" onclick="document.getElementById('importFile').click()">⤒ Restore from backup</button>
@@ -2643,7 +2653,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v69';
+const APP_VERSION='layi-v70';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
