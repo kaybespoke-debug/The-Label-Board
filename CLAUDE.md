@@ -74,7 +74,7 @@ a loose `layi_dashboard.html` outside `site/`, it is stale — do not edit it.
 node verify.js
 ```
 
-Twenty-five gates. Green before you start, green before you ship. A change
+Twenty-seven gates. Green before you start, green before you ship. A change
 that turns a gate red is a regression: fix the cause, not the test. `HANDOFF.md`
 explains what each gate exists to catch.
 

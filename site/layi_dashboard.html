@@ -1403,7 +1403,13 @@ body.modal-open{overflow:hidden}
             <option value="white">Light</option>
           </select></div>
           <div class="field" id="installField"><label>Install</label><button class="btn ghost" id="installBtn" onclick="installApp()" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7"/><path d="M9.4 11.4L12 14l2.6-2.6"/></svg>Install as an app</button><div class="sd" style="color:var(--text-faint);margin-top:6px">Adds The Label Board to your phone or desktop so it opens full-screen, like a normal app.</div></div>
-          <div class="field">
+          <!-- HIDDEN ON ANY INSTALL WITH A BACKEND, which is every studio.
+               renderBiometricSetting() sets this. It is not a styling choice:
+               the unlock it offers has been impossible since layi-v62, and a
+               toggle that reports "On for this device" over something that
+               cannot happen is worse than no toggle. See BIOMETRIC UNLOCK
+               below for the full reason and what replaces it. -->
+          <div class="field" id="bioField" style="display:none">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="bioToggle" onchange="onBioToggle(this.checked)"> <span>Unlock with Face ID or fingerprint</span></label>
           </div>
           <div class="sd" style="color:var(--text-faint)">Change your password in <b>My account</b>.</div>
@@ -1683,7 +1689,31 @@ body.modal-open{overflow:hidden}
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal"></div></div>
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img alt=""></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- THE CLIENT IS PINNED, AND ITS BYTES ARE CHECKED.
+
+     This used to read @supabase/supabase-js@2 with no integrity hash, so every
+     studio ran whatever jsdelivr resolved that tag to that morning, and a
+     tampered or swapped file would have been executed without question — in
+     the one app holding clients' names, addresses, measurements and
+     photographs, with the live session token in reach. The CSP allows
+     cdn.jsdelivr.net because this tag needs it, so the CSP cannot be the thing
+     that catches a bad file here. An integrity hash can.
+
+     2.117.2 is what @2 resolved to on 5 October 2026, so pinning changed
+     nothing that day; it stops it changing on its own afterwards. It is also
+     past 2.105.0, which is the floor for passkey sign-in.
+
+     TO MOVE IT: pick the version, then compute the hash from the exact file
+     and put both in the tag -
+
+       curl -sS https://cdn.jsdelivr.net/npm/@supabase/supabase-js@VERSION/dist/umd/supabase.js | openssl dgst -sha384 -binary | openssl base64 -A
+
+     crossorigin="anonymous" is not optional: without it the browser will not
+     check the hash on a cross-origin script at all. audit_pinned_deps.js
+     fails if the version floats, the hash is missing, or crossorigin is. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"
+        integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok"
+        crossorigin="anonymous"></script>
 <script>
 /* ============================================================================
    LIVE BACKEND (Supabase) — CHOSEN BY WHERE THIS PAGE IS SERVED FROM
@@ -1779,7 +1809,20 @@ let INVITATION_ERROR='';
 function authArrivalNeedsPassword(){
   return !!(AUTH_ARRIVAL&&['invite','recovery','signup'].indexOf(AUTH_ARRIVAL.kind)>=0);
 }
+/* IF THE CLIENT DID NOT LOAD, THE APP MUST NOT PRETEND IT HAS NO BACKEND.
+   With an integrity hash on the tag the browser refuses a tampered or
+   re-published file outright, and `window.supabase` is then simply absent.
+   The line below used to leave `supa` null in that case, which is exactly
+   what a local-only install looks like — so a studio would have worked all
+   day into localStorage believing it was syncing, and found out when they
+   opened the app on the second phone. A build that is configured for a
+   backend and cannot reach its client is broken, not local. */
+let SUPA_CLIENT_MISSING=false;
 try{ if(SUPA_URL && SUPA_KEY && window.supabase && window.supabase.createClient) supa=window.supabase.createClient(SUPA_URL,SUPA_KEY); }catch(e){ supa=null; }
+if(SUPA_URL && SUPA_KEY && !supa) SUPA_CLIENT_MISSING=true;
+/* The one sentence anybody is shown about it. Said in the two places a person
+   is already looking at a login form, rather than in a console nobody opens. */
+const SUPA_CLIENT_MISSING_MSG='This app could not load a required file, so it cannot reach your account. Check your connection and reload. If it keeps happening, contact us rather than entering anything — your saved work is untouched.';
 /* ===== CONFIG / SETTINGS ===== */
 const DEFAULTS={ownerPassword:'layi2025',currency:'NGN',tiers:[{name:'Starter',min:0},{name:'Bronze',min:1000},{name:'Silver',min:5000},{name:'Gold',min:15000},{name:'Platinum',min:50000}],
   /* No name. LAYI is the demo tenant, and a studio that has not said what it is
@@ -2653,7 +2696,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v71';
+const APP_VERSION='layi-v72';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4727,6 +4770,10 @@ async function doLogin(){
   const raw=(document.getElementById('loginUser').value||'').trim();
   const p=document.getElementById('loginPass').value||'';
   const errEl=document.getElementById('loginErr');
+  /* Said before anything else, because without the client there is no sign-in
+     to attempt and "sign in with your email address and password" would be a
+     lie that sends somebody round the same loop. */
+  if(SUPA_CLIENT_MISSING){errEl.textContent=SUPA_CLIENT_MISSING_MSG;return;}
   // Email address + live backend = real Supabase login
   if(supa && raw.indexOf('@')>=0){
     errEl.textContent='Signing in…';
@@ -5000,6 +5047,7 @@ async function startAuthArrival(){
 async function forgotPassword(){
   const raw=(document.getElementById('loginUser').value||'').trim();const errEl=document.getElementById('loginErr');
   if(raw.indexOf('@')<0){errEl.textContent='Enter your email address above first, then tap “Forgot password?”.';return;}
+  if(SUPA_CLIENT_MISSING){errEl.textContent=SUPA_CLIENT_MISSING_MSG;return;}
   if(!supa){errEl.textContent='Password reset needs the live server (email accounts only).';return;}
   errEl.textContent='Sending reset link…';
   /* OUR FUNCTION, NOT SUPABASE'S MAILER. resetPasswordForEmail hands the
@@ -5010,12 +5058,29 @@ async function forgotPassword(){
      The answer is the same whatever happens, deliberately, including for an
      address that has no account: telling somebody “no account with that
      email” hands anybody who asks a list of who banks here. */
+  /* AND THE ANSWER IS READ, which it was not until 5 October. The reply was
+     thrown away and the reassuring sentence printed whatever came back — so
+     when the function could not send at all it still said a link was on its
+     way. It had been saying that since it was deployed, to the only person
+     who ever asked.
+
+     The two failures are different and only one of them may be spoken about.
+     "No mail provider is configured" is a property of OUR deployment, true
+     for every address alike, so saying it discloses nothing and leaving it
+     unsaid strands somebody. A failure for one particular address stays
+     silent here and is written to error_reports instead, because which
+     addresses fail is exactly what this function must not reveal. */
   try{
-    await fetch(SUPA_URL+'/functions/v1/auth-recover',{
+    const r=await fetch(SUPA_URL+'/functions/v1/auth-recover',{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({email:raw.toLowerCase()})
     });
+    const out=await r.json().catch(()=>null);
+    if(out&&out.ok===false){
+      errEl.textContent=out.message||'We could not send the email. Nothing is wrong with your account. Please contact us and we will get you back in.';
+      return;
+    }
     errEl.textContent='If that address has an account, a link is on its way. It can be used once and expires in an hour.';
   }catch(e){errEl.textContent='Could not reach the server. Check your connection.';}
 }
@@ -5679,6 +5744,14 @@ async function verifyLiveSession(){
 async function maybeOfferBiometric(){
   try{
     if(typeof openModal!=='function')return;
+    /* And not at all while the unlock cannot work. This banner is the most
+       forward of the three places Face ID was offered: it appears unasked,
+       once per device, right after somebody signs in. Offering it was how a
+       studio came to believe the feature existed. Note it is checked BEFORE
+       layi_bio_asked is stamped, so suppressing it here does not burn
+       anybody's one offer — when there is a real unlock to offer, they get
+       it. */
+    if(!biometricCanWorkHere())return;
     // a real touch device, not merely a narrow laptop window
     let touch=false;try{touch=!!(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches);}catch(e){}
     if(!touch)return;
@@ -5782,8 +5855,41 @@ async function biometricUnlock(){
     activeBranchView='all'; document.getElementById('login').style.display='none'; logAudit('Signed in with biometrics',(user.name||user.username||'')); enterApp();
   }catch(e){ if(er)er.textContent=(e&&e.name==='NotAllowedError')?'Face ID / fingerprint was cancelled or not recognised. Use your password.':'Biometric unlock failed. Use your password.'; }
 }
+/* CAN THE UNLOCK THIS APP SHIPS TODAY ACTUALLY WORK HERE?
+   ==========================================================================
+   No, on any install with a backend, and that is every studio.
+
+   biometricUnlock() below refuses unless localLoginAllowed(), which is
+   !SUPA_URL. That guard arrived in commit e0273d6 on 29 September — "no
+   authentication secret is reachable by holding a membership" — and shipped
+   as layi-v62. It was right: the old unlock never touched a Supabase session
+   at all, it looked up a LOCAL account in getUsers() and set currentUser
+   directly, so it rode the same local-account path as username/PIN sign-in
+   and was correctly disabled with it. Collateral damage, not a biometric
+   regression.
+
+   Kayode's report was "it worked for a while, then after signing out the
+   button sent me to email and password". The signing out is a coincidence:
+   layi-v61 was the last version where it worked at all, for anybody.
+
+   So until real sign-in exists, the toggle and the button are hidden rather
+   than left to promise something impossible. Nothing is deleted and nobody's
+   enrolment is thrown away: a stored credential handle stays in
+   'layi_biometric' untouched, so when passkeys land it is a decision about
+   what to do with it rather than data that has gone.
+
+   WHY NOT JUST MAKE IT HONEST INSTEAD. "Show the button only when there is a
+   stored session it can unlock" has nowhere to go: this app ENTERS from a
+   stored session on its own, so a returning signed-in studio never sees the
+   login screen the button lives on. An honest version needs a lock screen
+   over the already-restored session — a new boot state, and one that locks a
+   studio out of its own records if it is wrong. That is a release of its
+   own, and the better answer is passkeys, where Face ID IS the sign-in and
+   survives a sign-out. */
+function biometricCanWorkHere(){ return localLoginAllowed(); }
 async function refreshBiometricUI(){
   try{const btn=document.getElementById('bioUnlockBtn'); if(!btn)return;
+    if(!biometricCanWorkHere()){btn.style.display='none';return;}
     const b=bioGet(); if(!b||!b.credId){btn.style.display='none';return;}
     const ok=await bioAvailable(); btn.style.display=ok?'':'none';
   }catch(e){}
@@ -5795,6 +5901,12 @@ async function onBioToggle(on){
 }
 async function renderBiometricSetting(){
   const cb=document.getElementById('bioToggle'),hint=null; if(!cb)return;
+  /* The whole row, not just the checkbox. A disabled checkbox beside the
+     words "Unlock with Face ID or fingerprint" still advertises a feature,
+     and somebody would reasonably ask us why theirs is greyed out. */
+  const row=document.getElementById('bioField');
+  if(!biometricCanWorkHere()){ if(row)row.style.display='none'; cb.checked=false; cb.disabled=true; return; }
+  if(row)row.style.display='';
   const b=bioGet(),supported=bioSupported(); let avail=false; try{avail=await bioAvailable();}catch(e){}
   cb.checked=!!(b&&b.credId); cb.disabled=!(supported&&avail);
   if(hint){ if(!(supported&&avail))hint.textContent='Not available on this device or browser. It needs Face ID, Touch ID, Windows Hello or Android fingerprint, over a secure (https) connection.';

@@ -24,6 +24,18 @@
 //   request inside that window is answered exactly like the first and sends
 //   nothing.
 //
+// AND SINCE 5 OCTOBER IT ADMITS WHEN IT CANNOT SEND. It used to answer "a
+// link is on its way" with no mail provider configured, which is what it had
+// been doing on production since the day it was deployed: RESEND_API_KEY was
+// set on staging on 28 September and never on production. One request had
+// ever been made and no email had ever been sent.
+//
+// The rule it follows now: LOUD ABOUT OURSELVES, SILENT ABOUT THEM. A missing
+// provider is identically true for every address, so it is said plainly and
+// the app repeats it. A failure for one particular address is the list this
+// function exists to withhold, so that stays `same` and goes to
+// error_reports without the address in it.
+//
 // TWO KINDS OF PERSON ARRIVE HERE and the difference matters. Somebody who
 // has a password gets "choose a new one". Somebody who was invited and never
 // finished gets "finish setting up" — telling them to reset a password they
@@ -76,7 +88,22 @@ async function send(to: string, subject: string, html: string, text: string) {
     headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: MAIL_FROM, to: [to], subject, html, text }),
   })
-  if (!res.ok) return { ok: false, id: '', error: 'provider ' + res.status }
+  if (!res.ok) {
+    /* The provider's own words, which are the difference between "the key is
+       wrong" and "the sending domain is not verified" and "that recipient is
+       suppressed". Without them a failure here is a number nobody can act
+       on. Capped, and it never contains the key.
+
+       REDACTED FIRST. Resend quotes the request back in some of its errors,
+       so its reply can contain the recipient. This string ends up in
+       error_reports, which a platform admin reads — and the entire point of
+       answering every caller the same sentence is that nobody learns which
+       addresses have accounts here. Putting the address in the error table
+       would rebuild that list on the other side of the wall. */
+    const why = (await res.text().catch(() => ''))
+      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '<address redacted>')
+    return { ok: false, id: '', error: 'provider ' + res.status + ' ' + why.slice(0, 400) }
+  }
   const body = await res.json().catch(() => null) as { id?: string } | null
   return { ok: true, id: body?.id || '', error: '' }
 }
@@ -126,6 +153,40 @@ Deno.serve(async (req) => {
      that varies with whether the address exists is a disclosure. */
   const same = { ok: true, message: 'If that address has an account, a link is on its way.' }
 
+  /* EXCEPT FOR THIS ONE, AND THE DISTINCTION IS THE WHOLE POINT.
+     ========================================================================
+     Until 5 October this function answered `same` even when it had no mail
+     provider at all, so it reported success and sent nothing, and the app
+     printed "a link is on its way" on top of that. The live project held one
+     request ever made and zero emails ever sent. The cause was mundane:
+     RESEND_API_KEY was set on the STAGING project on 28 September and never
+     on production, which has only the seven secrets Supabase provides.
+
+     A missing provider is a property of OUR DEPLOYMENT. It is identically
+     true for every address on earth, so saying it out loud reveals nothing
+     about who has an account here — and NOT saying it strands an owner who
+     is locked out of their own business, which is the thing this function
+     exists to prevent.
+
+     A failure for one PARTICULAR address is the opposite. Which addresses
+     bounce, are suppressed, or do not exist is exactly the list this
+     function must never hand out, so that case still answers `same` and goes
+     to error_reports instead, where we already look.
+
+     Loud about ourselves, silent about them. */
+  const notConfigured = {
+    ok: false,
+    code: 'mail_not_configured',
+    message: 'We cannot send email at the moment, so no link has gone out. '
+      + 'Nothing is wrong with your account. Please contact us and we will get you back in.',
+  }
+  if (!RESEND_KEY) {
+    console.error('auth-recover: RESEND_API_KEY is not set on this project. No mail was attempted.')
+    await reportEdgeFault('auth-recover/not-configured',
+      new Error('RESEND_API_KEY is not set on this project; no recovery mail can be sent'))
+    return json(notConfigured, 503)
+  }
+
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
     const email = String(body.email ?? '').trim().toLowerCase()
@@ -149,13 +210,28 @@ Deno.serve(async (req) => {
       options: { redirectTo: APP_URL },
     })
     if (gerr || !gl?.properties?.action_link) {
+      /* Reported as well as logged. A link that cannot be minted is as
+         complete a lockout as mail that cannot be sent, and it used to leave
+         nothing behind but a Deno log line nobody had a reason to read. */
       console.error('auth-recover generateLink:', gerr?.message)
+      await reportEdgeFault('auth-recover/generate-link',
+        new Error('generateLink failed for a ' + kind + ' link: ' + (gerr?.message ?? 'no action_link returned')))
       return json(same)
     }
 
     const mail = recoveryEmail(kind, String(gl.properties.action_link))
     const sent = await send(email, mail.subject, mail.html, mail.text)
-    if (!sent.ok) console.error('auth-recover send:', sent.error)
+    if (!sent.ok) {
+      /* SILENT TO THE CALLER, LOUD TO US. The address is deliberately not in
+         the report: the whole point of answering `same` is that nobody learns
+         which addresses have accounts here, and a report naming the address
+         would rebuild that list in a table a platform admin reads. The
+         provider's reason is what makes it fixable, and the reason is not
+         address-specific. */
+      console.error('auth-recover send:', sent.error)
+      await reportEdgeFault('auth-recover/send',
+        new Error('the provider refused a ' + kind + ' message: ' + sent.error))
+    }
     return json(same)
   } catch (e) {
     /* Even a crash answers the same way. A 500 for one address and a 200 for
