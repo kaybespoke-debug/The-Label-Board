@@ -748,6 +748,32 @@ out to be honest.
 Not padding this. Everything here is real and none of it stops an outside
 studio using the app safely.
 
+**Added 5 October, and it is the one I would move earliest: a studio cannot
+appoint a second owner.** Effort **S**.
+
+Measured on production, **all nine studios have exactly one owner and nobody
+else in them**. If that person loses their password they reset it themselves,
+which is fine. If they lose the **email address itself** — left the business,
+mailbox deleted, old employer's domain — the studio is unreachable and there
+is no sanctioned way to get it back.
+
+The database is already built for this and already refuses to leave a studio
+ownerless: `app.guard_last_owner()` raises *"A studio must keep at least one
+owner"* with the hint *"Make somebody else an owner first, then change this
+one."* **Nothing in the product can follow that hint.** `invite` and `update`
+both validate the tier against `['manager','staff','viewer']`, so a second
+owner cannot be created by any route.
+
+Not a launch blocker: it loses no data, leaks nothing, gets no money wrong,
+and nothing on screen claims you can do it. But it is the cheapest insurance
+on this list, it is the same screen and the same gateway as the invitations
+work, and it turns "the owner is locked out" from **certain and
+unrecoverable** into **rare**. The hard version — recovering a studio whose
+owner is gone — is a separate, deliberately awkward console action with a
+written reason in `platform_audit`, and it turns on what proof of entitlement
+we accept, which is a business decision. `TEAM_INVITATIONS_DESIGN.md` §7 has
+the whole analysis and the words to say when a client asks.
+
 **Flagged first, because it gates charging rather than using:** card payment
 is not live. The Subscription panel correctly hides plan buttons until
 Flutterwave is configured, so nothing lies — but **no studio can pay.** If

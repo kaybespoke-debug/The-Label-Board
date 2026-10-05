@@ -360,3 +360,101 @@ it should land in `platform_audit`. It is not on the launch checklist and I
 would not build it until a real studio needs it, because the design depends
 on what proof of entitlement we are willing to accept — which is a business
 question, not an engineering one.
+
+---
+
+## 7. "What if the owner loses their details?" — the answer, and the gap
+
+Raised by Kayode on 5 October, as a question a client or a demo audience will
+ask. It is two questions wearing one coat, and separating them is most of the
+answer.
+
+### Case A — they forgot their password. The mailbox still works.
+
+**Self-service, no operator involved.** "Forgot password?" on the sign-in
+screen, a link arrives, they choose a new one. `auth-recover` mints the link
+through `generateLink` and Resend delivers it; the link is single-use and
+expires in an hour. Nobody at The Label Board ever sees or sets a password.
+
+This is the overwhelming majority of real cases and it needs nothing built.
+**It does need the production Resend key**, which is the one thing still
+outstanding — see B6 in `LAUNCH_CHECKLIST.md`.
+
+### Case B — they have lost the email address itself.
+
+Left the business, mailbox deleted, account was their old employer's domain,
+died. **There is no route back today, and the lockout is total**, for a
+reason that is worth stating plainly.
+
+Measured on production on 5 October: **all nine studios have exactly one
+owner and nobody else in them at all.** So the person who cannot get in is
+not just the only administrator — they are the only member. A studio in that
+position has no one to help it from the inside.
+
+What exists and what does not:
+
+| | |
+|---|---|
+| `app.can()` | owner short-circuits, otherwise it reads the role's permissions |
+| `app.is_business_admin()` | owner **or manager** — so a manager is not a bystander |
+| Only `sendReset` is owner-only in `team-admin` | inviting, removing and changing roles are permissions (`team.invite`, `team.remove`, `users`) that an owner can delegate |
+| `app.guard_last_owner()` | **refuses to remove or demote the last owner**, with the hint *"Make somebody else an owner first, then change this one."* |
+| A second owner | **cannot be created by anything.** `invite` and `update` both validate the membership tier against `['manager','staff','viewer']` |
+
+**So the database is already built for more than one owner, already protects
+the last one, and already tells you to appoint another — and the product
+offers no way to do it.** That hint describes an action that does not exist.
+
+### The cheap fix is prevention, and it is small
+
+Not "transfer of ownership with proof of entitlement". That is the
+last-resort case and it is genuinely hard, because it turns on what evidence
+we are willing to accept that somebody is entitled to a studio's books.
+
+The thing to build first is much smaller: **let an owner appoint a second
+owner.** The schema allows it, the guard protects it, the UI already has a
+role dropdown. It is the one line in `team-admin` that excludes `owner` from
+the allowed tiers, gated on `isOwner` so only an owner can hand it out, plus
+the option in the app. Effort: **S.**
+
+That changes case B from *certain and unrecoverable* to *rare*, and it is the
+honest thing to recommend to a studio: the same advice a bank gives about a
+second signatory.
+
+### The last-resort path, stated accurately
+
+There is a mechanism in the database that would work: `businesses`
+has `pending_owner_email`, and `app.provision_studio()` claims a studio whose
+`pending_owner_email` matches a newly signed-up address and makes that account
+its owner. Pointing it at an existing studio and having the new person sign up
+would give that studio a working owner.
+
+Two things stop that being an answer today:
+
+1. **The console cannot do it.** `admin-api`'s `inviteStudio` either finds a
+   business already prepared for that exact address or creates a brand new
+   one. It never attaches an owner to a studio that already has one.
+2. **Reaching it means applying SQL at the project by hand**, which this
+   repository forbids outright, and for good reason — two incidents have come
+   from it.
+
+So it is a mechanism, not a procedure. Making it a procedure means a named,
+logged console action with a written reason landing in `platform_audit`, and a
+decision about what proof we accept. That is worth building when a real studio
+needs it, not before — but **a second owner should exist before the first
+pilot**, because it is what makes the hard case rare.
+
+### What to say when asked
+
+> If you forget your password, you reset it yourself from the sign-in screen
+> and we never see it. If you lose the email address itself, that is a harder
+> problem, so the app is built to avoid it: you can appoint a second owner,
+> and we would recommend you do on day one — the same way you would have a
+> second signatory on a bank account. If it ever did happen, getting a studio
+> back is a deliberate, recorded process rather than a support ticket, because
+> the alternative is that anyone who can write a convincing email can take
+> over somebody's business.
+
+Honest footnote, which should be fixed before that sentence is said to
+anybody: **the second owner is not built yet.** Until it is, the honest
+version ends at "we would need to talk about it".
