@@ -3,7 +3,8 @@
    browser before it is deployed rather than after.
 
    The headers come from netlify.toml, parsed out of it rather than typed
-   again here — a preview that tests a policy nobody is going to ship is
+   again here — and out of site/netlify.toml, which is the copy the live site
+   reads — a preview that tests a policy nobody is going to ship is
    worse than no preview.
 
    A <meta http-equiv> cannot be used for this: frame-ancestors is ignored
@@ -22,7 +23,7 @@ const ROOT = path.join(__dirname, '..', 'site');
 
 /* Lift the headers straight out of netlify.toml. */
 function headersFromToml() {
-  const toml = fs.readFileSync(path.join(__dirname, '..', 'netlify.toml'), 'utf8');
+  const toml = fs.readFileSync(path.join(__dirname, '..', 'site', 'netlify.toml'), 'utf8');
   const block = toml.slice(toml.indexOf('[headers.values]'));
   const out = {};
   for (const line of block.split('\n')) {

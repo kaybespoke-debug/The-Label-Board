@@ -9,9 +9,18 @@
    names, addresses, phone numbers, measurements and photographs set
    nothing.
 
-   This reads the four netlify.toml files rather than the live responses,
-   because a gate has to fail BEFORE a deploy rather than after one. The
-   live check is a separate step in the release.
+   This reads the netlify.toml files rather than the live responses, because
+   a gate has to fail BEFORE a deploy rather than after one. The live check
+   is a separate step in the release.
+
+   IT READS THE COPY THE SITE ACTUALLY READS, which is site/netlify.toml and
+   not the one at the repo root. The first version of this gate read the root
+   file, passed, and layi-v71 shipped with five headers configured and none
+   of them served. Every app folder's netlify.toml says publish = ".", which
+   only resolves when the Netlify site has a base directory, so each of the
+   four sites reads its own folder's file. Both copies are kept because the
+   root one is what the repo documents and a merge could bring either
+   forward; this gate fails if they ever disagree.
 
    WHAT THE CSP CAN AND CANNOT DO, so nobody reads this gate as more
    comfort than it is: script-src carries 'unsafe-inline' because the app
@@ -38,11 +47,20 @@ const read = f => { try { return fs.readFileSync(f, 'utf8'); } catch (e) { retur
 /* ------------------------------------------------------------------ */
 section('The customer app, which holds the client data');
 /* ------------------------------------------------------------------ */
-const app = read('netlify.toml');
-ok('netlify.toml exists and publishes site/', /publish\s*=\s*"site"/.test(app));
+/* app  = the file the LIVE SITE reads. Every assertion below is about this
+   one, because this is the one that decides what a studio's browser gets.
+   root = the copy at the repo root, checked afterwards for agreement. */
+const app = read('site/netlify.toml');
+const root = read('netlify.toml');
+ok('site/netlify.toml exists', !!app);
+ok('  and publishes "." , which is what a base directory needs',
+   /publish\s*=\s*"\."/.test(app));
+ok('the root netlify.toml still publishes site/, for whoever reads it',
+   /publish\s*=\s*"site"/.test(root));
 
 const csp = (app.match(/Content-Security-Policy\s*=\s*"([^"]+)"/) || [])[1] || '';
-ok('it sets a Content-Security-Policy', !!csp, 'there is none');
+ok('the file the site reads sets a Content-Security-Policy', !!csp,
+   'site/netlify.toml has none, so nothing is served however good the root copy is');
 
 /* The directives that do the work. Each one is here because removing it
    would quietly give something back. */
@@ -111,6 +129,17 @@ for (const [h, want] of [
 ]) {
   ok('  ' + h, want.test(app));
 }
+
+/* ------------------------------------------------------------------ */
+section('The two copies agree, so a merge cannot quietly pick the weaker one');
+/* ------------------------------------------------------------------ */
+const block = t => {
+  const i = t.indexOf('[[headers]]');
+  return i < 0 ? '' : t.slice(i).replace(/\r/g, '').trim();
+};
+ok('the root netlify.toml carries a [[headers]] block too', !!block(root));
+ok('  and it is identical to the one the site reads', block(root) === block(app),
+   'they differ, so the live headers depend on which file Netlify happens to read');
 
 /* ------------------------------------------------------------------ */
 section('And the other three still set theirs');

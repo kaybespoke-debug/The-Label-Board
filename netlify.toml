@@ -1,6 +1,16 @@
 # ============================================================================
 # CUSTOMER APP — main
 #
+# READ site/netlify.toml FIRST. THAT is the file the live site reads, not this
+# one. All four app folders say publish = ".", which only resolves when the
+# Netlify site has a base directory set, and the live responses on 5 October
+# agree: thelabelboard.com serves web/netlify.toml's headers, partners serves
+# partners/netlify.toml's, and app.thelabelboard.com served none at all while
+# this file set five. So the headers below are a mirror of the ones that
+# actually ship, kept here because this is the copy the docs describe and
+# because a merge from admin-deploy could bring either forward.
+# audit_headers.js fails if the two copies disagree.
+#
 # Netlify publishes the site/ folder: the app plus its PWA files, nothing else.
 # Connected to github.com/kaybespoke-debug/The-Label-Board, branch main, so a
 # push to main deploys the app every studio uses.

@@ -1,12 +1,33 @@
+# ============================================================================
+# CUSTOMER APP — the config the live site ACTUALLY READS.
+#
 # Netlify publishes the site/ folder: the app plus its PWA files, nothing else.
 # Connected to github.com/kaybespoke-debug/The-Label-Board, so a push deploys.
 #
-# publish is relative to the site's BASE DIRECTORY, not to the repo root. This
-# file is only ever read when the base directory is "site", so the path from
-# here is "." — it used to read "site", which would have resolved to site/site
-# and published nothing the first time anybody set a base directory. It is
-# unread today, because with no base directory Netlify reads the root
-# netlify.toml instead. Matches admin/, partners/ and web/, which all say ".".
+# publish is relative to the site's BASE DIRECTORY, not to the repo root, so
+# the path from here is ".".
+#
+# THIS FILE IS READ AND THE ROOT netlify.toml IS NOT. The comment here used to
+# say the opposite — "unread today, because with no base directory Netlify
+# reads the root netlify.toml instead" — and that guess cost a release. On
+# 5 October the security headers were added to the ROOT netlify.toml, the gate
+# that reads it passed, the deploy went out, layi-v71 went live, and the live
+# response carried no security header at all. The evidence, all from the live
+# responses that day:
+#
+#   thelabelboard.com         serves X-Frame-Options: SAMEORIGIN and
+#                             Referrer-Policy: strict-origin-when-cross-origin,
+#                             which is web/netlify.toml, not the root's DENY.
+#   partners.thelabelboard.com serves DENY and no-referrer, which is
+#                             partners/netlify.toml.
+#   app.thelabelboard.com     served nothing, while the root file set five
+#                             headers.
+#
+# All four app folders say publish = "." and that only resolves if the site
+# has a base directory, so every one of the four sites reads its own folder's
+# file. Headers and redirects belong HERE for this app.
+# ============================================================================
+
 [build]
   publish = "."
 
@@ -15,3 +36,61 @@
   from = "/"
   to = "/layi_dashboard.html"
   status = 200
+
+# ============================================================================
+# SECURITY HEADERS
+#
+# The app had none. The admin console, the partner portal and the marketing
+# site all set X-Frame-Options and Referrer-Policy; the one app holding
+# clients' names, addresses, phone numbers, measurements and photographs set
+# nothing.
+#
+# WHAT THIS CSP BUYS, AND WHAT IT DOES NOT. Be clear about the second part.
+#
+# script-src carries 'unsafe-inline' because it has to: the app is one file
+# with its scripts inline and roughly 691 lines carrying onclick / oninput /
+# onchange attributes. Inline event handlers are blocked by CSP unless
+# 'unsafe-inline' is present, and a nonce cannot cover an attribute. So this
+# policy does NOT stop injected inline script. Fixing that means moving every
+# handler to addEventListener, which is a real piece of work and not a header
+# change.
+#
+# It does stop the two things that actually hurt here:
+#
+#   frame-ancestors 'none' — a signed-in studio can no longer be framed, so
+#   clickjacking a real action out of somebody is off the table.
+#
+#   connect-src — an injected script cannot post a studio's client list,
+#   measurements or photographs to an address of its choosing. Exfiltration
+#   is the whole point of stealing this data, and this is the line that stops
+#   it even while 'unsafe-inline' stands.
+#
+# THE ALLOW-LIST, and why each entry is here:
+#   cdn.jsdelivr.net      the Supabase client (:1686) and SheetJS, pinned
+#                         with an SRI hash, loaded only on an import
+#   fonts.googleapis.com  the stylesheet
+#   fonts.gstatic.com     the font files
+#   *.supabase.co         REST, auth, realtime (wss), storage signed URLs and
+#                         the Edge Functions, for production AND staging,
+#                         because the same file is served to both hosts
+#   data: and blob:       inline photos before they upload, and the CSV / JSON
+#                         downloads built with URL.createObjectURL
+#
+# NOT restricted on purpose: publickey-credentials-get. Leaving it out of
+# Permissions-Policy keeps the default of 'self', and setting it to () would
+# break biometric unlock. camera=() is safe because photos come from
+# <input type="file">, which is not gated by it, and nothing calls
+# getUserMedia.
+#
+# Keep this block and the root netlify.toml's copy identical. audit_headers.js
+# reads both files and fails if they disagree, because the whole lesson of
+# layi-v71 is that a gate reading the wrong copy proves nothing.
+# ============================================================================
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://eskubrbgbcbaejynjxvh.supabase.co https://pakxhimjhrcpqvtsqwqz.supabase.co; media-src 'self' data: blob:; connect-src 'self' https://eskubrbgbcbaejynjxvh.supabase.co wss://eskubrbgbcbaejynjxvh.supabase.co https://pakxhimjhrcpqvtsqwqz.supabase.co wss://pakxhimjhrcpqvtsqwqz.supabase.co https://cdn.jsdelivr.net; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
