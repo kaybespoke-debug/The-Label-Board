@@ -197,36 +197,166 @@ creates no business, no second membership, and refuses over the seat limit.
 
 ## 4. So the plan, in order
 
-| # | Step | Who | Size |
+| # | Step | Who | State on 5 October, 17:30 |
 |---|---|---|---|
-| 1 | `RESEND_API_KEY` on the production project | Kayode | one command |
-| 2 | Point Supabase Auth's own SMTP at Resend, so confirmations work too | Kayode | dashboard |
-| 3 | Real password reset to a live mailbox, end to end | me, once 1 is done | minutes |
-| 4 | Rewrite the four harness assertions around the switch | me | S |
-| 5 | One real invitation to a real mailbox **on staging**, all the way to the studio | me | S |
-| 6 | Flip both switches, release, and run it once on production | me, on your word | S |
+| 1 | `RESEND_API_KEY` on the production project | Kayode | **not landed.** Four independent checks at 17:02 say production still holds only Supabase's seven default secrets, and the live function still answers `503 mail_not_configured` |
+| 2 | Point Supabase Auth's own SMTP at Resend | Kayode | **cannot be read from here**, but leaked-password protection — same dashboard — is still reported off on **both** projects, so it looks as though none of the three landed where they were aimed |
+| 3 | Real password reset to a live mailbox | me | **blocked on 1** |
+| 4 | Rewrite the four harness assertions around the switch | me | **done.** `team_admin_harness` 45/49 → **78 passed, 0 failed** |
+| 5 | Everything else the code can decide | me | **done.** Switches flipped, `delete` rewritten, migration written, `release.js` 37/37 offline |
+| 6 | Apply the migration, deploy `team-admin`, push the app, invite a real address | me, on your word | **held** |
 
-**No new tables, no new functions, no new screens, and no migration.** This
-is the rarest kind of item on the launch checklist: the work was done, it was
-done well, and what is in the way is a missing environment variable and a
-comment nobody went back to check.
+**Nothing is pushed and nothing is deployed, deliberately.** The three parts
+are coupled and have to go in one order — the migration, then `team-admin`,
+then the app:
+
+- pushing the app alone would put an invite form in front of an owner while
+  the deployed gateway still answers 503;
+- deploying the gateway before the migration would leave `delete` unable to
+  revoke a session, so somebody removed would keep a live session;
+- and all of it is pointless until the Resend key is on production, because
+  every invitation would roll itself back at the email step.
+
+**Correction to this document's first version**, which said *"no new tables,
+no new functions, no new screens, and no migration"*. The invitation half of
+that is still true — nothing was built for invitations. But the removal
+decision needed one new function and therefore one migration, which is
+written and applied nowhere.
 
 ---
 
-## 5. The one design question left for you
+## 5. Remove from studio — decided, and built
 
-**What should happen to somebody who is removed from a studio?**
+**Kayode's decision, 5 October: remove the membership only. The account
+survives, they are signed out of every device and lose access immediately,
+and their past work stays attributed to them.**
 
-`delete` exists on the gateway and removes the membership. What it does not
-decide is the account. Three options:
+### What the code did instead
 
-- **Membership only.** Their account survives, they can be re-invited, and
-  they can still sign in — to nothing. Simplest, and reversible.
-- **Membership and account**, when the studio is the only one they belong
-  to. Cleanest, and irreversible.
-- **Membership, and the account is suspended** until re-invited.
+`delete` removed the membership, and then, if that studio was the only one
+they belonged to, **deleted their profile and called
+`auth.admin.deleteUser`**. Removing a tailor from the only studio they had
+ever worked in destroyed their account. No undo, and re-inviting them later
+would have meant a new account and a new password. For a trade where people
+leave a label and come back, that was the wrong default.
 
-I would take the first: this app already has a close-and-reopen lifecycle
-for a whole studio, and a person who leaves a label and comes back six months
-later is a normal thing in this trade. But it decides what "remove" means on
-a screen an owner will use in anger, so it is yours.
+### The three parts, and only one needed building
+
+| Part | How |
+|---|---|
+| **The membership** | An ordinary delete. Every policy in this schema reads `memberships` through `app.can()` and `app.in_scope()`, so the moment the row is gone every read and every write is refused. Access dies here, whatever their token still says |
+| **Their past work** | Already safe, and not by luck. **Nothing in this database has a foreign key to `profiles` or `memberships`** — checked on production, eleven foreign keys point at `auth.users` and none at either. Work is attributed to `staff.id`, which belongs to the **studio** rather than to the account: `attendance.staff_id`, `orders.assigned_to`, `tlb_commissions.staff_id` |
+| **The session** | The part that needed building, in `20261005130000_removing_somebody_takes_their_access_not_their_account.sql` |
+
+**Why the session needed a migration.** Sessions live in `auth.sessions`,
+PostgREST only exposes the schemas in its search path, so an Edge Function
+holding the service role key cannot reach the `auth` schema over HTTP at all.
+And there is no GoTrue endpoint that logs a user out by id — the client's
+`admin.signOut()` wants that user's own JWT, which we do not have and should
+not have. So `public.revoke_all_sessions(uuid)` exists, forwards to an `app.`
+function, and is **granted to `service_role` and revoked from `public`, `anon`
+and `authenticated` by name** — because Supabase grants EXECUTE on new
+functions in `public` to the anon key by default, and `revoke from public`
+does not undo a grant made to a role. A function that signs anybody out of
+everything is not one to leave reachable with the publishable key.
+
+**What happens without it, which is worth writing down:** not nothing. They
+lose the data immediately because RLS reads memberships. What survives is the
+session — they stay signed in to an account that can see nothing, and the app,
+which enters from a stored session on its own, would show them a
+studio-shaped shell RLS refuses to fill. Revoking the session is what turns
+that into a sign-in screen.
+
+**The profile goes, the account stays, and those are different things.** A
+profile is per-studio by construction — `business_id` and `role_id` are both
+NOT NULL, so there is no such thing as a profile belonging to nobody's studio.
+Leaving it pointing at a studio they are no longer in is the worst of the
+three options, because that is what the app opens.
+`accept_invitation` writes it back `on conflict`, so being re-invited restores
+them rather than creating a second person with the same name.
+
+**`staff.user_id` is deliberately left alone.** Pointing at a surviving
+account with no membership grants nothing — RLS reads memberships — and it is
+what makes re-inviting them continuous.
+
+**`auth.admin.deleteUser` has been removed from the gateway entirely.** A
+helper that deletes accounts, sitting in the one file that holds the service
+role key, is a thing waiting to be called by the next action somebody adds.
+The only `deleteUser` left is the compensation for an invitation whose email
+could not be sent, which removes an account the function created seconds
+earlier and nobody has ever signed into. Deleting your **own** account is a
+different path: `public.delete_my_account`, run as yourself.
+
+Twelve assertions in `team_admin_harness` cover it, including the two grant
+checks and that they can no longer read the studio's orders.
+
+---
+
+## 6. Where each team action lives
+
+Asked for directly. The answer is cleaner than expected: **there is no
+overlap at all.**
+
+`admin-api`, the operator console's gateway, **never touches `memberships`,
+`team_invitations` or `business_roles`.** Not in any of its twenty-five
+actions. Checked by grep across the whole function.
+
+### The studio app, owner-facing — `team-admin`
+
+Everything about who is inside a studio. Owner-gated, and scoped to that
+owner's own business by `verifyTarget`, which reads the row back rather than
+trusting a scoped write.
+
+| Action | What it does |
+|---|---|
+| `invite` | A teammate, by email, with a role and a branch |
+| `resendInvitation` | The same invitation, a fresh link. Never a second invitation and never a second account |
+| `cancelInvitation` | Frees the seat it was holding |
+| `update` | Their role, their branch, the staff record they are linked to |
+| `delete` | Remove from studio, as decided above |
+| `sendReset` | A password link, to them, by email. The owner never sees it |
+| `list` | The team and the outstanding invitations |
+
+### The console, operator-facing — `admin-api`
+
+Everything about the studio as a **customer**, and nothing about its people.
+
+| Group | Actions |
+|---|---|
+| Creating accounts at the top | `inviteStudio` (a new studio's owner), `invitePartner`, `inviteOperator` |
+| The commercial relationship | `setPlan`, `setStudioLimits`, `setStorageCap`, `setStatus`, `setPayoutFrozen`, `setNote` |
+| Money | `billing`, `payments`, `recordPayment`, `partnerCommission`, `referralRisk` |
+| Talking to them | `enquiries`, `setEnquiryState`, `feedback`, `feedbackThread`, `replyFeedback`, `setFeedbackState` |
+| Looking | `tenants`, `tenant`, `audit`, `me` |
+
+`inviteStudio` is the one that looks like an overlap and is not: it creates
+the **owner of a new studio**, which is the start of a customer relationship.
+It cannot add a second person to a studio that already exists.
+
+### Should the console be able to remove a member from a studio?
+
+**No, and I would keep it that way.** It can technically do anything — it
+holds the service role key — so the restraint is a decision, not a
+limitation, and it is worth keeping as one.
+
+- A studio's team is **its own data**, like its customers and its orders. The
+  console deliberately reads tenant records through narrow, named actions and
+  writes almost nothing. Member management is the thickest possible wedge into
+  that.
+- The console already has the blunt instrument it needs: `setStatus` suspends
+  a whole studio. Reaching inside one to remove a person is a different and
+  much more dangerous power.
+- The moment support **can** remove a member, support can be **talked into**
+  removing a member. "The owner asked me to" is not something an operator can
+  verify from a chat message, and the person removed loses access to their
+  work immediately.
+
+**The one case that genuinely needs an answer is not this one.** It is: the
+owner's account is unreachable — lost mailbox, left the business, died — and
+somebody must become owner of a studio that still has staff and customers in
+it. That is **transfer ownership**, not remove a member. It deserves to be
+its own named, logged, deliberately awkward action with a written reason, and
+it should land in `platform_audit`. It is not on the launch checklist and I
+would not build it until a real studio needs it, because the design depends
+on what proof of entitlement we are willing to accept — which is a business
+question, not an engineering one.

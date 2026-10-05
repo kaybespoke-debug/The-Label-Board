@@ -16219,13 +16219,19 @@ async function renderUsersCloud(){const el=document.getElementById('usersList');
       :'<div class="kv" style="color:var(--text-faint)">No team accounts yet.</div>';
   }catch(e){el.innerHTML='<div class="kv" style="color:var(--red)">Could not load team: '+esc(e.message)+'</div>';}
 }
-/* Off with the Edge Function's own switch, and for the same reason: inviting
+/* ON since 5 October 2026. This said invitations were off because "inviting
    somebody currently makes them the owner of a brand new studio named after
    them, because the provisioning trigger has no way to attach an account to a
-   business that already exists. Phase 1B. Until then the owner is told it is
-   unavailable rather than shown a form that leaves wreckage behind. Editing an
-   existing teammate is untouched. */
-const TEAM_INVITES_ENABLED=false;
+   business that already exists" — which stopped being true on 25 September,
+   when app.provision_studio() gained the block that recognises an invited
+   teammate by a one-time server nonce and returns before creating anything.
+   The comment outlived its reason by a fortnight and was the only thing left
+   holding the feature shut.
+
+   Kept as a constant rather than deleted, so the Edge Function and the app
+   still have one named decision between them that a gate can check has not
+   drifted — team_admin_harness asserts both are the same way round. */
+const TEAM_INVITES_ENABLED=true;
 function openUserCloud(id){
   if(!id&&!TEAM_INVITES_ENABLED){
     openModal(`<h3>Add a team account</h3><div class="msub">Temporarily unavailable</div>

@@ -109,9 +109,20 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      (code.match(/as VerifiedTarget/g) || []).length === 1,
      'found ' + (code.match(/as VerifiedTarget/g) || []).length + ' casts; a second one is a back door');
 
-  ok('the privileged helpers take the branded type',
-     /removeAccount = \(t: VerifiedTarget\)/.test(code)
-     && /emailPasswordReset = async \(t: VerifiedTarget\)/.test(code));
+  ok('the privileged helper takes the branded type',
+     /emailPasswordReset = async \(t: VerifiedTarget\)/.test(code));
+
+  /* removeAccount USED TO BE THE OTHER ONE and was deleted on 5 October,
+     when "remove from studio" became the membership rather than the person.
+     This is now the stronger claim: nothing a studio owner can ask for
+     deletes an account at all, so there is no branded helper to protect.
+     Deleting your OWN account is public.delete_my_account, run as yourself. */
+  ok('nothing in this gateway can delete an account',
+     !/auth\.admin\.deleteUser\(/.test(code)
+     || /discard_invitation[\s\S]{0,400}?deleteUser/.test(code),
+     'the only deleteUser allowed here is the compensation for an invitation '
+     + 'whose email could not be sent, which removes an account this function '
+     + 'created seconds earlier and nobody has ever used');
 
   /* ---- and the ordering, per action, derived from the file ---- */
   const allActions = [...code.matchAll(/if \(action === '([a-zA-Z]+)'\)/g)].map(m => m[1]);
@@ -204,23 +215,27 @@ section('team-admin: the privileged calls are unreachable without a proved targe
      + 'posting it, so the wording and the sender are ours and Supabase\u2019s own '
      + 'mailer, broken since 13 September, is not in the path');
 
-  /* ---- WHERE THE FEATURE SWITCH LIVES -------------------------------
-     Production must not be one settings change away from sending live
-     invitations. So the switch is not a variable at all: it asks which
-     database it is talking to, and staging is the only answer that turns
-     it on. There is nothing to set on the wrong project. */
-  ok('invitations are on in staging and off everywhere else',
-     code.includes("const TEAM_INVITES_ENABLED = (Deno.env.get('SUPABASE_URL') || '').includes(STAGING_REF)")
-     && code.includes("const STAGING_REF = 'pakxhimjhrcpqvtsqwqz'"),
-     'an env var can be set on the wrong project; a project ref cannot be');
-  ok('and production is not that project',
-     !/includes('eskubrbgbcbaejynjxvh')/.test(code)
-     && code.indexOf('eskubrbgbcbaejynjxvh') < 0,
-     'the live ref appearing anywhere near this switch is the one way it '
-     + 'could be on in production');
-  ok('and the switch is read before anything the invite does',
-     code.indexOf('TEAM_INVITES_ENABLED') < code.indexOf("rpc('create_team_invitation'"),
-     'a 503 that arrives after the row is written is not a disabled feature');
+  /* ---- THE FEATURE SWITCH IS GONE, AND WHAT REPLACED IT -------------
+     It used to ask which database it was talking to, so production could not
+     be one settings change away from sending live invitations; staging was
+     the only answer that turned it on.
+
+     Invitations went on everywhere on 5 October, so the switch is gone and
+     the three assertions that guarded it go with it. They are REPLACED, not
+     deleted: the safety they bought is now bought by properties of the flow
+     itself, and those are what is checked here and below. A gate still
+     looking for the hostname test would fail on correct code, and a gate
+     that fails on correct code teaches the next person to delete it. */
+  ok('no hostname decides whether invitations work',
+     !/TEAM_INVITES_ENABLED/.test(code) && !/STAGING_REF/.test(code),
+     'a half-removed switch is worse than either state');
+  ok('and no project ref is hard-coded in this function at all',
+     code.indexOf('eskubrbgbcbaejynjxvh') < 0 && code.indexOf('pakxhimjhrcpqvtsqwqz') < 0,
+     'it reads SUPABASE_URL from its own environment, so it cannot be aimed '
+     + 'at the wrong database by a constant somebody forgot to change');
+  ok('nothing refuses an invitation before it is attempted',
+     !/invites_disabled/.test(code),
+     'a leftover early return is how a feature gets declared on and stays off');
 
   /* ---- THE ORDER OF THE TWO WRITES ----------------------------------
      This is the whole Phase 1A bug in one property. The account INSERT

@@ -704,6 +704,7 @@ fn app.reopen_studio(p_business uuid) -> jsonb
 fn app.resume_subscription(p_business uuid) -> jsonb
 fn app.retire_order_blob(p_business uuid) -> jsonb
 fn app.retire_payment_blob(p_business uuid) -> jsonb
+fn app.revoke_all_sessions(p_user uuid) -> integer
 fn app.seats_used(p_business uuid, p_exclude_membership uuid) -> integer
 fn app.seed_business_roles() -> trigger
 fn app.self_referral_reason(p_partner uuid, p_business uuid) -> text
@@ -782,6 +783,7 @@ fn public.reopen_studio(p_business uuid) -> jsonb
 fn public.request_account_deletion() -> jsonb
 fn public.resume_subscription(p_business uuid) -> jsonb
 fn public.retire_my_order_blob(p_business uuid) -> jsonb
+fn public.revoke_all_sessions(p_user uuid) -> integer
 fn public.set_enquiry_state(p_id uuid, p_state text, p_by text, p_notes text) -> void
 fn public.set_partner_payout_frozen(p_partner uuid, p_frozen boolean, p_reason text) -> void
 fn public.set_studio_limits(p_business uuid, p_max_studios integer, p_max_seats integer) -> void

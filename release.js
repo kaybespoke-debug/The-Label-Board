@@ -24,11 +24,34 @@ const QUICK = args.includes('--quick');
 const STAGING = args.includes('--staging');
 
 /* Offline: no network, no credentials, runs anywhere. */
+/* FIVE GATES WERE IN THIS REPOSITORY AND IN NO RUNNER, found on 5 October
+   while turning invitations on. Two of them guard the function that holds the
+   service role key:
+
+     audit_edge_auth.js      63 checks on team-admin's authority model
+     team_admin_harness      78 checks on the same, against real rows
+
+   team_admin_harness had been sitting at 45 passed, 4 failed for days and
+   nobody noticed, because nothing ran it. That is a worse failure than a gate
+   that reads the wrong file — a gate nobody invokes cannot even be wrong.
+
+   audit_calendar, audit_cohort and audit_console_clicks were green and are
+   added here too, for the same reason.
+
+   NOT added: audit_countdown.js, 24 passed and 27 failed. It tests the
+   marketing site's launch clock, which is the website's business and not this
+   release's. Registering a red gate would block every release until somebody
+   fixed an unrelated thing, which is how a suite gets switched off. It needs
+   its own sitting. */
 const APP = [
-  ['node', ['verify.js'], 'the customer app, 25 gates'],
+  ['node', ['verify.js'], 'the customer app, 27 gates'],
   ['node', ['audit_safearea.js'], 'nothing pinned under a phone’s furniture'],
+  ['node', ['audit_edge_auth.js'], 'the gateway that holds the service role key'],
   ['node', ['audit_web.js'], 'the public website'],
   ['node', ['audit_partners.js'], 'the partner portal, statically'],
+  ['node', ['audit_console_clicks.js'], 'every control in the operator console'],
+  ['node', ['audit_calendar.js'], 'the diary, and who can see whose'],
+  ['node', ['audit_cohort.js'], 'retention by cohort'],
 ];
 
 /* The database, built from the migrations alone in PGlite. */
@@ -40,7 +63,7 @@ const DB = [
   'lifecycle_harness', 'restore_harness', 'subscription_harness', 'cross_app_harness',
   'upgrade_harness', 'orders_migration_harness', 'money_concurrency_harness',
   'recovery_drill', 'backup_harness', 'partner_portal_harness',
-  'team_invite_harness', 'materials_harness',
+  'team_invite_harness', 'materials_harness', 'team_admin_harness',
 ].map(n => ['node', ['supabase/tests/' + n + '.mjs'], n.replace(/_/g, ' ')]);
 
 const INVENTORY = [

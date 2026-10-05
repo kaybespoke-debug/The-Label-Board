@@ -369,7 +369,13 @@ Deno.serve(async (req) => {
     /* These two are the whole reason this file needs care. They take a
        VerifiedTarget, so they cannot be called with an id straight off the
        wire — that is a type error, caught on deploy. */
-    const removeAccount = (t: VerifiedTarget) => admin.auth.admin.deleteUser(t)
+    /* deleteUser USED TO LIVE HERE and has been removed on purpose. Nothing
+       a studio owner can ask for destroys somebody's account any more: the
+       most `delete` does is take the membership, the profile and the
+       sessions. A helper that deletes accounts, sitting in the one file that
+       holds the service role key, is a thing waiting to be called by the next
+       action somebody adds. Deleting your OWN account is a different path
+       entirely — public.delete_my_account, run as the person themselves. */
     const emailPasswordReset = async (t: VerifiedTarget) => {
       /* Resolved HERE, not above. studioAndInviter is a const arrow defined
          further down, so calling it at this point is a temporal dead zone
@@ -534,19 +540,34 @@ Deno.serve(async (req) => {
 
        Phase 1C flips this to a plain `true` once the flow has been run
        end to end against a real mailbox and a real person. */
-    const STAGING_REF = 'pakxhimjhrcpqvtsqwqz'
-    const TEAM_INVITES_ENABLED = (Deno.env.get('SUPABASE_URL') || '').includes(STAGING_REF)
+    /* ---- ON, 5 October 2026 ----
+       It was off for a reason that had already gone away. The app's comment
+       said inviting somebody "makes them the owner of a brand new studio
+       named after them, because the provisioning trigger has no way to attach
+       an account to a business that already exists" — and that stopped being
+       true on 25 September, when app.provision_studio() gained the block that
+       recognises an invited teammate by a one-time server nonce checked
+       against team_invitations.nonce_hash and returns before creating
+       anything. The switch outlived its reason by a fortnight.
 
-    if (action === 'invite' || action === 'resendInvitation') {
-      if (!TEAM_INVITES_ENABLED) {
-        /* Before any validation, so no code path below can run and no
-           argument about input shape can change the outcome. */
-        return json({
-          error: 'Team invitations are temporarily unavailable.',
-          code: 'invites_disabled',
-        }, 503)
-      }
-    }
+       WHAT HAD TO BE TRUE BEFORE FLIPPING IT, all of it now checked rather
+       than assumed:
+
+         the trigger writes nothing for an invited insert, AND still builds a
+         studio for somebody who signs up independently — both measured in
+         team_admin_harness against the real migrations
+
+         accept_invitation refuses an expired, used or wrong-address
+         invitation with one message for all three, enforces the plan seat
+         limit, and is single use
+
+         the mail path fails LOUDLY: if the invitation cannot be emailed the
+         invitation is discarded and the account deleted, so there is no such
+         thing as a silent invitation holding a seat
+
+       There is no inert path any more, so there is no 503 here. The harness
+       section that used to assert the guard's position now asserts the
+       opposite: that nothing refuses before the work. */
 
     /* Shared by invite and resend, so the two emails cannot drift. */
     const ROLE_WORD: Record<string, string> = {
@@ -930,9 +951,52 @@ Deno.serve(async (req) => {
        Deleting the auth user outright would have been right when everybody
        had exactly one studio. It is wrong now: removing somebody from Adé
        Bespoke must not destroy the account they use to run their own label. */
+    /* ---- REMOVE FROM STUDIO = THE MEMBERSHIP, NOT THE PERSON ----
+       Kayode's decision, 5 October. Their account survives, they are signed
+       out of every device and lose access immediately, and their past work
+       stays attributed to them.
+
+       WHAT THIS USED TO DO. It removed the membership and then, if that
+       studio was the only one they belonged to, deleted their profile and
+       called auth.admin.deleteUser. So removing a tailor from the only
+       studio they had ever worked in destroyed their account, with no undo,
+       and re-inviting them later would have meant a new account and a new
+       password. For a trade where people leave a label and come back, that
+       is the wrong default.
+
+       THE THREE PARTS, and only one of them needed building:
+
+         the membership   an ordinary delete. Every policy in this schema
+                          reads memberships through app.can() and
+                          app.in_scope(), so the moment the row is gone
+                          every read and write is refused. Access dies here,
+                          whatever their token still says.
+
+         their work       already safe, and not by luck: nothing in this
+                          database has a foreign key to profiles or
+                          memberships. Work is attributed to staff.id, which
+                          belongs to the STUDIO rather than to the account —
+                          attendance.staff_id, orders.assigned_to,
+                          tlb_commissions.staff_id. Not deleting the account
+                          cannot cost attribution; deleting it never did
+                          either.
+
+         the session      the part that needed a function. Sessions live in
+                          auth.sessions, PostgREST only exposes the schemas
+                          in its search path, and there is no GoTrue endpoint
+                          that logs a user out by id — admin.signOut() wants
+                          that user's own JWT. So public.revoke_all_sessions
+                          exists, service-role only, and is called here,
+                          AFTER verifyTarget has established this owner is
+                          entitled to act on this person.
+
+       The staff link is deliberately left alone. staff.user_id pointing at a
+       surviving account with no membership grants nothing — RLS reads
+       memberships — and it is what makes re-inviting them continuous rather
+       than a second person with the same name. */
     if (action === 'delete') {
       if (str(payload.id) === user.id) {
-        return json({ error: 'You cannot delete your own account' }, 400)
+        return json({ error: 'You cannot remove yourself from the studio' }, 400)
       }
       const v = await verifyTarget(payload.id)
       if (!v.ok) return json({ error: v.error }, v.status)
@@ -940,6 +1004,24 @@ Deno.serve(async (req) => {
       const { error: merr } = await admin.from('memberships')
         .delete().eq('user_id', v.target).eq('business_id', biz)
       if (merr) return json({ error: merr.message }, 400)
+
+      /* ORDER MATTERS. The membership is gone before the session is, so there
+         is no instant in which a live token still has a membership behind it.
+         A failure to revoke is reported rather than swallowed — somebody who
+         keeps a session is somebody the owner believes they removed — but it
+         does not put the membership back, because access is already gone. */
+      let sessionsRevoked: number | null = null
+      let revokeFailed = ''
+      {
+        const { data: n, error: rerr } = await admin
+          .rpc('revoke_all_sessions', { p_user: v.target })
+        if (rerr) revokeFailed = rerr.message
+        else sessionsRevoked = typeof n === 'number' ? n : 0
+      }
+      if (revokeFailed) {
+        await reportEdgeFault('team-admin/revoke-sessions',
+          new Error('removed the membership but could not revoke sessions: ' + revokeFailed))
+      }
 
       /* anything left anywhere else? */
       const { data: rest } = await admin.from('memberships')
@@ -976,14 +1058,32 @@ Deno.serve(async (req) => {
         return json({
           ok: true, removed_from_studio: true, account_deleted: false,
           now_in: stays.business_id,
+          sessions_revoked: sessionsRevoked, revoke_failed: revokeFailed || undefined,
         })
       }
 
+      /* THIS STUDIO WAS THE ONLY ONE THEY WERE IN. The account stays. The
+         PROFILE does not, and those are different things.
+
+         A profile is a per-studio record by construction: business_id and
+         role_id are both NOT NULL, so there is no such thing as a profile
+         belonging to nobody's studio. Leaving it pointing at a studio they
+         are no longer a member of is the worst of the three options — that
+         is what the app opens, and opening it shows them a studio-shaped
+         shell that RLS refuses to fill, which reads as the product being
+         broken rather than as them having been removed.
+
+         So the profile goes and the auth account stays. accept_invitation
+         writes the profile back on conflict, so being re-invited restores
+         them rather than creating a second person with the same name, and
+         they keep their password and their email address throughout. */
       const { error: perr } = await admin.from('profiles').delete().eq('id', v.target)
       if (perr) return json({ error: perr.message }, 400)
-      const { error } = await removeAccount(v.target)
-      if (error) return json({ error: error.message }, 400)
-      return json({ ok: true, removed_from_studio: true, account_deleted: true })
+      return json({
+        ok: true, removed_from_studio: true, account_deleted: false,
+        now_in: null,
+        sessions_revoked: sessionsRevoked, revoke_failed: revokeFailed || undefined,
+      })
     }
 
     return json({ error: 'Unknown action' }, 400)
