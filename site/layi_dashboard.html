@@ -7188,6 +7188,11 @@ function syncOrderDraft(){
   if(document.getElementById('f_diron'))draft.directorOn=document.getElementById('f_diron').checked;
   if(fv('f_dirpct')!==undefined)draft.directorPct=+(fv('f_dirpct')||0);
   if(fv('f_diramt')!==undefined)draft.directorAmount=(fv('f_diramt')===''?null:amt('f_diramt'));
+  if(fv('f_invdel')!==undefined){
+    draft.delivery=draft.delivery||{};
+    const _f=amt('f_invdel');
+    draft.delivery.fee=_f;draft.delivery.enabled=_f>0;
+  }
   if(document.getElementById('f_del_on')){draft.delivery=draft.delivery||{};draft.delivery.enabled=document.getElementById('f_del_on').checked;
     if(fvOther('f_del_company')!==undefined){const _dc=fvOther('f_del_company');draft.delivery.company=(_dc==='Select courier')?'':_dc;}
     if(fv('f_del_fee')!==undefined)draft.delivery.fee=amt('f_del_fee');
@@ -7534,6 +7539,9 @@ function renderOrderModal(){
     </div>
     <div id="f_methodWrap" style="${(+draft.paid>0)?'':'display:none'}">${payMethodField('f_method',draft.payMethod,'How was that paid?')}</div>
     <div class="sd" style="color:var(--text-faint);margin:2px 0 14px">Balance: <b style="color:var(--text)">${curO(_bal,draft)}</b></div>`;
+  /* Only on the invoice form. The order form reaches the same figure through its
+     Delivery section, which also asks who is carrying it and where to. */
+  const invDeliveryField=invoiceOnly?`<div class="field"><label>Delivery charged (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_invdel" value="${orderDelivery(draft)?fmtNum(orderDelivery(draft)):''}" placeholder="0" oninput="recalcProfit()"></div>`:'';
   const branchField=multiBranch()?`<div class="field"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:'';
 
   /* ---- The invoice form ---------------------------------------------------------------
@@ -7551,6 +7559,7 @@ function renderOrderModal(){
       <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">＋ Add item</button>
       ${totalBlock}
       ${moneyRow}
+      ${invDeliveryField}
       ${branchField}
       <div class="modal-foot">
         <span style="flex:1"></span>

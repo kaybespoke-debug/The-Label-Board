@@ -347,6 +347,13 @@ ok(form.indexOf("openOrderSection('osecStock')")<0||form.indexOf('id="osecStock"
  ok(helpers<=12,'the order form is carrying '+helpers+' lines of helper text; a form is a form');
  const invHelpers=(inv.match(/class="sd"/g)||[]).length;
  ok(invHelpers<=4,'the invoice form is carrying '+invHelpers+' lines of helper text');
+ /* Delivery, 28 October. The DOCUMENT has printed a delivery line since September but the
+    FORM has never had a field to set one: on 23 September everything to do with the
+    workroom came off the invoice form and the courier went with the stage and the cloth.
+    Right for the courier, wrong for the fee, because the fee is money the client owes.
+    So the fee is here on its own, and the company, address, waybill and status are not. */
+ ok(/id="f_invdel"/.test(inv),'an invoice cannot charge for delivery, so a studio that delivers has to raise an order instead');
+ ok(!/id="f_del_company"/.test(inv)&&!/id="f_del_tracking"/.test(inv),'the courier and the waybill came back onto the invoice form with the fee');
  /* the specific sentences that were asked to go, by name, so they cannot drift back */
  ['None of this is in your way','Most of it you cannot know yet',
   'Pick an existing client to auto-fill','saved to Customers on save',
