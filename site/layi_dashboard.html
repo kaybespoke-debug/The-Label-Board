@@ -5517,7 +5517,7 @@ function renderStudioSetup(keepScroll){
      every tick and has text fields on it, so it lost focus the same way. */
   if(keepScroll)keepModalView();
   const chips=craftPickerHtml(d.does,'setupToggleCraft','setupToggleMode','');
-  openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
+  openModal('<h3>Set up your studio</h3><div class="msub">All of this can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
     +'<div class="field"><label>And your name</label><input class="fld" id="su_you" value="'+esc(d.you||'')+'" placeholder="e.g. Adéolá Ojo" autocomplete="name">'
     +'<div class="sd" style="color:var(--text-faint)">How the app greets you, and the name against everything you do in it.</div></div>'
@@ -6559,7 +6559,7 @@ function dismissInstall(){try{localStorage.setItem('layi_install_dismissed','1')
 function installApp(){
   if(_deferredInstall){var _d=_deferredInstall;_deferredInstall=null;try{_d.prompt();_d.userChoice.then(function(){refreshInstallUI();});}catch(e){}dismissInstall();return;}
   if(isIOSDevice()){
-    openModal(`<h3>Add The Label Board to your home screen</h3><div class="msub">One time, then it opens full-screen like a normal app.</div>
+    openModal(`<h3>Add The Label Board to your home screen</h3>
       <ol style="font-size:15px;line-height:2;color:var(--text-dim);padding-left:20px;margin:6px 0">
       <li>Open this page in <b>Safari</b> (not another browser).</li>
       <li>Tap the <b>Share</b> button, the square with an arrow pointing up, at the bottom of the screen.</li>
@@ -6567,7 +6567,7 @@ function installApp(){
       <li>Tap <b>Add</b>. The Label Board icon lands on your home screen.</li></ol>
       <div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Got it</button></div>`);
   } else {
-    openModal(`<h3>Install The Label Board</h3><div class="msub">Add it to your device for a full-screen app.</div>
+    openModal(`<h3>Install The Label Board</h3>
       <p style="color:var(--text-dim);font-size:14px;line-height:1.7">Open your browser menu (the ⋮ or ⋯ icon) and choose <b>Install app</b> or <b>Add to Home screen</b>. The Label Board then opens on its own, like an installed app.</p>
       <div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Got it</button></div>`);
   }
@@ -9317,7 +9317,7 @@ function renderBranchSwitch(){const sel=document.getElementById('branchSwitch');
   sel.style.display='';
   sel.innerHTML=`<option value="all" ${activeBranchView==='all'?'selected':''}>All studios</option>`+names.map(n=>`<option value="${esc(n)}" ${activeBranchView===n?'selected':''}>${esc(n)}</option>`).join('');
   sel.value=activeBranchView;}
-function openExpense(id){if(!can('money'))return;const x=id?getTxns().find(t=>t.id===id):null;openModal(`<h3>${x?'Edit expense':'Add expense'}</h3><div class="msub">Money out of the studio (rent, materials, services…)</div>
+function openExpense(id){if(!can('money'))return;const x=id?getTxns().find(t=>t.id===id):null;openModal(`<h3>${x?'Edit expense':'Add expense'}</h3>
   <div class="field"><label>What was it for?</label><input class="fld" id="t_label" placeholder="e.g. Studio rent, courier, electricity" value="${x?esc(x.label||''):''}"></div>
   <div class="row2"><div class="field"><label>Amount (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="t_amt" value="${x&&x.amount?fmtNum(x.amount):''}"></div><div class="field"><label>Date</label><input class="fld" type="date" id="t_date" value="${x&&x.at?x.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div></div>
   <div class="row2"><div class="field"><label>Category</label>${selOther('t_cat',EXPENSE_CATS,(x&&x.category)||EXPENSE_CATS[0],'Type a category')}</div><div class="field"><label>Department</label>${selOther('t_dept',FIN_DEPARTMENTS,(x&&x.dept)||'Operations','Type a department')}</div></div>
@@ -9383,7 +9383,7 @@ function openLogPayment(){
   if(!can('money'))return;
   payDraft={branch:defaultBranchName(),date:new Date().toISOString().slice(0,10)};
   const dl=Object.values(getCustomers()).map(c=>`<option value="${esc(c.name)}">`).join('');
-  openModal(`<h3>Log a payment received</h3><div class="msub">Money in from anywhere: transfer, cash, WhatsApp or Instagram.</div>
+  openModal(`<h3>Log a payment received</h3>
     <div class="row2"><div class="field"><label>Amount (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="lp_amount" placeholder="0"></div>
       <div class="field"><label>Date received</label><input class="fld" type="date" id="lp_date" value="${payDraft.date}"></div></div>
     <div class="row2"><div class="field"><label>Channel (where it came from)</label><select class="fld" id="lp_channel">${IN_CHANNELS.map(c=>`<option${c==='Studio'?' selected':''}>${c}</option>`).join('')}</select></div>
@@ -9497,7 +9497,7 @@ function renderBills(){const el=document.getElementById('billsList');if(!el)retu
   const bills=getBills().filter(inBranch);
   if(!bills.length){el.innerHTML='<div class="kv" style="color:var(--text-faint)">No recurring bills yet. Add rent, electricity, subscriptions and salaries here, monthly, quarterly or once a year. Tap “Log what is due” to post them to overheads.</div>';return;}
   el.innerHTML=`<table class="oledger"><tr><th>Bill</th><th class="hide-sm">How often</th><th class="num">Amount</th><th>This period</th></tr>${bills.map(b=>{const logged=!billIsDue(b);return`<tr class="orow" style="cursor:pointer" onclick="openBill('${b.id}')"><td><div class="oref">${esc(b.label)}</div></td><td class="hide-sm" style="color:var(--text-dim)">${esc(billCadence(b).label)}${b.note?' · '+esc(b.note):''}</td><td class="num" style="font-weight:600">${cur(b.amount)}</td><td>${logged?'<span class="sup-status ok">logged</span>':'<span class="sup-status low">not yet</span>'}</td></tr>`;}).join('')}</table>`;}
-function openAppt(id){if(!can('appts'))return;const e=id?getAppts().find(x=>x.id===id):null;openModal(`<h3>${e?'Edit appointment':'Add fitting / appointment'}</h3><div class="msub">Shows on the calendar and the dashboard</div>
+function openAppt(id){if(!can('appts'))return;const e=id?getAppts().find(x=>x.id===id):null;openModal(`<h3>${e?'Edit appointment':'Add fitting / appointment'}</h3>
   <div class="row2"><div class="field"><label>Type</label>${selOther('a_type',APPT_TYPES,apptTypeOf(e),'What kind of session?')}</div><div class="field"><label>Status</label><select class="fld" id="a_status">${APPT_STATUSES.map(s=>`<option ${apptStatus(e)===s?'selected':''}>${s}</option>`).join('')}</select></div></div>
   <div class="row2"><div class="field"><label>Date</label><input class="fld" type="date" id="a_date" value="${e?e.date||'':new Date().toISOString().slice(0,10)}"></div><div class="field"><label>Time</label><input class="fld" type="time" id="a_time" value="${e?e.time||'10:00':'10:00'}"></div></div>
   <div class="field"><label>Client</label><input class="fld" id="a_client" value="${e?esc(e.client||''):''}"></div>
@@ -10538,7 +10538,7 @@ function renderFeedbackModal(){
       </div>`).join(''):'<div class="kv" style="color:var(--text-faint)">You have not sent us anything yet.</div>'}
   `;
   openModal(`<h3>Help &amp; feedback</h3>
-    <div class="msub">Tell us what would make this better, or what went wrong. A person reads every one.</div>
+    <div class="msub">A person reads every one.</div>
     <div class="toolbar" style="gap:8px;margin:12px 0">
       <button class="chip${feedbackTab==='new'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('new')">Send something</button>
       <button class="chip${feedbackTab==='sent'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('sent')">What you have sent${sent.length?' ('+sent.length+')':''}</button>
@@ -11839,7 +11839,7 @@ function openSupplier(id,prefillType){
   const typeOpts=SUPPLIER_TYPES.map(t=>`<option ${s&&s.type===t?'selected':''}>${t}</option>`).join('');
   openModal(`
     <h3>${s?'Edit vendor & partner':'Add vendor & partner'}</h3>
-    <div class="msub">A contact you order from: fabrics, packaging, logistics, embroidery…</div>
+    
     <div class="field"><label>Business name</label><input class="fld" id="sp_business" value="${s?esc(s.business):''}" placeholder="e.g. Aso-oke House"></div>
     <div class="row2">
       <div class="field"><label>Supplier type</label>${selOther('sp_type',SUPPLIER_TYPES,(s&&s.type)||prefillType||SUPPLIER_TYPES[0],'What do they supply?')}</div>
@@ -12206,7 +12206,7 @@ function openProduct(id){
 function renderProductModal(){
   const p=productDraft;if(!p)return;
   const vrows=p.variants.map((v,i)=>`<div class="row2" style="gap:8px;margin-bottom:6px;align-items:end"><div class="field" style="margin:0"><label>Size</label><input class="fld" id="pv_size_${i}" value="${esc(v.size||'')}" placeholder="S / M / L / 42"></div><div class="field" style="margin:0"><label>Colour</label><input class="fld" id="pv_color_${i}" value="${esc(v.color||'')}" placeholder="e.g. Navy"></div><div class="field" style="margin:0;max-width:110px"><label>Stock${(activeBranchView!=='all'&&multiBranch())?' here':''}</label><input class="fld" type="number" id="pv_qty_${i}" value="${variantQty(v,stockBranch())}"></div><button class="btn ghost sm" style="margin-bottom:2px" onclick="removeVariant(${i})">✕</button></div>`).join('');
-  openModal(`<h3>${p.id?'Edit product':'Add product'}</h3><div class="msub">A ready-to-wear style with its sizes, colours & stock</div>
+  openModal(`<h3>${p.id?'Edit product':'Add product'}</h3>
     <div class="field"><label>Product name</label><input class="fld" id="pp_name" value="${esc(p.name||'')}" placeholder="e.g. Signature linen shirt"></div>
     <div class="field"><label>Photo (optional)</label><div style="display:flex;align-items:center;gap:14px"><div style="width:66px;height:66px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint);cursor:pointer" onclick="document.getElementById('ppPhotoFile').click()">${p.photo?`<img src="${photoSrc(p.photo)}" style="width:100%;height:100%;object-fit:cover">`:'add'}</div><button class="btn ghost sm" type="button" onclick="document.getElementById('ppPhotoFile').click()">Upload</button>${p.photo?`<button class="btn ghost sm" type="button" onclick="removeProductPhoto()">Remove</button>`:''}<input type="file" id="ppPhotoFile" accept="image/*" style="display:none" onchange="uploadProductPhoto(this)"></div></div>
     <div class="row2"><div class="field"><label>Category</label>${selOther('pp_category',productTypes(),p.category||productTypes()[0],'Type of piece')}</div><div class="field"><label>Selling price (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="pp_price" value="${p.price?fmtNum(p.price):''}" placeholder="0"></div></div>
@@ -14339,7 +14339,7 @@ let budgetDraft=null;
 function openBudgets(){if(!can('finance'))return;const b=(SETTINGS.budgets&&typeof SETTINGS.budgets==='object')?SETTINGS.budgets:{};
   budgetDraft=Object.keys(b).map(k=>({dept:k,amount:+b[k]||0}));
   if(!budgetDraft.length)budgetDraft=[{dept:'Production',amount:0}];
-  openModal(`<h3>Monthly budgets</h3><div class="msub">Set a monthly spend budget for any department or area. Add as many as you like.</div><div id="budgetRows"></div><button class="btn ghost sm" onclick="addBudgetRow()" style="margin-top:8px">+ Add budget</button>
+  openModal(`<h3>Monthly budgets</h3><div id="budgetRows"></div><button class="btn ghost sm" onclick="addBudgetRow()" style="margin-top:8px">+ Add budget</button>
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveBudgets()">Save budgets</button></div>`);
   renderBudgetRows();}
 function renderBudgetRows(){const el=document.getElementById('budgetRows');if(!el)return;
@@ -14399,7 +14399,7 @@ function setLeave(v){save('layi_dash_leave',v);}
 function leaveDays(l){if(!l.start||!l.end)return +l.days||0;const a=new Date(l.start),b=new Date(l.end);const d=Math.round((b-a)/86400000)+1;return d>0?d:0;}
 function leaveActiveNow(l){const t=new Date().toISOString().slice(0,10);return l.start&&l.end&&l.start<=t&&l.end>=t;}
 function openLeave(id){if(!can('team'))return;const l=id?getLeave().find(x=>x.id===id):null;const staff=getStaff();
-  openModal(`<h3>${l?'Edit leave':'Log leave'}</h3><div class="msub">Record time off for a team member</div>
+  openModal(`<h3>${l?'Edit leave':'Log leave'}</h3>
     <div class="field"><label>Staff member</label><select class="fld" id="lv_staff">${staff.map(s=>`<option value="${s.id}" ${l&&l.staffId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')||'<option value="">No staff yet</option>'}</select></div>
     <div class="row2">
       <div class="field"><label>Type</label>${selOther('lv_type',LEAVE_TYPES,(l&&l.type)||LEAVE_TYPES[0],'What kind of leave?')}</div>
@@ -14473,7 +14473,7 @@ function logAudit(action,detail){
   }catch(e){}
 }
 function openLogEntry(id){if(!can('team'))return;const e=id?getLog().find(x=>x.id===id):null;
-  openModal(`<h3>${e?'Edit entry':'New log entry'}</h3><div class="msub">Note something worth remembering about the business</div>
+  openModal(`<h3>${e?'Edit entry':'New log entry'}</h3>
     <div class="row2">
       <div class="field"><label>Date</label><input class="fld" type="date" id="lg_date" value="${e?e.date||'':new Date().toISOString().slice(0,10)}"></div>
       <div class="field"><label>Category</label>${selOther('lg_cat',LOG_CATEGORIES,(e&&e.category)||LOG_CATEGORIES[0],'What kind of event?')}</div>
@@ -15038,7 +15038,7 @@ function delPot(id){if(!confirm('Delete this pot?'))return;setPots(getPots().fil
 
 function openNewCustomer(){
   if(!can('customers'))return;
-  openModal(`<h3>Add customer</h3><div class="msub">Save contact details with or without an order</div>
+  openModal(`<h3>Add customer</h3>
     <div class="field"><label>Name</label><input class="fld" id="nc_name" placeholder="Client name"></div>
     <div class="field"><label>Email (for newsletters)</label><input class="fld" type="email" id="nc_email" placeholder="name@email.com"></div>
     <div class="field"><label>WhatsApp number</label><input class="fld" type="tel" id="nc_whatsapp" placeholder="+234…"></div>
@@ -16080,7 +16080,7 @@ function openLeavePeek(){
   const lv=(typeof getLeave==='function'?getLeave():[]);const now=lv.filter(l=>leaveActiveNow(l));
   const upcoming=lv.filter(l=>l.start&&l.start>todayKey()).sort((a,b)=>(a.start||'').localeCompare(b.start||'')).slice(0,8);
   const line=l=>`<div class="bd-row"><span class="bl">${esc(staffName(l.staffId)||'\u2014')} <span style="color:var(--text-faint)">\u00b7 ${esc(l.type||'Leave')}</span></span><span class="bv">${l.start?new Date(l.start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):''}${l.end?' \u2013 '+new Date(l.end).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):''}${l.status&&l.status!=='Approved'?` <span style="color:var(--amber)">${esc(l.status)}</span>`:''}</span></div>`;
-  openModal(`<h3>Leave</h3><div class="msub">Who's off now and what's coming up</div>
+  openModal(`<h3>Leave</h3>
     <div class="bd-sub" style="margin-top:10px">On leave now (${now.length})</div>${now.length?now.map(line).join(''):'<div class="kv" style="color:var(--text-faint)">Everyone is in.</div>'}
     <div class="bd-sub" style="margin-top:12px">Upcoming (${upcoming.length})</div>${upcoming.length?upcoming.map(line).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing booked.</div>'}
     <div class="modal-foot"><button class="btn ghost sm" onclick="closeModal();go('leave')">Open full leave</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
@@ -16255,7 +16255,7 @@ function saveTask(id){const title=(fv('tk_title')||'').trim();if(!title){alert('
 function toggleTask(id){const list=getTasks();const t=list.find(x=>x.id===id);if(t){t.done=!t.done;t.doneAt=t.done?new Date().toISOString():'';t.doneBy=t.done?userLabel():'';}setTasks(list);renderTasks();}
 function delTask(id){if(!confirm('Delete this task?'))return;setTasks(getTasks().filter(t=>t.id!==id));closeModal();renderTasks();}
 function openAnnouncement(id){if(!can('tasks')&&!can('team'))return;const a=id?getAnns().find(x=>x.id===id):null;
-  openModal(`<h3>${a?'Edit team announcement':'New team announcement'}</h3><div class="msub">Pinned for the whole team to see</div>
+  openModal(`<h3>${a?'Edit team announcement':'New team announcement'}</h3>
     <div class="field"><label>Message</label><textarea class="fld" id="an_text" placeholder="e.g. Studio closed Friday for Sallah">${a?esc(a.text):''}</textarea></div>
     <div class="modal-foot">${a?`<button class="btn danger sm" onclick="delAnn('${a.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveAnn('${a?a.id:''}')">${a?'Update':'Post'}</button></div>`);}
 function saveAnn(id){const text=(fv('an_text')||'').trim();if(!text){alert('Write a message.');return;}const list=getAnns();if(id){list.find(x=>x.id===id).text=text;}else{list.unshift({id:uid('an'),text,by:userLabel(),at:new Date().toISOString()});}setAnns(list);closeModal();renderTasks();}
@@ -16304,7 +16304,7 @@ function openUser(id){if(!can('users'))return;if(liveMode)return openUserCloud(i
   // one-to-one: a staff record already linked to another account is not offered here
   const linkedElsewhere=new Set(getUsers().filter(x=>x.staffId&&(!u||x.id!==u.id)).map(x=>x.staffId));
   const staff=getStaff().filter(s=>!linkedElsewhere.has(s.id));
-  openModal(`<h3>${u?'Edit account':'New account'}</h3><div class="msub">Login details &amp; role for a team member</div>
+  openModal(`<h3>${u?'Edit account':'New account'}</h3>
     <div class="field"><label>Display name</label><input class="fld" id="us_name" value="${u?esc(u.name):''}" placeholder="e.g. Idara Umah" oninput="acctNameSync()"></div>
     <div class="row2">
       <div class="field"><label>Username</label><input class="fld" id="us_username" value="${u?esc(u.username):''}" placeholder="e.g. idara"></div>

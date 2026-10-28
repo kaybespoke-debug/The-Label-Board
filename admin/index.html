@@ -108,7 +108,7 @@
           <h1 id="ttl">Dashboard</h1>
           <button class="demo" id="demoTag" onclick="openSettingsGroup('data')" title="Invented data. Tap to load or clear it.">Demo data</button>
         </div>
-        <div class="top-sub" id="sub">Monitor your platform at a glance</div>
+        <div class="top-sub" id="sub"></div>
       </div>
       </div>
       <div class="top-act">
@@ -130,7 +130,18 @@
 <div class="mask" id="mask" onclick="if(event.target===this)closeModal()"></div>
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- PINNED, like the customer app's, and for a sharper reason.
+     This read @supabase/supabase-js@2 with no integrity hash, so the operator
+     console ran whatever jsdelivr resolved that tag to that morning. This is
+     the app an operator signs into to reach every studio on the platform, so
+     a swapped file here is worse than a swapped file anywhere else in the
+     repo. 2.117.2 is what @2 resolved to, byte for byte the same build the
+     customer app pins, so the hash is the same one. 28 October.
+
+     To move it: curl the file and sha384 it, exactly as site/ documents. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"
+        integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok"
+        crossorigin="anonymous"></script>
 <script src="js/config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/core.js"></script>
@@ -193,22 +204,22 @@ const MOB_LABEL = { dashboard:'Home', subscribers:'Subs', payments:'Payments',
   support:'Support', staff:'Team' };
 
 const TITLES = {
-  dashboard: ['Dashboard', 'Monitor your platform at a glance'],
-  subscribers: ['Subscribers', 'Every business using The Label Board'],
-  onboarding: ['Onboarding', 'From signup to a live, paying account'],
-  billing: ['Plans & Billing', 'Plans, pricing and the referral programme'],
-  payments: ['Payments', 'Every subscription transaction'],
-  payroll: ['Payroll', 'Salaries, deductions and payslips'],
-  revenue: ['Revenue', 'Recurring revenue and SaaS performance'],
-  support: ['Support & Usage', 'Tickets, what subscribers are asking for, and how the product is used'],
-  enquiries: ['Enquiries', 'Everybody who asked about us through the website'],
-  announcements: ['Announcements', 'Tell subscribers what changed'],
-  calendar: ['Calendar', 'Meetings, deadlines and what lands when'],
-  tasks: ['Tasks', 'Internal work, who owns it, when it is due'],
-  partners: ['Partners', 'The people bringing studios in, and whether they can get in'],
-  staff: ['Staff & Roles', 'Your team, their pay, attendance and access'],
-  activity: ['Activity Log', 'Who did what, when, and why'],
-  settings: ['Settings', 'Accounts, roles and preferences']
+  dashboard: ['Dashboard', ''],
+  subscribers: ['Subscribers', ''],
+  onboarding: ['Onboarding', ''],
+  billing: ['Plans & Billing', ''],
+  payments: ['Payments', ''],
+  payroll: ['Payroll', ''],
+  revenue: ['Revenue', ''],
+  support: ['Support & Usage', ''],
+  enquiries: ['Enquiries', ''],
+  announcements: ['Announcements', ''],
+  calendar: ['Calendar', ''],
+  tasks: ['Tasks', ''],
+  partners: ['Partners', ''],
+  staff: ['Staff & Roles', ''],
+  activity: ['Activity Log', ''],
+  settings: ['Settings', '']
 };
 
 function buildNav() {
