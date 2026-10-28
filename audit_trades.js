@@ -176,8 +176,8 @@ Object.keys(WORDS).forEach(k=>{
 /* 7) The word for one piece follows the craft, and the studio can override. ----------- */
 setDoes(['garments:make']);if(run("tradeWord()")!=='garment')F('a tailor should make a garment, got '+run("tradeWord()"));
 setDoes(['footwear:make']);if(run("tradeWord()")!=='pair')F('a shoemaker should make a pair, got '+run("tradeWord()"));
-setDoes(['leather:make']);if(run("tradeWord()")!=='piece')F('a bag maker should make a piece, got '+run("tradeWord()"));
-setDoes(['garments:make','footwear:make']);if(run("tradeWord()")!=='piece')F('a studio in two crafts should use the neutral word, got '+run("tradeWord()"));
+setDoes(['leather:make']);if(run("tradeWord()")!=='item')F('a bag maker should call it an item, got '+run("tradeWord()"));
+setDoes(['garments:make','footwear:make']);if(run("tradeWord()")!=='item')F('a studio in two crafts should use the neutral word, got '+run("tradeWord()"));
 // an explicit choice always wins
 run("SETTINGS.itemWord='creation';");
 if(run("tradeWord()")!=='creation')F('the studio set its own word and the app ignored it');
@@ -278,10 +278,10 @@ const EX=run("EXAMPLE_STUDIOS.map(x=>x.key)");
 const EXPECT={
   bespoke: {word:'garment',stage:/fabric|cutting|stitch/i, prod:true,  retail:false, sells:false},
   footwear:{word:'pair',   stage:/last|clicking|closing/i, prod:true,  retail:true,  sells:true},
-  leather: {word:'piece',  stage:/pattern|cutting|skiv/i,  prod:true,  retail:true,  sells:true},
+  leather: {word:'item',  stage:/pattern|cutting|skiv/i,  prod:true,  retail:true,  sells:true},
   rtw:     {word:'garment',stage:/sampl|cutting|sew/i,     prod:false, retail:true,  sells:true},
-  fabrics: {word:'piece',  stage:/cloth|measured|packed/i, prod:false, retail:true,  sells:true},
-  accessories:{word:'piece',stage:/design|beading|fasten|trims/i, prod:true, retail:true, sells:true}
+  fabrics: {word:'item',  stage:/cloth|measured|packed/i, prod:false, retail:true,  sells:true},
+  accessories:{word:'item',stage:/design|beading|fasten|trims/i, prod:true, retail:true, sells:true}
 };
 Object.keys(EXPECT).forEach(k=>{
   const want=EXPECT[k];

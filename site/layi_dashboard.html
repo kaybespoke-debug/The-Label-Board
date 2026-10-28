@@ -1129,7 +1129,7 @@ body.modal-open{overflow:hidden}
       <div class="nav-item" data-view="orders" id="navOrders" onclick="go('orders')"><span class="ni">🧾</span> Orders <span class="nav-badge" id="badgeOrders"></span></div>
       <div class="nav-item" data-view="production" id="navProduction" onclick="go('production')"><span class="ni">✂</span> Production <span class="nav-badge" id="badgeProduction"></span></div>
       <div class="nav-item" data-view="sales" id="navSales" onclick="go('sales')"><span class="ni">🧾</span> Sales <span class="nav-badge" id="badgeSales"></span></div>
-      <div class="nav-item" data-view="customers" id="navCustomers" onclick="go('customers')"><span class="ni">♚</span> Customers <span class="nav-badge" id="badgeCustomers"></span></div>
+      <div class="nav-item" data-view="customers" id="navCustomers" onclick="go('customers')"><span class="ni">♚</span> Clients <span class="nav-badge" id="badgeCustomers"></span></div>
       <div class="nav-item" data-view="marketing" id="navMarketing" onclick="go('marketing')"><span class="ni">📣</span> Marketing</div>
       <div class="nav-item" data-view="logistics" id="navLogistics" onclick="go('logistics')"><span class="ni">⛟</span> Logistics <span class="nav-badge" id="badgeLogistics"></span></div>
       <div class="nav-group">Workroom</div>
@@ -1207,13 +1207,13 @@ body.modal-open{overflow:hidden}
       <section class="view" id="view-customers">
         <div class="stat-grid" id="custStats"></div>
         <div class="toolbar">
-          <input type="text" class="fld search" id="custSearch" placeholder="Search customers…" oninput="renderCustomers()"><select class="fld sortsel" id="sort_customers" onchange="setSort('customers',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_customers" onclick="toggleSortDir('customers')" title="Reverse order">↑</button>
+          <input type="text" class="fld search" id="custSearch" placeholder="Search clients…" oninput="renderCustomers()"><select class="fld sortsel" id="sort_customers" onchange="setSort('customers',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_customers" onclick="toggleSortDir('customers')" title="Reverse order">↑</button>
           <span style="flex:1"></span>
           
           <button class="btn sm ghost" onclick="go('marketing')"><svg viewBox="0 0 24 24" fill="none" stroke="#c2568a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>Marketing</button>
-          <button class="btn sm" onclick="openNewCustomer()">+ Add customer</button>
+          <button class="btn sm" onclick="openNewCustomer()">+ Add client</button>
         </div>
-        <div class="panel"><div class="panel-head"><h3>Customers</h3><span class="page-sub" id="custSub"></span></div><div id="custList"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Clients</h3><span class="page-sub" id="custSub"></span></div><div id="custList"></div></div>
       </section>
 
       <section class="view" id="view-production">
@@ -1324,7 +1324,7 @@ body.modal-open{overflow:hidden}
         <div class="stat-grid" id="mktStats"></div>
         <div class="toolbar"><span style="flex:1"></span><button class="btn sm" onclick="openCampaign('all')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>New campaign</button></div>
         <div class="cols">
-          <div class="panel"><div class="panel-head"><h3>Customer segments</h3><span class="page-sub">tap to message a group</span></div><div id="mktSegments"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Client segments</h3><span class="page-sub">tap to message a group</span></div><div id="mktSegments"></div></div>
           <div class="panel"><div class="panel-head"><h3>Campaign history</h3><span class="page-sub" id="mktHistSub"></span></div><div id="mktHistory"></div></div>
         </div>
       </section>
@@ -1500,7 +1500,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setCompany">
           <div class="panel-head"><h3>Company details</h3></div>
-          <p class="page-sub" style="margin-bottom:14px">Used on invoices and receipts you send to customers.</p>
+          <p class="page-sub" style="margin-bottom:14px">Used on invoices and receipts you send to clients.</p>
           <div class="field"><label>Logo</label><div style="display:flex;align-items:center;gap:14px"><div id="logoPreview" style="width:64px;height:64px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Upload logo</button><button class="btn ghost sm" onclick="clearLogo()">Remove</button><input type="file" id="logoFile" accept="image/*" style="display:none" onchange="uploadLogo(this)"></div></div>
           <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="Your studio name"></div>
           <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@yourlabel.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
@@ -1553,7 +1553,7 @@ body.modal-open{overflow:hidden}
           <div class="row2">
             <div class="field"><label>Default delivery fee</label><input class="fld money" type="text" inputmode="decimal" id="def_delivery" placeholder="0"></div>
             <div class="field"><label>Low-stock alert at / below</label><input class="fld" type="number" id="def_lowstock" placeholder="5"></div>
-            <div class="field"><label>Follow up customers after (days of no order)</label><input class="fld" type="number" id="def_followup" placeholder="90"></div>
+            <div class="field"><label>Follow up clients after (days of no order)</label><input class="fld" type="number" id="def_followup" placeholder="90"></div>
           </div>
           <button class="btn" id="defSaveBtn" onclick="saveDefaults()">Save defaults</button>
         </div>
@@ -1570,9 +1570,9 @@ body.modal-open{overflow:hidden}
           <div class="field"><label>Making stages, one per line, in order</label><textarea class="fld" id="set_stages" rows="7" placeholder="Cutting&#10;Stitching&#10;Finishing" oninput="renderStagePreview()"></textarea></div>
           <div id="stagePreview" class="sd" style="color:var(--text-faint);margin-bottom:12px"></div>
           <button class="btn" id="stageSaveBtn" onclick="saveStages()">Save workflow</button>
-          <div class="field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label>What you call one piece of work</label>
-            <input type="text" class="fld" id="set_itemword" placeholder="garment" maxlength="24">
-            <div class="sd" style="color:var(--text-faint);margin-top:6px">A tailor makes a <b>garment</b>, a shoemaker a <b>pair</b>, a bag maker a <b>piece</b>. Leave this empty and the app picks the word from what your studio does. Fill it in to use your own.</div>
+          <div class="field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label>What you call one item</label>
+            <input type="text" class="fld" id="set_itemword" placeholder="item" maxlength="24">
+            <div class="sd" style="color:var(--text-faint);margin-top:6px">Leave it empty and the app takes the word from your trade.</div>
           </div>
           <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
         </div>
@@ -2041,7 +2041,7 @@ function applyStages(){STAGES=buildStages(SETTINGS.productionStages);WORK_STAGES
 const PERM_PAGES=[
   {k:'orders',l:'Production'},
   {k:'products',l:'Shop'},
-  {k:'customers',l:'Customers'},
+  {k:'customers',l:'Clients'},
   {k:'marketing',l:'Marketing'},
   {k:'logistics',l:'Logistics'},
   {k:'supplies',l:'Supplies & suppliers'},
@@ -2062,11 +2062,11 @@ const PERM_FUNCS=[
   {k:'receivables',l:'See balances owed & payments in',hint:'Who owes, what\u2019s been paid in, and clients to chase, without profit, costs or the expenses tab'},
   {k:'seeProfit',l:'See profit & margins'},
   {k:'seeCost',l:'See cost prices'},
-  {k:'seeContact',l:'See customer contact details',hint:'Off = sees names & order history only, no phone, email or address'},
+  {k:'seeContact',l:'See client contact details',hint:'Off = sees names & order history only, no phone, email or address'},
   {k:'allOrders',l:'See all orders',hint:'Off = only their own assigned jobs'},
   {k:'editStaff',l:'Edit staff profiles & records',hint:'Edit team member contact, bank, documents & employment. Off = staff can view their profile but not change it'},
   {k:'update',l:'Post production updates'},
-  {k:'canQC',l:'Do quality checks',hint:'Run the QC checklist and pass/fail a piece'},
+  {k:'canQC',l:'Do quality checks',hint:'Run the QC checklist and pass/fail an item'},
   {k:'canDispatch',l:'Dispatch orders',hint:'Mark an order dispatched / out for delivery'},
   {k:'appts',l:'Manage appointments'},
   {k:'del',l:'Delete orders'},
@@ -2517,7 +2517,7 @@ function ofLineNote(x,d){const q=ofQty(x),pr=+((x&&x.price))||0;const disc=ofDis
   if(ocur(d)!==SETTINGS.currency)bits.push('≈ '+cur(ofLine(x)*ofx(d)));
   return bits.join(' · ');}
 function migrate(o){
-  if(!o.outfits)o.outfits=[{type:'Bespoke outfit',name:o.garment||'Bespoke piece',price:o.value||0,qty:1,photos:[],style:'',finish:''}];
+  if(!o.outfits)o.outfits=[{type:'Bespoke outfit',name:o.garment||'Bespoke item',price:o.value||0,qty:1,photos:[],style:'',finish:''}];
   /* Quantity arrived in September 2026. Every order written before it stored a price and no
      count, so an absent qty means one piece — never zero, which would wipe the line. */
   o.outfits.forEach(x=>{x.photos=x.photos||[];if(!x.type)x.type='Bespoke outfit';x.qty=Math.max(1,+x.qty||1);
@@ -4738,7 +4738,7 @@ function onOwnerPayBasis(){const b=(document.getElementById('op_basis')||{}).val
   const lbl=document.getElementById('op_valLabel'),inp=document.getElementById('op_val'),hint=document.getElementById('op_hint');const op=ownerPay();
   if(lbl)lbl.textContent=isPct?'Percentage (%)':(b==='salary'?('Monthly salary ('+SETTINGS.currency+')'):('Amount ('+SETTINGS.currency+')'));
   if(inp)inp.value=isPct?(op.pct||''):(op.amount?fmtNum(op.amount):'');
-  if(hint)hint.textContent=({pctProfit:'You keep this percentage of each order profit.',pctValue:'You keep this percentage of each order total value.',perOrder:'You take this fixed amount from every order.',perOutfit:'You take this fixed amount for each piece in an order.',salary:'A fixed monthly draw, posted as a cost each month. Orders carry no owner cut.'})[b]||'';
+  if(hint)hint.textContent=({pctProfit:'You keep this percentage of each order profit.',pctValue:'You keep this percentage of each order total value.',perOrder:'You take this fixed amount from every order.',perOutfit:'You take this fixed amount for each item in an order.',salary:'A fixed monthly draw, posted as a cost each month. Orders carry no owner cut.'})[b]||'';
 }
 function saveOwnerPay(){
   if(!ownerOnlySetting('how the owner is paid'))return;
@@ -6035,7 +6035,7 @@ const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantNam
      explanation of what the page is. That is the test applied throughout:
      a subtitle that CHANGES is telling you something; one that never does is
      telling you what you already read. */
-  calendar:['Calendar',''],customers:['Customers',''],marketing:['Marketing',''],
+  calendar:['Calendar',''],customers:['Clients',''],marketing:['Marketing',''],
   production:['Production',''],orders:['Orders',''],
   team:['Team',''],rota:['Rota',''],tasks:['Tasks & Announcements',''],
   attendance:['Attendance',''],leave:['Leave',''],companylog:['Company log',''],
@@ -6081,9 +6081,9 @@ function isRetailType(t){return t==='rtw'||t==='both'||t==='fabrics';}
 const CRAFTS=[
   {key:'garments',label:'Garments',      desc:'Clothing of any kind',       word:'garment',meas:'body',stages:{make:'bespoke', stock:'rtw'}},
   {key:'footwear',label:'Footwear',      desc:'Shoes, sandals & boots',     word:'pair',   meas:'foot',stages:{make:'footwear',stock:'rtw'}},
-  {key:'leather', label:'Bags & leather',desc:'Bags, belts & leather goods',word:'piece',  meas:'bag', stages:{make:'leather', stock:'rtw'}},
-  {key:'fabrics', label:'Fabrics',       desc:'Cloth sold by length',       word:'piece',  meas:'',    stages:{make:'fabrics', stock:''}},
-  {key:'accessories',label:'Accessories',desc:'Caps, scarves, jewellery & trims',word:'piece',meas:'acc',stages:{make:'accessories',stock:'rtw'}}
+  {key:'leather', label:'Bags & leather',desc:'Bags, belts & leather goods',word:'item',   meas:'bag', stages:{make:'leather', stock:'rtw'}},
+  {key:'fabrics', label:'Fabrics',       desc:'Cloth sold by length',       word:'item',   meas:'',    stages:{make:'fabrics', stock:''}},
+  {key:'accessories',label:'Accessories',desc:'Caps, scarves, jewellery & trims',word:'item',meas:'acc',stages:{make:'accessories',stock:'rtw'}}
 ];
 /* Quality control is a CRAFT question, and it was one flat list for every studio. A
    shoemaker was handed a suit's checks; a bag maker was asked about drape. Worse, the
@@ -6194,8 +6194,8 @@ function tradeWord(){
   activeBranchesInView().forEach(b=>branchDoes(b).forEach(k=>{seen[craftWord(k)]=1;}));
   const words=Object.keys(seen);
   if(words.length===1)return words[0];
-  if(!words.length)return 'garment';
-  return 'piece';
+  if(!words.length)return 'item';
+  return 'item';
 }
 function tradeWordCap(){const w=tradeWord();return w.charAt(0).toUpperCase()+w.slice(1);}
 function tradeWordPlural(){const w=tradeWord();return /s$/.test(w)?w:w+'s';}
@@ -6210,7 +6210,7 @@ function applyTradeWording(){
   const ps=document.getElementById('prodSearch');
   if(ps)ps.placeholder='Search client or '+w+'…';
   const mp=document.getElementById('matPerTypeSub');
-  if(mp)mp.textContent='Set the materials each '+w+' type uses, as a reference for what each piece consumes.';
+  if(mp)mp.textContent='Set the materials each '+w+' type uses, as a reference for what each item consumes.';
 }
 /* A studio can add its own type and can remove one it will never be, so the option
    list is whatever it last saved, read through the new shape, with the two legacy
@@ -6815,7 +6815,7 @@ function itemCraftChips(i){
   const o=(draft&&draft.outfits&&draft.outfits[i])||{};
   const Q=String.fromCharCode(39);
   const chip=(k,label,on)=>'<span class="matchip'+(on?' on':'')+'" onclick="setOutfitCraft('+i+','+Q+k+Q+')">'+esc(label)+'</span>';
-  return '<div class="field" style="margin-bottom:10px"><label>What kind of piece is this</label>'
+  return '<div class="field" style="margin-bottom:10px"><label>What kind of item is this</label>'
     +'<div class="matchips">'+chip('','Same as the studio',!itemCraft(o))
     +list.map(k=>chip(k,activityLabel(k),itemCraft(o)===k)).join('')+'</div>'
     +'<div class="sd" style="color:var(--text-faint);margin-top:6px">'
@@ -7188,7 +7188,7 @@ function renderGroupModal(){
     const pct=Math.round(itemProgress(m)*100);
     const own=itemCraft(m)?activityLabel(itemCraft(m)):'';
     const ks=MEAS_ALL.filter(f=>m.meas&&m.meas[f]);const measSummary=ks.length?ks.slice(0,6).map(f=>esc(f)+' '+esc(m.meas[f])).join(' · ')+(ks.length>6?' …':''):'no measurements on file';
-    return `<div class="srow"><div class="smain"><div class="sup-name">${esc(grp?(m.person||('Person '+(i+1))):(m.name||m.type||('Piece '+(i+1))))}${grp?` <span style="color:var(--text-faint);font-weight:400">· ${esc(m.name||m.type||'piece')}</span>`:''}</div>
+    return `<div class="srow"><div class="smain"><div class="sup-name">${esc(grp?(m.person||('Person '+(i+1))):(m.name||m.type||('Item '+(i+1))))}${grp?` <span style="color:var(--text-faint);font-weight:400">· ${esc(m.name||m.type||'item')}</span>`:''}</div>
       <div class="sup-meta"><b style="color:var(--gold)">${esc(S[si])}</b> · ${pct}%${own?` <span style="color:var(--text-faint)">· ${esc(own)}</span>`:''}</div>
       <div class="sup-meta" style="color:var(--text-faint)">${measSummary}</div>
       <div class="prog" style="margin-top:6px"><i style="width:${pct}%"></i></div></div>
@@ -7197,9 +7197,9 @@ function renderGroupModal(){
         <button class="btn sm" ${si>=dispI?'disabled':''} onclick="groupStep(${i},1)">Advance →</button>
       </div></div>`;}).join('');
   const n=(o.outfits||[]).length;
-  openModal(`<h3>${esc(o.client)} · ${grp?'group order':'piece by piece'}</h3><div class="msub">${o.id} · ${n} ${grp?(n===1?'person':'people'):(n===1?'piece':'pieces')} · each one tracked on its own</div>
+  openModal(`<h3>${esc(o.client)} · ${grp?'group order':'item by item'}</h3><div class="msub">${o.id} · ${n} ${grp?(n===1?'person':'people'):(n===1?'item':'items')} · each one tracked on its own</div>
     <div class="sd" style="color:var(--text-faint);margin-bottom:12px">${grp?'Move each person through the stages individually.':'These pieces are not made the same way, so each one walks its own stages.'} Delivery is marked from Logistics once everything is dispatched.</div>
-    <div class="slist">${rows||`<div class="kv">No ${grp?'people':'pieces'} on this order.</div>`}</div>`);
+    <div class="slist">${rows||`<div class="kv">No ${grp?'people':'items'} on this order.</div>`}</div>`);
 }
 function groupStep(i,delta){
   if(!can('update'))return;
@@ -7211,7 +7211,7 @@ function groupStep(i,delta){
   x.stageIndex=si;
   o.stageIndex=orderStageFromItems(o);
   save('layi_dash_orders',list);
-  logAudit('Piece updated',o.id+' · '+(x.person||x.name||x.type||('piece '+(i+1)))+' → '+S[si]);
+  logAudit('Piece updated',o.id+' · '+(x.person||x.name||x.type||('item '+(i+1)))+' → '+S[si]);
   renderGroupModal();renderAll();
 }
 function openBatch(id){if(!can('update'))return;const o=getOrders().find(x=>x.id===id);if(!o||!isBatch(o))return;batchId=id;renderBatchModal();}
@@ -7231,7 +7231,7 @@ function renderBatchModal(){
       </div>`:`<div style="font-size:12px;color:var(--text-faint)">all ${q}</div>`}
     </div>`;}).join('');
   const dispatched=r[STAGES.length-1]||0;
-  openModal(`<h3>Track batch · ${esc(o.client)}</h3><div class="msub">${o.id} · ${esc(o.garment)} · ${q} pieces · ${batchPct(o)}% complete</div>
+  openModal(`<h3>Track batch · ${esc(o.client)}</h3><div class="msub">${o.id} · ${esc(o.garment)} · ${q} items · ${batchPct(o)}% complete</div>
     <div class="sd" style="color:var(--text-faint);margin-bottom:6px">Set how many pieces have reached each stage. Each stage can't exceed the one before it.</div>
     ${rows}
     <div class="reinvest" style="margin-top:12px"><div class="profit-line"><span>Dispatched</span><b style="color:${dispatched>=q?'var(--green)':'var(--text)'}">${dispatched} / ${q}</b></div></div>
@@ -7267,7 +7267,7 @@ let orderMeasOpen=false;
 let orderSpecialOpen=false;
 function toggleOrderSpecial(){syncOrderDraft();orderSpecialOpen=!orderSpecialOpen;reRenderOrder();}
 function clientPick(){const s=document.getElementById('f_clientPick');const t=document.getElementById('f_client');if(!s||!t)return;if(s.value==='__new__'){t.style.display='block';t.value='';t.focus();}else{t.style.display='none';t.value=s.value;}clientChosen();}
-function clientChosen(){if(!draft)return;syncOrderDraft();const nm=(fv('f_client')||'').trim();const key=nameKey(nm);const c=getCustomers()[key];if(c){const e=document.getElementById('f_email');if(e&&!e.value&&c.email)e.value=c.email;const w=document.getElementById('f_whatsapp');if(w&&!w.value&&c.whatsapp)w.value=c.whatsapp;const a=document.getElementById('f_address');if(a&&!a.value&&c.address)a.value=c.address;}const cm=document.getElementById('clientMatch');if(cm)cm.innerHTML=!nm?'':(c?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Customers on save</span>');refreshOrderMeas();}
+function clientChosen(){if(!draft)return;syncOrderDraft();const nm=(fv('f_client')||'').trim();const key=nameKey(nm);const c=getCustomers()[key];if(c){const e=document.getElementById('f_email');if(e&&!e.value&&c.email)e.value=c.email;const w=document.getElementById('f_whatsapp');if(w&&!w.value&&c.whatsapp)w.value=c.whatsapp;const a=document.getElementById('f_address');if(a&&!a.value&&c.address)a.value=c.address;}const cm=document.getElementById('clientMatch');if(cm)cm.innerHTML=!nm?'':(c?'<span style="color:var(--green)">↩ Returning client, details loaded</span>':'<span style="color:var(--text-faint)">New client, will be added to Clients on save</span>');refreshOrderMeas();}
 function toggleOrderMeas(){syncOrderDraft();orderMeasOpen=!orderMeasOpen;reRenderOrder();}
 function loadLatestMeasIntoOrder(){syncOrderDraft();const key=nameKey(draft.client||'');const latest=key?latestMeasOf(key):null;if(latest){draft.meas=Object.assign({},latest.meas||{});draft.measFit=latest.fit||'';draft.measPosture=latest.posture||'';draft.measNote=latest.note||'';orderMeasOpen=true;reRenderOrder();}}
 async function addOutfitPhotos(i,files){syncOrderDraft();if(photoUploadBlocked())return;for(const f of files){if(!f.type.startsWith('image/'))continue;draft.outfits[i].photos.push(await saveImageAsset(await compressFor(f,'reference'),'outfit'));}reRenderOrder();}
@@ -7474,7 +7474,7 @@ function renderOrderModal(){
       ${draft.outfits.length>1?`<span class="rmo" onclick="removeOutfit(${i})">✕ remove</span>`:''}
       ${isGroup(draft)?`<div class="field" style="margin-bottom:10px"><label>Wearer / person name</label><input class="fld" id="of_person_${i}" value="${esc(o.person||'')}" placeholder="Bride, Tunde, Aunty Bisi"></div>`:''}
       <div class="row2">
-        <div class="field" style="margin-bottom:10px"><label>Product type</label>${selOther('of_type_'+i,productTypes(),o.type||productTypes()[0],'Type of piece','ofTypeChanged('+i+')')}</div>
+        <div class="field" style="margin-bottom:10px"><label>Product type</label>${selOther('of_type_'+i,productTypes(),o.type||productTypes()[0],'Type of item','ofTypeChanged('+i+')')}</div>
         <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)}) &amp; how many</label><div style="display:flex;gap:8px"><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()" style="flex:1;min-width:0"><input class="fld" type="number" min="1" step="1" id="of_qty_${i}" value="${ofQty(o)}" oninput="recalcProfit()" aria-label="How many" style="max-width:78px"></div><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${ofLineNote(o,draft)}</div></div>
       </div>
       <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="Wedding agbada, size 43 mules"></div>
@@ -7483,7 +7483,7 @@ function renderOrderModal(){
         <div class="field" style="margin-bottom:10px"><label>Off this piece (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_disc_${i}" value="${o.discount?fmtNum(o.discount):''}" placeholder="0" oninput="recalcProfit()"></div>
       </div>
       <div class="field" style="margin-bottom:10px"><label>Photos</label>${outfitPhotoGrid(i,o.photos)}</div>
-      <label class="switchrow"><span><b>Save this piece for future invoices</b></span><input type="checkbox" id="of_save_${i}" ${o.saveToCatalog?'checked':''}></label>`;
+      <label class="switchrow"><span><b>Save this item for future invoices</b></span><input type="checkbox" id="of_save_${i}" ${o.saveToCatalog?'checked':''}></label>`;
   const outfitsHtml=draft.outfits.map((o,i)=>`
     <div class="outfit">${itemHead(o,i)}${invoiceOnly?'':`
       <details class="osec osec-in">
@@ -7571,12 +7571,12 @@ function renderOrderModal(){
     ${phoneField}
     <div class="bd-sub">What are you making</div>
     ${outfitsHtml}
-    <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">${isGroup(draft)?'＋ Add another person':'＋ Add another piece'}</button>
+    <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">${isGroup(draft)?'＋ Add another person':'＋ Add another item'}</button>
     <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
       <label style="margin:0;cursor:pointer" onclick="toggleOrderSpecial()">Batch run or group / party?<span style="float:right;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0">${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?'Hide':'Choose'}</span></label>
       ${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?`
-        <label style="margin:12px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>Batch (multiple identical pieces)</span><input type="checkbox" id="f_batch_on" ${isBatch(draft)?'checked':''} ${isGroup(draft)?'disabled':''} onchange="toggleBatch()"></label>
-        ${isBatch(draft)?`<div class="row2" style="margin-top:10px"><div class="field" style="margin-bottom:0"><label>How many pieces?</label><input class="fld" type="number" min="1" id="f_batch_qty" value="${(draft.batch&&draft.batch.qty)||1}" oninput="recalcProfit()"></div></div>`:''}
+        <label style="margin:12px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>Batch (multiple identical items)</span><input type="checkbox" id="f_batch_on" ${isBatch(draft)?'checked':''} ${isGroup(draft)?'disabled':''} onchange="toggleBatch()"></label>
+        ${isBatch(draft)?`<div class="row2" style="margin-top:10px"><div class="field" style="margin-bottom:0"><label>How many items?</label><input class="fld" type="number" min="1" id="f_batch_qty" value="${(draft.batch&&draft.batch.qty)||1}" oninput="recalcProfit()"></div></div>`:''}
         <label style="margin:14px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer"><span>Group / party (different people, one invoice)</span><input type="checkbox" id="f_group_on" ${isGroup(draft)?'checked':''} ${isBatch(draft)?'disabled':''} onchange="toggleGroup()"></label>
       `:''}
     </div>
@@ -7615,7 +7615,7 @@ function saveOrder(){
   } else {
     draft.value=_unit;
   }
-  const first=draft.outfits[0];const firstLabel=(first.name||first.type||'Bespoke piece');
+  const first=draft.outfits[0];const firstLabel=(first.name||first.type||'Bespoke item');
   draft.garment=draft.group.on?('Group · '+draft.outfits.length+' '+(draft.outfits.length===1?'person':'people')):((draft.outfits.length>1?(draft.outfits.length+' items'):firstLabel)+(draft.batch.on?` ×${draft.batch.qty}`:''));
   // build commission entries, preserving 'paid' flags where the same staff+kind+amount existed
   const prevComm=(editingOrderId&&(rawOrders().find(x=>x.id===editingOrderId)||{}).commissions)||[];
@@ -7692,7 +7692,7 @@ function orderAttention(o){
   /* A finished run is not done until it is on the shelf. Until somebody presses the button
      the stock does not exist, so nothing can be sold and the cost is sitting nowhere. */
   if(isRun(o)&&runReadyToStock(o))
-    return {sev:'var(--green)',text:'Finished. Put the '+runUnits(o)+' pieces on the shelf at '+cur(runUnitCost(o))+' each.',
+    return {sev:'var(--green)',text:'Finished. Put the '+runUnits(o)+' items on the shelf at '+cur(runUnitCost(o))+' each.',
       act:can('products')?{label:'Add to stock',fn:`runToStock('${o.id}')`}:null};
   if(isRun(o)&&runIsStocked(o))return null;
   /* Above quality control on purpose. QC finds the wrong cloth after it has been cut,
@@ -7831,7 +7831,7 @@ function openDetail(id){
       ${can('orders')?`<button class="btn ghost sm" onclick="openReceipt('${o.id}')">Receipt</button>`:''}
       ${(isClientOrder(o)||isRun(o))&&(can('orders')||can('update'))?`<button class="btn ghost sm" onclick="printJobSheet('${o.id}')">Job sheet</button>`:''}
       ${can('update')&&isBatch(o)?`<button class="btn ghost sm" onclick="closeModal();openBatch('${o.id}')">Track progress</button>`:''}
-      ${can('update')&&hasOwnPieces(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each ${isGroup(o)?'person':'piece'}</button>`:''}
+      ${can('update')&&hasOwnPieces(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each ${isGroup(o)?'person':'item'}</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openQC('${o.id}')">Quality check</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openUpdate('${o.id}')">Post update</button>`:''}
       ${can('orders.edit')?`<button class="btn ghost sm" onclick="duplicateOrder('${o.id}')">Duplicate</button>`:''}
@@ -8326,7 +8326,7 @@ function runToStock(id){
   const dl=STAGES.indexOf('Delivered');if(dl>=0)o.stageIndex=dl;
   saveSafe('layi_dash_orders',list);
   logAudit('Run stocked',o.id+' · '+made+' × '+(prod.name||'')+' at '+cur(unit)+' each');
-  if(typeof toast==='function')toast(made+' '+(prod.name||'pieces')+' on the shelf at '+cur(unit)+' each');
+  if(typeof toast==='function')toast(made+' '+(prod.name||'items')+' on the shelf at '+cur(unit)+' each');
   closeModal();renderAll();
 }
 
@@ -8430,7 +8430,7 @@ function renderRunModal(){
     +'<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">'
       +'<div class="profit-line"><span>Total cost of the run</span><b>'+cur(cost)+'</b></div>'
       +'<div class="profit-line"><span>Pieces made</span><b>'+made+'</b></div>'
-      +'<div class="profit-line"><span><b>Cost per piece</b></span><b style="color:var(--gold)">'+cur(unit)+'</b></div>'
+      +'<div class="profit-line"><span><b>Cost per item</b></span><b style="color:var(--gold)">'+cur(unit)+'</b></div>'
       +(price>0&&unit>0?'<div class="profit-line"><span>Sells at '+cur(price)+', so margin</span><b style="color:'+(price>unit?'var(--green)':'var(--red)')+'">'+cur(price-unit)+' each'+(made?' · '+cur((price-unit)*made)+' on the run':'')+'</b></div>':'')
       +'<div class="sd" style="color:var(--text-faint);margin-top:6px">This run posts no money of its own. The cost is already out of your account: either you restocked the material, or you typed it above and it is booked against the run. Each piece carries '+cur(unit)+' to the shelf, and the till does not charge it again.</div></div>'
     +'<div class="modal-foot">'+(d.id?'<button class="btn danger sm" onclick="deleteRun()">Delete</button>':'')
@@ -8605,7 +8605,7 @@ function renderQCModal(){
   }).join(''):'';
   const _left=qcPerPiece(_qo)?(_qo.outfits||[]).filter(function(x){return !(x.qc&&x.qc.status==='passed');}).length:0;
   openModal(`<h3>Quality check</h3><div class="msub">${esc(qcDraft.client)} · ${esc(qcDraft.garment)}</div>
-    ${_pieces?`<div class="field"><label>Which piece <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(each is checked on its own)</span></label><div class="matchips">${_pieces}</div></div>`:''}
+    ${_pieces?`<div class="field"><label>Which item</label><div class="matchips">${_pieces}</div></div>`:''}
     <div class="field"><label>Checklist · ${passed}/${total} passed</label>${items}</div>
     <div class="field"><label>Notes / issues found</label><textarea class="fld" id="qc_note" placeholder="Defects, rework needed, or sign-off comments">${esc(qcDraft.note)}</textarea></div>
     <div class="sd" style="color:var(--text-faint);margin-bottom:8px">${_pieces?`Pass marks <b>${esc(qcDraft.garment)}</b> done. The order moves to <b>Ready for Delivery</b> when all ${(_qo.outfits||[]).length} pieces have passed${_left>1?`, and ${_left} are still to check`:''}.`:'Pass moves the order to <b>Ready for Delivery</b>.'} Fail sends it back for rework and flags it.</div>
@@ -8628,7 +8628,7 @@ function passQC(){
     const all=(o.outfits||[]).every(x=>x.qc&&x.qc.status==='passed');
     o.qc=all?{status:'passed',items:qcDraft.items,note:qcDraft.note,by:userLabel(),at:stamp.at}:
              {status:'partial',by:userLabel(),at:stamp.at,
-              note:(o.outfits||[]).filter(x=>x.qc&&x.qc.status==='passed').length+' of '+(o.outfits||[]).length+' pieces passed'};
+              note:(o.outfits||[]).filter(x=>x.qc&&x.qc.status==='passed').length+' of '+(o.outfits||[]).length+' items passed'};
     o.stageIndex=orderStageFromItems(o);
   }else{
     o.qc=stamp;
@@ -9388,7 +9388,7 @@ function openLogPayment(){
       <div class="field"><label>Date received</label><input class="fld" type="date" id="lp_date" value="${payDraft.date}"></div></div>
     <div class="row2"><div class="field"><label>Channel (where it came from)</label><select class="fld" id="lp_channel">${IN_CHANNELS.map(c=>`<option${c==='Studio'?' selected':''}>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Method (how they paid)</label><select class="fld" id="lp_method">${IN_METHODS.map(m=>`<option${m==='Transfer'?' selected':''}>${m}</option>`).join('')}</select></div></div>
-    <div class="field"><label>Who from <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="lp_who" list="lpClients" placeholder="Customer name"><datalist id="lpClients">${dl}</datalist></div>
+    <div class="field"><label>Who from <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="lp_who" list="lpClients" placeholder="Client name"><datalist id="lpClients">${dl}</datalist></div>
     <div class="field"><label>What it was for <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="lp_note" placeholder="e.g. deposit on ankara gown, balance for cap"></div>
     ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('lp_branch',branchNames(),payDraft.branch,'Type a branch')}</div>`:''}
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveLogPayment()">Record payment</button></div>`);
@@ -10578,12 +10578,12 @@ function sendFeedback(){
 }
 function renderFeedbackList(){if(document.getElementById('modal')&&feedbackTab==='sent')renderFeedbackModal();}
 function saveItemWord(){
-  if(!ownerOnlySetting('what the studio calls a piece of work'))return;
+  if(!ownerOnlySetting('what the studio calls an item'))return;
 
   const el=document.getElementById('set_itemword');if(!el)return;
   const v=(el.value||'').trim().replace(/[^A-Za-z -]/g,'').slice(0,24);
   SETTINGS.itemWord=v;save('layi_dash_settings',SETTINGS);
-  if(typeof logAudit==='function')logAudit('Wording updated',v?('one piece of work is a "'+v+'"'):'back to the automatic word');
+  if(typeof logAudit==='function')logAudit('Wording updated',v?('an item is a "'+v+'"'):'back to the automatic word');
   applyTradeWording();renderAll();flashSaved('itemWordSaveBtn','Save wording');
 }
 function applyStagePreset(key){const el=document.getElementById('set_stages');if(el)el.value=(STAGE_PRESETS[key]||DEFAULT_MIDDLE).join('\n');renderStagePreview();}
@@ -10825,7 +10825,7 @@ const IMP_ICO={
   suppliers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg>',
   fin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16M8 13h5M8 16h8"/></svg>'};
 const IMPORTERS=[
- {key:'cust',hue:'#c04668',title:'Customers & measurements',sub:'Names, contact, and every measurement',preview:['name','phone','chest','waist'],
+ {key:'cust',hue:'#c04668',title:'Clients & measurements',sub:'Names, contact, and every measurement',preview:['name','phone','chest','waist'],
   template:'name,phone,email,address,chest,waist,hip,sleeve length,trouser length,note\n"A. Bakare",+234 800 000 0000,bakare@example.com,"12 Marina, Lagos",38,31,40,24,40,VIP client\n',
   apply:function(rows,head){var cust=getCustomers(),added=0,updated=0;
    var iName=impCol(head,['name','client','customer','full name','client name']),iPhone=impCol(head,['phone','mobile','tel','telephone','whatsapp','contact','contact number']),iEmail=impCol(head,['email','e-mail','email address']),iAddr=impCol(head,['address','location','home address']),iNote=impCol(head,['note','notes','comment','comments','remark']);
@@ -10894,7 +10894,7 @@ const IMPORTERS=[
    return {added:res.added||0,updated:0,skipped:res.skipped||0,historical:res.added||0,
      toFinished:toFinished,onBoard:onBoard,txns:money.created,revenueByYear:money.byYear,
      unknownStatuses:unknown};}},
- {key:'stock',hue:'#c47d12',title:'Stock & inventory',sub:'Fabrics, trims and ready-to-wear pieces',preview:['item','category','quantity','cost'],
+ {key:'stock',hue:'#c47d12',title:'Stock & inventory',sub:'Fabrics, trims and ready-to-wear items',preview:['item','category','quantity','cost'],
   template:'item,category,quantity,unit,cost,reorder,note\n"Ankara Blue floral","Fabric",12,yards,2500,4,"Bestseller"\n',
   apply:function(rows,head){var list=getSupplies(),added=0,updated=0;var cats=(typeof invCatNames==='function'?invCatNames():[])||[];
    var iSku=impCol(head,['sku','code','product code','item code','ref']),iName=impCol(head,['name','item','item name','material','product','description']),iCat=impCol(head,['category','cat','type','group']),iSub=impCol(head,['subcategory','subcat','sub-category','variety','brand']),iQty=impCol(head,['quantity','qty','stock','count','units','on hand']),iUnit=impCol(head,['unit','uom','measure']),iCost=impCol(head,['cost','unit cost','price','buy price','cost price']),iRe=impCol(head,['reorder','low stock','low-stock at','minimum','min','reorder at']),iNote=impCol(head,['note','notes','comment']);
@@ -11410,7 +11410,7 @@ function loadExample(force){
   };
   setStaff([
     {id:'st-demo1',staffId:'AA-S001',name:'Franklin',role:'Master Tailor',department:'Production',specialty:'Tailor',skills:'Agbada, kaftan, suits',gender:'Male',dob:'1990-04-12',nationality:'Nigerian',phone:'+234 803 111 2222',email:'franklin@example.com',address:'Surulere, Lagos',emergencyName:'Grace F.',emergencyPhone:'+234 803 000 1111',emergencyRel:'Sister',employmentType:'Full Time',startDate:'2023-02-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Commission',active:true,maxLoad:4,basic:0,rate:45000,rates:[{type:'Kaftan',amount:40000},{type:'Agbada',amount:65000}],bankName:'GTBank',accountNo:'0011223344',accountName:'Franklin',docs:[],timeline:[{id:'tl1',at:iso(11000),type:'Joined',text:'Joined as Master Tailor (2023-02-01)',by:'Adé Sowande'}]},
-    {id:'st-demo2',staffId:'AA-S002',name:'Idara Umah',role:'Customer Relationship Executive',department:'Sales / Client Relations',specialty:'Customer Relations',skills:'Client care, follow-up, styling advice',gender:'Female',dob:'1994-09-03',nationality:'Nigerian',phone:'+234 805 333 4444',email:'idara@example.com',address:'Lekki, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Full Time',startDate:'2024-05-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Monthly Salary',active:true,maxLoad:10,basic:150000,rate:0,rates:[],bankName:'Access Bank',accountNo:'0099887766',accountName:'Idara Umah',docs:[],timeline:[{id:'tl2',at:iso(2500),type:'Joined',text:'Joined as Customer Relationship Executive (2024-05-01)',by:'Adé Sowande'}]},
+    {id:'st-demo2',staffId:'AA-S002',name:'Idara Umah',role:'Client Relationship Executive',department:'Sales / Client Relations',specialty:'Customer Relations',skills:'Client care, follow-up, styling advice',gender:'Female',dob:'1994-09-03',nationality:'Nigerian',phone:'+234 805 333 4444',email:'idara@example.com',address:'Lekki, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Full Time',startDate:'2024-05-01',status:'Active',manager:'',location:'Lagos studio',notes:'',salaryType:'Monthly Salary',active:true,maxLoad:10,basic:150000,rate:0,rates:[],bankName:'Access Bank',accountNo:'0099887766',accountName:'Idara Umah',docs:[],timeline:[{id:'tl2',at:iso(2500),type:'Joined',text:'Joined as Customer Relationship Executive (2024-05-01)',by:'Adé Sowande'}]},
     {id:'st-demo3',staffId:'AA-S003',name:'Tunde',role:'Shoemaker',department:'Production',specialty:'Cutter / Finisher',skills:'Leather shoes & slippers',gender:'Male',dob:'1988-12-20',nationality:'Nigerian',phone:'+234 807 555 6666',email:'',address:'Mushin, Lagos',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Contract',startDate:'2023-08-15',status:'Active',manager:'st-demo1',location:'Lagos studio',notes:'',salaryType:'Commission',active:true,maxLoad:6,basic:0,rate:6000,rates:[{type:'Shoes',amount:6000},{type:'Leather slippers',amount:6000}],bankName:'',accountNo:'',accountName:'',docs:[],timeline:[{id:'tl3',at:iso(8000),type:'Joined',text:'Joined as Shoemaker (2023-08-15)',by:'Adé Sowande'}]},
     {id:'st-demo4',staffId:'AA-S004',name:'Hassan',role:'Tailor',department:'Production',specialty:'Tailor',skills:'Kaftans, casual sets, trousers',gender:'Male',dob:'1992-06-18',nationality:'Nigerian',phone:'+234 806 222 3333',email:'hassan@example.com',address:'Yaba, Lagos',emergencyName:'Aisha H.',emergencyPhone:'+234 806 222 0000',emergencyRel:'Wife',employmentType:'Full Time',startDate:'2024-01-10',status:'Active',manager:'st-demo1',location:'Lagos studio',notes:'Fast turnaround on everyday pieces',salaryType:'Commission',active:true,maxLoad:8,basic:0,rate:35000,rates:[{type:'Kaftan',amount:35000},{type:'Casual set',amount:30000},{type:'Ankara trousers',amount:18000}],bankName:'UBA',accountNo:'2011334455',accountName:'Hassan',docs:[],timeline:[{id:'tl4',at:iso(3600),type:'Joined',text:'Joined as Tailor (2024-01-10)',by:'Adé Sowande'}]},
     {id:'st-demo5',staffId:'AA-S005',name:'Musa',role:'Embroiderer',department:'Production',specialty:'Embroiderer / Beading',skills:'Hand embroidery, beadwork, monograms',gender:'Male',dob:'1991-02-25',nationality:'Nigerian',phone:'+234 809 444 5555',email:'',address:'Aba (remote)',emergencyName:'',emergencyPhone:'',emergencyRel:'',employmentType:'Freelance',startDate:'2024-09-01',status:'On Leave',manager:'st-demo1',location:'Aba',notes:'Freelance, on leave this week',salaryType:'Commission',active:true,maxLoad:5,basic:0,rate:25000,rates:[{type:'Bespoke outfit',amount:30000},{type:'Agbada',amount:35000}],bankName:'Zenith',accountNo:'1099887700',accountName:'Musa',docs:[],timeline:[{id:'tl5',at:iso(1500),type:'Joined',text:'Joined as freelance Embroiderer (2024-09-01)',by:'Adé Sowande'}]},
@@ -11540,7 +11540,7 @@ function loadExample(force){
   ]);
   setLog([
     {id:'lg-1',date:dd(-40),category:'Milestone',title:'Crossed 100 lifetime orders',note:'Celebrated with the team. A small thank-you bonus was paid.',by:'Owner',at:dago(40)},
-    {id:'lg-2',date:dd(-28),category:'Team / HR',title:'Idara Umah joined as Customer Relationship Executive',note:'Owns client follow-ups, bookings and referrals.',by:'Owner',at:dago(28)},
+    {id:'lg-2',date:dd(-28),category:'Team / HR',title:'Idara Umah joined as Client Relationship Executive',note:'Owns client follow-ups, bookings and referrals.',by:'Owner',at:dago(28)},
     {id:'lg-3',date:dd(-21),category:'Pricing',title:'Raised agbada base price to ₦220,000',note:'Fabric costs up ~15%. New rate applies to fresh orders only.',by:'Owner',at:dago(21)},
     {id:'lg-4',date:dd(-14),category:'Team / HR',title:'Hassan joined as tailor',note:'3-month probation. Reports to Franklin.',by:'Owner',at:dago(14)},
     {id:'lg-5',date:dd(-7),category:'Closure',title:'Studio closed for public holiday',note:'Reopened next day; deliveries shifted by one day.',by:'Idara Umah',at:dago(7)},
@@ -12209,7 +12209,7 @@ function renderProductModal(){
   openModal(`<h3>${p.id?'Edit product':'Add product'}</h3>
     <div class="field"><label>Product name</label><input class="fld" id="pp_name" value="${esc(p.name||'')}" placeholder="e.g. Signature linen shirt"></div>
     <div class="field"><label>Photo (optional)</label><div style="display:flex;align-items:center;gap:14px"><div style="width:66px;height:66px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint);cursor:pointer" onclick="document.getElementById('ppPhotoFile').click()">${p.photo?`<img src="${photoSrc(p.photo)}" style="width:100%;height:100%;object-fit:cover">`:'add'}</div><button class="btn ghost sm" type="button" onclick="document.getElementById('ppPhotoFile').click()">Upload</button>${p.photo?`<button class="btn ghost sm" type="button" onclick="removeProductPhoto()">Remove</button>`:''}<input type="file" id="ppPhotoFile" accept="image/*" style="display:none" onchange="uploadProductPhoto(this)"></div></div>
-    <div class="row2"><div class="field"><label>Category</label>${selOther('pp_category',productTypes(),p.category||productTypes()[0],'Type of piece')}</div><div class="field"><label>Selling price (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="pp_price" value="${p.price?fmtNum(p.price):''}" placeholder="0"></div></div>
+    <div class="row2"><div class="field"><label>Category</label>${selOther('pp_category',productTypes(),p.category||productTypes()[0],'Type of item')}</div><div class="field"><label>Selling price (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="pp_price" value="${p.price?fmtNum(p.price):''}" placeholder="0"></div></div>
     <div class="field"><label>Cost to make / buy per unit (${SETTINGS.currency}) <span style="color:var(--text-faint);font-weight:400">(for profit)</span></label><input class="fld money" type="text" inputmode="decimal" id="pp_cost" value="${p.cost?fmtNum(p.cost):''}" placeholder="0"></div>
     <div class="bd-sub" style="margin-top:8px">Sizes / colours & stock</div>
     <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add a row per size and/or colour you stock. Leave both blank for a one-size item.</div>
@@ -13019,7 +13019,7 @@ function custDrill(kind){
 function dashDrill(kind,arg){
   if(kind==='quotes'){
     const list=getOrders().filter(inBranch).filter(o=>isClientOrder(o)&&isQuote(o));
-    openOrderListModal('Quotes out',list,'waiting on a yes — each starts when the client pays, or when you confirm it');
+    openOrderListModal('Invoices out',list);
     return;
   }
   const orders=getOrders().filter(o=>isClientOrder(o)).filter(inBranch);
@@ -13339,7 +13339,7 @@ function renderActivity(){
   ];
   /* Only when there are any. A studio that has never quoted should not carry an empty tile
      for a feature it does not use, and one that HAS quoted should not have to remember. */
-  if(quotes.length)cells.push({cls:'pink',label:'Quotes Out',val:quotes.length,
+  if(quotes.length)cells.push({cls:'pink',label:'Invoices Out',val:quotes.length,
     sub:can('money')?cur(quoteValue)+' waiting on a yes':'waiting on a yes',click:"dashDrill('quotes')"});
 
   mini.innerHTML=cells.map(c=>`<div class="mini-stat ${c.cls}" onclick="${c.click}"><div class="mini-l">${c.label}</div><div class="mini-n">${c.val}</div><div class="mini-s">${c.sub}</div></div>`).join('');}
@@ -13913,7 +13913,7 @@ function ledgerStatus(o){
   const du=daysUntil(o.due);
   /* Before anything else: a quote is not late, not in progress and not due today. It is
      waiting on somebody else, and chasing a due date nobody agreed to is noise. */
-  if(isQuote(o))return{cls:'quote',txt:'Quote'};
+  if(isQuote(o))return{cls:'quote',txt:'Invoice'};
   if(o.stageIndex>=DELI)return{cls:'green',txt:'Delivered'};
   if(o.stageIndex>=DIS)return{cls:'blue',txt:'Dispatched'};
   if(o.qc&&o.qc.status==='failed')return{cls:'red',txt:'Rework'};
@@ -14834,7 +14834,7 @@ function renderStaffModal(){
   // Reports-to options: any OTHER active staff, minus anyone who already reports up to this person (would loop).
   const mgrOpts=`<option value="">Nobody</option>`+getStaff().filter(x=>x.id!==s.id&&staffActive(x)&&!reportingWouldLoop(s.id,x.id)).map(x=>`<option value="${x.id}" ${s.manager===x.id?'selected':''}>${esc(x.name)}${x.role?' · '+esc(x.role):''}</option>`).join('');
   const rateRows=(s.rates||[]).map((r,i)=>`<div class="cost-line">
-    <span>${selOther('sr_type_'+i,productTypes(),r.type||productTypes()[0],'Type of piece')}</span>
+    <span>${selOther('sr_type_'+i,productTypes(),r.type||productTypes()[0],'Type of item')}</span>
     <input class="fld money price" type="text" inputmode="decimal" id="sr_amt_${i}" value="${r.amount?fmtNum(r.amount):''}" placeholder="0">
     <span class="rm" onclick="removeStaffRate(${i})">✕</span></div>`).join('');
   const docRows=(s.docs||[]).map((d,i)=>`<div class="srow"><div class="smain"><div class="sup-name">${esc(d.type)}</div><div class="sup-meta">${esc(d.name||'')} · ${d.size?Math.round(d.size/1024)+'KB':''}</div></div><div class="sacts">${d.data?`<a class="btn sm ghost" href="${d.data}" download="${esc(d.name||'document')}">Open</a>`:''}<button class="btn sm ghost" onclick="removeStaffDoc(${i})">Remove</button></div></div>`).join('');

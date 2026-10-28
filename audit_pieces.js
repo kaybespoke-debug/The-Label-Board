@@ -105,7 +105,7 @@ HP.forEach(c=>{
    spot. */
 run("SETTINGS.branches=[{id:'b1',name:'Solo',active:true,does:['leather:make','garments:make']}];openOrder();");
 const ofForm=run("document.getElementById('modal').innerHTML")||'';
-if(ofForm.indexOf('What kind of piece is this')<0)
+if(ofForm.indexOf('What kind of item is this')<0)
   F('a studio working in two crafts is never asked which craft an item is');
 if(ofForm.indexOf('Bags & leather')<0&&ofForm.indexOf('Bags &amp; leather')<0)
   F('the item craft picker does not offer the crafts the studio works in');
@@ -121,7 +121,7 @@ run("setOutfitCraft(0,'');");
 if(run("draft.outfits[0].craft")!=='')F('an item cannot be put back on the studio’s own stages');
 // a studio in ONE craft is not asked at all: it would be the same answer every time
 run("SETTINGS.branches=[{id:'b1',name:'Solo',active:true,does:['garments:make']}];openOrder();");
-if((run("document.getElementById('modal').innerHTML")||'').indexOf('What kind of piece is this')>=0)
+if((run("document.getElementById('modal').innerHTML")||'').indexOf('What kind of item is this')>=0)
   F('a studio that works in one craft is asked which craft every item is');
 run("closeModal();draft=null;");
 
@@ -180,7 +180,7 @@ else{
 
   run("openQC('"+pid+"');");
   let qk=run("document.getElementById('modal').innerHTML")||'';
-  if(qk.indexOf('Which piece')<0)F('quality control does not offer the pieces separately');
+  if(qk.indexOf('Which item')<0)F('quality control does not offer the pieces separately');
   if(qk.indexOf('Tote bag')<0||qk.indexOf('Agbada')<0)F('the QC screen does not name both pieces');
   if(run("qcDraft.idx")!==0)F('quality control did not start on the first piece');
   // ticks made on one piece survive moving to the other and back
@@ -223,7 +223,7 @@ else{
   if(run("hasOwnPieces(getOrders().find(o=>o.id==='"+pid+"'))")!==false)F('a one-piece order is being offered a piece-by-piece screen it does not need');
   run("openQC('"+pid+"');");
   if(run("qcDraft.idx")!==-1)F('a one-piece order runs quality control on a piece rather than on itself');
-  if((run("document.getElementById('modal').innerHTML")||'').indexOf('Which piece')>=0)
+  if((run("document.getElementById('modal').innerHTML")||'').indexOf('Which item')>=0)
     F('a one-piece order is asked which piece to check');
   run("qcDraft.items.forEach(function(it,i){document.getElementById('qc_'+i).checked=true;});document.getElementById('qc_note').value='';passQC();");
   const single=J("getOrders().find(o=>o.id==='"+pid+"')");

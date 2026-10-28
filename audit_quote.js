@@ -80,7 +80,7 @@ else{
 
   /* 3) It is not late, not failing QC, and owes no fabric check. -------------------- */
   const st=J("ledgerStatus(getOrders().find(o=>o.id==='"+qid+"'))");
-  if(!/quote/i.test(st.txt||''))F('a quote does not say it is a quote, it says "'+st.txt+'"');
+  if(!/invoice/i.test(st.txt||''))F('an unconfirmed order does not say it is an invoice, it says "'+st.txt+'"');
   if(/late/i.test(st.txt||''))F('a quote is being called late against a date nobody agreed to');
   if(html.indexOf('.opill.'+st.cls)<0)F('the quote status uses a pill style that does not exist: '+st.cls);
   const att=J("orderAttention(getOrders().find(o=>o.id==='"+qid+"'))");
@@ -164,7 +164,7 @@ else{
   asQuote();
   run("renderActivity();");
   const mini=run("document.getElementById('dashMini').innerHTML")||'';
-  if(mini.indexOf('Quotes Out')<0)F('a studio with a quote out is not told about it on the dashboard');
+  if(mini.indexOf('Invoices Out')<0)F('a studio with a quote out is not told about it on the dashboard');
   const hero=run("document.getElementById('dashHero').innerHTML")||'';
   const activeWithQuote=+(hero.match(/hero-num">(\d+)/)||[0,0])[1];
   run("(function(){var l=rawOrders(),o=l.find(x=>x.id==='"+qid+"');delete o.quoted;o.confirmedAt=new Date().toISOString();save('layi_dash_orders',l);})();");
@@ -172,7 +172,7 @@ else{
   const activeConfirmed=+((run("document.getElementById('dashHero').innerHTML")||'').match(/hero-num">(\d+)/)||[0,0])[1];
   if(!(activeConfirmed>activeWithQuote))
     F('Active Orders counted the quote as work in hand, so the number is a wish list');
-  if((run("document.getElementById('dashMini').innerHTML")||'').indexOf('Quotes Out')>=0)
+  if((run("document.getElementById('dashMini').innerHTML")||'').indexOf('Invoices Out')>=0)
     F('a studio with no quotes out is carrying an empty tile for a feature it is not using');
 }
 

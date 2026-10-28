@@ -71,7 +71,7 @@ run("_impState={};renderImpCards();");
 const cardsHtml=(cache['impCards']&&cache['impCards'].innerHTML)||'';
 const cardCount=(cardsHtml.match(/imp-card/g)||[]).length;
 if(cardCount<6)F('the import screen did not render 6 cards (got '+cardCount+')');
-if(cardsHtml.indexOf('Customers &amp; measurements')<0&&cardsHtml.indexOf('Customers & measurements')<0)F('import cards missing the customers title');
+if(cardsHtml.indexOf('Clients &amp; measurements')<0&&cardsHtml.indexOf('Clients & measurements')<0)F('import cards missing the clients title');
 
 /* Every record an importer makes has to be able to tell itself apart from the others.
    uid() used to be Date.now() plus three random base-36 characters: 46,656 values inside
