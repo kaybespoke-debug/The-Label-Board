@@ -845,10 +845,9 @@ run("openDetail('"+OID+"');");
  ok(d.indexOf('It starts when they pay')<0,'the second sentence is back in the action banner');
  ok(d.indexOf('Action needed')<0,'the generic heading is back above the fact');
  run("closeModal();");}
-ok(run("typeof duplicateOrder")==='function','duplicateOrder was deleted rather than moved');
-run("openOrder('"+OID+"');");
-ok((run("document.getElementById('modal').innerHTML")||'').indexOf('>Duplicate<')>=0,'Duplicate came off the order page and landed nowhere');
-run("closeModal();");
+/* Duplicate is not on the order page and not anywhere else either: the whole
+   capability went on 28 October. audit_order_split holds the absence. */
+ok(run("typeof duplicateOrder")==='undefined','duplicateOrder is back in the app');
 run("openUpdate('"+OID+"');");
 ok((run("document.getElementById('modal').innerHTML")||'').indexOf('Quality check')>=0,'Quality check came off the order page and is not under Post update either');
 run("closeModal();");

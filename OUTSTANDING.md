@@ -39,7 +39,10 @@ before and not done.
   Invoice and Receipt moved to the order's **Payments** tab (an order raised
   straight as an order was never in the Invoices tab, so deleting the button
   outright would have left it with no way to be invoiced); Quality check moved
-  under Post update; Duplicate moved into the order form beside Delete.
+  under Post update. **Duplicate is gone altogether** — not moved: "why do i
+  want to duplicate an order, that could give chances for fraud, i dont want it."
+  The function went with the button, and `audit_order_split` now checks for its
+  ABSENCE so nobody re-adds it quietly.
 - **The story, again.** The action banner is now the fact and the button —
   "Quoted ₦440,000, waiting on them" · [Confirm order] — with the generic
   heading and the second sentence gone. The receipt's note went with them.

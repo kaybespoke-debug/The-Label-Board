@@ -314,19 +314,29 @@ section('8. Reading an order and changing one are different permissions');
   for (const [what, probe] of [
     ['newOrder()',        /function newOrder\(\)\s*\{ if\(!can\('orders\.edit'\)\)return;/],
     ['the order form',    /function openOrder\(id,door\)\s*\{ if\(!can\('orders\.edit'\)\)return;/],
-    ['duplicateOrder()',  /function duplicateOrder\(id\)\s*\{ if\(!can\('orders\.edit'\)\)return;/],
     ['setSatisfaction()', /function setSatisfaction\(id,n\)\{if\(!can\('orders\.edit'\)\)return;/],
     ['the New Order button', /show\('newOrderBtn',can\('orders\.edit'\)/],
     ['the Edit button',      /can\('orders\.edit'\)\?.{0,60}openOrder\('\$\{o\.id\}'\)">Edit/],
-    /* 28 October: Duplicate moved off the order detail page and into the order
-       form, so the id it carries is editingOrderId rather than a row's o.id.
-       The rule being tested is unchanged — a role that may read orders but not
-       edit them must not be able to copy one — so the key is still what is
-       asserted and only the shape of the id is now left open. */
-    ['the Duplicate button', /can\('orders\.edit'\)\?.{0,70}duplicateOrder\('\$\{[A-Za-z.]+\}'\)">Duplicate/],
   ]) {
     ok(what + ' asks for orders.edit, not orders', probe.test(flat), 'it still asks for the read key');
   }
+
+  /* NOTHING COPIES AN ORDER — 28 October.
+     "why do i want to duplicate an order, that could give chances for fraud, i
+     dont want it." Duplicate used to sit on the order detail page behind
+     orders.edit, and the two checks that lived here held it to that key. The
+     decision is now that the capability should not exist at all, so what is
+     checked is its ABSENCE: a copy of an order is a second invoice nobody
+     raised, carrying a real client and a real value, one tap from any screen a
+     staff member can reach. This is the check that stops it being re-added
+     quietly in six months, which is how the last three regressions got in. */
+  /* Comments out first. The note left where the function used to live has to keep
+     saying its name, or the reason it went gets deleted with it. */
+  const noComments = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  ok('nothing in the app duplicates an order', !/duplicateOrder/.test(noComments),
+     'duplicateOrder is back; a copied order is a second invoice nobody raised');
+  ok('no button offers to copy an order', !/>Duplicate</.test(noComments),
+     'a Duplicate button is back on some screen');
 
   /* and the per-outfit price asks the money question rather than the
      order question */

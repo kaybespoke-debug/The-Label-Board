@@ -7066,32 +7066,13 @@ function openOrder(id,door){
   reRenderOrder();
 }
 function addCost(){syncOrderDraft();draft.costs.push({label:'',amount:0});reRenderOrder();}
-function duplicateOrder(id){
-  if(!can('orders.edit'))return;
-  const src=getOrders().find(x=>x.id===id);if(!src)return;
-  closeModal();
-  editingOrderId=null;
-  const d=JSON.parse(JSON.stringify(src));
-  // keep: client, contact, address, outfits, costs, currency/fx, director settings, delivery setup, batch design, discount, measurements
-  delete d.id;delete d.createdAt;delete d.satisfaction;delete d.qc;delete d.potContribs;delete d.kind;delete d.saleItems;
-  d.paid=0;d.stageIndex=0;d.updates=[];
-  // commissions: keep who & how much, reset the paid flags; strip any director line (re-derived)
-  d.commissions=(d.commissions||[]).filter(c=>c.kind!=='director').map(c=>Object.assign({},c,{paid:false}));
-  if(!d.commissions.length)d.commissions=[{staffId:'',kind:'maker',amount:0}];
-  // batch: keep it a batch with same qty, but reset the wave counts to "all just received"
-  if(d.batch&&d.batch.on){d.batch.qty=Math.max(1,+d.batch.qty||1);d.batch.reached=normalizeReached([],d.batch.qty);}
-  else d.batch={on:false};
-  // delivery: keep courier/fee/location, clear tracking & status (new shipment)
-  if(d.delivery){d.delivery.tracking='';d.delivery.status='Pending';}
-  // fresh due date from your default lead time
-  d.due=defaultDueDate();
-  d.costs=d.costs||[];d.discount=+d.discount||0;d.stockUsed=d.stockUsed||[];d.meas=d.meas||{};
-  if(d.directorPct==null)d.directorPct=25;if(d.directorOn===undefined)d.directorOn=true;if(d.directorAmount===undefined)d.directorAmount=null;
-  orderMeasOpen=false;
-  draft=d;
-  logAudit('Order duplicated','from '+id+' · '+(src.client||''));
-  reRenderOrder();
-}
+/* duplicateOrder() WAS HERE, and is deliberately gone — 28 October.
+   "why do i want to duplicate an order, that could give chances for fraud, i
+   dont want it." It copied a client, their line items and the order's value
+   into a brand new record from one tap, which is a second invoice nobody
+   raised. Permissioning it behind orders.edit was never the answer to that.
+   audit_order_split refuses any route back. A repeat client is booked by
+   raising the order, which is the point at which somebody decides to. */
 function addCommRow(){syncOrderDraft();draft.commissions.push({staffId:'',kind:'maker',amount:0});reRenderOrder();}
 function removeCommRow(i){syncOrderDraft();draft.commissions.splice(i,1);if(!draft.commissions.length)draft.commissions=[{staffId:'',kind:'maker',amount:0}];reRenderOrder();}
 function getRecipes(){return (SETTINGS.recipes&&typeof SETTINGS.recipes==='object')?SETTINGS.recipes:{};}
@@ -7671,7 +7652,6 @@ function renderOrderModal(){
     ${can('money')?sect('profit','What it made you',cur(retained),pnlSection):''}
     ${sect('van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery',deliverySection)}
     <div class="modal-foot">
-      ${editingOrderId&&can('orders.edit')?`<button class="btn ghost sm" onclick="duplicateOrder('${editingOrderId}')">Duplicate</button>`:''}
       ${editingOrderId&&can('del')?`<button class="btn danger sm" onclick="deleteOrder()">Delete</button>`:''}
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
