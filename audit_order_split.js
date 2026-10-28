@@ -318,7 +318,12 @@ section('8. Reading an order and changing one are different permissions');
     ['setSatisfaction()', /function setSatisfaction\(id,n\)\{if\(!can\('orders\.edit'\)\)return;/],
     ['the New Order button', /show\('newOrderBtn',can\('orders\.edit'\)/],
     ['the Edit button',      /can\('orders\.edit'\)\?.{0,60}openOrder\('\$\{o\.id\}'\)">Edit/],
-    ['the Duplicate button', /can\('orders\.edit'\)\?.{0,60}duplicateOrder\('\$\{o\.id\}'\)">Duplicate/],
+    /* 28 October: Duplicate moved off the order detail page and into the order
+       form, so the id it carries is editingOrderId rather than a row's o.id.
+       The rule being tested is unchanged — a role that may read orders but not
+       edit them must not be able to copy one — so the key is still what is
+       asserted and only the shape of the id is now left open. */
+    ['the Duplicate button', /can\('orders\.edit'\)\?.{0,70}duplicateOrder\('\$\{[A-Za-z.]+\}'\)">Duplicate/],
   ]) {
     ok(what + ' asks for orders.edit, not orders', probe.test(flat), 'it still asks for the read key');
   }

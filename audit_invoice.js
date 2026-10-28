@@ -796,6 +796,75 @@ ok(/invoices:'branch'/.test(html),'the invoices tab declares no branch scope, so
   run("closeModal();");}
 }
 /* ===================================================================================
+   PART EIGHT — THE PHONE PASS, 28 October
+
+   "Generally the mobile version is overwhelming to use, easy usage is what will make
+   the app sell." Eight complaints, photographed. Every one of them is a screen, so
+   every one of them is rendered here and read back rather than grepped for.
+   =================================================================================== */
+{
+const PHONECSS=fs.readFileSync('site/layi_dashboard.html','utf8');
+
+/* ---- the invoice is its own page, end to end ---------------------------------- */
+run("invoiceFilter='all';renderInvoices();");
+{const invs=run("document.getElementById('invoicesLedger').innerHTML")||'';
+ ok(invs.indexOf('onclick="openInvoice(')>=0,'tapping an invoice no longer opens the invoice');
+ ok(invs.indexOf('onclick="openDetail(')<0,'tapping an invoice still lands on the order page, stages, measurements and all');}
+
+run("openInvoice('"+OID+"');");
+{const prev=run("document.getElementById('modal').innerHTML")||'';
+ ok(prev.indexOf('>Edit<')>=0,'the invoice preview has no Edit, which was asked for twice');
+ /* FOUR CONTROLS DOING ONE JOB. The top bar carries Close; the foot carried Close
+    again, and a Back into the order page the invoice is meant to be separate from. */
+ ok((prev.match(/Close/g)||[]).length===1,'the preview is not carrying exactly one Close');
+ ok(prev.indexOf('class="modal-foot"')<0,'the invoice preview grew a foot again');
+ run("closeModal();");}
+
+/* ---- dedupeModalFoot ----------------------------------------------------------
+   Static, and deliberately so. It works on the live DOM and this harness keeps
+   innerHTML as a string, so running it here would pass whatever the app did. What
+   is held instead is the wiring and the narrowness: an exact closeModal() only, so
+   a Close that also navigates somewhere is never swallowed. */
+ok(/dedupeModalFoot\(modalEl,!!back\)/.test(PHONECSS),'openModal no longer dedupes its foot');
+ok(PHONECSS.indexOf("a==='closeModal()'")>=0,'dedupeModalFoot stopped matching an exact closeModal(), so it can now eat a Close that navigates');
+
+/* ---- the order page is four buttons, and nothing was simply deleted ------------ */
+run("openDetail('"+OID+"');");
+{const d=run("document.getElementById('modal').innerHTML")||'';
+ const bar=(d.match(/<div class="detail-actbar">[\s\S]*?<\/div>/)||[''])[0];
+ ok(bar.indexOf('>Duplicate<')<0,'Duplicate is back on the order page');
+ ok(bar.indexOf('>Quality check<')<0,'Quality check is back on the order page');
+ ok(bar.indexOf('>Invoice<')<0,'Invoice is back on the order page');
+ ok(bar.indexOf('>Receipt<')<0,'Receipt is back on the order page');
+ /* and the two that moved are reachable where they moved TO. An order raised
+    straight as an order was never in the Invoices tab, so deleting its Invoice
+    button outright would have left it with no way to be invoiced at all. */
+ ok(d.indexOf("openInvoice('"+OID+"')")>=0,'Invoice is not on the order either, so this order can never be invoiced');
+ ok(d.indexOf("openReceipt('"+OID+"')")>=0,'Receipt vanished with the action bar');
+ /* "take off the lines of explanation, dont shorten, just cut it all off." */
+ ok(d.indexOf('It starts when they pay')<0,'the second sentence is back in the action banner');
+ ok(d.indexOf('Action needed')<0,'the generic heading is back above the fact');
+ run("closeModal();");}
+ok(run("typeof duplicateOrder")==='function','duplicateOrder was deleted rather than moved');
+run("openOrder('"+OID+"');");
+ok((run("document.getElementById('modal').innerHTML")||'').indexOf('>Duplicate<')>=0,'Duplicate came off the order page and landed nowhere');
+run("closeModal();");
+run("openUpdate('"+OID+"');");
+ok((run("document.getElementById('modal').innerHTML")||'').indexOf('Quality check')>=0,'Quality check came off the order page and is not under Post update either');
+run("closeModal();");
+
+/* ---- four cards on a phone, and the fifth one tappable ------------------------- */
+ok(PHONECSS.indexOf('.stat-grid:not(.open)>:nth-child(n+5){display:none}')>=0,'the stat grids no longer stop at four on a phone');
+ok(PHONECSS.indexOf('#dashMini{display:none}')>=0,'the dashboard mini cards are back on the phone');
+ok(PHONECSS.indexOf('user-scalable=no')>=0,'the page can be pinched out of shape again');
+ok(run("typeof capStatGrids")==='function','nothing tells you the fifth card is there');
+/* Outstanding is who owes you. It was fifth of six on Orders, so capping at four
+   would have hidden the one number worth opening the tab for. */
+{const o=run("(function(){renderOrders();return document.getElementById('ordersStats').innerHTML;})()")||'';
+ const labels=(o.match(/class="sl">[^<]+/g)||[]).map(function(s){return s.replace('class="sl">','');});
+ ok(labels.slice(0,4).join('|').indexOf('Outstanding')>=0,'Outstanding is outside the first four cards again, so a phone hides it');}
+}
+/* ===================================================================================
    REPORT
    =================================================================================== */
 Promise.all(PENDING).then(function(){

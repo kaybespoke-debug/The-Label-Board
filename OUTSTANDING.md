@@ -5,7 +5,62 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 28 October 2026 (twenty-sixth session)
+Last updated: 28 October 2026 (twenty-seventh session)
+
+## 28 October 2026 — cutting the phone down (layi-v74)
+
+The second pass over the same five screenshots, plus eight more taken from the
+deployed build. "Generally the mobile version is overwhelming to use, easy
+usage is what will make the app sell." Three of these had been asked for
+before and not done.
+
+### Done
+
+- **Four cards, not nine.** Every stat grid stops at four on a phone and grows
+  a "Show N more" line (`capStatGrids`); a grid that only ever holds four never
+  grows one, so nothing is hidden that was not already there. On Orders,
+  Outstanding was fifth of six and would have been the one cut, so it swapped
+  places with Order Value — which is the dashboard's Revenue card under another
+  name. On the dashboard the five mini cards come off the phone entirely and
+  the hero drops from a 150px block to a 90px band.
+- **Sizes.** Panel, button, page title, card padding and the serif figures all
+  come down again on a phone.
+- **Zoom off.** `user-scalable=no` is back in the viewport and
+  `touch-action:manipulation` kills the double-tap. The 16px rule on every text
+  control stays, so a browser tab still does not zoom when you type.
+- **The invoice is its own page.** Tapping a row in Invoices opens the invoice,
+  not the order. The preview is taller (64vh), has an **Edit** button, and has
+  lost the foot that offered the order page as its way out.
+- **Four controls doing one job.** Every modal foot's Close — and its Back when
+  the top bar already has one — is removed at render time by
+  `dedupeModalFoot`; a foot left holding nothing but a spacer goes with it.
+  Only an exact `closeModal()` is touched, so a Close that also navigates stays.
+- **The order page is four buttons.** Message · Job sheet · Post update · Edit.
+  Invoice and Receipt moved to the order's **Payments** tab (an order raised
+  straight as an order was never in the Invoices tab, so deleting the button
+  outright would have left it with no way to be invoiced); Quality check moved
+  under Post update; Duplicate moved into the order form beside Delete.
+- **The story, again.** The action banner is now the fact and the button —
+  "Quoted ₦440,000, waiting on them" · [Confirm order] — with the generic
+  heading and the second sentence gone. The receipt's note went with them.
+- **PART EIGHT of `audit_invoice`** holds all of it: 321 checks, mutation-drilled
+  four ways.
+
+### Open from this pass
+
+- **The black haze at the top of the phone.** The cause was fixed this morning
+  (`apple-mobile-web-app-status-bar-style` handed back to iOS) and the live file
+  carries it, but an **installed** home-screen app keeps the value it was
+  installed with. It needs the icon removed and re-added. The topbar also gained
+  9px of clearance as a belt. **Waiting on Kayode to reinstall and confirm.**
+- **The Today strip** is four more cards on the dashboard, but only for a
+  multi-branch studio, so Kayode has never seen it. Not capped. Say if it should
+  be.
+- **Settings still carries ~100 lines of field hints.** Every `.sd` left in the
+  app is one, and they are what a new studio reads while setting up. Not cut.
+  Say if they should go too.
+- **A second owner per studio** — unchanged from below, and the real blocker is
+  `team-admin`'s `['manager','staff','viewer']` allow-list.
 
 ## 28 October 2026 — the phone pass, and invoicing rebuilt
 

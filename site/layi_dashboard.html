@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <!-- THE DARK HAZE ACROSS THE TOP OF EVERY SCREEN, 28 October.
@@ -174,6 +174,7 @@ textarea.fld{resize:vertical;min-height:64px;letter-spacing:.3px;font-size:14px}
 .who .wn{font-size:13.5px;color:var(--text)}.who .wr{font-size:11px;color:var(--text-faint);letter-spacing:.5px}
 
 /* padding-top is 0 because .topbar carries it, sticky header, see above */
+body{touch-action:manipulation}
 .main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:0 max(30px,env(safe-area-inset-right)) 60px max(30px,env(safe-area-inset-left));max-width:none}
 /* The header stays put while the page scrolls under it. Kayode, 20 September
    2026: "lets keep the headers firm, so the header doesnt scroll while you are
@@ -746,7 +747,7 @@ body.modal-open{overflow:hidden}
   .main{padding:0 max(16px,env(safe-area-inset-right)) calc(82px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
   body.has-install .main{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
   /* the header keeps carrying the top inset on a phone, where it matters most */
-  .topbar{padding-top:max(18px,env(safe-area-inset-top));padding-bottom:10px;margin-bottom:20px}
+  .topbar{padding-top:calc(max(18px,env(safe-area-inset-top)) + 9px);padding-bottom:10px;margin-bottom:14px}
   .mob-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);border-top:1px solid var(--line);padding:6px 2px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px -12px rgba(0,0,0,.35)}
   .mob-bar .mb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text-faint);cursor:pointer;padding:4px 2px}
   .mob-bar .mb .mbi{line-height:0;display:block}
@@ -771,7 +772,31 @@ body.modal-open{overflow:hidden}
   .stat .sl{font-size:9.5px;letter-spacing:1.1px}
   .stat .sd{font-size:11px;margin-top:4px;line-height:1.3}
   .stat .stat-more{top:9px;right:10px;font-size:16px}
-  .panel{padding:18px 16px}
+  .panel{padding:14px 13px;border-radius:13px}
+  .panel-head h2{font-size:16px}
+  .page-title{font-size:21px}
+  .stat-grid{gap:8px;margin-bottom:14px}
+  .stat{padding:9px 11px}
+  .stat .sv{font-size:20px;margin-top:4px}
+  .btn{padding:9px 13px;font-size:13px}
+  .btn.sm{padding:7px 11px;font-size:12.5px}
+  /* FOUR CARDS, AND THE REST BEHIND A TAP.
+     Shrinking a card does not fix nine of them, and it was shrinking a card
+     that was tried this morning. Every stat grid now stops at four on a
+     phone and grows a "Show N more" line underneath; capStatGrids() adds it,
+     so a grid that only ever holds four never grows one and nothing is lost
+     from any screen — it is one tap away instead of three screens down. */
+  .stat-grid:not(.open)>:nth-child(n+5){display:none}
+  .statmore{color:var(--gold);font-size:12.5px;cursor:pointer;margin:-10px 0 16px;padding:4px 2px}
+  /* The dashboard is the one screen capping cannot fix: four money cards, a
+     150px hero and five minis is three screens before any work appears. The
+     minis come off the phone altogether, because every number on them is
+     already somewhere else — Outstanding covers payments pending, Needs
+     Attention covers due today, Appointments has its own panel further down
+     the same page, and Invoices has a tab of its own now. The hero stays,
+     because Active Orders is the number the app is for, but it stops being
+     a block and becomes a band. */
+  #dashMini{display:none}
   .cols{gap:14px}
   /* order cards stack cleanly */
   .oc-top{align-items:flex-start}
@@ -809,6 +834,7 @@ body.modal-open{overflow:hidden}
    is narrower than, so the rule is now a floor rather than a layout anybody
    meets. 28 October. */
 @media(max-width:300px){.stat-grid{grid-template-columns:1fr}}
+@media(min-width:681px){.statmore{display:none}}
 /* collapsible panels (used for Outstanding & Transactions; collapsed by default on mobile) */
 .panel-head.pcol{cursor:pointer;user-select:none}
 .panel .collapse-chev{color:var(--gold);font-size:14px;transition:transform .2s;margin-left:auto}
@@ -908,7 +934,12 @@ body.modal-open{overflow:hidden}
 .appt-t{font-weight:600;font-size:13.5px}
 .appt-m{font-size:12px;color:var(--text-faint);margin-top:2px}
 @media(max-width:980px){.dash-top{grid-template-columns:1fr 1fr}.dash-col-a{grid-column:1/-1}.mini-grid{grid-template-columns:repeat(4,1fr)}.dash-bottom{grid-template-columns:1fr!important}}
-@media(max-width:680px){.dash-top{grid-template-columns:1fr!important}.mini-grid{grid-template-columns:1fr 1fr}.dash-hero .hero-num{font-size:46px}}
+@media(max-width:680px){.dash-top{grid-template-columns:1fr!important}.mini-grid{grid-template-columns:1fr 1fr}
+  /* A band, not a block. See the phone section higher up for why the minis go. */
+  .dash-hero{min-height:0;padding:12px 15px;border-radius:13px}
+  .dash-hero .hero-num{font-size:29px;margin-top:0}
+  .dash-hero .hero-sub{font-size:12px}
+  .dash-hero .hero-wm{display:none}}
 /* ===== READY-TO-WEAR THUMBNAIL GRID ===== */
 .rtw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px}
 .rtw-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel);cursor:pointer;transition:transform .12s,box-shadow .12s;display:flex;flex-direction:column}
@@ -2763,7 +2794,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v73';
+const APP_VERSION='layi-v74';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -6621,7 +6652,28 @@ function renderAccentPicker(){const el=document.getElementById('accentPicker');i
 
 /* ===== MODAL ===== */
 let _scrollY=0;
-function openModal(html){openStaffId=null;const modalEl=document.getElementById('modal');if(!window.__modalStack)window.__modalStack=[];const ovShown=document.getElementById('overlay').classList.contains('show');if(ovShown&&!window.__omKeep&&modalEl.innerHTML){window.__modalStack.push(modalEl.innerHTML);if(window.__modalStack.length>15)window.__modalStack.shift();}const back=window.__modalStack.length?'<button class="btn ghost sm" onclick="modalBack()">‹ Back</button>':'';modalEl.innerHTML='<div class="modal-topbar">'+back+'<button class="btn ghost sm" onclick="closeModal()">✕ Close</button></div><div class="modal-page">'+html+'</div>';const ov=document.getElementById('overlay');ov.classList.add('show');if(window.__omKeep){const _s=window.__omScroll||0;window.__omKeep=false;restoreModalView(ov,_s);}else{ov.scrollTop=0;}const mn=document.querySelector('.main');if(mn)mn.classList.add('locked');document.body.classList.add('modal-open');}
+/* FOUR CONTROLS DOING ONE JOB. Every modal's own foot carried a Back and a
+   Close while the sticky top bar carried the same two, so the invoice preview
+   offered Back, Close, Back, Close. The top bar is the one that is always
+   reachable without scrolling, so the foot's copies go, and a foot left
+   holding nothing but a spacer goes with them.
+
+   Only an EXACT closeModal() is touched. A Close that also navigates
+   somewhere — closeModal();go('calendar') — is a different button and stays,
+   and so does every Cancel, Save and Delete. Back only goes when the top bar
+   actually has one, which it does not when a modal was opened cold. */
+function dedupeModalFoot(root,hasBack){
+  root.querySelectorAll('.modal-foot').forEach(function(f){
+    f.querySelectorAll('button').forEach(function(b){
+      const t=(b.textContent||'').trim();
+      const a=(b.getAttribute('onclick')||'').trim();
+      if(t==='Close'&&a==='closeModal()')b.remove();
+      else if(hasBack&&t==='Back')b.remove();
+    });
+    if(!f.querySelector('button'))f.remove();
+  });
+}
+function openModal(html){openStaffId=null;const modalEl=document.getElementById('modal');if(!window.__modalStack)window.__modalStack=[];const ovShown=document.getElementById('overlay').classList.contains('show');if(ovShown&&!window.__omKeep&&modalEl.innerHTML){window.__modalStack.push(modalEl.innerHTML);if(window.__modalStack.length>15)window.__modalStack.shift();}const back=window.__modalStack.length?'<button class="btn ghost sm" onclick="modalBack()">‹ Back</button>':'';modalEl.innerHTML='<div class="modal-topbar">'+back+'<button class="btn ghost sm" onclick="closeModal()">✕ Close</button></div><div class="modal-page">'+html+'</div>';dedupeModalFoot(modalEl,!!back);const ov=document.getElementById('overlay');ov.classList.add('show');if(window.__omKeep){const _s=window.__omScroll||0;window.__omKeep=false;restoreModalView(ov,_s);}else{ov.scrollTop=0;}const mn=document.querySelector('.main');if(mn)mn.classList.add('locked');document.body.classList.add('modal-open');}
 function modalBack(){if(!window.__modalStack||!window.__modalStack.length){closeModal();return;}const html=window.__modalStack.pop();const modalEl=document.getElementById('modal');modalEl.innerHTML=html;const ov=document.getElementById('overlay');if(ov)ov.scrollTop=0;}
 function closeModal(){window.__modalStack=[];const _ov=document.getElementById('overlay');if(_ov)_ov.scrollTop=0;document.getElementById('overlay').classList.remove('show');const mn=document.querySelector('.main');if(mn)mn.classList.remove('locked');document.body.classList.remove('modal-open');draft=null;updateDraft=null;}
 const fv=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
@@ -7619,6 +7671,7 @@ function renderOrderModal(){
     ${can('money')?sect('profit','What it made you',cur(retained),pnlSection):''}
     ${sect('van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery',deliverySection)}
     <div class="modal-foot">
+      ${editingOrderId&&can('orders.edit')?`<button class="btn ghost sm" onclick="duplicateOrder('${editingOrderId}')">Duplicate</button>`:''}
       ${editingOrderId&&can('del')?`<button class="btn danger sm" onclick="deleteOrder()">Delete</button>`:''}
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="closeModal()">Cancel</button>
@@ -7788,10 +7841,18 @@ function buildOrderTimeline(o){
 }
 var orderTab='overview';
 function setOrderTab(t){orderTab=t;document.querySelectorAll('.otab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));document.querySelectorAll('.opane').forEach(p=>{p.style.display=(p.dataset.pane===t)?'':'none';});}
+/* "take off the lines of explanation, dont shorten, just cut it all off."
+   The action banner used to carry a generic heading and then two sentences:
+   what is true, and then what to do about it. The button already says what to
+   do, so the second sentence goes and the heading goes with it — the fact is
+   the heading. "Quoted N575,000, waiting on them. It starts when they pay, or
+   confirm it yourself." becomes "Quoted N575,000, waiting on them" beside a
+   Confirm order button, which is the whole of it. */
+function attHead(t){return String(t||'Action needed').split('. ')[0].replace(/\.$/,'');}
 function openDetail(id){
   const o=getOrders().find(x=>x.id===id);if(!o)return;
   const att=orderAttention(o);
-  const attBanner=att?`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid ${att.sev};border-left:4px solid ${att.sev};background:var(--panel-2);border-radius:10px;padding:12px 14px;margin-bottom:14px"><div style="flex:1;min-width:200px"><b style="color:${att.sev}">⚠ Action needed</b><div style="font-size:13.5px;color:var(--text-dim);margin-top:3px">${esc(att.text)}</div></div>${att.act?`<button class="btn sm" onclick="${att.act.fn}">${esc(att.act.label)}</button>`:''}</div>`:'';
+  const attBanner=att?`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid ${att.sev};border-left:4px solid ${att.sev};background:var(--panel-2);border-radius:10px;padding:12px 14px;margin-bottom:14px"><b style="flex:1;min-width:150px;color:${att.sev};font-size:13.5px">${esc(attHead(att.text))}</b>${att.act?`<button class="btn sm" onclick="${att.act.fn}">${esc(att.act.label)}</button>`:''}</div>`:'';
   const owed=orderNet(o)-(+o.paid||0);
   const clientPhotos=o.clientPhotos.length?`<div class="field"><label>Client photos</label><div class="photo-grid">${o.clientPhotos.map(p=>`<div class="thumb"><img src="${photoSrc(p)}" onclick="lightbox(this.src)"></div>`).join('')}</div></div>`:'';
   const outfits=o.outfits.map((of,i)=>`
@@ -7858,14 +7919,10 @@ function openDetail(id){
     <div class="msub">${o.id} · ${STAGES[o.stageIndex]} ${o.due?'· due '+new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):''}</div>
     <div class="detail-actbar">
       ${(can('customers')||can('orders'))?`<button class="btn ghost sm" onclick="openMsgHelper('${o.id}')">Message</button>`:''}
-      ${can('orders')?`<button class="btn ghost sm" onclick="openInvoice('${o.id}')">Invoice</button>`:''}
-      ${can('orders')?`<button class="btn ghost sm" onclick="openReceipt('${o.id}')">Receipt</button>`:''}
       ${(isClientOrder(o)||isRun(o))&&(can('orders')||can('update'))?`<button class="btn ghost sm" onclick="printJobSheet('${o.id}')">Job sheet</button>`:''}
       ${can('update')&&isBatch(o)?`<button class="btn ghost sm" onclick="closeModal();openBatch('${o.id}')">Track progress</button>`:''}
       ${can('update')&&hasOwnPieces(o)?`<button class="btn sm" onclick="closeModal();openGroup('${o.id}')">Track each ${isGroup(o)?'person':'item'}</button>`:''}
-      ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openQC('${o.id}')">Quality check</button>`:''}
       ${can('update')&&!isBatch(o)&&!isGroup(o)?`<button class="btn ghost sm" onclick="openUpdate('${o.id}')">Post update</button>`:''}
-      ${can('orders.edit')?`<button class="btn ghost sm" onclick="duplicateOrder('${o.id}')">Duplicate</button>`:''}
       ${can('orders.edit')?`<button class="btn ghost sm" onclick="openOrder('${o.id}')">Edit</button>`:''}
     </div>
     ${attBanner}
@@ -7891,6 +7948,7 @@ function openDetail(id){
       ${can('orders')?`<div class="total-line"><span>${(canReceivables()&&!isWithheld(o.paid))?'Paid '+curO(o.paid,o):'Order value'}</span><b>${can('money')?curO(o.value,o):notShown('what an order sells for')}${(can('money')&&canReceivables()&&owed>0)?` <span style="font-size:13px;color:var(--amber)">(${curO(owed,o)} due)</span>`:''}</b></div>${ocur(o)!==SETTINGS.currency?`<div class="kv" style="color:var(--text-faint);text-align:right">Invoiced in ${ocur(o)} · ≈ ${cur(orderNetBase(o))} at 1 ${ocur(o)} = ${fmtNum(ofx(o))} ${SETTINGS.currency}</div>`:''}`:''}
       ${can('money')?`<div class="field" style="margin-top:6px"><label>Payments received</label>${(()=>{const ps=getTxns().filter(t=>t.orderId===o.id&&t.dir==='in').sort((a,b)=>String(a.at).localeCompare(String(b.at)));return ps.length?ps.map(t=>`<div class="bd-row"><span class="bl">${esc(t.label||'Payment')} <span style="color:var(--text-faint)">· ${new Date(t.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})}</span></span><span class="bv" style="color:var(--green)">+${cur(t.amount)}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No payments recorded yet.</div>';})()}</div>`:''}
       ${(can('money')&&owed>0)?`<button class="btn" style="margin-top:10px" onclick="openPayment('${o.id}')">Record payment</button>`:''}
+      ${can('orders')?`<div class="toolbar" style="gap:8px;margin-top:12px"><button class="btn sm ghost" onclick="openInvoice('${o.id}')">Invoice</button><button class="btn sm ghost" onclick="openReceipt('${o.id}')">Receipt</button></div>`:''}
       ${commInfo}
     </div>
     <div class="opane" data-pane="measurements" style="display:none">
@@ -7969,7 +8027,7 @@ function renderInvoices(){
     (money?'<th class="num">Value</th>':'')+'<th>Status</th></tr>';
   const body=list.map(function(o){
     const n=(o.outfits||[]).length||1;
-    return '<tr class="orow" onclick="openDetail(\''+o.id+'\')">'+
+    return '<tr class="orow" onclick="openInvoice(\''+o.id+'\')">'+
       '<td><b>'+esc(orderRef(o))+'</b><div class="kv" style="color:var(--text-faint)">'+n+' item'+(n===1?'':'s')+'</div></td>'+
       '<td class="hide-sm">'+esc(fmtDateShort(o.createdAt))+'</td>'+
       '<td>'+esc(o.client)+'</td>'+
@@ -8415,14 +8473,14 @@ function openInvoice(id){
   const cust=getCustomers()[nameKey(o.client)]||{};
   const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');
   openModal(`<h3>Invoice #${o.invoiceNo}</h3><div class="msub">${esc(o.client)} · ${esc(o.id)}</div>
-    <div style="max-height:48vh;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:14px">${invoiceInner(o)}</div>
+    <div style="max-height:64vh;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:14px">${invoiceInner(o)}</div>
     <div class="toolbar" style="flex-wrap:wrap;gap:8px">
       <button class="btn sm" onclick="printInvoice('${o.id}')">⤓ Save / Print PDF</button>
       ${wa?`<button class="btn sm ghost" onclick="sendInvoiceWhatsApp('${o.id}')">WhatsApp</button>`:''}
       <button class="btn sm ghost" onclick="sendInvoiceEmail('${o.id}')">Email</button>
       <button class="btn sm ghost" onclick="copyInvoiceText('${o.id}')">Copy text</button>
-    </div>
-    <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="openDetail('${o.id}')">Back</button><button class="btn" onclick="closeModal()">Close</button></div>`);
+      ${can('orders.edit')?`<button class="btn sm ghost" onclick="openOrder('${o.id}')">Edit</button>`:''}
+    </div>`);
 }
 function openReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');
   openModal(`<h3>Receipt #${o.invoiceNo}</h3><div class="msub">${esc(o.client)} \u00b7 ${esc(o.id)}</div>
@@ -8433,7 +8491,6 @@ function openReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ens
       <button class="btn sm ghost" onclick="sendReceiptEmail('${o.id}')">Email</button>
       <button class="btn sm ghost" onclick="copyReceiptText('${o.id}')">Copy text</button>
     </div>
-    <div class="sd" style="color:var(--text-faint);margin-top:6px">A receipt confirms payment received. Best sent once the balance is settled.</div>
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="openDetail('${o.id}')">Back</button><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 function printReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the receipt.');return;}w.document.write(`<!doctype html><html><head><title>Receipt ${o.invoiceNo} \u00b7 ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:10mm}}</style></head><body>${invoiceInner(o,'receipt')}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
@@ -8695,6 +8752,7 @@ function renderUpdateModal(){
     <div class="msub">${esc(updateDraft.client)} · ${esc(updateDraft.garment)}</div>
     <div class="field"><label>Current stage</label><select class="fld" id="u_stage" onchange="syncUpdate();renderUpdateModal()">${stageOpts}</select></div>
     ${(updateDraft.stage===_delIdx&&_uOut>0&&can('money'))?`<div class="field"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0"><input type="checkbox" id="u_collectBalance" checked style="width:16px;height:16px;flex:0 0 auto"> Collect remaining ${curO(_uOut,_uo)} now</label>${payMethodField('u_balMethod','','How was the balance paid?')}<div class="sd" style="color:var(--text-faint);margin-top:4px">Tick if the client paid the balance on ${_isDeliv?'delivery':'pickup'}. It'll be recorded as income and the order marked paid.</div></div>`:''}
+    ${(can('canQC')&&!isBatch(_uo)&&!isGroup(_uo))?`<div class="field"><button class="btn sm ghost" onclick="openQC('${updateDraft.id}')">Quality check ›</button></div>`:''}
     <div class="field"><label>Who did this work?</label><select class="fld" id="u_worker">${workerOpts}</select><div class="sd" style="color:var(--text-faint);margin-top:6px">Credited for traceability &amp; performance: who cut, sewed, finished, etc.</div></div>
     ${(function(){
       if(!fabricCheckNeeded(_uo))return '';
@@ -12919,7 +12977,26 @@ function updateNavBadges(){
   setNavBadge('badgeProducts',getProducts().filter(p=>productLow(p)!=='ok').length);
   setNavBadge('badgeLeave',getLeave().filter(leaveInView).filter(leaveActiveNow).length);
 }
-function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();}
+/* The fifth card onward is hidden by the stylesheet on a phone; this is what
+   tells you it is there. Runs after every render and does nothing at all on a
+   desktop, where all six fit across one row and always did. */
+function paintStatMore(g,t){const n=g.children.length;t.textContent=g.classList.contains('open')?'Show less':('Show '+(n-4)+' more');}
+function capStatGrids(){
+  if(!window.matchMedia||!window.matchMedia('(max-width:680px)').matches)return;
+  document.querySelectorAll('.stat-grid').forEach(function(g){
+    let t=g.nextElementSibling;
+    if(t&&!t.classList.contains('statmore'))t=null;
+    if(g.children.length<=4){g.classList.remove('open');if(t)t.remove();return;}
+    if(!t){
+      t=document.createElement('div');t.className='statmore';
+      g.parentNode.insertBefore(t,g.nextSibling);
+      t.onclick=function(){g.classList.toggle('open');paintStatMore(g,t);};
+    }
+    paintStatMore(g,t);
+  });
+}
+if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('resize',function(){capStatGrids();});
+function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();capStatGrids();}
 function statTone(label,val){
   const l=(label||'').toLowerCase();let tone;
   if(/overdue|out of stock|past due|outstanding|owed|pending/.test(l))tone='alert';
@@ -14177,8 +14254,8 @@ function renderOrders(){
         stat('In Progress',String(active),'not yet delivered','',`ordersDrill('active')`),
         stat('Overdue',String(overdue),'past due date',overdue?'warn':'',`ordersDrill('overdue')`)
       ].concat(can('money')?[
-        stat('Order Value',cur(value),'total billed','',`ordersDrill('value')`),
-        stat('Outstanding',cur(owed),'awaiting payment',owed?'warn':'',`ordersDrill('outstanding')`)
+        stat('Outstanding',cur(owed),'awaiting payment',owed?'warn':'',`ordersDrill('outstanding')`),
+        stat('Order Value',cur(value),'total billed','',`ordersDrill('value')`)
       ]:[]).concat(canSeeProfit()?[
         stat('Profit',cur(profit),'projected on these orders',profit<0?'down':'up',`ordersDrill('profit')`)
       ]:[]).join('');
