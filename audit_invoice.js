@@ -770,12 +770,30 @@ ok(invs().indexOf(qid)>=0,'a confirmed invoice disappeared from Invoices, so a s
 ok(run("invoiceState(getOrders().find(o=>o.id==='"+qid+"'))")==='paid','a confirmed invoice is not shown as agreed');
 
 /* the two doors, and the control that switches the lists */
-ok(/id="newInvBtn"/.test(html),'there is no New invoice button on the orders screen, which is the whole complaint');
-ok(/id="newOrderBtn2"/.test(html),'New order came off the orders screen');
+/* Two pages, each on its own. The Orders/Invoices control that was here earlier today
+   came off when Invoices got a sidebar entry of its own: two ways to one place, and a
+   reason for each page to know about the other. The sidebar is the way between them, so
+   what is checked is that each page has its OWN door to a new record and neither page
+   carries the other's. */
 ok(/id="view-invoices"/.test(html),'there is no invoices view');
-ok((html.match(/onclick="go\('invoices'\)"/g)||[]).length>=2,'the Orders and Invoices control is not on both lists');
+ok(/id="navInvoices"/.test(html),'Invoices is not in the sidebar, so with no control on the orders page there is no way to reach it at all');
+ok(/id="newOrderBtn2"/.test(html),'New order came off the orders screen');
+ok(!/id="newInvBtn"/.test(html),'the orders screen is carrying an invoice button again; the two pages were separated on purpose');
+{const ordersView=(html.match(/<section class="view" id="view-orders">[\s\S]*?<\/section>/)||[''])[0];
+ const invView=(html.match(/<section class="view" id="view-invoices">[\s\S]*?<\/section>/)||[''])[0];
+ ok(invView.indexOf("openOrder(null,'invoice')")>=0,'the invoices page has no New invoice button, so an invoice cannot be raised from the page it lives on');
+ ok(ordersView.indexOf("go('invoices')")<0,'the orders page is still navigating to invoices');
+ ok(invView.indexOf("go('orders')")<0,'the invoices page is still navigating to orders');}
 ok(/invoices:\['Invoices'/.test(html),'the invoices tab has no title, so the heading is blank');
 ok(/invoices:'branch'/.test(html),'the invoices tab declares no branch scope, so it would show every studio at once');
+ /* "take off the lines of explanation, dont shorten, just cut it all off, i dont want the
+    story." The preview used to explain what each of its four buttons did with the file. */
+ {run("openInvoice('"+OID+"');");
+  const prev=run("document.getElementById('modal').innerHTML")||'';
+  ok(prev.indexOf('PDF opens a print window')<0,'the explanation under the invoice buttons is back');
+  ok((prev.match(/class="sd"/g)||[]).length===0,'the invoice preview has grown a line of helper text');
+  ok(/Save \/ Print PDF/.test(prev),'the PDF button went with the explanation');
+  run("closeModal();");}
 }
 /* ===================================================================================
    REPORT

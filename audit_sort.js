@@ -27,6 +27,7 @@ for (const fn of ['sortPref', 'setSort', 'applySort', 'sortInPlace', 'renderSort
 const LISTS = {
   customers: 'renderCustomers',
   orders:    'renderOrders',
+  invoices:  'renderInvoices',
   team:      'renderTeam',
   supplies:  'renderSupplies',
   suppliers: 'renderSuppliers',

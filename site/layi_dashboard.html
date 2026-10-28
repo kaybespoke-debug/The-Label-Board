@@ -1236,9 +1236,8 @@ body.modal-open{overflow:hidden}
       </section>
 
       <section class="view" id="view-invoices">
-        <div class="profile-tabs" style="margin-bottom:12px"><button class="ptab" onclick="go('orders')">Orders</button><button class="ptab active" onclick="go('invoices')">Invoices</button></div>
         <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
-          <span class="sortpair"><select class="fld sortsel" id="sort_invoices" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_invoices" onclick="toggleSortDir('orders')" title="Reverse order">↑</button></span>
+          <span class="sortpair"><select class="fld sortsel" id="sort_invoices" onchange="setSort('invoices',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_invoices" onclick="toggleSortDir('invoices')" title="Reverse order">↑</button></span>
           <span style="flex:1"></span>
           <button class="btn sm" onclick="openOrder(null,'invoice')">+ New invoice</button>
         </div>
@@ -1246,7 +1245,6 @@ body.modal-open{overflow:hidden}
         <div class="panel"><div class="panel-head"><h3>Invoices</h3><span class="page-sub" id="invoicesSub"></span></div><div class="pt-wrap"><div id="invoicesLedger"></div></div></div>
       </section>
       <section class="view" id="view-orders">
-        <div class="profile-tabs" style="margin-bottom:12px"><button class="ptab active" onclick="go('orders')">Orders</button><button class="ptab" onclick="go('invoices')">Invoices</button></div>
         <div class="stat-grid" id="ordersStats"></div>
         <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
           <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px"><!--
@@ -1256,7 +1254,6 @@ body.modal-open{overflow:hidden}
             the start of a line with nothing to say what it reversed. 28 Oct.
           --><span class="sortpair"><select class="fld sortsel" id="sort_orders" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_orders" onclick="toggleSortDir('orders')" title="Reverse order">↑</button></span>
           <select class="fld" id="ordersStatusSel" onchange="setOrdersFilter(this.value)" style="width:auto;min-width:150px"></select>
-          <button class="btn sm ghost" id="newInvBtn" onclick="openOrder(null,'invoice')">+ New invoice</button>
           <button class="btn sm" id="newOrderBtn2" onclick="newOrder()">+ New order</button>
         </div>
         <div class="panel"><div class="panel-head"><h3>All orders</h3><span class="page-sub" id="ordersLedgerSub"></span></div><div class="pt-wrap"><div id="ordersLedger"></div></div></div>
@@ -7958,7 +7955,8 @@ function renderInvoices(){
       f[1]+' <b>'+count(f[0])+'</b></button>';
   }).join('');
   let list=all.filter(o=>invoiceFilter==='all'||invoiceState(o)===invoiceFilter);
-  list=applySort('orders',list);
+  list=applySort('invoices',list);
+  renderSortControl('invoices');
   const money=can('money');
   const sub=document.getElementById('invoicesSub');
   if(sub)sub.textContent=list.length+' invoice'+(list.length===1?'':'s');
@@ -8424,7 +8422,6 @@ function openInvoice(id){
       <button class="btn sm ghost" onclick="sendInvoiceEmail('${o.id}')">Email</button>
       <button class="btn sm ghost" onclick="copyInvoiceText('${o.id}')">Copy text</button>
     </div>
-    <div class="sd" style="color:var(--text-faint);margin-top:6px">PDF opens a print window. Choose “Save as PDF”. WhatsApp/Email/Copy send a text summary; attach the PDF for the full layout.</div>
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="openDetail('${o.id}')">Back</button><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 function openReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');
@@ -15287,6 +15284,9 @@ const SORTS={
   customers:[{v:'default',label:'Top spenders',dir:'desc',cmp:(a,b)=>b.spend-a.spend},
              {v:'az',     label:'Name',        dir:'asc', cmp:(a,b)=>_az(a.name,b.name)},
              {v:'new',    label:'Date added', dir:'desc',cmp:(a,b)=>custAdded(b)-custAdded(a)}],
+  invoices: [{v:'default',label:'Date added',  dir:'desc',cmp:(a,b)=>_t(b.createdAt)-_t(a.createdAt)},
+             {v:'az',     label:'Client',      dir:'asc', cmp:(a,b)=>_az(a.client,b.client)},
+             {v:'value',  label:'Value',       dir:'desc',cmp:(a,b)=>(+b.value||0)-(+a.value||0)}],
   orders:   [{v:'default',label:'Date added',  dir:'desc',cmp:(a,b)=>_t(b.createdAt)-_t(a.createdAt)},
              {v:'az',     label:'Client',      dir:'asc', cmp:(a,b)=>_az(a.client,b.client)},
              {v:'due',    label:'Due date',    dir:'asc', cmp:(a,b)=>_t(a.due||'9999')-_t(b.due||'9999')}],
