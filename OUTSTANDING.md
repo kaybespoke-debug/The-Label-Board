@@ -5,7 +5,86 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 5 October 2026 (twenty-fifth session)
+Last updated: 28 October 2026 (twenty-sixth session)
+
+## 28 October 2026 — the phone pass, and invoicing rebuilt
+
+Five screenshots from a phone, worked through in order. Nothing deployed: the
+instruction was "don't deploy till we finish", and it still stands. Six commits
+held on `main`.
+
+### Done
+
+- **The words.** client (not customer), item (not piece), invoice (not quote),
+  across the app, the console, the portal and the marketing site. `garment`
+  survives only as the garments craft's own word. Storage keys, `o.quoted`,
+  `isQuote()`, `getCustomers()` and the `customers` table are untouched: they
+  are the record, not the wording. Five gate assertions moved WITH the
+  vocabulary rather than being deleted, each still proving the same behaviour.
+- **The copy sweep.** 239 static subtitles inventoried, 116 of them real
+  sentences. 14 deleted and 2 shortened in the app, 17 in the console, 6 in the
+  portal. Nine kept on purpose and listed with reasons in the sweep script, so
+  the next pass does not take them: consent lines, lines explaining an absence,
+  and empty states that ARE the content.
+- **The invoice document**, rebuilt against LAYI invoice #311. Five columns
+  (Item, Price, Qty, Disc., Amount) with the discount column appearing only
+  when something is discounted. "Included in this set" per item. The courier
+  block off, the delivery FEE kept. Photographs two to a row with captions
+  instead of one per page. The studio's own colour on the top rule, the Bill to
+  band and the table head. Logo top right on a phone, email under the phone
+  number.
+- **Invoices as a tab**, with the rota's segmented control, four filter buttons
+  carrying their own counts, and a New invoice button on the Orders screen
+  beside New order. An invoice lives there until it is confirmed and
+  `renderOrders` leaves quotes out, which is why a green "paid" can no longer
+  sit over something nobody has seen.
+- **`sentAt`**, set by whichever of print / WhatsApp / email / copy happens
+  first, never moved by the second. The preview now opens when a new invoice is
+  saved.
+- **Delivery on the invoice form.** The document could print the fee; the form
+  had no field to set one. Found by checking the claim rather than repeating it.
+- **The phone**, from the earlier batch: KPI cards 118px to 82px at 375pt, the
+  status bar handed back to iOS, the modal no longer jumping when a row is
+  added, the sort control no longer splitting across two lines.
+
+### Measured, not assumed
+
+Five columns is one more than the four that did not fit 360px in September.
+Measured in a browser at 320, 360 and 414: the table was 25px wider than the
+sheet at 320 and pushed the page sideways, because the item cell's longest word
+and its thumbnail could not be squeezed. Breaking the word and dropping the
+thumbnail to 30px fixes it; the table now lands at exactly the container width
+at all three widths. **No gate that runs in node can see this.** Re-measure
+after any change to that table.
+
+### Still open
+
+- **A second owner per studio** (S). All nine studios have exactly one owner
+  and nobody else. The database already refuses to remove or demote the last
+  owner and tells you to appoint another, which the product cannot do. Wanted
+  before the first pilot.
+- **`RESEND_API_KEY` is on staging, never production.** The real password-reset
+  test and its delivery ID are blocked on it. Four independent checks say none
+  of the three stated production changes landed.
+- **Leaked-password protection** — a dashboard toggle, not something a session
+  can set.
+- **The B10 release sequence** — migration approval, then DB, then team-admin,
+  then the app. Needs a second email address to accept a live invitation.
+- **PDF.** Decided 28 October: keep the print sheet, which saves to Files on
+  iOS and Android. Revisit only if the extra tap becomes annoying in practice;
+  a real one-tap download means a ~300KB library with an integrity hash in an
+  app that has one pinned dependency and no build step.
+
+### Worth doing, not asked for
+
+- An invoice preview with no signature should offer a one-tap **Add your
+  signature** instead of printing a bare dotted line. Nothing is broken —
+  `audit_invoice` proves the signature prints when uploaded and does not when
+  it is not — but a studio that has never opened Settings has no way to learn
+  that from the screen where it matters.
+- The Photos field on the invoice form sits under the price where nobody looks,
+  which is the whole reason the first invoices came out with no pictures.
+
 
 ## 5 October 2026 — the launch checklist, and a gate that read the wrong file
 
