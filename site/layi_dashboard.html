@@ -1126,6 +1126,7 @@ body.modal-open{overflow:hidden}
       <div class="nav-item" data-view="calendar" id="navCalendar" onclick="go('calendar')"><span class="ni">📅</span> Calendar</div>
       <div class="nav-item" data-view="mywork" id="navMywork" onclick="go('mywork')" style="display:none"><span class="ni">👤</span> My Profile</div>
       <div class="nav-group">Orders &amp; Clients</div>
+      <div class="nav-item" data-view="invoices" id="navInvoices" onclick="go('invoices')"><span class="ni">💷</span> Invoices <span class="nav-badge" id="badgeInvoices"></span></div>
       <div class="nav-item" data-view="orders" id="navOrders" onclick="go('orders')"><span class="ni">🧾</span> Orders <span class="nav-badge" id="badgeOrders"></span></div>
       <div class="nav-item" data-view="production" id="navProduction" onclick="go('production')"><span class="ni">✂</span> Production <span class="nav-badge" id="badgeProduction"></span></div>
       <div class="nav-item" data-view="sales" id="navSales" onclick="go('sales')"><span class="ni">🧾</span> Sales <span class="nav-badge" id="badgeSales"></span></div>
@@ -1234,7 +1235,18 @@ body.modal-open{overflow:hidden}
                 <div class="panel" id="ordersListPanel"><div class="panel-head"><h3 id="ordersHead">Orders</h3><span class="page-sub" id="ordersSub"></span></div><div id="orderList"></div></div>
       </section>
 
+      <section class="view" id="view-invoices">
+        <div class="profile-tabs" style="margin-bottom:12px"><button class="ptab" onclick="go('orders')">Orders</button><button class="ptab active" onclick="go('invoices')">Invoices</button></div>
+        <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
+          <span class="sortpair"><select class="fld sortsel" id="sort_invoices" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_invoices" onclick="toggleSortDir('orders')" title="Reverse order">↑</button></span>
+          <span style="flex:1"></span>
+          <button class="btn sm" onclick="openOrder(null,'invoice')">+ New invoice</button>
+        </div>
+        <div class="profile-tabs" id="invoiceFilters" style="margin-bottom:12px"></div>
+        <div class="panel"><div class="panel-head"><h3>Invoices</h3><span class="page-sub" id="invoicesSub"></span></div><div class="pt-wrap"><div id="invoicesLedger"></div></div></div>
+      </section>
       <section class="view" id="view-orders">
+        <div class="profile-tabs" style="margin-bottom:12px"><button class="ptab active" onclick="go('orders')">Orders</button><button class="ptab" onclick="go('invoices')">Invoices</button></div>
         <div class="stat-grid" id="ordersStats"></div>
         <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
           <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px"><!--
@@ -1244,6 +1256,7 @@ body.modal-open{overflow:hidden}
             the start of a line with nothing to say what it reversed. 28 Oct.
           --><span class="sortpair"><select class="fld sortsel" id="sort_orders" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_orders" onclick="toggleSortDir('orders')" title="Reverse order">↑</button></span>
           <select class="fld" id="ordersStatusSel" onchange="setOrdersFilter(this.value)" style="width:auto;min-width:150px"></select>
+          <button class="btn sm ghost" id="newInvBtn" onclick="openOrder(null,'invoice')">+ New invoice</button>
           <button class="btn sm" id="newOrderBtn2" onclick="newOrder()">+ New order</button>
         </div>
         <div class="panel"><div class="panel-head"><h3>All orders</h3><span class="page-sub" id="ordersLedgerSub"></span></div><div class="pt-wrap"><div id="ordersLedger"></div></div></div>
@@ -5709,6 +5722,7 @@ function enterApp(){
   show('navSales',can('sales')&&salesVisible());show('msSales',can('sales')&&salesVisible());
   show('navMywork',!!(myStaff()&&staffPortalOn()));
   show('newSupBtn',can('supplies'),'inline-block');show('logStockBtn',can('money'),'inline-block');
+  show('navInvoices',can('orders'));
   show('navCustomers',can('customers'));show('mobCustomers',can('customers'),'block');
   show('navTeam',can('team'));show('msTeam',can('team'));
   show('navRota',can('team'));show('msRota',can('team'));
@@ -6042,7 +6056,7 @@ const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantNam
      a subtitle that CHANGES is telling you something; one that never does is
      telling you what you already read. */
   calendar:['Calendar',''],customers:['Clients',''],marketing:['Marketing',''],
-  production:['Production',''],orders:['Orders',''],
+  production:['Production',''],orders:['Orders',''],invoices:['Invoices',''],
   team:['Team',''],rota:['Rota',''],tasks:['Tasks & Announcements',''],
   attendance:['Attendance',''],leave:['Leave',''],companylog:['Company log',''],
   audit:['Audit trail',''],supplies:['Inventory',''],suppliers:['Vendors & Partners',''],
@@ -6433,6 +6447,7 @@ function go(view){
   if(view==='payroll'&&!can('payroll'))return;if(view==='pots'&&!can('funds'))return;
   if(view==='calendar'&&!(can('orders')||can('appts')||can('logistics')))return;
   if(view==='customers'&&!can('customers'))return;
+  if(view==='invoices'&&!can('orders'))return;
   if(view==='marketing'&&!can('marketing'))return;
   if(view==='supplies'&&!can('supplies'))return;
   if(view==='suppliers'&&!can('supplies'))return;
@@ -6465,7 +6480,7 @@ function go(view){
   {const _f=VIEW_FEATURE[view];
    if(_f){ if(!planIncludes(_f)){showPlanGate(view);return;} hidePlanGate(view); }}
   if(view==='finance')renderFinance();if(view==='settings')fillSettings();if(view==='supplies')renderSupplies();if(view==='suppliers')renderSuppliers();if(view==='customers')renderCustomers();if(view==='marketing')renderMarketing();if(view==='payroll')renderPayrollView();if(view==='pots')renderPotsView();if(view==='logistics')renderLogistics();if(view==='products')renderProducts();if(view==='sales')renderSales();
-  if(view==='orders')renderOrders();
+  if(view==='orders')renderOrders();if(view==='invoices')renderInvoices();
   if(view==='team')renderTeam();if(view==='rota')renderRota();if(view==='calendar')renderCalendar();if(view==='attendance')renderAttendance();
   if(view==='leave')renderLeave();if(view==='companylog')renderCompanyLog();if(view==='expenses')renderExpensesView();if(view==='audit')renderAudit();if(view==='mywork')renderMyWork();
 }
@@ -7606,6 +7621,7 @@ function renderOrderModal(){
 }
 function saveOrder(){
   syncOrderDraft();
+  const _newInvoice=!editingOrderId&&orderDoor==='invoice';
   if(!draft.client.trim()){alert('Client name is required.');return;}
   if(!draft.batch)draft.batch={on:false};
   if(!draft.group)draft.group={on:false};
@@ -7678,6 +7694,7 @@ function saveOrder(){
   const delta=(+draft.paid||0)-prevPaid;
   if(delta>0){const t=getTxns();t.push({id:uid('t'),dir:'in',label:draft.client+' · '+(editingOrderId?'payment':'deposit')+(ocur(draft)!==SETTINGS.currency?' ('+curC(delta,ocur(draft))+')':''),amount:delta*ofx(draft),ccy:ocur(draft),amtCcy:delta,at:new Date().toISOString(),orderId:draft.id,branch:branchOf(draft),method:draft.payMethod||''});setTxns(t);}
   closeModal();renderAll();
+  if(_newInvoice&&typeof openInvoice==='function')openInvoice(draft.id);
 }
 function deleteOrder(){if(!can('del')||!editingOrderId)return;if(!confirm('Delete this order permanently?'))return;logAudit('Order deleted',editingOrderId);save('layi_dash_orders',rawOrders().filter(o=>o.id!==editingOrderId));closeModal();renderAll();}
 
@@ -7877,6 +7894,83 @@ function openDetail(id){
   `);
 }
 
+/* ===== INVOICES, THE TAB ==============================================================
+   28 October: "the side navigation bar should be orders and invoicing/invoice. Then you
+   click orders, we should be able to navigate orders and invoices separately like we have
+   in the rota."
+
+   ONE RECORD, TWO LISTS, and the line between them is whether the client has said yes. An
+   invoice lives here until it is confirmed. The moment it is, it becomes an order and
+   appears under Orders. It does not disappear from here: a studio chasing money wants to
+   see the one that landed beside the two that have not.
+
+   This is also the fix for what he photographed that morning: an invoice that had never
+   been sent to anybody, sitting in the orders list wearing a green "paid ✓". It was never
+   an order. renderOrders now leaves quotes out, which is the only reason that pill can no
+   longer appear over something nobody has agreed to.
+
+   WHY sentAt AND NOT A STATUS FIELD. There are three states and two of them are already
+   in the record: a quote is pending, and an order that is no longer a quote has been
+   agreed. The one thing the record did not know was whether it had actually gone out, so
+   that is the one thing added. A status column would have been a fourth place for the
+   same truth to drift out of step with the other three. */
+function isInvoiceRow(o){return isQuote(o)||!!o.sentAt;}
+function invoiceState(o){return isQuote(o)?(o.sentAt?'sent':'pending'):'paid';}
+const INVOICE_FILTERS=[['all','All'],['pending','Pending'],['sent','Sent'],['paid','Paid']];
+let invoiceFilter='all';
+function setInvoiceFilter(k){invoiceFilter=k;renderInvoices();}
+function invoiceList(){return getOrders().filter(inBranch).filter(isClientOrder).filter(isInvoiceRow);}
+/* Sending is not a button of its own. Printing it, putting it on WhatsApp, emailing it and
+   copying its text are the four ways an invoice leaves a studio and every one of them
+   means the client has it. Whichever happens first is the moment it went; the rest are the
+   studio sending it again, which must not move the date. */
+function markInvoiceSent(id){
+  const list=rawOrders(),o=list.find(x=>x.id===id);
+  if(!o||o.sentAt)return;
+  o.sentAt=new Date().toISOString();
+  save('layi_dash_orders',list);
+  logAudit('Invoice sent',orderRef(o)+' · '+o.client);
+  if(typeof renderAll==='function')renderAll();
+}
+function invoiceStateCell(o){
+  const st=invoiceState(o);
+  if(st==='pending')return '<span style="color:var(--blue)">not sent</span>';
+  if(st==='paid')return '<span style="color:var(--green)">confirmed</span>';
+  const days=Math.max(0,Math.round((Date.now()-new Date(o.sentAt).getTime())/86400000));
+  return '<span style="color:'+(days>=7?'var(--red)':'var(--amber)')+'">sent'+(days?', '+days+'d':' today')+'</span>';
+}
+function renderInvoices(){
+  const wrap=document.getElementById('invoicesLedger');if(!wrap)return;
+  const all=invoiceList();
+  const count=k=>k==='all'?all.length:all.filter(o=>invoiceState(o)===k).length;
+  const btns=document.getElementById('invoiceFilters');
+  if(btns)btns.innerHTML=INVOICE_FILTERS.map(function(f){
+    return '<button class="ptab'+(invoiceFilter===f[0]?' active':'')+'" onclick="setInvoiceFilter(\''+f[0]+'\')">'+
+      f[1]+' <b>'+count(f[0])+'</b></button>';
+  }).join('');
+  let list=all.filter(o=>invoiceFilter==='all'||invoiceState(o)===invoiceFilter);
+  list=applySort('orders',list);
+  const money=can('money');
+  const sub=document.getElementById('invoicesSub');
+  if(sub)sub.textContent=list.length+' invoice'+(list.length===1?'':'s');
+  if(!list.length){
+    wrap.innerHTML='<div class="kv" style="color:var(--text-faint);padding:16px 2px">'+
+      (all.length?'Nothing in this group.':'No invoices yet. Raise one with New invoice.')+'</div>';
+    return;
+  }
+  const head='<tr><th>Invoice</th><th class="hide-sm">Raised</th><th>Client</th>'+
+    (money?'<th class="num">Value</th>':'')+'<th>Status</th></tr>';
+  const body=list.map(function(o){
+    const n=(o.outfits||[]).length||1;
+    return '<tr class="orow" onclick="openDetail(\''+o.id+'\')">'+
+      '<td><b>'+esc(orderRef(o))+'</b><div class="kv" style="color:var(--text-faint)">'+n+' item'+(n===1?'':'s')+'</div></td>'+
+      '<td class="hide-sm">'+esc(fmtDateShort(o.createdAt))+'</td>'+
+      '<td>'+esc(o.client)+'</td>'+
+      (money?'<td class="num">'+curO(o.value,o)+'</td>':'')+
+      '<td>'+invoiceStateCell(o)+'</td></tr>';
+  }).join('');
+  wrap.innerHTML='<table class="oledger">'+head+body+'</table>';
+}
 /* ===== INVOICES ===== */
 /* ===== THE INVOICE =====================================================================
    Rebuilt 21 September 2026 against the studio’s own invoice (#308), which this app could
@@ -8067,7 +8161,7 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
     const parts=(x.parts||[]).map(p=>String(p||'').trim()).filter(Boolean);
     const ld=ofDiscount(x);
     return `<tr>
-      <td class="tlb-item" style="padding:11px 8px 11px 7px;vertical-align:top;border-bottom:1px solid ${LINE}"><div style="display:flex;gap:9px">${th?`<img src="${photoSrc(th)}" style="flex:0 0 auto;width:40px;height:40px;border-radius:3px;object-fit:cover">`:''}<div style="min-width:0"><div style="font-size:13px;line-height:1.3">${isGroup(o)&&x.person?esc(x.person)+' · ':''}${esc(x.name||x.type||'Item')}</div>${x.code?`<div style="${SANS};font-size:10.5px;color:${DIM};letter-spacing:.04em;margin-top:2px">${esc(x.code)}</div>`:''}${desc?`<div style="${SANS};font-size:10.5px;color:${DIM};line-height:1.5;margin-top:3px">${esc(desc)}</div>`:''}${parts.length?`<div style="${SANS};font-size:10.5px;color:${DIM};line-height:1.6;margin-top:4px">Included in this set:${parts.map(p=>`<br>&#8226;&nbsp;${esc(p)}`).join('')}</div>`:''}</div></div></td>
+      <td class="tlb-item" style="padding:11px 8px 11px 7px;vertical-align:top;border-bottom:1px solid ${LINE}"><div style="display:flex;gap:9px">${th?`<img src="${photoSrc(th)}" class="tlb-thumb" style="flex:0 0 auto;width:40px;height:40px;border-radius:3px;object-fit:cover">`:''}<div style="min-width:0"><div style="font-size:13px;line-height:1.3">${isGroup(o)&&x.person?esc(x.person)+' · ':''}${esc(x.name||x.type||'Item')}</div>${x.code?`<div style="${SANS};font-size:10.5px;color:${DIM};letter-spacing:.04em;margin-top:2px">${esc(x.code)}</div>`:''}${desc?`<div style="${SANS};font-size:10.5px;color:${DIM};line-height:1.5;margin-top:3px">${esc(desc)}</div>`:''}${parts.length?`<div style="${SANS};font-size:10.5px;color:${DIM};line-height:1.6;margin-top:4px">Included in this set:${parts.map(p=>`<br>&#8226;&nbsp;${esc(p)}`).join('')}</div>`:''}</div></div></td>
       <td class="tlb-cnum" style="padding:11px 5px;vertical-align:top;text-align:right;white-space:nowrap;font-size:12px;border-bottom:1px solid ${LINE}">${NUM(+x.price||0)}</td>
       <td class="tlb-cqty" style="padding:11px 2px;vertical-align:top;text-align:center;font-size:12px;border-bottom:1px solid ${LINE}">${ofQty(x)}</td>
       ${anyDisc?`<td class="tlb-cnum" style="padding:11px 5px;vertical-align:top;text-align:right;white-space:nowrap;font-size:12px;border-bottom:1px solid ${LINE}">${ld>0?NUM(ld):`<span style="color:#9aa5a0">&#8211;</span>`}</td>`:''}
@@ -8114,9 +8208,16 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
      The table stays a table. Four columns do not fit 360px, so Price and Qty fold into the
      item cell as one line and their columns go, which is the same decision this app made
      everywhere else: keep the table, drop the columns, never stack a row into a card. */
+  /* .tlb-item is allowed to break a word because the item cell sets the whole table's
+     floor: its longest word and its thumbnail cannot be squeezed, and at 320px that floor
+     came out 25px wider than the sheet it sits in, which pushed the page sideways.
+     Measured in a browser at 320, 360 and 414; no gate that runs in node can see it.
+     These rules carry NO comments of their own: this stylesheet is handed to a print
+     window, and audit_invoice reads its selectors by splitting on braces. */
   const phoneCss=`<style>
   .tlb-inv .tlb-only-wide{display:inline}
   .tlb-inv .tlb-only-narrow{display:none}
+  .tlb-inv .tlb-item{overflow-wrap:anywhere}
   .tlb-inv .tlb-cnum{width:92px}
   .tlb-inv .tlb-cqty{width:46px}
   @media(max-width:600px){
@@ -8128,6 +8229,7 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
     .tlb-inv .tlb-only-narrow{display:inline}
     .tlb-inv .tlb-cnum,.tlb-inv .tlb-cqty{width:auto}
     .tlb-inv th,.tlb-inv td{padding-left:4px!important;padding-right:4px!important}
+    .tlb-inv .tlb-thumb{width:30px!important;height:30px!important}
     .tlb-inv .tlb-sig{width:100%!important}
     .tlb-inv .tlb-due{font-size:17px!important}
   }
@@ -8332,10 +8434,10 @@ function printReceipt(id){const o=getOrders().find(x=>x.id===id);if(!o)return;en
 function sendReceiptWhatsApp(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(invoiceText(o,'receipt')),'_blank');}
 function sendReceiptEmail(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const subj='Receipt #'+(o.invoiceNo||'')+' \u00b7 '+((SETTINGS.company||{}).name||tenantName());location.href='mailto:'+(cust.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(invoiceText(o,'receipt'));}
 function copyReceiptText(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const txt=invoiceText(o,'receipt');if(navigator.clipboard){navigator.clipboard.writeText(txt).then(function(){if(typeof toast==='function')toast('Receipt copied');});}else if(typeof toast==='function'){toast('Copy not supported here');}}
-function printInvoice(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the invoice.');return;}w.document.write(`<!doctype html><html><head><title>Invoice ${o.invoiceNo} · ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:10mm}}</style></head><body>${invoiceInner(o)}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
-function sendInvoiceWhatsApp(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(invoiceText(o)),'_blank');}
-function sendInvoiceEmail(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const cust=getCustomers()[nameKey(o.client)]||{};const subj='Invoice #'+(o.invoiceNo||'')+' · '+(SETTINGS.company||{}).name;location.href='mailto:'+(cust.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(invoiceText(o));}
-function copyInvoiceText(id){const o=getOrders().find(x=>x.id===id);if(!o)return;const t=invoiceText(o);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>alert('Invoice text copied.'),()=>alert('Copy failed. Select and copy manually.'));}else{alert(t);}}
+function printInvoice(id){const o=getOrders().find(x=>x.id===id);if(!o)return;ensureInvoiceNo(o);markInvoiceSent(id);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to save or print the invoice.');return;}w.document.write(`<!doctype html><html><head><title>Invoice ${o.invoiceNo} · ${esc(o.client)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:10mm}}</style></head><body>${invoiceInner(o)}</body></html>`);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);}
+function sendInvoiceWhatsApp(id){const o=getOrders().find(x=>x.id===id);if(!o)return;markInvoiceSent(id);const cust=getCustomers()[nameKey(o.client)]||{};const wa=(cust.whatsapp||'').replace(/[^0-9]/g,'');window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(invoiceText(o)),'_blank');}
+function sendInvoiceEmail(id){const o=getOrders().find(x=>x.id===id);if(!o)return;markInvoiceSent(id);const cust=getCustomers()[nameKey(o.client)]||{};const subj='Invoice #'+(o.invoiceNo||'')+' · '+(SETTINGS.company||{}).name;location.href='mailto:'+(cust.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(invoiceText(o));}
+function copyInvoiceText(id){const o=getOrders().find(x=>x.id===id);if(!o)return;markInvoiceSent(id);const t=invoiceText(o);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>alert('Invoice text copied.'),()=>alert('Copy failed. Select and copy manually.'));}else{alert(t);}}
 
 /* ===== PRODUCTION RUNS — materials in, stock out ==============================
    What a run is for: an RTW brand cannot know what a garment cost to make, so cannot know
@@ -9237,6 +9339,7 @@ function branchesOf(rec){
 const VIEW_SCOPE={
   activity:'branch',   calendar:'branch',   production:'branch', orders:'branch',
   sales:'branch',      customers:'branch',  supplies:'branch',   products:'stock',
+  invoices:'branch',
   suppliers:'company', marketing:'company', logistics:'branch',  expenses:'branch',
   payroll:'branch',    finance:'branch',    pots:'company',      team:'branch',
   rota:'branch',       attendance:'branch', leave:'branch',      tasks:'company',
@@ -14033,6 +14136,11 @@ function orderItemsLabel(o){const names=(o.outfits||[]).map(x=>x.name||x.type).f
 function renderOrders(){
   const wrap=document.getElementById('ordersLedger');if(!wrap)return;
   let orders=getOrders().filter(inBranch).filter(o=>showsBespoke()?isClientOrder(o):o.kind==='sale');
+  /* 28 October: an invoice nobody has agreed to is not an order and does not belong in
+     this list. It lives under Invoices until it is confirmed, and the moment it is it
+     appears here on its own. This one line is why a green "paid" can no longer sit over
+     something that was never sent. */
+  orders=orders.filter(o=>!isQuote(o));
   if(ownJobsOnly())orders=orders.filter(isMyJob);
   const opb=document.getElementById('ordersPeriodBar');if(opb)opb.innerHTML=periodControlHTML(ordersPeriod,ordersCustom,'setOrdersPeriod','setOrdersCustom');
   const inP=orders.filter(o=>ordersPeriod==='all'||inPeriod(o.createdAt,ordersPeriod,ordersCustom));

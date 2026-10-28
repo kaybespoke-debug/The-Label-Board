@@ -593,7 +593,10 @@ d=doc();
 ok(/<style>[\s\S]*?<\/style>/.test(d),'the invoice carries no rules of its own, so it cannot respond to a narrow screen');
 {/* every selector inside that stylesheet has to be under .tlb-, or a document meant for a
     print window starts restyling the app it was opened from */
- const css=(d.match(/<style>([\s\S]*?)<\/style>/)||['',''])[1];
+ /* Comments are stripped before the selectors are read. A block comment carries no braces,
+    so splitting on them glues it to the selector that follows and the check reports a
+    reach-out that is not there. Cost twenty minutes on 28 October. */
+ const css=((d.match(/<style>([\s\S]*?)<\/style>/)||['',''])[1]).replace(/\/\*[\s\S]*?\*\//g,'');
  const selectors=css.split('}').map(b=>b.split('{')[0]).join(',').split(',')
    .map(x=>x.trim()).filter(x=>x&&!x.startsWith('@'));
  const loose=selectors.filter(x=>x.indexOf('.tlb-')<0);
@@ -697,6 +700,76 @@ run("closeModal();draft=null;");
   }));
 }
 
+
+/* ===================================================================================
+   PART SEVEN — THE INVOICES TAB, 28 October
+
+   "On the order list, its showing paid for an invoice that wasn't even sent out or
+   confirmed." Photographed from a phone. The money was right all along: orderOutstanding
+   returns 0 for a quote on purpose, because nothing is owed on something nobody has
+   agreed to. What was wrong was that the row was in that list at all.
+
+   So an invoice now lives under Invoices until it is confirmed, and these checks hold
+   BOTH ends of that: it is absent from Orders AND present under Invoices. A check that
+   only watched it leave the orders list would pass just as happily if it had vanished
+   from the app altogether.
+   =================================================================================== */
+{
+const ledger=()=>run("document.getElementById('ordersLedger').innerHTML")||'';
+const invs=()=>run("document.getElementById('invoicesLedger').innerHTML")||'';
+const paint=()=>{run("renderOrders();");run("invoiceFilter='all';renderInvoices();");};
+
+/* a fresh quote, raised through the invoice door and saved */
+/* A quote in the store, written the way asInvoice writes one. The FORM path into this
+   state is covered six times over in PART THREE; what is being checked here is where the
+   record then shows up, so driving the form again would only add a second way to fail. */
+const qid=run("(function(){var l=rawOrders();var o=JSON.parse(JSON.stringify(l.find(function(x){return x.id==='"+OID+"'})));"+
+  "o.id='ord-tabtest';o.client='Tab Test';o.quoted=true;o.confirmedAt=null;o.sentAt=null;o.invoiceNo=null;"+
+  "o.value=outfitsTotal(o.outfits);l.push(o);save('layi_dash_orders',l);return o.id;})()");
+ok(qid==='ord-tabtest','the fixture invoice did not reach the orders store');
+ok(run("isQuote(getOrders().find(o=>o.id==='"+qid+"'))")===true,'a record raised through the invoice door is not a quote');
+
+paint();
+ok(ledger().indexOf(qid)<0,'an invoice nobody has agreed to is still in the orders list, which is where the green "paid" came from');
+ok(invs().indexOf(qid)>=0,'the invoice left the orders list and did not arrive anywhere; it is now invisible');
+ok(invs().indexOf('not sent')>=0,'an invoice that has never been sent does not say so');
+ok(run("invoiceState(getOrders().find(o=>o.id==='"+qid+"'))")==='pending','a saved, unsent invoice is not pending');
+
+/* sending it. Four ways out, and the first one is the date. */
+run("copyInvoiceText('"+qid+"');");
+const sent1=run("(getOrders().find(o=>o.id==='"+qid+"')||{}).sentAt")||'';
+ok(!!sent1,'copying the invoice text did not record that the client has it');
+ok(run("invoiceState(getOrders().find(o=>o.id==='"+qid+"'))")==='sent','an invoice that has gone out is not marked sent');
+run("sendInvoiceEmail('"+qid+"');");
+ok(run("(getOrders().find(o=>o.id==='"+qid+"')||{}).sentAt")===sent1,'sending it a second time moved the date it first went out');
+
+paint();
+ok(ledger().indexOf(qid)<0,'sending an invoice put it in the orders list before the client agreed to anything');
+
+/* the filters are counts of the same list, not a second list */
+{const all=run("invoiceList().length");
+ const pend=run("invoiceList().filter(o=>invoiceState(o)==='pending').length");
+ const sent=run("invoiceList().filter(o=>invoiceState(o)==='sent').length");
+ const paid=run("invoiceList().filter(o=>invoiceState(o)==='paid').length");
+ ok(pend+sent+paid===all,'the three filters do not add up to the list they filter: '+pend+'+'+sent+'+'+paid+' of '+all);
+ ok(sent>=1,'the invoice that was sent is in no filter');}
+
+/* and the yes. It becomes an order, appears under Orders, and stays visible here. */
+run("confirmOrder('"+qid+"');");
+ok(run("isQuote(getOrders().find(o=>o.id==='"+qid+"'))")===false,'confirming an invoice did not confirm it');
+paint();
+ok(ledger().indexOf(qid)>=0,'a confirmed invoice never became an order');
+ok(invs().indexOf(qid)>=0,'a confirmed invoice disappeared from Invoices, so a studio cannot see the one that landed');
+ok(run("invoiceState(getOrders().find(o=>o.id==='"+qid+"'))")==='paid','a confirmed invoice is not shown as agreed');
+
+/* the two doors, and the control that switches the lists */
+ok(/id="newInvBtn"/.test(html),'there is no New invoice button on the orders screen, which is the whole complaint');
+ok(/id="newOrderBtn2"/.test(html),'New order came off the orders screen');
+ok(/id="view-invoices"/.test(html),'there is no invoices view');
+ok((html.match(/onclick="go\('invoices'\)"/g)||[]).length>=2,'the Orders and Invoices control is not on both lists');
+ok(/invoices:\['Invoices'/.test(html),'the invoices tab has no title, so the heading is blank');
+ok(/invoices:'branch'/.test(html),'the invoices tab declares no branch scope, so it would show every studio at once');
+}
 /* ===================================================================================
    REPORT
    =================================================================================== */
