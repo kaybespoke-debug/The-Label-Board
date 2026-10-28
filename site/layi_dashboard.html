@@ -7827,7 +7827,7 @@ function openDetail(id){
     stageActions=`<div style="margin-top:9px"><button class="btn sm" onclick="markDelivered('${o.id}')">${(o.delivery&&o.delivery.enabled)?'✓ Mark as delivered':'✓ Mark as collected'}</button></div>`;
   }
   const glance=`<div class="kv" style="background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0 12px">
-    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span><b>Stage:</b> ${isGroup(o)?'👥 Group · '+o.outfits.length+' '+(o.outfits.length===1?'person':'people'):isBatch(o)?'📦 Batch · '+o.batch.qty+' pieces':hasOwnPieces(o)?'🧵 '+o.outfits.length+' pieces · each on its own stages':STAGES[o.stageIndex]} <span style="color:var(--text-faint)">(${(isGroup(o)||hasOwnPieces(o))?groupPct(o):isBatch(o)?batchPct(o):pctG}%)</span></span><span style="color:${dueGc}">${dueG}</span></div>
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span><b>Stage:</b> ${isGroup(o)?'👥 Group · '+o.outfits.length+' '+(o.outfits.length===1?'person':'people'):isBatch(o)?'📦 Batch · '+o.batch.qty+' items':hasOwnPieces(o)?'🧵 '+o.outfits.length+' items · each on its own stages':STAGES[o.stageIndex]} <span style="color:var(--text-faint)">(${(isGroup(o)||hasOwnPieces(o))?groupPct(o):isBatch(o)?batchPct(o):pctG}%)</span></span><span style="color:${dueGc}">${dueG}</span></div>
     <div class="prog" style="margin:8px 0"><i style="width:${(isGroup(o)||hasOwnPieces(o))?groupPct(o):isBatch(o)?batchPct(o):pctG}%"></i></div>
     ${isBatch(o)?`<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin:4px 0 8px">${STAGES.map((s,i)=>{const at=batchAt(o,i);return at>0?`<span style="font-size:12px;color:var(--text-dim)"><b style="color:var(--gold)">${at}</b> at ${esc(s)}</span>`:'';}).filter(Boolean).join('')||'<span style="color:var(--text-faint)">Not started yet</span>'}</div>${can('update')?`<button class="btn sm" style="margin-bottom:6px" onclick="closeModal();openBatch('${o.id}')">Track progress</button>`:''}`:isGroup(o)?`<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin:4px 0 8px">${o.outfits.map((m,i)=>`<span style="font-size:12px;color:var(--text-dim)">${esc(m.person||('P'+(i+1)))}: <b style="color:var(--gold)">${esc(STAGES[+m.stageIndex||0])}</b></span>`).join('')}</div>${can('update')?`<button class="btn sm" style="margin-bottom:6px" onclick="closeModal();openGroup('${o.id}')">Track each person</button>`:''}`:''}
     <div style="margin-top:2px"><b>Assigned to:</b> ${makers.length?makers.join(', '):'<span style="color:var(--text-faint)">not assigned yet, use Edit to add the maker</span>'}</div>
@@ -13940,7 +13940,7 @@ function renderProdKpis(srcOrders){
   const dueSoon=active.filter(o=>{const du=daysUntil(o.due);return du!==null&&du>=0&&du<=3;});
   const actCount=computeActionBuckets().reduce((s,b)=>s+b.items.length,0);
   el.innerHTML=[
-    stat('In progress',String(active.length),'pieces in the workroom','',`prodCardDrill('active')`),
+    stat('In progress',String(active.length),'items in the workroom','',`prodCardDrill('active')`),
     stat('Action required',String(actCount),actCount?'tap to see what needs doing':'all clear',actCount?'warn':'up',`actionDrill()`),
     stat('Due soon',String(dueSoon.length),dueSoon.length?'due within 3 days':'none imminent',dueSoon.length?'warn':'up',`dueSoonDrill()`),
     stat('Overdue',String(overdue.length),'past due date',overdue.length?'warn':'up',`prodCardDrill('overdue')`)
@@ -13952,7 +13952,7 @@ function computeActionBuckets(){try{const RFD=STAGES.indexOf('Ready for Delivery
   const noMeas=o=>{try{return !latestMeasOf(nameKey(o.client||''));}catch(e){return false;}};
   const buckets=[
     {key:'meas',label:'📐 Measurements needed',hint:'no measurements on file',items:active.filter(noMeas)},
-    {key:'fit',label:'✂ Fittings to do',hint:'pieces at the fitting stage',items:FIT>=0?active.filter(o=>o.stageIndex===FIT):[]},
+    {key:'fit',label:'✂ Fittings to do',hint:'items at the fitting stage',items:FIT>=0?active.filter(o=>o.stageIndex===FIT):[]},
     {key:'qc',label:'✔ Quality check',hint:'awaiting sign-off',items:QC>=0?active.filter(o=>o.stageIndex===QC):[]},
     {key:'pay',label:'₦ Payments outstanding',hint:'balance still owed',items:money?active.filter(o=>orderOutstanding(o)>0):[]}
   ];
@@ -13964,11 +13964,11 @@ function actionDrill(){const buckets=computeActionBuckets();
 }
 function actionBucketDrill(key){const b=computeActionBuckets().find(x=>x.key===key);if(!b){actionDrill();return;}
   const rows=b.items.sort((a,b2)=>(daysUntil(a.due)??999)-(daysUntil(b2.due)??999)).map(o=>{const du=daysUntil(o.due);const lbl=du==null?'':du<0?`<span style="color:var(--red)">${-du}d late</span>`:du===0?'<span style="color:var(--amber)">due today</span>':du+'d left';const extra=key==='pay'?(can('money')?cur(orderOutstanding(o))+' due':''):STAGES[o.stageIndex];return`<div class="bd-row" style="cursor:pointer" onclick="openDetail('${o.id}')"><span class="bl">${esc(o.client)} · ${esc(o.garment||'')} <span style="color:var(--text-faint)">${o.id}</span></span><span class="bv">${extra}${lbl?' · '+lbl:''}</span></div>`;}).join('');
-  openListModal(b.label.replace(/^[^A-Za-z]+/,''),b.items.length+' piece'+(b.items.length===1?'':'s')+' · '+b.hint,rows);
+  openListModal(b.label.replace(/^[^A-Za-z]+/,''),b.items.length+' item'+(b.items.length===1?'':'s')+' · '+b.hint,rows);
 }
 function dueSoonDrill(){const RFD=STAGES.indexOf('Ready for Delivery');const list=prodOrders().filter(o=>{if(o.stageIndex>=RFD)return false;const du=daysUntil(o.due);return du!==null&&du>=0&&du<=3;});
   const rows=list.sort((a,b)=>(daysUntil(a.due)??999)-(daysUntil(b.due)??999)).map(o=>{const du=daysUntil(o.due);const lbl=du===0?'<span style="color:var(--amber)">due today</span>':du+'d left';return`<div class="bd-row" style="cursor:pointer" onclick="openDetail('${o.id}')"><span class="bl">${esc(o.client)} · ${esc(o.garment||'')} <span style="color:var(--text-faint)">${o.id}</span> · ${STAGES[o.stageIndex]}</span><span class="bv">${lbl}</span></div>`;}).join('');
-  openListModal('Due soon',list.length+' piece'+(list.length===1?'':'s')+' due within the next 3 days',listSearch('Search client or item…','.bd-row',list.length)+(rows||'<div class="kv" style="color:var(--text-faint)">Nothing due in the next 3 days.</div>'));
+  openListModal('Due soon',list.length+' item'+(list.length===1?'':'s')+' due within the next 3 days',listSearch('Search client or item…','.bd-row',list.length)+(rows||'<div class="kv" style="color:var(--text-faint)">Nothing due in the next 3 days.</div>'));
 }
 // Production KPI cards open a focused list (they no longer flip the pipeline filter chips).
 function prodCardDrill(kind){
@@ -13984,7 +13984,7 @@ function nudgeMaker(id){const o=getOrders().find(x=>x.id===id);if(!o)return;
   let wid='';for(let i=(o.updates||[]).length-1;i>=0;i--){if(o.updates[i].workerId){wid=o.updates[i].workerId;break;}}
   if(!wid){const mk=(o.commissions||[]).find(c=>c.kind==='maker'&&c.staffId);wid=mk?mk.staffId:'';}
   const s=getStaff().find(x=>x.id===wid);
-  if(!s){alert('No maker is assigned to this piece yet. Assign one by posting a production update.');return;}
+  if(!s){alert('No maker is assigned to this item yet. Assign one by posting a production update.');return;}
   const num=String(s.whatsapp||s.phone||'').replace(/[^0-9]/g,'');
   if(!num){alert((s.name||'This maker')+' has no WhatsApp or phone on file. Add it under Team → their profile.');return;}
   const msg=`Hi ${s.name||''}, quick check on ${o.client||''}'s ${o.garment||'order'} (${o.id}). It is currently at ${STAGES[o.stageIndex]}. How is it coming along? Any delay or anything you need?`;
@@ -13998,7 +13998,7 @@ function renderProdFocus(q){
   if(prodFilter==='overdue')list=list.filter(o=>{const du=daysUntil(o.due);return du!==null&&du<0;});
   else if(prodFilter==='qcfail')list=list.filter(o=>o.qc&&o.qc.status==='failed');
   list.sort((a,b)=>((daysUntil(a.due)??999)-(daysUntil(b.due)??999)));
-  const sub=document.getElementById('prodFocusSub');if(sub)sub.textContent=list.length?(list.length+(list.length===1?' piece in production':' pieces in production')):'';
+  const sub=document.getElementById('prodFocusSub');if(sub)sub.textContent=list.length?(list.length+(list.length===1?' item in production':' items in production')):'';
   if(!list.length){el.innerHTML='<div class="ad" style="color:var(--text-faint);padding:14px 2px">Nothing in active production right now.</div>';return;}
   const head=`<tr><th>Client</th><th>Current stage</th><th class="num">Timeline</th><th class="num hide-sm">Expected</th><th class="hide-sm">Maker</th></tr>`;
   const body=list.map(o=>{
@@ -14057,7 +14057,7 @@ function renderProduction(){
     const waveStrip=bat?`<div class="oc-latest" style="display:flex;flex-wrap:wrap;gap:4px 10px">${STAGES.map((s,i)=>{const at=batchAt(o,i);return at>0?`<span style="font-size:11.5px;color:var(--text-dim)"><b style="color:var(--gold)">${at}</b> ${esc(s)}</span>`:'';}).filter(Boolean).join('')||'<span style="color:var(--text-faint)">Not started</span>'}</div>`:'';
     return`<div class="order-card"><div class="oc-top">
       ${ph?`<img class="card-thumb" src="${ph}" onclick="lightbox(this.src)">`:''}
-      <div><div class="oc-id">${o.id}${bat?'':(pieces>1?' · '+pieces+' pieces':'')}</div><div class="oc-client">${esc(o.client)}</div><div class="oc-garment">${esc(o.garment)}</div></div>
+      <div><div class="oc-id">${o.id}${bat?'':(pieces>1?' · '+pieces+' items':'')}</div><div class="oc-client">${esc(o.client)}</div><div class="oc-garment">${esc(o.garment)}</div></div>
       <div><span class="badge ${bcl}">${bat?'≤ '+stageName:stageName}</span>${batBadge}${o.qc&&o.qc.status&&o.qc.status!=='pending'&&!bat?' '+qcBadge(o):''}</div>
       <div><div class="due ${dueCls}">${dueTxt}</div>${can('money')?(function(){const m=orderMoneyNote(o);return `<div class="oc-garment" style="color:${m.colour}">${m.text}</div>`;})():''}</div>
       <div><div class="prog"><i style="width:${pct}%"></i></div><div class="oc-garment" style="margin-top:5px">${pct}%</div></div>
@@ -14239,7 +14239,7 @@ function renderOrders(){
       const valCell=money?`<td class="num"><div class="oref">${curO(orderNet(o),o)}</div><div class="osub" style="color:${mn.colour}">${mn.text}</div></td>`:'';
       const pft=orderProfit(o);const profitCell=canSeeProfit()?`<td class="num hide-sm"><div class="oref" style="color:${pft<0?'var(--red)':'var(--green)'}">${cur(pft)}</div></td>`:'';
       return `<tr class="orow" onclick="openDetail('${o.id}')">
-        <td><div class="oref">${orderRef(o)}</div><div class="osub">${orderPieces(o)} ${orderPieces(o)===1?'piece':'pieces'}</div></td>
+        <td><div class="oref">${orderRef(o)}</div><div class="osub">${orderPieces(o)} ${orderPieces(o)===1?'item':'items'}</div></td>
         <td class="hide-sm">${dateTxt}<div class="osub" style="${late?'color:var(--red)':'color:var(--text-faint)'}">${dueTxt}</div></td>
         <td><div class="oref">${esc(o.client)}${branchTag(branchOf(o))}</div></td>
         <td class="hide-sm">${orderItemsLabel(o)}</td>
