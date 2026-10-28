@@ -46,9 +46,29 @@ function compose(title,type,opts){
 /* 1) It is called a planner, and it plans more than fittings. ---------------- */
 // Kayode asked for the visible name to stay Calendar. The machinery is still
 // called the planner because that is what it does, but the tab a studio sees
-// says Calendar, and the subtitle carries the rest.
+// says Calendar.
 if(run("TITLES.calendar[0]")!=='Calendar')F('the tab is no longer called Calendar');
-if(!/meetings/.test(run("TITLES.calendar[1]")))F('the subtitle does not say the calendar carries meetings now');
+
+// THIS USED TO ASSERT THE SUBTITLE SAID "meetings", and it is replaced rather
+// than deleted, because the reason it existed is worth keeping and the thing
+// it checked is not.
+//
+// It was written when the tab was named Calendar but had grown to hold
+// meetings, reminders and content as well as fittings, and the strapline was
+// what carried that. On 28 October Kayode asked for every strapline in the app
+// to go: "the heading should be single or short titles not an explanation like
+// it is now". So the subtitle this asserted on no longer exists anywhere, and
+// a gate demanding a sentence that the house style now forbids would fail on
+// correct code — which is how a gate teaches the next person to delete it.
+//
+// What it was really protecting is that the calendar carries more than
+// fittings, and that is proved below on BEHAVIOUR rather than on wording:
+// every one of the six entry kinds composes and saves, a meeting keeps its
+// guests, two meetings never share a video room, and there is a way to join
+// one. Seven checks, none of which can be satisfied by a strapline.
+if((run("TITLES.calendar[1]")||'')!=='')
+  F('the Calendar heading has grown a strapline again — headings are names now, '
+    +'and what the calendar holds is proved by the entry-kind checks below');
 const types=run("PLANNER_TYPES.map(t=>t.k)");
 ['task','meeting','reminder','content','fitting','order'].forEach(k=>{
   if(types.indexOf(k)<0)F('the planner has no "'+k+'" entries');

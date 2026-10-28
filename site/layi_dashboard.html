@@ -5,7 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- THE DARK HAZE ACROSS THE TOP OF EVERY SCREEN, 28 October.
+     This read "black-translucent", which tells iOS to run the web view UNDER
+     the status bar. The app then owns those ~50 points and iOS, to keep its
+     own clock and battery legible over whatever we put there, draws a dimming
+     scrim behind them. That scrim is the shadow: it falls across the page
+     title, which is why "Orders" looked blurred and haloed at the top of the
+     screen and nowhere else.
+
+     "default" hands the strip back to iOS. The page starts below it, nothing
+     of ours is underneath it to be dimmed, and iOS tints it from theme-color,
+     which this app already rewrites whenever the theme changes. That is also
+     the answer that travels: Android and the desktop PWA have never used this
+     tag and read theme-color instead, so both ends now agree.
+
+     viewport-fit=cover stays, and so does every env(safe-area-inset-*) in the
+     stylesheet. They are written as max(fixed, inset) so a zero top inset
+     falls back to the fixed padding, while the left, right and bottom insets
+     still do their work in landscape and over the home indicator.
+
+     If this ever needs reverting it is this one line. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Label Board">
 <meta name="theme-color" content="#010817">
 <meta name="color-scheme" content="light dark">
@@ -174,6 +194,11 @@ textarea.fld{resize:vertical;min-height:64px;letter-spacing:.3px;font-size:14px}
   position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line-soft);
   padding-top:max(30px,env(safe-area-inset-top));padding-bottom:14px}
 .page-title{font-size:30px;letter-spacing:.5px}.page-sub{color:var(--text-faint);font-size:13px;margin-top:3px;letter-spacing:.6px}
+/* An empty subtitle must take no room. Straplines were stripped from the page
+   headings on 28 October, and without this the element keeps its margin and
+   leaves a gap under every title that looks like a rendering fault. */
+.page-sub:empty{display:none;margin:0}
+.msub:empty{display:none;margin:0}
 .top-actions{display:flex;align-items:center;gap:10px}
 .icon-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--text-dim);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.2s}
 .icon-btn:hover{border-color:var(--gold);color:var(--gold)}
@@ -397,6 +422,9 @@ select.cal-jump{padding-right:26px;background-image:url('data:image/svg+xml;utf8
 .sortsel{flex:0 0 auto;width:auto;min-width:118px;max-width:170px}
 .sortdir{flex:0 0 auto;width:38px;min-width:38px;padding:0;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 @media(max-width:680px){.sortsel{min-width:0;flex:1 1 130px;max-width:none}}
+/* One control, so it wraps as one. */
+.sortpair{display:inline-flex;align-items:center;gap:8px;flex:0 1 auto}
+@media(max-width:680px){.sortpair{flex:1 1 auto}.toolbar .btn{white-space:nowrap}}
 .pt-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .pipe-table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:620px}
 .pipe-table th{position:sticky;top:0;background:var(--panel-2);color:var(--text-dim);font-weight:600;text-align:center;padding:8px 5px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:11px;letter-spacing:.2px}
@@ -730,8 +758,19 @@ body.modal-open{overflow:hidden}
   #topLead{flex:1 1 100%}
   .brand{font-size:21px;letter-spacing:4px}.row2{grid-template-columns:1fr}
   .page-title{font-size:25px}
-  .stat-grid{grid-template-columns:1fr 1fr;gap:11px;margin-bottom:22px}
-  .stat{padding:15px 16px}.stat .sv{font-size:27px}.stat .sl{font-size:10px}
+  /* KPI CARDS, TIGHTENED FOR A PHONE — 28 October.
+     Six cards at the old size filled an iPhone screen on their own: the whole
+     of Orders above the fold was numbers, and the orders themselves started
+     below two full screens of scrolling. Measured against the screenshots
+     from a 390pt phone, a card was about 118pt tall; it is now about 86.
+     Padding, the serif figure and the gap all come down together, because
+     shrinking only the number leaves a small figure marooned in a big box. */
+  .stat-grid{grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px}
+  .stat{padding:11px 12px;border-radius:12px}
+  .stat .sv{font-size:22px;margin-top:5px}
+  .stat .sl{font-size:9.5px;letter-spacing:1.1px}
+  .stat .sd{font-size:11px;margin-top:4px;line-height:1.3}
+  .stat .stat-more{top:9px;right:10px;font-size:16px}
   .panel{padding:18px 16px}
   .cols{gap:14px}
   /* order cards stack cleanly */
@@ -762,7 +801,14 @@ body.modal-open{overflow:hidden}
   .ms-item{padding:15px 18px;color:var(--text);font-size:15px;border-bottom:1px solid var(--line-soft);display:flex;gap:12px;align-items:center;cursor:pointer}
   .ms-item:last-child{border-bottom:none}.ms-item span{color:var(--gold);width:20px;text-align:center}
 }
-@media(max-width:380px){.stat-grid{grid-template-columns:1fr}}
+/* 380 was the width below which two KPI cards stopped fitting, set when a card
+   was 15px-padded with a 27px figure. At the sizes above, two fit at 320 — an
+   iPhone SE — with room to spare, and one card per row was the worst of both:
+   a full-width box holding one small number, and six of them burying the
+   orders under two screens of scrolling. Dropped to 300, which no phone in use
+   is narrower than, so the rule is now a floor rather than a layout anybody
+   meets. 28 October. */
+@media(max-width:300px){.stat-grid{grid-template-columns:1fr}}
 /* collapsible panels (used for Outstanding & Transactions; collapsed by default on mobile) */
 .panel-head.pcol{cursor:pointer;user-select:none}
 .panel .collapse-chev{color:var(--gold);font-size:14px;transition:transform .2s;margin-left:auto}
@@ -1191,7 +1237,12 @@ body.modal-open{overflow:hidden}
       <section class="view" id="view-orders">
         <div class="stat-grid" id="ordersStats"></div>
         <div class="toolbar" style="gap:10px;flex-wrap:wrap;align-items:center">
-          <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px"><select class="fld sortsel" id="sort_orders" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_orders" onclick="toggleSortDir('orders')" title="Reverse order">↑</button>
+          <input type="text" class="fld search" id="ordersSearch" placeholder="Search orders by client, item or reference…" oninput="renderOrders()" style="flex:1;min-width:180px"><!--
+            THE SORT FIELD AND ITS DIRECTION ARROW ARE ONE CONTROL, so they are
+            wrapped and cannot be split by the wrap. On a phone they were
+            landing on different rows, which left a lone ↑ button sitting at
+            the start of a line with nothing to say what it reversed. 28 Oct.
+          --><span class="sortpair"><select class="fld sortsel" id="sort_orders" onchange="setSort('orders',this.value)" aria-label="Sort"></select><button class="btn sm ghost sortdir" id="sortdir_orders" onclick="toggleSortDir('orders')" title="Reverse order">↑</button></span>
           <select class="fld" id="ordersStatusSel" onchange="setOrdersFilter(this.value)" style="width:auto;min-width:150px"></select>
           <button class="btn sm" id="newOrderBtn2" onclick="newOrder()">+ New order</button>
         </div>
@@ -4231,6 +4282,23 @@ function manyCurrencies(by){return Object.keys(by||{}).length>1;}
    owed here and shows up as a loss in the expenses instead, which is the only place a bad
    debt belongs. */
 const orderOutstanding=o=>isQuote(o)?0:Math.max(0,orderNet(o)-(+o.paid||0)-(+o.writeOff||0));        // order currency
+/* WHAT THE MONEY LINE UNDER AN ORDER'S VALUE SAYS, in one place because it
+   was written twice and both copies had the same bug.
+
+   Both read `owed > 0 ? owed + ' due' : 'paid ✓'`, and orderOutstanding()
+   returns 0 for a quote ON PURPOSE — nothing is owed on something nobody has
+   agreed to yet. So every unsent invoice displayed "paid ✓" in green, next to
+   a badge reading "Quote". Reported from a phone on 28 October against a
+   ₦575,000 invoice that had never been sent to anybody.
+
+   A quote is not paid and it is not owed. It is not yet money, and the line
+   has to say so rather than pick the nearest of two wrong answers. */
+function orderMoneyNote(o){
+  if(isQuote(o))return {text:'not sent yet',colour:'var(--text-faint)'};
+  const owed=orderOutstanding(o);
+  if(owed>0)return {text:curO(owed,o)+' due',colour:'var(--amber)'};
+  return {text:'paid ✓',colour:'var(--green)'};
+}
 const orderOutstandingBase=o=>orderOutstanding(o)*ofx(o);             // base ₦
 /* ---- Work sent out ------------------------------------------------------------------
    Beading, monogramming, embroidery, soling, printing. The piece leaves the workroom, sits
@@ -5445,11 +5513,9 @@ function renderStudioSetup(keepScroll){
      the second half, every tick pushed another copy of this screen onto the
      stack, so a "Back" button appeared on a screen that has nowhere to go
      back to and the stack filled with fifteen copies of itself. */
-  if(keepScroll){
-    const _ov=document.getElementById('overlay');
-    window.__omScroll=_ov?_ov.scrollTop:0;
-    window.__omKeep=true;
-  }
+  /* Same capture as the order form: the first-run screen rebuilds itself on
+     every tick and has text fields on it, so it lost focus the same way. */
+  if(keepScroll)keepModalView();
   const chips=craftPickerHtml(d.does,'setupToggleCraft','setupToggleMode','');
   openModal('<h3>Set up your studio</h3><div class="msub">A few questions. They decide which tabs you see, the stages on your production board, and where an online order lands. All of it can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
@@ -5956,7 +6022,27 @@ async function saveMyAccount(){
 const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantName():'';
     if(multiBranch()&&activeBranchView==='all')return 'Today across your studios';
     if(multiBranch()&&activeBranchView&&activeBranchView!=='all')return 'Today at '+activeBranchView;
-    return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],calendar:['Calendar','Tasks, fittings, meetings, content & what is due'],customers:['Customers','Orders, spend & loyalty'],marketing:['Marketing','Campaigns, segments & announcements'],production:['Production','Track every piece across the workroom'],orders:['Orders','Every order in one place'],team:['Team','Your people, roles & performance'],rota:['Rota','Who is in, who is free, who is on what today'],tasks:['Tasks & Announcements','Assign work, keep everyone aligned'],attendance:['Attendance','Clock-in & hours'],leave:['Leave','Time off, holidays & absences'],companylog:['Company log','A diary of notable studio events'],audit:['Audit trail','Who changed what, and when'],supplies:['Inventory','Stock by category'],suppliers:['Vendors & Partners','Suppliers, couriers, makers & partners'],products:['Shop','Stock styles, sizes & colours'],sales:['Sales','Retail sales & daily/weekly/monthly takings'],logistics:['Logistics','Deliveries, couriers & costs'],expenses:['Expenses','Overheads, bills & money out'],payroll:['Payroll','Salaries & commission'],pots:['Funds & Reserves','Set profit aside for tax, expansion, equipment & more'],finance:['Finance','Revenue, costs & profit'],settings:['Settings','Accounts, roles & preferences'],mywork:['My Profile','Pay, work, leave, attendance & documents']};
+    return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],
+  /* A PAGE HEADING IS A NAME, NOT A SENTENCE.
+     Every one of these carried a strapline: Orders said "Every order in one
+     place", Finance said "Revenue, costs & profit", Funds & Reserves ran to
+     "Set profit aside for tax, expansion, equipment & more". On a phone they
+     cost a line under every title, said nothing the title did not, and read
+     like a brochure rather than a tool somebody uses forty times a day.
+     Stripped on 28 October.
+
+     The date under Today stays, because it is the day's date — data, not an
+     explanation of what the page is. That is the test applied throughout:
+     a subtitle that CHANGES is telling you something; one that never does is
+     telling you what you already read. */
+  calendar:['Calendar',''],customers:['Customers',''],marketing:['Marketing',''],
+  production:['Production',''],orders:['Orders',''],
+  team:['Team',''],rota:['Rota',''],tasks:['Tasks & Announcements',''],
+  attendance:['Attendance',''],leave:['Leave',''],companylog:['Company log',''],
+  audit:['Audit trail',''],supplies:['Inventory',''],suppliers:['Vendors & Partners',''],
+  products:['Shop',''],sales:['Sales',''],logistics:['Logistics',''],
+  expenses:['Expenses',''],payroll:['Payroll',''],pots:['Funds & Reserves',''],
+  finance:['Finance',''],settings:['Settings',''],mywork:['My Profile','']};
 /* go() paints the header once, on the way in, and nothing repainted it after.
    So a studio that arrived on the placeholder name and then named itself on the
    first-run screen kept reading "Today at ..." with the old value until it
@@ -6517,7 +6603,7 @@ function renderAccentPicker(){const el=document.getElementById('accentPicker');i
 
 /* ===== MODAL ===== */
 let _scrollY=0;
-function openModal(html){openStaffId=null;const modalEl=document.getElementById('modal');if(!window.__modalStack)window.__modalStack=[];const ovShown=document.getElementById('overlay').classList.contains('show');if(ovShown&&!window.__omKeep&&modalEl.innerHTML){window.__modalStack.push(modalEl.innerHTML);if(window.__modalStack.length>15)window.__modalStack.shift();}const back=window.__modalStack.length?'<button class="btn ghost sm" onclick="modalBack()">‹ Back</button>':'';modalEl.innerHTML='<div class="modal-topbar">'+back+'<button class="btn ghost sm" onclick="closeModal()">✕ Close</button></div><div class="modal-page">'+html+'</div>';const ov=document.getElementById('overlay');ov.classList.add('show');if(window.__omKeep){const _s=window.__omScroll||0;window.__omKeep=false;ov.scrollTop=_s;setTimeout(function(){ov.scrollTop=_s;},0);}else{ov.scrollTop=0;}const mn=document.querySelector('.main');if(mn)mn.classList.add('locked');document.body.classList.add('modal-open');}
+function openModal(html){openStaffId=null;const modalEl=document.getElementById('modal');if(!window.__modalStack)window.__modalStack=[];const ovShown=document.getElementById('overlay').classList.contains('show');if(ovShown&&!window.__omKeep&&modalEl.innerHTML){window.__modalStack.push(modalEl.innerHTML);if(window.__modalStack.length>15)window.__modalStack.shift();}const back=window.__modalStack.length?'<button class="btn ghost sm" onclick="modalBack()">‹ Back</button>':'';modalEl.innerHTML='<div class="modal-topbar">'+back+'<button class="btn ghost sm" onclick="closeModal()">✕ Close</button></div><div class="modal-page">'+html+'</div>';const ov=document.getElementById('overlay');ov.classList.add('show');if(window.__omKeep){const _s=window.__omScroll||0;window.__omKeep=false;restoreModalView(ov,_s);}else{ov.scrollTop=0;}const mn=document.querySelector('.main');if(mn)mn.classList.add('locked');document.body.classList.add('modal-open');}
 function modalBack(){if(!window.__modalStack||!window.__modalStack.length){closeModal();return;}const html=window.__modalStack.pop();const modalEl=document.getElementById('modal');modalEl.innerHTML=html;const ov=document.getElementById('overlay');if(ov)ov.scrollTop=0;}
 function closeModal(){window.__modalStack=[];const _ov=document.getElementById('overlay');if(_ov)_ov.scrollTop=0;document.getElementById('overlay').classList.remove('show');const mn=document.querySelector('.main');if(mn)mn.classList.remove('locked');document.body.classList.remove('modal-open');draft=null;updateDraft=null;}
 const fv=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
@@ -6848,14 +6934,17 @@ function itemSectionNote(o,d){
 let orderDoor=null;
 function newOrder(){
   if(!can('orders.edit'))return;
+  /* The straplines are gone. "Price it and send it. Their deposit turns it
+     into an order." under a button labelled Invoice told somebody choosing
+     between two doors nothing they could not work out from the two words on
+     the doors, and it is the house style that was making the app read like a
+     tutorial. 28 October. */
   openModal(`<h3>New</h3>
     <button type="button" class="door lead" onclick="openOrder(null,'invoice')">
       <span class="door-h">${OSEC_ICO.quote}Invoice</span>
-      <span class="door-p">Price it and send it. Their deposit turns it into an order.</span>
     </button>
     <button type="button" class="door" onclick="openOrder(null,'order')">
       <span class="door-h">${OSEC_ICO.board}New order</span>
-      <span class="door-p">Already agreed. It goes on the production board.</span>
     </button>
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
 }
@@ -7197,7 +7286,60 @@ function outfitPhotoGrid(i,photos){
     <label class="add-photo">＋<span>photo</span><input type="file" accept="image/*" multiple style="display:none" onchange="addOutfitPhotos(${i},this.files)"></label>
   </div>`;
 }
-function reRenderOrder(){const ov=document.getElementById('overlay');window.__omScroll=ov?ov.scrollTop:0;window.__omKeep=true;renderOrderModal.call(window);}
+/* THE FORM JUMPING UNDER YOUR FINGER — 28 October.
+   Reported from a phone: "I tried adding a detail and the screen jumped or
+   scrolled down so I had to scroll back up to what I was actually filling."
+
+   Every add, remove or photo in this form calls through here, and this rebuilt
+   the ENTIRE modal from scratch and then put the scroll position back. Two
+   things went wrong with that:
+
+     the scroll was restored immediately and again on setTimeout 0, both of
+     which can run BEFORE the new content has been laid out. scrollTop clamps
+     to whatever the scroll height is at that instant, so a tall form restored
+     against a half-measured document lands short — and the page appears to
+     have jumped.
+
+     the focused field was not restored at all. On a phone that also drops the
+     keyboard, and the keyboard closing changes the viewport height, which
+     moves the page a second time.
+
+   So the field with focus and its caret position are remembered too, and the
+   restore happens after layout rather than racing it. */
+function keepModalView(){
+  const ov=document.getElementById('overlay');
+  window.__omScroll=ov?ov.scrollTop:0;
+  const a=document.activeElement;
+  window.__omFocus=(a&&a.id&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'))?{
+    id:a.id,
+    start:(typeof a.selectionStart==='number')?a.selectionStart:null,
+    end:(typeof a.selectionEnd==='number')?a.selectionEnd:null,
+  }:null;
+  window.__omKeep=true;
+}
+function reRenderOrder(){keepModalView();renderOrderModal.call(window);}
+/* Put the view back exactly where it was, after the browser has measured the
+   new content. Two frames: the first lets layout settle, the second runs once
+   it has, which is when scrollTop will accept the full value. */
+function restoreModalView(ov,top){
+  if(!ov)return;
+  const put=()=>{ov.scrollTop=top;};
+  put();
+  requestAnimationFrame(()=>{put();requestAnimationFrame(()=>{
+    put();
+    const f=window.__omFocus;window.__omFocus=null;
+    if(!f)return;
+    const el=document.getElementById(f.id);
+    if(!el)return;
+    try{
+      /* preventScroll, or focusing drags the page to the field and undoes
+         the restore we just did. */
+      el.focus({preventScroll:true});
+      if(f.start!=null&&el.setSelectionRange)el.setSelectionRange(f.start,f.end);
+      ov.scrollTop=top;
+    }catch(e){}
+  });});
+}
 function renderOrderModal(){
   const staffList=getStaff();
   {const _u=outfitsTotal(draft.outfits);draft.value=isBatch(draft)?_u*((draft.batch&&draft.batch.qty)||1):_u;}
@@ -13713,7 +13855,7 @@ function renderProduction(){
       ${ph?`<img class="card-thumb" src="${ph}" onclick="lightbox(this.src)">`:''}
       <div><div class="oc-id">${o.id}${bat?'':(pieces>1?' · '+pieces+' pieces':'')}</div><div class="oc-client">${esc(o.client)}</div><div class="oc-garment">${esc(o.garment)}</div></div>
       <div><span class="badge ${bcl}">${bat?'≤ '+stageName:stageName}</span>${batBadge}${o.qc&&o.qc.status&&o.qc.status!=='pending'&&!bat?' '+qcBadge(o):''}</div>
-      <div><div class="due ${dueCls}">${dueTxt}</div>${can('money')?`<div class="oc-garment">${owed>0?curO(owed,o)+' due':'paid ✓'}</div>`:''}</div>
+      <div><div class="due ${dueCls}">${dueTxt}</div>${can('money')?(function(){const m=orderMoneyNote(o);return `<div class="oc-garment" style="color:${m.colour}">${m.text}</div>`;})():''}</div>
       <div><div class="prog"><i style="width:${pct}%"></i></div><div class="oc-garment" style="margin-top:5px">${pct}%</div></div>
       <div class="oc-spacer"></div>
       <div class="oc-actions">
@@ -13884,7 +14026,8 @@ function renderOrders(){
       const dateTxt=o.createdAt?new Date(o.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):'—';
       const dueTxt=o.due?('due '+new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'})):'no due date';
       const owedO=orderOutstanding(o);
-      const valCell=money?`<td class="num"><div class="oref">${curO(orderNet(o),o)}</div>${owedO>0?`<div class="osub" style="color:var(--amber)">${curO(owedO,o)} due</div>`:'<div class="osub" style="color:var(--green)">paid ✓</div>'}</td>`:'';
+      const mn=orderMoneyNote(o);
+      const valCell=money?`<td class="num"><div class="oref">${curO(orderNet(o),o)}</div><div class="osub" style="color:${mn.colour}">${mn.text}</div></td>`:'';
       const pft=orderProfit(o);const profitCell=canSeeProfit()?`<td class="num hide-sm"><div class="oref" style="color:${pft<0?'var(--red)':'var(--green)'}">${cur(pft)}</div></td>`:'';
       return `<tr class="orow" onclick="openDetail('${o.id}')">
         <td><div class="oref">${orderRef(o)}</div><div class="osub">${orderPieces(o)} ${orderPieces(o)===1?'piece':'pieces'}</div></td>
