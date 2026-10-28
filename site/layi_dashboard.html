@@ -1512,6 +1512,12 @@ body.modal-open{overflow:hidden}
             <div id="taxFields"></div>
           </div>
           <div class="field"><label>Signature</label><div style="display:flex;align-items:center;gap:14px"><div id="sigPreview" style="width:150px;height:56px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('sigFile').click()">Upload signature</button><button class="btn ghost sm" onclick="clearSignature()">Remove</button><input type="file" id="sigFile" accept="image/*" style="display:none" onchange="uploadSignature(this)"></div><div class="sd" style="color:var(--text-faint);margin-top:6px">Set once. It prints above your name and the date at the foot of every invoice.</div></div>
+          <div class="field"><label>Brand colour</label><div style="display:flex;align-items:center;gap:12px">
+            <input type="color" id="co_brand" value="#0b3d25" oninput="brandPicked(this.value)" style="width:56px;height:44px;padding:2px;border:1px solid var(--line);border-radius:9px;background:var(--panel-2);cursor:pointer">
+            <input type="text" class="fld" id="co_brandhex" value="#0B3D25" maxlength="7" oninput="brandTyped(this.value)" style="flex:1;min-width:0;letter-spacing:1px">
+            <button class="btn ghost sm" onclick="brandReset()">Reset</button></div>
+            <div id="brandBar" style="height:6px;border-radius:3px;margin-top:9px;background:#0b3d25"></div>
+          </div>
           <div class="field"><label>Payment accounts (for invoices)</label>
             <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add only the accounts you actually collect into. The boxes follow the currency: pounds ask for a sort code, dollars and euros for an IBAN and BIC. Only the accounts you add ever print.</div>
             <div id="bankRows"></div>
@@ -7133,6 +7139,7 @@ function syncOrderDraft(){
     if(fv('of_price_'+i)!==undefined)o.price=parseAmt(fv('of_price_'+i));
     if(fv('of_qty_'+i)!==undefined)o.qty=Math.max(1,+fv('of_qty_'+i)||1);
     if(fv('of_code_'+i)!==undefined)o.code=fv('of_code_'+i);
+    if(fv('of_parts_'+i)!==undefined)o.parts=String(fv('of_parts_'+i)||'').split('\n').map(s=>s.trim()).filter(Boolean);
     if(fv('of_disc_'+i)!==undefined)o.discount=parseAmt(fv('of_disc_'+i));
     if(document.getElementById('of_save_'+i))o.saveToCatalog=document.getElementById('of_save_'+i).checked;
     if(fv('of_style_'+i)!==undefined)o.style=fv('of_style_'+i);
@@ -7478,6 +7485,7 @@ function renderOrderModal(){
         <div class="field" style="margin-bottom:10px"><label>Price (${CUR_SYM[ocur(draft)]||ocur(draft)}) &amp; how many</label><div style="display:flex;gap:8px"><input class="fld money" type="text" inputmode="decimal" id="of_price_${i}" value="${o.price?fmtNum(o.price):''}" placeholder="0" oninput="recalcProfit()" style="flex:1;min-width:0"><input class="fld" type="number" min="1" step="1" id="of_qty_${i}" value="${ofQty(o)}" oninput="recalcProfit()" aria-label="How many" style="max-width:78px"></div><div id="ofconv_${i}" class="sd" style="color:var(--text-faint);margin-top:4px">${ofLineNote(o,draft)}</div></div>
       </div>
       <div class="field" style="margin-bottom:10px"><label>Name / description</label><input class="fld" id="of_name_${i}" value="${esc(o.name)}" placeholder="Wedding agbada, size 43 mules"></div>
+      <div class="field" style="margin-bottom:10px"><label>Included in this set</label><textarea class="fld" id="of_parts_${i}" rows="2" style="min-height:62px" placeholder="A suit jacket&#10;A tailored trousers">${esc((o.parts||[]).join('\n'))}</textarea></div>
       <div class="row2">
         <div class="field" style="margin-bottom:10px"><label>Product code</label><input class="fld" id="of_code_${i}" value="${esc(o.code||'')}" placeholder="SKU12345"></div>
         <div class="field" style="margin-bottom:10px"><label>Off this piece (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="of_disc_${i}" value="${o.discount?fmtNum(o.discount):''}" placeholder="0" oninput="recalcProfit()"></div>
@@ -7951,10 +7959,13 @@ function finishedPhotos(o){
    It is a FALLBACK rather than a value written into their settings, so a studio that has
    never opened that box still sends an invoice that says what paying does. The moment
    they write their own, theirs is the only thing that prints. */
+/* 28 October: "100% should be the default but since a studio owner can add note, they can
+   simply adjust it to the percentage that is reasonable for them". So this is a starting
+   point and not a rule; the box in Settings overrides every word of it. */
 const DEFAULT_PAY_TERMS=
-  'A deposit confirms your order and work begins once it has been received.\n'+
-  'The balance is due before collection or delivery.\n'+
-  'Please send proof of payment so we can confirm it.';
+  'Full payment is required upfront to ensure a smooth production process and timely delivery.\n'+
+  'Kindly make payment to the account details provided on this invoice.\n'+
+  'Proof of payment must be forwarded before production commences.';
 function payTerms(){const t=String((SETTINGS.company||{}).payInstructions||'').trim();return t||DEFAULT_PAY_TERMS;}
 function invoiceBanks(o){
   const all=((SETTINGS.company||{}).banks||[]).filter(bankHasDetail);
@@ -10355,6 +10366,9 @@ function fillSettings(){fillOwnerPay();renderPayrollSetup();renderPayMethodSetti
   const co=SETTINGS.company||{};const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   setV('co_name',co.name);setV('co_email',co.email);setV('co_phone',co.phone);setV('co_address',co.address);setV('co_reg',co.reg);setV('co_pay',co.payInstructions);
   const ph=document.getElementById('co_photos');if(ph)ph.checked=co.showPhotos!==false;
+  {const b=brandColour();const bp=document.getElementById('co_brand');if(bp)bp.value=b;
+   const bh=document.getElementById('co_brandhex');if(bh&&document.activeElement!==bh)bh.value=b.toUpperCase();
+   const bb=document.getElementById('brandBar');if(bb)bb.style.background=b;}
   renderLogoPreview();renderSigPreview();
   {const tb=document.getElementById('co_taxon');if(tb)tb.checked=!!co.taxOn;renderTaxFields();}
   companyBanks=JSON.parse(JSON.stringify(co.banks||[]));renderBankRows();
@@ -10764,6 +10778,24 @@ function clearSignature(){
 SETTINGS.company=Object.assign({},SETTINGS.company,{signature:''});save('layi_dash_settings',SETTINGS);renderSigPreview();}
 /* Puts the general wording in the box so it can be edited into theirs. It does not save;
    nothing here is theirs until they press the button that says so. */
+/* The picker writes as you drag, so the hex box, the bar under it and the next invoice
+   all follow one value. Nothing is saved until Update company details is pressed, which
+   is how every other field in this panel behaves. */
+let brandPending=brandColour();
+function brandApply(v){
+  brandPending=v;
+  const bp=document.getElementById('co_brand');if(bp&&bp.value!==v)bp.value=v;
+  const bb=document.getElementById('brandBar');if(bb)bb.style.background=v;
+}
+function brandPicked(v){const h=document.getElementById('co_brandhex');if(h)h.value=String(v).toUpperCase();brandApply(v);}
+function brandTyped(v){
+  v=String(v||'').trim();if(v&&v[0]!=='#')v='#'+v;
+  if(/^#[0-9a-f]{6}$/i.test(v))brandApply(v.toLowerCase());
+}
+function brandReset(){
+  const h=document.getElementById('co_brandhex');if(h)h.value=BRAND_DEFAULT.toUpperCase();
+  brandApply(BRAND_DEFAULT);
+}
 function useStandardTerms(){const e=document.getElementById('co_pay');if(!e)return;e.value=DEFAULT_PAY_TERMS;e.focus();}
 function saveGarmentTypes(){const box=document.getElementById('gtypes_box');if(!box)return;const list=box.value.split('\n').map(x=>x.trim()).filter(Boolean);if(!list.length){alert('Add at least one '+tradeWord()+' type.');return;}SETTINGS.garmentTypes=list;save('layi_dash_settings',SETTINGS);if(typeof logAudit==='function')logAudit(tradeWordCap()+' types updated',list.length+' types');flashSaved('gtypesSaveBtn','Save '+tradeWord()+' types');}
 function saveCompany(){
@@ -10771,7 +10803,7 @@ function saveCompany(){
 syncBanks();
   const _tb=document.getElementById('co_taxon');const _ton=_tb?_tb.checked:!!(SETTINGS.company||{}).taxOn;
   const _trate=(fv('co_taxrate')!==undefined)?(+fv('co_taxrate')||0):(+(SETTINGS.company||{}).taxRate||0);
-  SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,
+  SETTINGS.company=Object.assign({},SETTINGS.company,{name:fv('co_name')||'',email:fv('co_email')||'',phone:fv('co_phone')||'',address:fv('co_address')||'',reg:fv('co_reg')||'',payInstructions:fv('co_pay')||'',showPhotos:document.getElementById('co_photos').checked,brandColour:brandPending,
     taxOn:_ton,taxLabel:(fv('co_taxlabel')||(SETTINGS.company||{}).taxLabel||'VAT'),taxRate:Math.max(0,Math.min(100,_trate)),
     banks:companyBanks.filter(bankHasDetail).map(bankClean)});
   save('layi_dash_settings',SETTINGS);applyBranding();if(typeof renderActivity==='function')renderActivity();flashSaved('coSaveBtn','Update company details');}

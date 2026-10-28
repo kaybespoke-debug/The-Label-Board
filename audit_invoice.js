@@ -208,7 +208,7 @@ asInvoice({currency:'NGN',fx:1});
 run("SETTINGS.company=Object.assign({},SETTINGS.company,{banks:[],payInstructions:''});save('layi_dash_settings',SETTINGS);");
 ok(run("payTerms()")===run("DEFAULT_PAY_TERMS"),'a studio that has written no terms falls back to nothing');
 {const bare=doc();
- ok(bare.indexOf('A deposit confirms your order')>=0,
+ ok(bare.indexOf('Full payment is required upfront')>=0,
    'a studio that has never opened the terms box sends an invoice saying nothing about what paying does');
  ok(bare.indexOf('>Payment<')>=0,'the general terms print with no heading over them');}
 run("SETTINGS.company=Object.assign({},SETTINGS.company,{banks:[{currency:'NGN',bank:'Kuda MFB',name:'Studio Ltd',no:'3003250397'}],payInstructions:'Balance on collection.'});save('layi_dash_settings',SETTINGS);");
@@ -451,6 +451,56 @@ ok(txt().indexOf('less')>=0,'the message summary drops the discount that is on t
 {asInvoice({outfits:[Object.assign({},BASE.outfits[0],{discount:0})]});
  ok(!/>Disc\.</.test(doc()),'nothing is discounted and the invoice prints an empty discount column anyway');
  asInvoice({outfits:[Object.assign({},BASE.outfits[0],{discount:5000})]});}
+
+/* --- what a set is made of -----------------------------------------------------------
+   28 October, against LAYI invoice #311, which lists "Included in this set: A Suit Jacket,
+   A Tailored Trousers" under every suit. This app could print one description line and no
+   more, so a client buying a three-piece was told less by us than by the invoice they had
+   before. Both directions: it prints when there is one, and it is absent when there is
+   not, because a heading over an empty list is worse than no heading. */
+asInvoice({outfits:[Object.assign({},BASE.outfits[0],{parts:['A Suit Jacket','A Tailored Trousers']})]});
+d=doc();
+ok(d.indexOf('Included in this set')>=0,'an item lists what it contains and the invoice does not print it');
+ok(d.indexOf('A Suit Jacket')>=0&&d.indexOf('A Tailored Trousers')>=0,'the parts of the set are not on the invoice');
+asInvoice({outfits:[Object.assign({},BASE.outfits[0],{parts:[]})]});
+ok(doc().indexOf('Included in this set')<0,'an item with no parts prints an empty "Included in this set" heading');
+
+/* and the studio can actually type it. One per line, because that is how somebody writes
+   a list, and blank lines are dropped so a trailing return is not a bullet. */
+run("openOrder(null,'invoice');");
+run("document.getElementById('of_parts_0').value='A Suit Jacket\\n\\n A Tailored Trousers \\n';syncOrderDraft();");
+{const parts=J("draft.outfits[0].parts");
+ ok(Array.isArray(parts)&&parts.length===2,'the parts a studio typed did not reach the item: '+JSON.stringify(parts));
+ ok(parts[1]==='A Tailored Trousers','a part kept the spaces around it: '+JSON.stringify(parts));}
+run("closeModal();");
+
+/* --- the studio's colour --------------------------------------------------------------
+   One hex drives the rule across the top, the Bill to band and the table head. The band is
+   the head mixed into white rather than a second pick, so they cannot disagree. */
+asInvoice({outfits:[BASE.outfits[0]]});
+ok(doc().indexOf('#0b3d25')>=0,'a studio that has chosen no colour lost the green this app has always printed');
+run("SETTINGS.company=Object.assign({},SETTINGS.company,{brandColour:'#6b1f32'});save('layi_dash_settings',SETTINGS);");
+{const c=doc();
+ ok(c.indexOf('#6b1f32')>=0,'the studio chose a colour and the invoice ignored it');
+ ok(c.indexOf('#0b3d25')<0,'the old green is still printed somewhere on a recoloured invoice');
+ ok(/border-top:5px solid #6b1f32/.test(c),'there is no rule across the top of the sheet');
+ ok(c.indexOf('#e8efe9')<0,'the Bill to band kept its own colour instead of following the studio’s');}
+run("SETTINGS.company=Object.assign({},SETTINGS.company,{brandColour:'rubbish'});save('layi_dash_settings',SETTINGS);");
+ok(doc().indexOf('#0b3d25')>=0,'a colour that is not a colour is printed instead of falling back');
+run("SETTINGS.company=Object.assign({},SETTINGS.company,{brandColour:''});save('layi_dash_settings',SETTINGS);");
+
+/* --- the photographs, two to a row ----------------------------------------------------
+   They used to be two at most, each the full width of a page of its own, so a six-item
+   invoice was six pages of scrolling. Captioned with the item, because a client looking at
+   six suits needs to know which line each one is. */
+asInvoice({outfits:[
+  Object.assign({},BASE.outfits[0],{name:'Gray Stripe Suit',photos:['data:image/png;base64,ONE']}),
+  Object.assign({},BASE.outfits[0],{name:'Navy Tuxedo',photos:['data:image/png;base64,TWO']})]});
+d=doc();
+ok(/grid-template-columns:1fr 1fr/.test(d),'the photographs are not laid out two to a row');
+ok(d.indexOf('base64,ONE')>=0&&d.indexOf('base64,TWO')>=0,'an item’s photograph is missing from the sheet');
+ok(d.indexOf('Gray Stripe Suit')>=0&&d.indexOf('Navy Tuxedo')>=0,'the photographs carry no caption, so nobody can tell which line they are');
+asInvoice({outfits:[BASE.outfits[0]]});
 
 /* --- the product code ---------------------------------------------------------------- */
 asInvoice({outfits:[Object.assign({},BASE.outfits[0],{code:'SKU12345'})]});
