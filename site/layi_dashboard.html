@@ -7963,13 +7963,63 @@ function invoiceBanks(o){
 }
 /* The line that makes the invoice-first flow actually work. Without it the client is
    holding a bill for work that has not started and no idea what makes it start. */
+/* ---- The studio's own colour ---------------------------------------------------------
+   Asked for on 28 October: "we should have themes so every studio gets the option to
+   switch colours ... so the invoice can react to that".
+
+   One stored hex drives three things that used to be hardcoded: the rule across the top
+   of the sheet, the Bill to band and the table head. Keeping them one value rather than
+   three is the whole point; a studio picking a band colour and a head colour separately
+   is a studio making an invoice nobody wants to be handed.
+
+   The fallback is the green this app has always printed, so a studio that never opens the
+   setting sees no change at all. */
+const BRAND_DEFAULT='#0b3d25';
+function brandColour(){
+  const v=String(((SETTINGS.company||{}).brandColour)||'').trim();
+  return /^#[0-9a-f]{6}$/i.test(v)?v:BRAND_DEFAULT;
+}
+/* The band is the head colour mixed into white, not a second choice. t is how much white:
+   .9 is a wash you can read black text on. */
+function tintColour(hex,t){
+  const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex||''));
+  if(!m)return '#e8efe9';
+  const mix=i=>Math.round(parseInt(m[i],16)*(1-t)+255*t);
+  const h=n=>('0'+n.toString(16)).slice(-2);
+  return '#'+h(mix(1))+h(mix(2))+h(mix(3));
+}
+/* ---- The photographs on the sheet ----------------------------------------------------
+   One per item, captioned with the item it is, laid out two to a row. It used to be two
+   photographs at most, each the full width of its own page, which on a six-suit invoice
+   was six pages the client had to scroll past to reach nothing. If no item carries a
+   photograph we fall back to the progress shots, uncaptioned, because there is nothing
+   to caption them with. */
+function invoicePhotos(o){
+  const out=[],seen={};
+  (o.outfits||[]).forEach(function(x){
+    const ph=(x.photos||[])[0];
+    if(ph&&!seen[ph]){seen[ph]=1;out.push({src:ph,label:x.name||x.type||''});}
+  });
+  /* And then the progress shots, which are not any one item's and so carry no caption.
+     NOT a fallback: the piece as it left the workroom is the photograph the client
+     actually wants, and an item that also has a catalogue photo of its own must not push
+     it off the sheet. Writing this as an else was a bug for about ten minutes. */
+  finishedPhotos(o).forEach(function(ph){
+    if(ph&&!seen[ph]){seen[ph]=1;out.push({src:ph,label:''});}
+  });
+  return out.slice(0,8);
+}
 function invoiceInner(o,kind){const _R=kind==='receipt';
   const co=SETTINGS.company||{};const cust=getCustomers()[nameKey(o.client)]||{};
   const f=invoiceFigures(o);const no=o.invoiceNo||'—';
   const cs=CUR_SYM[ocur(o)]||(ocur(o)+' ');
   const M=n=>cs+fmtMoney2(n);
   const SANS="font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif";
-  const INK='#1a1a1a',DIM='#5a6560',LINE='#e3e7e5',BAND='#e8efe9',DARK='#0b3d25';
+  /* The studio's colour, not ours. BAND is the same hue mixed into white, so one pick
+     drives the rule across the top, the Bill to band and the table head, and those three
+     can never disagree. A studio that picks nothing keeps the green it has always had. */
+  const BRAND=brandColour();
+  const INK='#1a1a1a',DIM='#5a6560',LINE='#e3e7e5',BAND=tintColour(BRAND,.9),DARK=BRAND;
   const cap='font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#4a5a52;font-weight:700';
   const issued=new Date(o.createdAt||Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
@@ -7987,34 +8037,43 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
   /* A thumbnail in the row, and the same piece large on the page after. Confirmed: he
      wants both, because the thumbnail says which line this is and the large one is what
      the client actually wants to look at. */
+  /* A discount column that appears ONLY when something is actually discounted. A column
+     of dashes on every invoice is a column nobody reads, and on a phone it is a column
+     that costs the item name a line of wrapping. */
+  const anyDisc=(o.outfits||[]).some(x=>ofDiscount(x)>0);
+  /* One figure, two formats. The sheet a client is handed prints the currency and the
+     kobo; a phone prints 385,000, because five columns, a currency symbol and two
+     decimals do not fit 360px and the studio reading it on a phone wrote the currency
+     itself. This is what replaced folding Price and Qty away on a narrow screen: every
+     column is now on every width, which is what an invoice is for. */
+  const NUM=n=>`<span class="tlb-only-wide">${M(n)}</span><span class="tlb-only-narrow">${fmtNum(Math.round(n))}</span>`;
   const items=(o.outfits||[]).map(x=>{
     const th=showPix?((x.photos||[])[0]||''):'';
     const desc=[x.style,x.finish].filter(Boolean).join('. ');
-    /* A discount on one piece and not the others. Shown as the arithmetic rather than as a
-       word, because a client checking a bill wants to see where the figure came from. */
+    /* What a set is made of, listed. A suit is a jacket and a pair of trousers and the
+       client is paying for both; one line reading "suit" tells them less than the
+       invoice they had before this app. */
+    const parts=(x.parts||[]).map(p=>String(p||'').trim()).filter(Boolean);
     const ld=ofDiscount(x);
     return `<tr>
-      <td style="padding:11px;vertical-align:top;border-bottom:1px solid ${LINE}"><div style="display:flex;gap:11px">${th?`<img src="${photoSrc(th)}" style="flex:0 0 auto;width:46px;height:46px;border-radius:3px;object-fit:cover">`:''}<div><div style="font-size:14px;font-weight:600">${isGroup(o)&&x.person?esc(x.person)+' · ':''}${esc(x.name||x.type||'Item')}</div>${x.code?`<div style="${SANS};font-size:11px;color:${DIM};letter-spacing:.04em;margin-top:2px">${esc(x.code)}</div>`:''}${desc?`<div style="${SANS};font-size:11.5px;color:${DIM};line-height:1.55;margin-top:3px">${esc(desc)}</div>`:''}${ld>0?`<div style="${SANS};font-size:11.5px;color:${DIM};margin-top:4px">${M(ofGross(x))} less ${M(ld)} discount</div>`:''}<div class="tlb-only-narrow" style="${SANS};font-size:11.5px;color:${DIM};margin-top:4px">${M(+x.price||0)}${ofQty(x)>1?' × '+ofQty(x):''}</div></div></div></td>
-      <td class="tlb-only-wide" style="padding:11px;vertical-align:top;text-align:right;white-space:nowrap;font-size:13.5px;border-bottom:1px solid ${LINE}">${M(+x.price||0)}</td>
-      <td class="tlb-only-wide" style="padding:11px;vertical-align:top;text-align:right;font-size:13.5px;border-bottom:1px solid ${LINE}">${ofQty(x)}</td>
-      <td style="padding:11px;vertical-align:top;text-align:right;white-space:nowrap;font-size:13.5px;border-bottom:1px solid ${LINE}">${M(ofLine(x))}</td>
+      <td class="tlb-item" style="padding:11px 8px 11px 7px;vertical-align:top;border-bottom:1px solid ${LINE}"><div style="display:flex;gap:9px">${th?`<img src="${photoSrc(th)}" style="flex:0 0 auto;width:40px;height:40px;border-radius:3px;object-fit:cover">`:''}<div style="min-width:0"><div style="font-size:13px;line-height:1.3">${isGroup(o)&&x.person?esc(x.person)+' · ':''}${esc(x.name||x.type||'Item')}</div>${x.code?`<div style="${SANS};font-size:10.5px;color:${DIM};letter-spacing:.04em;margin-top:2px">${esc(x.code)}</div>`:''}${desc?`<div style="${SANS};font-size:10.5px;color:${DIM};line-height:1.5;margin-top:3px">${esc(desc)}</div>`:''}${parts.length?`<div style="${SANS};font-size:10.5px;color:${DIM};line-height:1.6;margin-top:4px">Included in this set:${parts.map(p=>`<br>&#8226;&nbsp;${esc(p)}`).join('')}</div>`:''}</div></div></td>
+      <td class="tlb-cnum" style="padding:11px 5px;vertical-align:top;text-align:right;white-space:nowrap;font-size:12px;border-bottom:1px solid ${LINE}">${NUM(+x.price||0)}</td>
+      <td class="tlb-cqty" style="padding:11px 2px;vertical-align:top;text-align:center;font-size:12px;border-bottom:1px solid ${LINE}">${ofQty(x)}</td>
+      ${anyDisc?`<td class="tlb-cnum" style="padding:11px 5px;vertical-align:top;text-align:right;white-space:nowrap;font-size:12px;border-bottom:1px solid ${LINE}">${ld>0?NUM(ld):`<span style="color:#9aa5a0">&#8211;</span>`}</td>`:''}
+      <td class="tlb-cnum" style="padding:11px 7px 11px 5px;vertical-align:top;text-align:right;white-space:nowrap;font-size:12px;border-bottom:1px solid ${LINE}">${NUM(ofLine(x))}</td>
     </tr>`;}).join('');
-  const batchNote=isBatch(o)?`<tr><td colspan="4" style="${SANS};padding:8px 11px;font-size:11.5px;color:${DIM}">Production run of ${(o.batch&&o.batch.qty)||1} × the piece above.</td></tr>`:'';
-  /* All four, not just the fee. The order already knows the courier, where it is going,
-     the waybill and where it has got to; the invoice used only the money. */
-  const d=o.delivery||{};
-  const ship=d.enabled?`<div style="${SANS};flex:1;min-width:0;font-size:11.5px;line-height:1.6;color:#33403a">
-      <div style="${cap};margin-bottom:4px">Shipment</div>
-      ${d.company?`<span style="color:${INK};font-weight:600">${esc(d.company)}</span><br>`:''}
-      ${(d.location||o.address||cust.address)?esc(d.location||o.address||cust.address).replace(/\n/g,'<br>')+'<br>':''}
-      ${d.tracking?`<span style="color:${DIM}">Waybill</span> ${esc(d.tracking)}${d.status?' · ':''}`:''}${d.status?`<span style="color:${DIM}">${esc(d.status)}</span>`:''}
-    </div>`:'<div style="flex:1"></div>';
+  const batchNote=isBatch(o)?`<tr><td colspan="${anyDisc?5:4}" style="${SANS};padding:8px 11px;font-size:11.5px;color:${DIM}">Production run of ${(o.batch&&o.batch.qty)||1} × the item above.</td></tr>`:'';
+  /* The courier, the waybill, the address it is going to and where it has got to were all
+     printed here. Taken off 28 October at Kayode's instruction: "we dont need shipment
+     details on the invoice". The order still knows every one of them and the client is
+     still told on the order screen; what the invoice keeps is the FEE, because that is
+     money the client owes and it belongs in the totals. */
   const tot=(l,v,opt)=>`<div style="${SANS};display:flex;align-items:baseline;padding:5px 0;border-bottom:1px solid ${LINE};font-size:12.5px${(opt&&opt.rule)?';border-bottom:2px solid #33403a':''}"><span style="flex:1;color:${(opt&&opt.strong)?INK:DIM}${(opt&&opt.strong)?';font-weight:600':''}">${l}</span><span style="white-space:nowrap${(opt&&opt.strong)?';font-weight:600':''}">${v}</span></div>`;
   const totals=[
     tot('Subtotal',M(f.subtotal)),
     f.discount>0?tot('Discount','('+M(f.discount)+')'):'',
     f.tax>0?tot(esc(taxLabel())+' '+f.taxRate+'%',M(f.tax)):'',
-    f.shipping>0?tot('Shipping',M(f.shipping)):'',
+    f.shipping>0?tot('Delivery',M(f.shipping)):'',
     tot('Total',M(f.total),{strong:true,rule:true}),
     f.paid>0?tot(_R?'Paid':'Deposit paid','('+M(f.paid)+')'):''
   ].join('');
@@ -8045,35 +8104,38 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
      item cell as one line and their columns go, which is the same decision this app made
      everywhere else: keep the table, drop the columns, never stack a row into a card. */
   const phoneCss=`<style>
-  .tlb-inv .tlb-only-wide{display:table-cell}
+  .tlb-inv .tlb-only-wide{display:inline}
   .tlb-inv .tlb-only-narrow{display:none}
+  .tlb-inv .tlb-cnum{width:92px}
+  .tlb-inv .tlb-cqty{width:46px}
   @media(max-width:600px){
-    .tlb-inv,.tlb-photopage{padding:20px 16px!important}
-    .tlb-inv .tlb-head,.tlb-inv .tlb-billto,.tlb-inv .tlb-foot{flex-direction:column;gap:12px!important}
-    .tlb-inv .tlb-logo{order:-1;align-self:flex-start}
+    .tlb-inv,.tlb-photopage{padding:20px 14px!important}
+    .tlb-inv .tlb-billto,.tlb-inv .tlb-foot{flex-direction:column;gap:12px!important}
     .tlb-inv .tlb-meta{min-width:0!important;width:100%}
     .tlb-inv .tlb-totals{width:100%!important}
     .tlb-inv .tlb-only-wide{display:none}
-    .tlb-inv .tlb-only-narrow{display:block}
-    .tlb-inv th,.tlb-inv td{padding:9px 8px!important}
-    .tlb-inv th:last-child,.tlb-inv td:last-child{width:104px;font-size:12.5px!important}
+    .tlb-inv .tlb-only-narrow{display:inline}
+    .tlb-inv .tlb-cnum,.tlb-inv .tlb-cqty{width:auto}
+    .tlb-inv th,.tlb-inv td{padding-left:4px!important;padding-right:4px!important}
     .tlb-inv .tlb-sig{width:100%!important}
     .tlb-inv .tlb-due{font-size:17px!important}
   }
-  @media print{.tlb-inv .tlb-only-narrow{display:none}.tlb-inv .tlb-only-wide{display:table-cell}}
+  @media print{.tlb-inv .tlb-only-narrow{display:none}.tlb-inv .tlb-only-wide{display:inline}}
   </style>`;
-  const big=showPix?finishedPhotos(o):[];
+  const big=showPix?invoicePhotos(o):[];
   const photoPage=big.length?`<div class="tlb-photopage" style="page-break-before:always;break-before:page;max-width:720px;margin:0 auto;background:#fff;padding:40px 48px;font-family:Georgia,'Times New Roman',serif;color:${INK}">
-    <div style="${cap};margin-bottom:12px">${esc(o.client)} · ${_R?'Receipt':'Invoice'} #${no}</div>
-    ${big.map(ph=>`<img src="${photoSrc(ph)}" style="width:100%;max-height:820px;object-fit:contain;margin-bottom:18px">`).join('')}
+    <div style="${cap};margin-bottom:14px">${esc(o.client)} · ${_R?'Receipt':'Invoice'} #${no}</div>
+    <div class="tlb-photogrid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      ${big.map(p=>`<div><img src="${photoSrc(p.src)}" style="width:100%;max-height:430px;object-fit:cover;border-radius:3px;display:block">${p.label?`<div style="${SANS};font-size:11.5px;font-weight:600;text-align:center;margin-top:7px">${esc(p.label)}</div>`:''}</div>`).join('')}
+    </div>
   </div>`:'';
-  return `${phoneCss}<div class="tlb-inv" style="font-family:Georgia,'Times New Roman',serif;color:${INK};max-width:720px;margin:0 auto;background:#fff;padding:32px 48px">
+  return `${phoneCss}<div class="tlb-inv" style="font-family:Georgia,'Times New Roman',serif;color:${INK};max-width:720px;margin:0 auto;background:#fff;border-top:5px solid ${DARK};padding:28px 48px 32px">
     <div class="tlb-head" style="display:flex;align-items:flex-start;gap:20px">
       <div style="flex:1;min-width:0">
         <div style="font-size:23px;font-weight:700;letter-spacing:.02em">${esc(co.name||tenantName())}</div>
         <div style="${SANS};font-size:12px;color:${DIM};line-height:1.6;margin-top:6px">
           ${co.address?`<span style="white-space:pre-line">${esc(co.address)}</span><br>`:''}
-          ${[co.phone,co.email].filter(Boolean).map(esc).join(' · ')}
+          ${[co.phone,co.email].filter(Boolean).map(esc).join('<br>')}
           ${co.reg?'<br>'+esc(co.reg):''}
         </div>
       </div>
@@ -8094,15 +8156,16 @@ function invoiceInner(o,kind){const _R=kind==='receipt';
     </div>
     <table style="width:100%;border-collapse:collapse;margin-top:20px">
       <thead><tr style="background:${DARK};color:#fff">
-        <th style="${cap};color:#fff;text-align:left;padding:8px 11px">Item</th>
-        <th class="tlb-only-wide" style="${cap};color:#fff;text-align:right;padding:8px 11px;width:112px">Price</th>
-        <th class="tlb-only-wide" style="${cap};color:#fff;text-align:right;padding:8px 11px;width:62px">Qty</th>
-        <th style="${cap};color:#fff;text-align:right;padding:8px 11px;width:120px">Amount</th>
+        <th style="${cap};color:#fff;text-align:left;padding:8px 8px 8px 7px">Item</th>
+        <th class="tlb-cnum" style="${cap};color:#fff;text-align:right;padding:8px 5px">Price</th>
+        <th class="tlb-cqty" style="${cap};color:#fff;text-align:center;padding:8px 2px">Qty</th>
+        ${anyDisc?`<th class="tlb-cnum" style="${cap};color:#fff;text-align:right;padding:8px 5px">Disc.</th>`:''}
+        <th class="tlb-cnum" style="${cap};color:#fff;text-align:right;padding:8px 7px 8px 5px">Amount</th>
       </tr></thead>
       <tbody>${items}${batchNote}</tbody>
     </table>
     <div class="tlb-foot" style="display:flex;gap:26px;margin-top:20px;align-items:flex-start">
-      ${ship}
+      <div style="flex:1"></div>
       <div class="tlb-totals" style="flex:0 0 auto;width:288px">
         ${totals}
         <div style="display:flex;align-items:baseline;padding:12px 0 0">

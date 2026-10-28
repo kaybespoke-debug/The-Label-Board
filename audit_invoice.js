@@ -139,10 +139,17 @@ ok(/400,000\.00/.test(d),'the unit price is not printed beside the amount');
 // --- the client's email, which was the one contact detail never shown ---------------
 ok(d.indexOf('ellis@example.com')>=0,'the client’s email is not on the invoice');
 
-// --- the shipment, all four parts, not just the fee ---------------------------------
-['Red Star Express','Victoria Island','RSE-884120','Dispatched'].forEach(bit=>{
-  ok(d.indexOf(bit)>=0,'the invoice drops the shipment’s '+bit+'; the order knows it and the client is not told');
+// --- the shipment, which is NOT on the invoice -------------------------------------
+/* It used to be, all four parts of it, and that was right at the time. Taken off on
+   28 October: "we dont need shipment details on the invoice". The order still carries the
+   courier, the address, the waybill and the status, and the client is still told on the
+   order screen; what the invoice keeps is the fee, because that is money owed. This
+   checks BOTH halves, because a check that only watched the courier go would pass just as
+   happily if the fee went with it. */
+['Red Star Express','Victoria Island','RSE-884120'].forEach(bit=>{
+  ok(d.indexOf(bit)<0,'the courier’s '+bit+' is back on the invoice; the client is being handed logistics they did not ask for');
 });
+ok(/Delivery/.test(d),'the delivery fee came off the invoice along with the courier, so the client is billed for carriage nowhere');
 
 // --- two trading addresses print as two lines ---------------------------------------
 run("SETTINGS.company=Object.assign({},SETTINGS.company,{address:'Lagos, Nigeria\\nStotfold, UK'});save('layi_dash_settings',SETTINGS);");
@@ -429,12 +436,21 @@ ok(f.total===755000+f.tax+15000,'the total does not follow line discount, then o
  ok(a.tax===b.tax,'putting the carriage up moved the tax, so the studio is charging its tax on the courier');
  asInvoice({delivery:BASE.delivery});}
 
-/* --- and the client is shown where the figure came from ---------------------------- */
+/* --- and the client is shown where the figure came from ----------------------------
+   It used to be printed as a sentence in the item cell: "800,000.00 less 5,000.00
+   discount". Replaced on 28 October by a column of its own, because a client checking a
+   bill reads columns and because a studio putting ONE item in a run of six on sale wants
+   that visible at a glance rather than buried in prose. */
 d=doc();
-ok(/800,000\.00 less .{0,12}5,000\.00 discount/.test(d),
-  'a discount on one piece is taken off the invoice silently, so the client cannot check the line');
+ok(/>Disc\.</.test(d),'an item is discounted and the invoice has no discount column');
+ok(/5,000\.00/.test(d),'the discount on the line is not printed, so the client cannot check it');
+ok(!/less .{0,12}5,000\.00 discount/.test(d),'the discount is still being told as a story as well as shown as a column');
 ok(/795,000\.00/.test(d),'the line amount is not its gross less its own discount');
 ok(txt().indexOf('less')>=0,'the message summary drops the discount that is on the line');
+/* and no column of dashes on the invoices that have no discount at all */
+{asInvoice({outfits:[Object.assign({},BASE.outfits[0],{discount:0})]});
+ ok(!/>Disc\.</.test(doc()),'nothing is discounted and the invoice prints an empty discount column anyway');
+ asInvoice({outfits:[Object.assign({},BASE.outfits[0],{discount:5000})]});}
 
 /* --- the product code ---------------------------------------------------------------- */
 asInvoice({outfits:[Object.assign({},BASE.outfits[0],{code:'SKU12345'})]});
@@ -535,13 +551,28 @@ ok(/<style>[\s\S]*?<\/style>/.test(d),'the invoice carries no rules of its own, 
  ok(/@media\(max-width:600px\)|@media \(max-width: ?600px\)/.test(css),'nothing in the invoice changes on a narrow screen');
  ok(/@media print/.test(css),'the narrow layout is not put back for printing, so a phone prints a phone invoice');}
 ok(d.indexOf('class="tlb-inv"')>=0,'the invoice has no root class, so none of its own rules can reach it');
-// the two columns that are dropped, and the line that replaces them
-ok((d.match(/class="tlb-only-wide"/g)||[]).length>=4,'the Price and Qty columns are not marked as the wide-screen ones');
-ok(d.indexOf('class="tlb-only-narrow"')>=0,'nothing carries the price and quantity when their columns are dropped');
+/* Every column, at every width. Price and Qty used to be DROPPED under 600px and folded
+   into the item cell as a line of text, because four columns and a currency symbol did
+   not fit 360px. Kayode asked on 28 October for Item, Price, Qty, Discount and Amount,
+   and a column a phone cannot show is not a column. So what changes on a narrow screen is
+   now the FORMAT of the figure, not whether it is there: the sheet a client is handed
+   prints ₦385,000.00, a phone prints 385,000. */
+['>Price<','>Qty<','>Amount<'].forEach(h=>
+  ok(d.indexOf(h)>=0,'the '+h.replace(/[<>]/g,'')+' column is not on the invoice'));
+/* One item, nothing discounted: the money cells are Price and Amount, so two of each.
+   Counting them EQUAL is the check that matters — a figure marked wide with no narrow
+   twin is a figure that vanishes on a phone. */
+{const wides=(d.match(/class="tlb-only-wide"/g)||[]).length;
+ const narrows=(d.match(/class="tlb-only-narrow"/g)||[]).length;
+ ok(wides>=2,'the full-format figures are not marked, so a printed sheet cannot differ from a phone');
+ ok(narrows===wides,'a figure is marked for one width and not the other, so it disappears at the other: '+wides+' wide, '+narrows+' narrow');}
 {const narrow=(d.match(/class="tlb-only-narrow"[^>]*>([^<]*)</)||[])[1]||'';
- ok(/400,000\.00/.test(narrow)&&/2/.test(narrow),
-   'the narrow line does not carry the price and the quantity, so dropping the columns loses them: '+narrow);}
-// and the blocks that have to stack rather than sit side by side
+ ok(/^[\d,]+$/.test(narrow),'the narrow figure is not the compact one, so a phone is being handed the wide format: '+narrow);
+ const wide=(d.match(/class="tlb-only-wide"[^>]*>([^<]*)</)||[])[1]||'';
+ ok(/\.\d\d$/.test(wide),'the wide figure has lost its kobo: '+wide);}
+{const css=(d.match(/<style>([\s\S]*?)<\/style>/)||['',''])[1];
+ ok(/\.tlb-only-wide\{display:none\}/.test(css.replace(/\s/g,'')),'the wide format is not hidden on a narrow screen, so both print at once');
+ ok(!/display:table-cell/.test(css),'a column is still being hidden as a table cell, which is the layout that was replaced');}
 ['tlb-head','tlb-billto','tlb-foot','tlb-totals','tlb-meta','tlb-sig'].forEach(c=>
   ok(d.indexOf('class="'+c+'"')>=0,'the '+c.replace('tlb-','')+' block is not marked, so it cannot stack on a phone'));
 
