@@ -1365,7 +1365,7 @@ body.modal-open{overflow:hidden}
         <div class="stat-grid" id="mktStats"></div>
         <div class="toolbar"><span style="flex:1"></span><button class="btn sm" onclick="openCampaign('all')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a4 4 0 0 1 0 7"/></svg>New campaign</button></div>
         <div class="cols">
-          <div class="panel"><div class="panel-head"><h3>Client segments</h3><span class="page-sub">tap to message a group</span></div><div id="mktSegments"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Client segments</h3></div><div id="mktSegments"></div></div>
           <div class="panel"><div class="panel-head"><h3>Campaign history</h3><span class="page-sub" id="mktHistSub"></span></div><div id="mktHistory"></div></div>
         </div>
       </section>
@@ -1389,7 +1389,7 @@ body.modal-open{overflow:hidden}
           <div class="panel"><div class="panel-head"><h3>Money in by channel</h3><div style="display:flex;align-items:center;gap:10px"><span class="page-sub" id="finMoneyInSub"></span><button class="btn sm" onclick="openLogPayment()">+ Log payment</button></div></div><div id="finMoneyIn"></div></div>
           <div class="panel"><div class="panel-head"><h3>How the money moved</h3><span class="page-sub" id="finMethodSub"></span></div><div id="finMethods"></div></div>
           <div class="cols">
-            <div class="panel dash-panel"><div class="panel-head"><h3>Revenue vs Expenses</h3><span class="page-sub">last 6 months</span></div><div id="finTrend"></div></div>
+            <div class="panel dash-panel"><div class="panel-head"><h3>Revenue vs Expenses</h3></div><div id="finTrend"></div></div>
             <div class="panel dash-panel"><div class="panel-head"><h3>Where the money goes</h3><span class="page-sub" id="finDonutSub"></span></div><div id="finExpDonut"></div></div>
           </div>
           <div class="panel"><div class="panel-head"><h3>Cash flow</h3><span class="page-sub" id="finFlowSub"></span></div><div id="finFlow"></div></div>
@@ -1406,7 +1406,7 @@ body.modal-open{overflow:hidden}
           <div class="stat-grid" id="payStats"></div>
           <div class="toolbar"><input type="text" class="fld search" id="paySearch" placeholder="Search staff…" oninput="renderPayrollView()"><span style="flex:1"></span><button class="btn sm" onclick="openStaff()">+ Add staff</button></div>
           <div class="panel"><div class="panel-head"><h3>Monthly payslips</h3></div>
-            <p class="page-sub" style="margin-bottom:12px">Generate payslips for every staff member for a given month. Opens as a print/PDF sheet you can save and send.</p>
+            
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><select class="fld" id="payslipMonth" style="max-width:220px"></select><button class="btn sm" onclick="printAllPayslips()">⬇ Download all payslips</button></div>
           </div>
           <div class="panel"><div class="panel-head"><h3>Staff & Commission</h3><span class="page-sub" id="payInfo"></span></div><div id="payroll"></div></div>
@@ -1419,7 +1419,7 @@ body.modal-open{overflow:hidden}
           <div class="stat-grid" id="potStats"></div>
           <div class="reinvest" id="reinvest"></div>
           <div class="toolbar"><input type="text" class="fld search" id="potSearch" placeholder="Search pots…" oninput="renderPotsView()"><span style="flex:1"></span><button class="btn sm" onclick="openPot()">+ New pot</button></div>
-          <div class="panel"><div class="panel-head"><h3>Funds & Reserves</h3><span class="page-sub">Set money aside per order or anytime</span></div><div id="pots"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Funds & Reserves</h3></div><div id="pots"></div></div>
           <div class="panel"><div class="panel-head"><h3>Money set aside &amp; taken out <span class="page-sub" id="potMovesSub"></span></h3></div><div id="potMoves"></div></div>
         </div>
       </section>
@@ -1474,18 +1474,18 @@ body.modal-open{overflow:hidden}
       </section>
       <section class="view" id="view-companylog">
         <div class="toolbar"><input type="text" class="fld search" id="companyLogSearch" placeholder="Search the log…" oninput="renderCompanyLog()"><span style="flex:1"></span><button class="btn sm" onclick="openLogEntry()">+ Add entry</button></div>
-        <div class="panel"><div class="panel-head"><h3>Company log</h3><span class="page-sub">A diary of notable studio events: hires, price changes, closures, incidents</span></div><div id="companyLogList"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Company log</h3></div><div id="companyLogList"></div></div>
       </section>
       <section class="view" id="view-mywork"><div id="myWorkBody"></div></section>
       <section class="view" id="view-settings">
         <div class="panel" id="usersPanel">
           <div class="panel-head"><h3>Team accounts</h3><button class="btn sm" onclick="openUser()">+ Add account</button></div>
-          <p class="page-sub" style="margin-bottom:12px">Each person signs in with their own username &amp; password. Assign a role to control what they can see and do.</p>
+          
           <div id="usersList"></div>
         </div>
         <div class="panel" id="rolesPanel">
           <div class="panel-head"><h3>Roles &amp; permissions</h3><span><button class="btn sm ghost" onclick="resetRoles()">Reset</button> <button class="btn sm" onclick="addRole()">+ New role</button></span></div>
-          <p class="page-sub" style="margin-bottom:12px">Tap a page or permission to turn it on (green) or off. Add roles to match how your studio is staffed.</p>
+          
           <div id="rolesList"></div>
         </div>
         <div class="panel">
@@ -1508,7 +1508,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" id="bizDoesPanel" data-setperm="settings">
           <div class="panel-head"><h3>What your studio does</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Tick what you work in, then how each one reaches your customer. We'll show only the tools you need.</p>
+          
           <div id="bizDoesBox" style="display:flex;flex-wrap:wrap;gap:10px"></div>
           
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);margin-top:16px;border-top:1px solid var(--line-soft);padding-top:14px"><input type="checkbox" id="set_teamtools" onchange="toggleTeamTools(this.checked)"> <span>I work with a team <span style="color:var(--text-faint);font-weight:400">(shows Team, Rota, Attendance, Leave &amp; Payroll</span></span></label>
@@ -1516,7 +1516,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setCompany">
           <div class="panel-head"><h3>How the owner is paid</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Choose how you (the owner) take money out. New orders use this automatically, and you can still override a single order.</p>
+          
           <div class="row2">
             <div class="field"><label>Pay basis</label><select class="fld" id="op_basis" onchange="onOwnerPayBasis()">
               <option value="pctProfit">Percentage of profit</option>
@@ -1531,17 +1531,17 @@ body.modal-open{overflow:hidden}
           <button class="btn" id="opSaveBtn" onclick="saveOwnerPay()" style="margin-top:10px">Save owner pay</button>
         </div>
         <div class="panel">
-          <div class="panel-head"><h3>Notifications</h3><span class="page-sub">sound &amp; alerts</span></div>
+          <div class="panel-head"><h3>Notifications</h3></div>
           <div id="notifSettings"></div>
         </div>
         <div class="panel" data-setperm="setCompany">
-          <div class="panel-head"><h3>Storage</h3><span class="page-sub">photos &amp; documents</span></div>
+          <div class="panel-head"><h3>Storage</h3></div>
           <div id="storageMeter"></div>
           <div id="storageLocalNote" class="sd" style="color:var(--text-faint);margin-top:8px"></div>
         </div>
         <div class="panel" data-setperm="setCompany">
           <div class="panel-head"><h3>Company details</h3></div>
-          <p class="page-sub" style="margin-bottom:14px">Used on invoices and receipts you send to clients.</p>
+          
           <div class="field"><label>Logo</label><div style="display:flex;align-items:center;gap:14px"><div id="logoPreview" style="width:64px;height:64px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Upload logo</button><button class="btn ghost sm" onclick="clearLogo()">Remove</button><input type="file" id="logoFile" accept="image/*" style="display:none" onchange="uploadLogo(this)"></div></div>
           <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="Your studio name"></div>
           <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@yourlabel.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
@@ -1572,7 +1572,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel">
           <div class="panel-head"><h3>Message templates</h3></div>
-          <p class="page-sub" style="margin-bottom:14px">Default wording for the messages you send clients. Use <b>{client}</b>, <b>{order}</b>, <b>{balance}</b>, <b>{brand}</b>. They fill in automatically.</p>
+          
           <div class="field"><label>Order confirmed</label><textarea class="fld" id="tpl_confirm" rows="3"></textarea></div>
           <div class="field"><label>Ready for collection / delivery</label><textarea class="fld" id="tpl_ready" rows="3"></textarea></div>
           <div class="field"><label>Payment reminder</label><textarea class="fld" id="tpl_reminder" rows="3"></textarea></div>
@@ -1586,7 +1586,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel">
           <div class="panel-head"><h3>Order defaults</h3></div>
-          <p class="page-sub" style="margin-bottom:14px">Sensible starting values, used to pre-fill new orders so you type less.</p>
+          
           <div class="field"><label>Reporting currency (your books)</label><select class="fld" id="setCurrency">
             <option value="NGN">Naira (₦)</option>
             <option value="GBP">Pound (£)</option>
@@ -1606,13 +1606,13 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setBranches">
           <div class="panel-head"><h3>Branches &amp; outlets</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Add each shop, studio or outlet you operate. Orders, sales, expenses and staff can then be tagged to a branch.</p>
+          
           <div id="unplacedNotice"></div>
           <div id="branchBox"></div>
         </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Production workflow</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">The stages every order moves through. Tailor the making stages to how your studio works. <b>Order Received</b> opens every order, and <b>Quality Check → Ready for Delivery → Dispatched → Delivered</b> close it out. Those are added automatically.</p>
+          
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="stagePresetChips"></div>
           <div class="field"><label>Making stages, one per line, in order</label><textarea class="fld" id="set_stages" rows="7" placeholder="Cutting&#10;Stitching&#10;Finishing" oninput="renderStagePreview()"></textarea></div>
           <div id="stagePreview" class="sd" style="color:var(--text-faint);margin-bottom:12px"></div>
@@ -1637,7 +1637,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setWorkflow" id="payMethodPanel">
           <div class="panel-head"><h3>How you get paid</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">The ways money comes in and goes out of your studio. These are what you pick from when you record a payment, so the list should match how you actually trade &mdash; add Opay, Moniepoint, PalmPay, MoMo, a card machine, whatever you use.</p>
+          
           <div class="field"><label>One per line, in the order you use them most</label><textarea class="fld" id="set_paymethods" rows="7" placeholder="Bank transfer&#10;Cash&#10;POS"></textarea></div>
           <div class="field"><label>Usual method for routine outgoings</label><select class="fld" id="set_defmethod"></select>
             </div>
@@ -1645,24 +1645,24 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setWorkflow" id="payrollSetupPanel">
           <div class="panel-head"><h3>Pay, allowances &amp; deductions</h3></div>
-          <p class="page-sub" style="margin-bottom:12px">Everything here is off to begin with. A studio that pays a basic and nothing else never has to look at it, and payslips print exactly as they do now. Switch on only what your business actually runs.</p>
+          
           <div id="payrollSetupBox"></div>
           <button class="btn" id="payrollSaveBtn" onclick="savePayrollPanel()" style="margin-top:12px">Save pay setup</button>
         </div>
         <div class="panel" data-setperm="setWorkflow">
           <div class="panel-head"><h3>Products &amp; materials</h3><button class="btn sm" onclick="addCatalogProduct()">+ Add product</button></div>
-          <p class="page-sub" style="margin-bottom:14px">Everything your studio makes or sells, each with the materials it can use.</p>
+          
           <div id="catalogBox"></div>
           <button class="btn" id="catalogSaveBtn" onclick="saveCatalog()" style="margin-top:12px">Save products &amp; materials</button>
         </div>
         <div class="panel" data-setperm="setWorkflow">
-          <div class="panel-head"><h3>Stock used per product <span class="page-sub" style="font-weight:400">(auto-deduct from inventory)</span></h3></div>
+          <div class="panel-head"><h3>Stock used per product </h3></div>
           <p class="page-sub" id="matPerTypeSub" style="margin-bottom:12px">Set the materials each garment type uses, as a reference for what each piece consumes.</p>
           <div id="recipeBox"></div>
         </div>
         <div class="panel" data-setperm="setCatalog">
           <div class="panel-head"><h3>Quality control checklist</h3></div>
-          <p class="page-sub" style="margin-bottom:6px">The checks your team ticks off before an order passes QC. One per line.</p>
+          
           <div class="sd" id="qcWhere" style="color:var(--text-faint);margin-bottom:12px"></div>
           <div class="field"><textarea class="fld" id="set_qc" rows="8" placeholder="Construction sound&#10;Measurements match the spec&#10;Symmetry — left matches right"></textarea></div>
           <button class="btn" id="qcSaveBtn" onclick="saveQCChecklist()">Save checklist</button>
@@ -1670,7 +1670,7 @@ body.modal-open{overflow:hidden}
         <div class="panel" data-setperm="setCatalog">
           <div class="panel-head"><h3>Loyalty tiers</h3></div>
           <label class="switch" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="set_loyalty"> <span>Use loyalty tiers in this studio <span style="color:var(--text-faint);font-weight:400">(turn off if you do not run a loyalty scheme)</span></span></label>
-          <p class="page-sub" style="margin-bottom:14px">A customer's tier is based on total spend. Name each tier and set the minimum to reach it.</p>
+          
           <div class="field"><label>Base tier name (everyone new, from 0)</label><input class="fld" id="tier_n0" placeholder="Starter"></div>
           <div class="row2"><div class="field"><label>Tier 2 name</label><input class="fld" id="tier_n1" placeholder="Bronze"></div><div class="field"><label>… reached from</label><input class="fld money" type="text" inputmode="decimal" id="tier_m1"></div></div>
           <div class="row2"><div class="field"><label>Tier 3 name</label><input class="fld" id="tier_n2" placeholder="Silver"></div><div class="field"><label>… reached from</label><input class="fld money" type="text" inputmode="decimal" id="tier_m2"></div></div>
@@ -1680,13 +1680,13 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setCatalog">
           <div class="panel-head"><h3>Inventory categories</h3></div>
-          <p class="page-sub" style="margin-bottom:14px">Tailor your stock categories to your studio. Tick <b>production material</b> for anything that goes into making an outfit (it feeds outfit costing). Add subcategories by typing them when you add an item.</p>
+          
           <div id="invCatList"></div>
           <div style="display:flex;gap:8px;margin-top:12px"><button class="btn ghost sm" onclick="addInvCatRow()">+ Add category</button><span style="flex:1"></span><button class="btn" id="invCatSaveBtn" onclick="saveInvCats()">Save categories</button></div>
         </div>
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Backup &amp; restore</h3></div>
-          <p class="page-sub" style="margin-bottom:16px">Your work syncs to our servers, so it is safe if this device is lost, and we keep a nightly copy of every studio. A backup is the extra copy you hold yourself, which is worth having before you import anything or make a big change. Restoring the file on any device brings everything back exactly as it was.</p>
+          
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn" onclick="exportData()">⤓ Export backup</button>
             <button class="btn ghost" onclick="document.getElementById('importFile').click()">⤒ Restore from backup</button>
@@ -1698,12 +1698,12 @@ body.modal-open{overflow:hidden}
              no costs and no phone numbers in it. -->
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Your data, from the server</h3></div>
-          <p class="page-sub" style="margin-bottom:16px">Everything the studio has, gathered where all of it is visible — orders with their costs, clients with their contact details, and the full activity log. The backup above only holds what this device was allowed to see.</p>
+          
           <button class="btn" id="srvExportBtn" onclick="exportStudioFromServer()">⤓ Download everything</button>
         </div>
         <div class="panel" data-setperm="setData" id="closingPanel">
           <div class="panel-head"><h3>Closing</h3></div>
-          <p class="page-sub" style="margin-bottom:16px">Closing the studio signs everybody out and stops the subscription. <strong>Nothing is deleted for 30 days</strong> — you can reopen it, or download everything, at any point in that time.</p>
+          
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn danger" id="closeStudioBtn" onclick="closeThisStudio()">Close the studio…</button>
             <button class="btn ghost" onclick="deleteMyAccount()">Delete my account…</button>
@@ -1711,7 +1711,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Import old data</h3></div>
-          <p class="page-sub" style="margin-bottom:16px">Bring your history across from another app, a spreadsheet or your old website. Columns are matched automatically, and re-importing updates records rather than duplicating them.</p>
+          
           <button class="btn" onclick="openImportMigrate()">⤒ Bring your data across ›</button>
         </div>
         <div class="panel" data-setperm="setData">
@@ -1727,7 +1727,7 @@ body.modal-open{overflow:hidden}
              door. So it moved, it did not go. -->
         <div class="panel">
           <div class="panel-head"><h3>About</h3></div>
-          <p class="page-sub" style="margin-bottom:10px">If you ever report a problem, this is the one thing worth telling us. It says exactly which version your device is running.</p>
+          
           <div id="buildStamp" style="color:var(--text-dim);font-size:13px;letter-spacing:.04em"></div>
           <!-- Two lines, not one, because they answer different questions. The
                first is the build this page is RUNNING. The second is the build
@@ -2792,7 +2792,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v76';
+const APP_VERSION='layi-v77';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -6027,7 +6027,7 @@ function openMyAccount(){
   if(!currentUser)return;const u=getUsers().find(x=>x.id===currentUser.id)||currentUser;const isLive=!getUsers().some(x=>x.id===currentUser.id);
   const pwField=(id,ph)=>`<div style="position:relative"><input type="password" class="fld" id="${id}" placeholder="${ph}" style="padding-right:52px" autocomplete="off" oninput="acctDirty()"><span onclick="togglePwField('${id}',this)" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-dim);font-size:13px;user-select:none">Show</span></div>`;
   openModal(`<h3>My account</h3><div class="msub">${esc(u.name)} · ${esc(roleName(u.roleId))}</div>
-    <p class="page-sub" style="margin-bottom:14px">Change your own sign-in details to something you'll remember. Only affects your account.</p>
+    
     <div class="field"><label>Display name</label><input class="fld" id="my_name" value="${esc(u.name)}" oninput="acctDirty()"></div>
     <div class="field"><label>${isLive?'Email (sign-in)':'Username (used to sign in)'}</label><input class="fld" id="my_username" value="${esc(u.username||u.email||'')}" ${isLive?'readonly style="opacity:.7"':'oninput="acctDirty()"'} autocomplete="off"></div>
     <div class="row2"><div class="field"><label>Email</label><input class="fld" type="email" id="my_email" value="${esc(u.email||'')}" placeholder="you@example.com" autocomplete="off" oninput="acctDirty()"></div><div class="field"><label>Phone</label><input class="fld" type="tel" id="my_phone" value="${esc(u.phone||'')}" placeholder="e.g. 080…" autocomplete="off" oninput="acctDirty()"></div></div>
@@ -12201,7 +12201,7 @@ function offerFeedback(id){const o=rawOrders().find(x=>x.id===id);if(!o){closeMo
   const wa=o.whatsapp?('https://wa.me/'+String(o.whatsapp).replace(/[^0-9]/g,'')+'?text='+encodeURIComponent(msg)):'';
   const mail=o.email?('mailto:'+encodeURIComponent(o.email)+'?subject='+encodeURIComponent('How was your '+(o.garment||'order')+'?')+'&body='+encodeURIComponent(msg)):'';
   openModal(`<h3>✓ Delivered</h3><div class="msub">${esc(o.client||'Client')}${o.garment?' · '+esc(o.garment):''}</div>
-    <p class="page-sub" style="margin-bottom:12px">Nice work. Would you like to request feedback from the client now?</p>
+    
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${wa?`<a class="btn" href="${wa}" target="_blank">Ask on WhatsApp</a>`:''}
       ${mail?`<a class="btn ghost" href="${mail}">Ask by email</a>`:''}
@@ -12969,7 +12969,74 @@ function capStatGrids(){
   });
 }
 if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('resize',function(){capStatGrids();});
-function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();capStatGrids();}
+/* SETTINGS WAS 27 PANELS STACKED, which on a phone is about twenty screens of
+   scrolling to reach the one switch somebody came for. Each panel becomes a
+   title row that opens when tapped, closed by default on a phone and left
+   open on a desktop, where the room exists and nobody has complained.
+
+   Done by walking the view rather than by editing 27 panels, for two reasons:
+   a panel added next month gets this for free, and a hand edit across 27
+   blocks is the shape that has half-applied twice in this repo. Idempotent,
+   so calling it on every render costs nothing. */
+/* Put a panel back the way it was found: used when one turns out to live
+   inside a group, which already has a chevron of its own. */
+function unwirePanel(p){
+  const head=p.querySelector(".panel-head");
+  const body=p.querySelector(".panel-collapse");
+  if(body){while(body.firstChild)p.appendChild(body.firstChild);body.remove();}
+  if(head){
+    head.classList.remove("pcol");
+    head.removeAttribute("onclick");
+    const c=head.querySelector(".collapse-chev");if(c)c.remove();
+  }
+  p.classList.remove("collapsed");
+  delete p.dataset.collapsible;
+  delete p.dataset.tog;
+}
+function makeSettingsCollapsible(){
+  const v=document.getElementById("view-settings");if(!v)return;
+  const phone=window.matchMedia&&window.matchMedia("(max-width:680px)").matches;
+  /* Anything inside #setGroups already has a group header with its own
+     chevron. A second one inside it is two taps for one switch. */
+  const grouped=document.getElementById("setGroups");
+  /* The groups are built at runtime and the panels are MOVED into them. Wiring
+     a panel before that move happens travels with it, so wait for the move. */
+  if(!grouped||!grouped.querySelector(".panel"))return;
+  /* The groups are appended after the panels that have none, which puts
+     Closing and About above everything. Once, on the first pass. */
+  if(!window.__setOrdered){
+    window.__setOrdered=1;
+    if(v.firstChild!==grouped)v.insertBefore(grouped,v.firstChild);
+    if(phone)v.querySelectorAll(".set-group").forEach(function(g){g.classList.add("collapsed");});
+  }
+  v.querySelectorAll(".panel").forEach(function(p){
+    if(grouped.contains(p)){
+      if(p.dataset.collapsible)unwirePanel(p);   // wired on an earlier pass, before the move
+      return;
+    }
+    if(p.dataset.collapsible){
+      /* already wired. Only the default changes, and only for a panel the
+         person has not opened or closed themselves. */
+      if(!p.dataset.tog)p.classList.toggle("collapsed",!!phone);
+      return;
+    }
+    const head=p.querySelector(".panel-head");if(!head)return;
+    const body=document.createElement("div");
+    body.className="panel-collapse";
+    while(head.nextSibling)body.appendChild(head.nextSibling);
+    if(!body.childNodes.length)return;          // nothing to hide
+    p.appendChild(body);
+    head.classList.add("pcol");
+    const chev=document.createElement("span");
+    chev.className="collapse-chev";chev.textContent="\u25be";
+    head.appendChild(chev);
+    head.setAttribute("onclick","togglePanel('"+(p.id||"")+"')");
+    if(!p.id){p.id="setpan_"+Math.random().toString(36).slice(2,8);head.setAttribute("onclick","togglePanel('"+p.id+"')");}
+    p.dataset.collapsible="1";
+    p.classList.toggle("collapsed",!!phone);
+  });
+}
+function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();capStatGrids();makeSettingsCollapsible();}
 function statTone(label,val){
   const l=(label||'').toLowerCase();let tone;
   if(/overdue|out of stock|past due|outstanding|owed|pending/.test(l))tone='alert';
@@ -14909,7 +14976,7 @@ function renderPayrollView(){
   const psm=document.getElementById('payslipMonth');if(psm&&(!psm.options||!psm.options.length)){const n=new Date();let html='';for(let i=0;i<12;i++){const d=new Date(n.getFullYear(),n.getMonth()-i,1);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');html+=`<option value="${k}">${monthLabel(k)}</option>`;}psm.innerHTML=html;}
 }
 function printOnePayslip(id){const k=(document.getElementById('payslipMonth')&&document.getElementById('payslipMonth').value)||new Date().toISOString().slice(0,7);const w=window.open('','_blank');if(!w){alert('Allow pop-ups to open the payslip.');return;}w.document.write(`<!doctype html><html><head><title>Payslip · ${monthLabel(k)}</title><meta charset="utf-8"><style>body{margin:0;background:#fff}@media print{@page{margin:14mm}}</style></head><body>${payslipInner(id,k)}</body></html>`);w.document.close();}
-function sendPayslip(id){const s=getStaff().find(x=>x.id===id);if(!s)return;const k=(document.getElementById('payslipMonth')&&document.getElementById('payslipMonth').value)||new Date().toISOString().slice(0,7);const co=tenantName()||'your studio';const msg=`Hi ${s.name||''}, your payslip for ${monthLabel(k)} from ${co} is ready. I'll share the PDF with you here. Thank you.`;const num=String(s.whatsapp||s.phone||'').replace(/[^0-9]/g,'');const email=s.email||'';let opts=[];if(num)opts.push(`<a class="btn" href="https://wa.me/${num}?text=${encodeURIComponent(msg)}" target="_blank">WhatsApp</a>`);if(email)opts.push(`<a class="btn ghost" href="mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Payslip · '+monthLabel(k))}&body=${encodeURIComponent(msg)}">Email</a>`);openModal(`<h3>Send payslip</h3><div class="msub">${esc(s.name)} · ${monthLabel(k)}</div><p class="page-sub" style="margin:8px 0 12px">Open the payslip and save it as a PDF, then send it to ${esc((s.name||'').split(' ')[0]||'them')} with a note.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><button class="btn ghost" onclick="printOnePayslip('${id}')">⬇ Open payslip (save as PDF)</button>${opts.join('')}</div>${(!num&&!email)?'<div class="kv" style="color:var(--text-faint)">No WhatsApp or email on file. Add it in their profile.</div>':''}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>`);}
+function sendPayslip(id){const s=getStaff().find(x=>x.id===id);if(!s)return;const k=(document.getElementById('payslipMonth')&&document.getElementById('payslipMonth').value)||new Date().toISOString().slice(0,7);const co=tenantName()||'your studio';const msg=`Hi ${s.name||''}, your payslip for ${monthLabel(k)} from ${co} is ready. I'll share the PDF with you here. Thank you.`;const num=String(s.whatsapp||s.phone||'').replace(/[^0-9]/g,'');const email=s.email||'';let opts=[];if(num)opts.push(`<a class="btn" href="https://wa.me/${num}?text=${encodeURIComponent(msg)}" target="_blank">WhatsApp</a>`);if(email)opts.push(`<a class="btn ghost" href="mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Payslip · '+monthLabel(k))}&body=${encodeURIComponent(msg)}">Email</a>`);openModal(`<h3>Send payslip</h3><div class="msub">${esc(s.name)} · ${monthLabel(k)}</div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><button class="btn ghost" onclick="printOnePayslip('${id}')">⬇ Open payslip (save as PDF)</button>${opts.join('')}</div>${(!num&&!email)?'<div class="kv" style="color:var(--text-faint)">No WhatsApp or email on file. Add it in their profile.</div>':''}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>`);}
 function printAllPayslips(){
   const k=(document.getElementById('payslipMonth')&&document.getElementById('payslipMonth').value)||new Date().toISOString().slice(0,7);
   const staff=getStaff().filter(s=>(s.status||'Active')!=='Left Company').filter(s=>(+s.basic>0)||staffMonthEntries(s.id,k).length);
@@ -15882,7 +15949,7 @@ function renderMyWork(){
     <button class="btn ghost" onclick="openMyAccount()">Change my password</button>
   </div>
 
-  </div><div class="ptab-pane" data-pane="pay" style="display:none"><div class="panel"><div class="panel-head"><h3>My Pay</h3><span class="page-sub">Your commissions only</span></div>
+  </div><div class="ptab-pane" data-pane="pay" style="display:none"><div class="panel"><div class="panel-head"><h3>My Pay</h3></div>
     <div class="stat-grid">
       ${stat('This month',cur(E.month),'earned this month','','myDrill(\'month\')')}
       ${stat('This year',cur(E.year),'earned this year','','myDrill(\'year\')')}
@@ -15899,7 +15966,7 @@ function renderMyWork(){
 
   </div><div class="ptab-pane" data-pane="work" style="display:none">${(()=>{const kind=staffKind(s);
     if(kind==='client'){const CS=staffClientStats(s.id);
-      return `<div class="panel"><div class="panel-head"><h3>My Impact</h3><span class="page-sub">clients & business you bring in</span></div>
+      return `<div class="panel"><div class="panel-head"><h3>My Impact</h3></div>
         <div class="stat-grid">
           ${stat('Clients brought in',CS.clients,'introduced by you','','myDrill(\'clients\')')}
           ${stat('Orders introduced',CS.refOrders.length,'from your clients','','myDrill(\'clients\')')}
@@ -15927,15 +15994,15 @@ function renderMyWork(){
     ${myTasks.length?myTasks.map(t=>{const du=t.due?daysUntil(t.due):null;const late=du!==null&&du<0&&!t.done;return`<div class="srow"><div class="smain" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" ${t.done?'checked':''} onchange="toggleMyTask('${t.id}')" style="width:18px;height:18px;accent-color:var(--gold);margin-top:2px"><div><div class="sup-name" style="${t.done?'text-decoration:line-through;opacity:.6':''}">${esc(t.title)}</div><div class="sup-meta">${t.due?'due '+new Date(t.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):''}${late?' <span style="color:var(--red)">overdue</span>':''}${t.note?' · '+esc(t.note):''}</div></div></div><div class="sacts"><button class="btn sm ghost" onclick="addTaskNote('${t.id}')">Note</button></div></div>`;}).join(''):'<div class="kv" style="color:var(--text-faint)">No tasks assigned to you right now.</div>'}
     </div>`;})()}
 
-  </div><div class="ptab-pane" data-pane="payslips" style="display:none"><div class="panel"><div class="panel-head"><h3>My Payslips</h3><span class="page-sub">tap a month to open &amp; download</span></div>
+  </div><div class="ptab-pane" data-pane="payslips" style="display:none"><div class="panel"><div class="panel-head"><h3>My Payslips</h3></div>
     ${(()=>{const byMonth={};E.items.forEach(e=>{const d=e.at?new Date(e.at):new Date();const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');const lbl=d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});(byMonth[k]=byMonth[k]||{lbl,total:0}).total+=e.amount;});const ks=Object.keys(byMonth).sort().reverse();return ks.length?ks.map(k=>`<div class="bd-row" style="cursor:pointer" onclick="openPayslip('${s.id}','${k}')"><span class="bl">${byMonth[k].lbl} <span style="color:var(--gold)">›</span></span><span class="bv">${cur(byMonth[k].total)} commission${+s.basic>0?` <span style="color:var(--text-faint)">+ ${cur(s.basic)} basic</span>`:''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No payslips yet. They appear once you have earnings in a month.</div>';})()}
   </div>
 
-  </div><div class="ptab-pane" data-pane="attendance" style="display:none"><div class="panel"><div class="panel-head"><h3>My Attendance</h3><span class="page-sub">recent clock-ins</span></div>
+  </div><div class="ptab-pane" data-pane="attendance" style="display:none"><div class="panel"><div class="panel-head"><h3>My Attendance</h3></div>
     ${(()=>{const u=getUsers().find(x=>x.staffId===s.id);const att=u?getAttendance().filter(a=>a.userId===u.id).sort((a,b)=>b.date.localeCompare(a.date)||(b.inAt||'').localeCompare(a.inAt||'')).slice(0,30):[];return u?(att.length?att.map(a=>`<div class="bd-row"><span class="bl">${new Date(a.date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</span><span class="bv">${fmtTime(a.inAt)}${a.outAt?' – '+fmtTime(a.outAt):' · still in'}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No attendance records yet. Clock in from the Attendance tab.</div>'):'<div class="kv" style="color:var(--text-faint)">No login account linked, so attendance is not tracked.</div>';})()}
   </div>
 
-  </div><div class="ptab-pane" data-pane="leave" style="display:none"><div class="panel"><div class="panel-head"><h3>My Leave</h3><span class="page-sub">time off &amp; absences</span></div>
+  </div><div class="ptab-pane" data-pane="leave" style="display:none"><div class="panel"><div class="panel-head"><h3>My Leave</h3></div>
     ${(()=>{const lv=getLeave().filter(l=>l.staffId===s.id).sort((a,b)=>(b.start||'').localeCompare(a.start||''));return lv.length?lv.map(l=>`<div class="bd-row"><span class="bl">${esc(l.type||'Leave')} <span style="color:var(--text-faint)">${l.start?fmtDateShort(l.start):''}${l.end&&l.end!==l.start?' – '+fmtDateShort(l.end):''}</span></span><span class="bv">${leaveDays(l)}d · ${esc(l.status||'')}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No leave booked.</div>';})()}
   </div>
 

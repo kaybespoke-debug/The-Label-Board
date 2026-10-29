@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 29 October 2026 (twenty-eighth session)
+Last updated: 29 October 2026 (twenty-ninth session)
 
 ## 29 October 2026 — the story, swept rather than spotted (layi-v75)
 
@@ -51,6 +51,49 @@ never say done without green gates and a rendered test.
   Re-run as an owner.
 - **Checked the other three apps.** `admin/`, `partners/` and `web/` use none
   of these classes, and none of the cut phrases survive anywhere in the repo.
+
+### And then Settings itself (layi-v77)
+
+*"not just those, take off every explanation and note away from settings, the
+titles are already self explanatory... i dont want to scare or bore people, i
+want even someone unlettered to be able to use the app without having to deal
+with long scrolling."*
+
+- **The second family found.** `page-sub` is a different class on a different
+  element, and the hint sweep never looked at it. That is why three paragraphs
+  survived a sweep that claimed to be complete and were photographed the next
+  morning. **36 static page-sub lines removed** across six views, 33 of them in
+  Settings. The 29 that carry an id are left: they are filled at runtime with a
+  count, a date or a period.
+- **Settings is now ten rows.** Seven groups with icons and a three-word label
+  of what is inside, then Your data, Closing and About. It was 27 stacked
+  panels, roughly twenty phone screens to reach one switch.
+- **Three ordering bugs found by rendering it, none findable by reading code:**
+  the per-panel collapse I added first put a second chevron inside groups that
+  already had one, which is two taps for one switch and the exact repetition he
+  asked me to remove; `#setGroups` is built at runtime so panels were wired
+  before they moved into it; and `#setGroups` is appended, so Settings opened on
+  **Closing** and **About** rather than on the groups. All three fixed, the
+  middle one from both directions (wait for the move, and unwire anything that
+  slipped through).
+- **On a phone every group starts closed.** On a desktop the first stays open.
+- **The ratchet now counts page-sub too, and has no slack left.** It was 71
+  against 69 shipped, and two is exactly how many sentences can be added before
+  anybody notices. It is 69 against 69. Five new static checks hold the Settings
+  shape. Mutation-drilled: adding one paragraph back, and breaking the
+  ordering, both turn it red.
+
+### Open from this pass
+
+- **The red "N changes not saved" pill is real, not decoration.** It means a
+  change on that device failed to reach the server eight times and stopped
+  retrying. Tapping it names what failed, shows the server's reason and offers
+  Try again. **Kayode to tap it once and say what it names** — if it is a
+  persistent failure it is a bug worth finding, and it should not be hidden
+  either way.
+- **Other pages are not yet shortened.** Only Settings was restructured. The
+  dashboard and Orders were capped to four cards on 28 October; Production,
+  Money, Clients and the rest have not been looked at for length.
 
 ### Then, the same day: the field hints too (layi-v76)
 

@@ -118,7 +118,33 @@ run("SETTINGS.branches=SETTINGS.__b;setStaff(SETTINGS.__s);delete SETTINGS.__b;d
       if (plain(win).split(/\s+/).filter(w => w && w !== 'X').length >= 5) prose++;
     }
   });
-  const CEILING = 71;    // 69 on 29 Oct 2026 after the field hints came off, two of slack
+  /* THE SECOND FAMILY. page-sub is a different class on a different element and
+     the counter above never saw it, so three paragraphs survived the whole
+     no-story sweep and were photographed the next morning. One with an id is
+     filled at runtime with a count or a date and is data, not prose. */
+  const PS = /<(p|span|div)([^>]*class="page-sub"[^>]*)>([\s\S]*?)<\/\1>/g;
+  let psm;
+  while ((psm = PS.exec(shipped))) {
+    if (/\bid="/.test(psm[2])) continue;
+    if (plain(psm[3]).split(/\s+/).filter(w => w && w !== 'X').length >= 5) prose++;
+  }
+
+  /* SETTINGS IS A LIST OF TITLES, not a scroll. 27 panels stacked was about
+     twenty phone screens to reach one switch. The seven groups already existed;
+     what was missing was that they came after Closing and About, that the first
+     one opened by default, and that the four panels with no group never
+     collapsed at all. */
+  if (!/function makeSettingsCollapsible\(\)/.test(shipped)) F('Settings no longer collapses on a phone');
+  if (!/capStatGrids\(\);makeSettingsCollapsible\(\)/.test(shipped)) F('makeSettingsCollapsible is defined but never called');
+  if (!/grouped\.contains\(p\)/.test(shipped)) F('a panel inside a group can grow a second chevron again, which is two taps for one switch');
+  if (!/function unwirePanel\(p\)/.test(shipped)) F('nothing undoes a chevron on a panel that is later moved into a group');
+  if (!/insertBefore\(grouped,v\.firstChild\)/.test(shipped)) F('Settings opens on Closing and About again instead of the groups');
+
+  /* NO SLACK. It had two, and two is exactly how many sentences can be added
+     before anybody notices. 69 is what the app ships on 29 October 2026 with
+     page-sub counted. Adding a line means raising this number in the same
+     commit and saying which of the two it is. */
+  const CEILING = 69;
   if (prose > CEILING) F('the app now ships ' + prose + ' lines of prose, over the ' + CEILING +
     ' agreed on 29 October. Either it is consequence and belongs somewhere tighter, or it is story. Raise this number in the same commit and say which.');
   console.log('  prose lines shipped: ' + prose + ' (ceiling ' + CEILING + ')');
