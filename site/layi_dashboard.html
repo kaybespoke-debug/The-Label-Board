@@ -773,6 +773,14 @@ body.modal-open{overflow:hidden}
   .stat .sd{font-size:11px;margin-top:4px;line-height:1.3}
   .stat .stat-more{top:9px;right:10px;font-size:16px}
   .panel{padding:14px 13px;border-radius:13px}
+  /* A SHUT SECTION IS A TITLE AND A CHEVRON. The running count beside the
+     title is the same figure that lives inside the panel, so it waits until
+     the panel is open. The button does not: it is why somebody came. */
+  .panel.collapsed > .panel-head > .page-sub,
+  .panel.collapsed > .panel-head .page-sub{display:none}
+  .panel-head.pcol{flex-wrap:nowrap;gap:8px}
+  .panel-head.pcol > h3{flex:1 1 auto;min-width:0}
+  .panel-head.pcol .collapse-chev{flex:0 0 auto}
   .panel-head h2{font-size:16px}
   .page-title{font-size:21px}
   .stat-grid{gap:8px;margin-bottom:14px}
@@ -912,6 +920,11 @@ body.modal-open{overflow:hidden}
 .mini-stat.pink{background:rgba(212,72,90,.13)}.mini-stat.pink .mini-n{color:var(--red)}
 .mini-stat.teal{background:rgba(60,160,180,.14)}.mini-stat.teal .mini-n{color:var(--blue)}
 .dash-panel{min-height:200px}
+/* A shut panel draws no chart, so it needs no room for one, and a segmented
+   control for content that is not on screen is a control for nothing. Below
+   .dash-panel on purpose: the phone block higher up would lose on order. */
+.panel.collapsed{min-height:0}
+.panel.collapsed > .panel-head .seg{display:none!important}  /* the seg carries an inline display:flex, which wins without this */
 .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:6px 0}
 .donut-svg{width:140px;height:140px}
 .donut-legend{display:flex;flex-direction:column;gap:6px;width:100%}
@@ -2792,7 +2805,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v77';
+const APP_VERSION='layi-v78';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -12993,6 +13006,47 @@ function unwirePanel(p){
   delete p.dataset.collapsible;
   delete p.dataset.tog;
 }
+/* Turn the panels of a view into title rows on a phone. keepOpen names the
+   panels that ARE the page and so are left expanded; everything else starts
+   closed and opens on a tap.
+
+   Panels already wired by hand in the markup (Outstanding Balances and
+   Transactions both carry their own .panel-collapse) are not re-wrapped; only
+   their default changes. And once somebody has tapped a panel themselves,
+   togglePanel stamps data-tog and this stops deciding for them. */
+function collapseViewPanels(viewId,keepOpen){
+  const v=document.getElementById(viewId);if(!v)return;
+  const phone=window.matchMedia&&window.matchMedia("(max-width:680px)").matches;
+  const keep=keepOpen||[];
+  v.querySelectorAll(".panel").forEach(function(p){
+    const head=p.querySelector(".panel-head");if(!head)return;
+    let body=p.querySelector(":scope > .panel-collapse");
+    if(!body){
+      body=document.createElement("div");
+      body.className="panel-collapse";
+      while(head.nextSibling)body.appendChild(head.nextSibling);
+      if(!body.childNodes.length)return;        // a head and nothing to hide
+      p.appendChild(body);
+    }
+    if(!p.id)p.id="vpan_"+Math.random().toString(36).slice(2,8);
+    if(!head.classList.contains("pcol")){
+      head.classList.add("pcol");
+      head.setAttribute("onclick","togglePanel('"+p.id+"')");
+      const chev=document.createElement("span");
+      chev.className="collapse-chev";chev.textContent="\u25be";
+      head.appendChild(chev);
+    }
+    if(!p.dataset.tog)p.classList.toggle("collapsed",!!phone&&keep.indexOf(p.id)<0);
+  });
+}
+/* Which panel IS each page. Money has none: the four cards at the top are the
+   answer and the rest are sections. Clients is absent on purpose — its one
+   panel is the client list, so there is nothing to collapse that is not the
+   page itself. */
+function collapsePhonePanels(){
+  collapseViewPanels("view-finance",[]);
+  collapseViewPanels("view-production",["prodFocusPanel"]);
+}
 function makeSettingsCollapsible(){
   const v=document.getElementById("view-settings");if(!v)return;
   const phone=window.matchMedia&&window.matchMedia("(max-width:680px)").matches;
@@ -13036,7 +13090,7 @@ function makeSettingsCollapsible(){
     p.classList.toggle("collapsed",!!phone);
   });
 }
-function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();capStatGrids();makeSettingsCollapsible();}
+function renderAll(){renderBranchSwitch();if(typeof renderTopPeriod==='function')renderTopPeriod();renderActivity();renderBranchCard();renderCustomers();renderProduction();if(typeof renderOrders==='function')renderOrders();renderSupplies();if(can('products'))renderProducts();if(typeof renderSales==='function')renderSales();if(typeof renderSuppliers==='function')renderSuppliers();renderFinance();if(can('logistics'))renderLogistics();if(can('payroll'))renderPayrollView();if(can('funds'))renderPotsView();if(can('expenses'))renderExpensesView();if(typeof renderTeam==='function')renderTeam();if(typeof renderRota==='function')renderRota();if(typeof renderCalendar==='function')renderCalendar();if(typeof renderTasks==='function')renderTasks();if(typeof renderWorkforce==='function')renderWorkforce();if(typeof renderAttendance==='function')renderAttendance();if(can('team')){renderLeave();renderCompanyLog();}if(can('audit'))renderAudit();updateNavBadges();capStatGrids();makeSettingsCollapsible();collapsePhonePanels();}
 function statTone(label,val){
   const l=(label||'').toLowerCase();let tone;
   if(/overdue|out of stock|past due|outstanding|owed|pending/.test(l))tone='alert';

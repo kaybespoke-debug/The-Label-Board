@@ -140,6 +140,26 @@ run("SETTINGS.branches=SETTINGS.__b;setStaff(SETTINGS.__s);delete SETTINGS.__b;d
   if (!/function unwirePanel\(p\)/.test(shipped)) F('nothing undoes a chevron on a panel that is later moved into a group');
   if (!/insertBefore\(grouped,v\.firstChild\)/.test(shipped)) F('Settings opens on Closing and About again instead of the groups');
 
+  /* MONEY AND PRODUCTION, 29 October. Measured at 375px before anything was
+     changed, because guessing which page is long is how three passes went
+     wrong: Money carried 2,868px of panels, Production 1,970, and Clients
+     1,115 which IS the client list. So Clients is deliberately absent from
+     collapsePhonePanels and that absence is checked — a later pass that
+     "does every page" and pads the one that was already fine is the same
+     dishonesty as one that skips the page that was not. */
+  if (!/function collapseViewPanels\(viewId,keepOpen\)/.test(shipped)) F('the panel stacks on Money and Production no longer collapse on a phone');
+  if (!/capStatGrids\(\);makeSettingsCollapsible\(\);collapsePhonePanels\(\)/.test(shipped)) F('collapsePhonePanels is defined but never called');
+  {
+    const fn = (shipped.match(/function collapsePhonePanels\(\)\{[\s\S]*?\n\}/) || [''])[0];
+    if (!/collapseViewPanels\("view-finance",\[\]\)/.test(fn)) F('Money no longer collapses every panel; its four cards are the page and the rest are sections');
+    if (!/collapseViewPanels\("view-production",\["prodFocusPanel"\]\)/.test(fn)) F('Production no longer keeps Workroom focus open, which is what that page is for');
+    if (/view-customers/.test(fn)) F('Clients is being collapsed: its one panel IS the client list, so there is nothing to shut that is not the page');
+  }
+  /* and a shut row is a title, its button and a chevron — not a chart's
+     reserved height, not a segmented control for content that is not shown. */
+  if (!/\.panel\.collapsed\{min-height:0\}/.test(shipped)) F('a shut chart panel reserves 200px for a chart it is not drawing');
+  if (!/\.panel\.collapsed > \.panel-head \.seg\{display:none!important\}/.test(shipped)) F('a shut panel still shows a period toggle for content that is not on screen (the seg carries an inline display:flex, so this needs !important)');
+
   /* NO SLACK. It had two, and two is exactly how many sentences can be added
      before anybody notices. 69 is what the app ships on 29 October 2026 with
      page-sub counted. Adding a line means raising this number in the same

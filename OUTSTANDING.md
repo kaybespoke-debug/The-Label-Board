@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 29 October 2026 (twenty-ninth session)
+Last updated: 29 October 2026 (thirtieth session)
 
 ## 29 October 2026 — the story, swept rather than spotted (layi-v75)
 
@@ -51,6 +51,44 @@ never say done without green gates and a rendered test.
   Re-run as an owner.
 - **Checked the other three apps.** `admin/`, `partners/` and `web/` use none
   of these classes, and none of the cut phrases survive anywhere in the repo.
+
+### The same pass on Production, Money and Clients (layi-v78)
+
+Measured at 375px **before** changing anything, because guessing which page is
+long is how three earlier passes went wrong:
+
+| Page | Panels before | After | |
+|---|---|---|---|
+| Money | 2,868px, nine panels | **697px** | every panel shut; the four cards are the page |
+| Production | 1,970px | **967px** | Pipeline shut, Workroom focus stays open |
+| Clients | 1,115px, one panel | **1,115px** | left alone: that panel IS the client list |
+
+- **Clients is deliberately untouched, and the gate checks that absence.** A
+  pass that "does every page" and pads the one that was already fine is the
+  same dishonesty as one that skips the page that was not.
+- **`collapseViewPanels(viewId, keepOpen)`** generalises the Settings answer:
+  a panel becomes a title row that opens on a tap, except the ones named as
+  being the page itself. Panels already wired by hand in the markup
+  (Outstanding Balances, Transactions) are not re-wrapped, only re-defaulted.
+  Once somebody taps a panel, `data-tog` stops the code deciding for them.
+- **A shut row is a title, its button and a chevron.** Three things were making
+  shut rows 150-200px instead of 74: the running count in the head (hidden
+  while shut — it is the same figure that is inside), `.dash-panel`'s
+  `min-height:200px` reserving room for a chart that is not being drawn, and
+  Profit & Loss's period toggle, a control for content that is not on screen.
+  That last one needed `!important`, because the seg carries an inline
+  `display:flex`.
+- **The button stays.** "+ Log payment" is why somebody opens the Money tab,
+  and burying a primary action one tap deeper to win 40px is a trade nobody
+  asked for.
+- **Both new CSS rules sit below `.dash-panel`**, not in the phone block at
+  ~760, which would have lost on document order. That is
+  `labelboard-media-query-order`, and it had already cost one cycle earlier the
+  same day.
+- **Proved by opening all nine Money panels** and confirming each one grows to
+  real content: 74 to 285, 585, 200, 367, 213, 825, 247, 770 and 1,404px.
+- **Seven new static checks** in `audit_simplicity`, mutation-drilled three
+  ways.
 
 ### And then Settings itself (layi-v77)
 
