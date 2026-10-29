@@ -1494,7 +1494,7 @@ body.modal-open{overflow:hidden}
             <option value="black">Dark</option>
             <option value="white">Light</option>
           </select></div>
-          <div class="field" id="installField"><label>Install</label><button class="btn ghost" id="installBtn" onclick="installApp()" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7"/><path d="M9.4 11.4L12 14l2.6-2.6"/></svg>Install as an app</button><div class="sd" style="color:var(--text-faint);margin-top:6px">Adds The Label Board to your phone or desktop so it opens full-screen, like a normal app.</div></div>
+          <div class="field" id="installField"><label>Install</label><button class="btn ghost" id="installBtn" onclick="installApp()" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7"/><path d="M9.4 11.4L12 14l2.6-2.6"/></svg>Install as an app</button></div>
           <!-- HIDDEN ON ANY INSTALL WITH A BACKEND, which is every studio.
                renderBiometricSetting() sets this. It is not a styling choice:
                the unlock it offers has been impossible since layi-v62, and a
@@ -1504,15 +1504,15 @@ body.modal-open{overflow:hidden}
           <div class="field" id="bioField" style="display:none">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="bioToggle" onchange="onBioToggle(this.checked)"> <span>Unlock with Face ID or fingerprint</span></label>
           </div>
-          <div class="sd" style="color:var(--text-faint)">Change your password in <b>My account</b>.</div>
+          
         </div>
         <div class="panel" id="bizDoesPanel" data-setperm="settings">
           <div class="panel-head"><h3>What your studio does</h3></div>
           <p class="page-sub" style="margin-bottom:12px">Tick what you work in, then how each one reaches your customer. We'll show only the tools you need.</p>
           <div id="bizDoesBox" style="display:flex;flex-wrap:wrap;gap:10px"></div>
-          <div class="sd" style="color:var(--text-faint);margin-top:10px"><b>Made to order</b> shows Production &amp; fittings. <b>Ready made</b> shows the Shop &amp; Sales. Tick both if you make what you sell.</div>
+          
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);margin-top:16px;border-top:1px solid var(--line-soft);padding-top:14px"><input type="checkbox" id="set_teamtools" onchange="toggleTeamTools(this.checked)"> <span>I work with a team <span style="color:var(--text-faint);font-weight:400">(shows Team, Rota, Attendance, Leave &amp; Payroll</span></span></label>
-          <div class="sd" style="color:var(--text-faint);margin-top:6px">Leave this off if it is just you. These tools appear on their own once you add staff or a second studio.</div>
+          
         </div>
         <div class="panel" data-setperm="setCompany">
           <div class="panel-head"><h3>How the owner is paid</h3></div>
@@ -1545,14 +1545,14 @@ body.modal-open{overflow:hidden}
           <div class="field"><label>Logo</label><div style="display:flex;align-items:center;gap:14px"><div id="logoPreview" style="width:64px;height:64px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Upload logo</button><button class="btn ghost sm" onclick="clearLogo()">Remove</button><input type="file" id="logoFile" accept="image/*" style="display:none" onchange="uploadLogo(this)"></div></div>
           <div class="field"><label>Company name</label><input class="fld" id="co_name" placeholder="Your studio name"></div>
           <div class="row2"><div class="field"><label>Email</label><input class="fld" id="co_email" placeholder="hello@yourlabel.com"></div><div class="field"><label>Phone / WhatsApp</label><input class="fld" id="co_phone" placeholder="+234…"></div></div>
-          <div class="field"><label>Address</label><textarea class="fld" id="co_address" rows="3" style="min-height:76px" placeholder="Lagos, Nigeria&#10;Stotfold, UK"></textarea><div class="sd" style="color:var(--text-faint);margin-top:5px">Trade from more than one place? Put each on its own line. Every line prints on the invoice.</div></div>
+          <div class="field"><label>Address</label><textarea class="fld" id="co_address" rows="3" style="min-height:76px" placeholder="Lagos, Nigeria&#10;Stotfold, UK"></textarea></div>
           <div class="field"><label>Business registration (RC / TIN)</label><input class="fld" id="co_reg" placeholder="RC123456"></div>
           <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
             <label style="display:flex;align-items:center;gap:10px;margin:0;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600"><input type="checkbox" id="co_taxon" onchange="renderTaxFields()" style="width:18px;height:18px;accent-color:var(--gold)"> Charge tax on invoices</label>
-            <div class="sd" style="color:var(--text-faint);margin-top:6px">Off unless you actually charge it. When it is on it applies to the order after any discount, and never to shipping.</div>
+            
             <div id="taxFields"></div>
           </div>
-          <div class="field"><label>Signature</label><div style="display:flex;align-items:center;gap:14px"><div id="sigPreview" style="width:150px;height:56px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('sigFile').click()">Upload signature</button><button class="btn ghost sm" onclick="clearSignature()">Remove</button><input type="file" id="sigFile" accept="image/*" style="display:none" onchange="uploadSignature(this)"></div><div class="sd" style="color:var(--text-faint);margin-top:6px">Set once. It prints above your name and the date at the foot of every invoice.</div></div>
+          <div class="field"><label>Signature</label><div style="display:flex;align-items:center;gap:14px"><div id="sigPreview" style="width:150px;height:56px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center;overflow:hidden;font-size:11px;color:var(--text-faint)">none</div><button class="btn ghost sm" onclick="document.getElementById('sigFile').click()">Upload signature</button><button class="btn ghost sm" onclick="clearSignature()">Remove</button><input type="file" id="sigFile" accept="image/*" style="display:none" onchange="uploadSignature(this)"></div></div>
           <div class="field"><label>Brand colour</label><div style="display:flex;align-items:center;gap:12px">
             <input type="color" id="co_brand" value="#0b3d25" oninput="brandPicked(this.value)" style="width:56px;height:44px;padding:2px;border:1px solid var(--line);border-radius:9px;background:var(--panel-2);cursor:pointer">
             <input type="text" class="fld" id="co_brandhex" value="#0B3D25" maxlength="7" oninput="brandTyped(this.value)" style="flex:1;min-width:0;letter-spacing:1px">
@@ -1560,12 +1560,12 @@ body.modal-open{overflow:hidden}
             <div id="brandBar" style="height:6px;border-radius:3px;margin-top:9px;background:#0b3d25"></div>
           </div>
           <div class="field"><label>Payment accounts (for invoices)</label>
-            <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add only the accounts you actually collect into. The boxes follow the currency: pounds ask for a sort code, dollars and euros for an IBAN and BIC. Only the accounts you add ever print.</div>
+            
             <div id="bankRows"></div>
             <button class="btn ghost sm" style="width:100%" onclick="addBankRow()">＋ Add payment account</button>
           </div>
           <div class="field"><label>Payment terms</label><textarea class="fld" id="co_pay" rows="4" style="min-height:92px" placeholder="How you take money, in your own words"></textarea>
-            <div class="sd" style="color:var(--text-faint);margin-top:6px">These print on every invoice and receipt. No two studios collect money the same way, so write yours. Leave it empty and a general set prints instead, which is better than nothing but is not yours.</div>
+            
             <button class="btn ghost sm" style="margin-top:8px" onclick="useStandardTerms()">Start from the standard wording</button></div>
           <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="co_photos" style="width:18px;height:18px;accent-color:var(--gold)"> Include order photos on invoices</label>
           <button class="btn" id="coSaveBtn" onclick="saveCompany()">Save company details</button>
@@ -1592,7 +1592,7 @@ body.modal-open{overflow:hidden}
             <option value="GBP">Pound (£)</option>
             <option value="USD">US Dollar ($)</option>
             <option value="EUR">Euro (€)</option>
-          </select><div class="sd" style="color:var(--text-faint);margin-top:6px">All dashboards &amp; totals show in this. Individual orders can still be invoiced in other currencies.</div></div>
+          </select></div>
           <div class="row2">
             <div class="field"><label>Default deposit (%)</label><input class="fld" type="number" id="def_deposit" placeholder="50"></div>
             <div class="field"><label>Default lead time (days)</label><input class="fld" type="number" id="def_lead" placeholder="21"></div>
@@ -1619,7 +1619,7 @@ body.modal-open{overflow:hidden}
           <button class="btn" id="stageSaveBtn" onclick="saveStages()">Save workflow</button>
           <div class="field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><label>What you call one item</label>
             <input type="text" class="fld" id="set_itemword" placeholder="item" maxlength="24">
-            <div class="sd" style="color:var(--text-faint);margin-top:6px">Leave it empty and the app takes the word from your trade.</div>
+            
           </div>
           <button class="btn ghost" id="itemWordSaveBtn" onclick="saveItemWord()">Save wording</button>
         </div>
@@ -1640,7 +1640,7 @@ body.modal-open{overflow:hidden}
           <p class="page-sub" style="margin-bottom:12px">The ways money comes in and goes out of your studio. These are what you pick from when you record a payment, so the list should match how you actually trade &mdash; add Opay, Moniepoint, PalmPay, MoMo, a card machine, whatever you use.</p>
           <div class="field"><label>One per line, in the order you use them most</label><textarea class="fld" id="set_paymethods" rows="7" placeholder="Bank transfer&#10;Cash&#10;POS"></textarea></div>
           <div class="field"><label>Usual method for routine outgoings</label><select class="fld" id="set_defmethod"></select>
-            <div class="sd" style="color:var(--text-faint);margin-top:4px">Used for restocking and other regular spending, so you are not asked every time. Everything else still asks.</div></div>
+            </div>
           <button class="btn" id="payMethodSaveBtn" onclick="savePayMethods()">Save payment methods</button>
         </div>
         <div class="panel" data-setperm="setWorkflow" id="payrollSetupPanel">
@@ -2342,12 +2342,10 @@ function openStudioSwitcher(){
     return '<div class="ms-item" style="padding:12px 14px;'+(here?'opacity:.6;':'cursor:pointer')+'"'
       +(here?'':' onclick="switchStudio(\''+m.business_id+'\')"')+'>'
       +'<b>'+esc(m.business_name||'Studio')+'</b>'
-      +'<div class="sd" style="color:var(--text-dim)">'+esc(roleWordFor(m))
-      +(m.branch_id?'':' \u00b7 all branches')+(here?' \u00b7 open now':'')+'</div></div>';
+      +'</div>';
   }).join('');
   openModal('Your studios',
-    '<div class="sd" style="margin-bottom:10px;color:var(--text-dim)">'
-    +'You belong to more than one. What you can do is decided separately in each.</div>'
+    ''
     +rows+'<div class="modal-foot"><button class="btn ghost" onclick="closeModal()">Close</button></div>');
 }
 function roleWordFor(m){
@@ -2794,7 +2792,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v75';
+const APP_VERSION='layi-v76';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -5283,7 +5281,7 @@ function renderNotifSettings(){const el=document.getElementById('notifSettings')
     ${tog('sale','A sale is recorded')}${tog('payment','A payment comes in')}${tog('status','An order status changes')}${tog('order','A new order is added')}${tog('appointment','An appointment is booked')}
     <label style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line);cursor:pointer;margin-top:4px"><span style="font-size:14px">Pop-up notifications</span><input type="checkbox" ${p.popups?'checked':''} onchange="setNotifPopups(this.checked)"></label>
     ${wantEnable?`<button class="btn ghost sm" style="width:100%;margin-top:4px" onclick="enableBrowserAlerts()">Enable phone / desktop alerts</button>`:''}
-    <div class="sd" style="color:var(--text-faint);margin-top:12px">Sounds and pop-ups fire while the app is open.</div>`;
+    `;
 }
 function setNotifSound(on){const p=notifPrefs();p.sound=!!on;saveNotifPrefs(p);}
 function setNotifChime(c){const p=notifPrefs();p.chime=c;saveNotifPrefs(p);renderNotifSettings();if(c!=='silent')playChime(c,p.volume);}
@@ -5517,7 +5515,7 @@ function setupStudiosHtml(){
       +del+'</div>'+chips+'</div>';
   }).join('');
   return '<div class="field"><label>Name your studios</label>'
-    +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 10px">Each one is scoped and reported on its own, and the switcher at the top lets you move between them. Tap a craft to say it does not happen there.</div>'
+    +''
     +rows
     +'<button class="btn ghost sm" onclick="setupAddStudio()">+ Add another studio</button></div>';
 }
@@ -5567,10 +5565,10 @@ function renderStudioSetup(keepScroll){
   openModal('<h3>Set up your studio</h3><div class="msub">All of this can be changed later in Settings.</div>'
     +'<div class="field"><label>What is your label called?</label><input class="fld" id="su_name" value="'+esc(d.name)+'" placeholder="e.g. Adé Bespoke"></div>'
     +'<div class="field"><label>And your name</label><input class="fld" id="su_you" value="'+esc(d.you||'')+'" placeholder="e.g. Adéolá Ojo" autocomplete="name">'
-    +'<div class="sd" style="color:var(--text-faint)">How the app greets you, and the name against everything you do in it.</div></div>'
+    +'</div>'
     +'<div class="field"><label>Where do you work from <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="su_loc" value="'+esc(d.location)+'" placeholder="City / area"></div>'
     +'<div class="field"><label>What do you do <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label>'
-    +'<div class="sd" style="color:var(--text-faint);margin:-2px 0 8px">Tick what you work in, then how each one reaches your customer. <b>Made to order</b> opens the production board, <b>ready made</b> opens the Shop and Sales. Tick both if you make what you sell.</div>'
+    +''
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:2px">'+chips+'</div></div>'
     +'<div class="field"><label>How do you sell <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick all that applies)</span></label><div style="display:flex;gap:20px;padding-top:4px">'
     +'<label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="su_show" '+(d.channels.indexOf('showroom')>=0?'checked':'')+'> In person</label>'
@@ -5578,12 +5576,10 @@ function renderStudioSetup(keepScroll){
     +'</div></div>'
     +'<div class="field"><label>How many people work with you? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
     +'<div style="padding-top:2px">'+setupBandRow('team',SETUP_TEAM)+'</div>'
-    +'<div class="sd" style="color:var(--text-faint)">Tell us and the Team, Rota and Payroll tabs are there from the start. Add the actual people whenever you like.</div></div>'
+    +'</div>'
     +'<div class="field"><label>How many studios or outlets do you run? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
     +'<div style="padding-top:2px">'+setupBandRow('outlets',SETUP_OUTLETS)+'</div>'
-    +'<div class="sd" style="color:var(--text-faint)">'+(outletsMin(d.outlets)>1
-        ? 'Name them below and they are all set up now, switcher and all.'
-        : 'We set up the first one now. You name and add the rest in Settings, so each is scoped and reported on its own.')+'</div></div>'
+    +'</div>'
     +setupStudiosHtml()
     +'<div class="modal-foot"><button class="btn ghost" onclick="skipStudioSetup()">Skip for now</button><span style="flex:1"></span><button class="btn" onclick="saveStudioSetup()">Start</button></div>');
 }
@@ -6888,9 +6884,7 @@ function itemCraftChips(i){
   return '<div class="field" style="margin-bottom:10px"><label>What kind of item is this</label>'
     +'<div class="matchips">'+chip('','Same as the studio',!itemCraft(o))
     +list.map(k=>chip(k,activityLabel(k),itemCraft(o)===k)).join('')+'</div>'
-    +'<div class="sd" style="color:var(--text-faint);margin-top:6px">'
-    +(itemCraft(o)?'Walks its own stages: '+esc(itemStages(o).slice(1,-1).join(' · ')):'Walks the studio\u2019s production stages.')
-    +'</div></div>';
+    +'</div>';
 }
 function renderItemCraft(i){const el=document.getElementById('of_craft_'+i);if(el)el.innerHTML=itemCraftChips(i);}
 /* Asked of any studio that makes anything. A studio that only sells off a shelf takes no
@@ -6909,7 +6903,7 @@ function itemMethodChips(i){
     +'<div class="matchips">'+chips+'</div>'
     +'<div class="sd" style="color:var(--text-faint);margin-top:6px">'
     +(meta?esc(meta.hint)+(meta.measured?'':'. No measurements needed, and it prints on the work order as a shelf piece.'):'Not said yet. It prints on the work order either way, and the books will read it as <b>not recorded</b> rather than guessing.')
-    +'</div></div>';
+    +'</div>';
 }
 function renderItemMethod(i){const el=document.getElementById('of_meth_'+i);if(el)el.innerHTML=itemMethodChips(i);}
 function setOutfitMethod(i,k){if(!draft||!draft.outfits[i])return;draft.outfits[i].method=(draft.outfits[i].method===k?'':k);renderItemMethod(i);}
@@ -8642,7 +8636,7 @@ function renderRunModal(){
     +'<div class="field"><label>How many of each</label>'+rows+'</div>'
     +'<div class="field"><label>Materials bought for this run</label>'+costRows
       +'<button class="btn ghost sm" style="width:100%" onclick="runAddCost()">＋ Add material</button>'
-      +'<div class="sd" style="color:var(--text-faint);margin-top:6px">Only what you bought <b>for this run</b>. Anything taken from Supplies was already paid for when you restocked it, so leave it out here and draw it down in Inventory.</div></div>'
+      +'</div>'
     +'<div class="field"><label>Who is making it</label>'+makerRows
       +'<button class="btn ghost sm" style="width:100%" onclick="runAddMaker()">＋ Add maker</button></div>'
     +'<div class="field"><label>Wanted by <span style="text-transform:none;letter-spacing:0;color:var(--text-faint)">(optional)</span></label><input class="fld" type="date" id="r_due" value="'+esc(d.due||'')+'"></div>'
@@ -8733,7 +8727,7 @@ function renderUpdateModal(){
     <div class="field"><label>Current stage</label><select class="fld" id="u_stage" onchange="syncUpdate();renderUpdateModal()">${stageOpts}</select></div>
     ${(updateDraft.stage===_delIdx&&_uOut>0&&can('money'))?`<div class="field"><label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0"><input type="checkbox" id="u_collectBalance" checked style="width:16px;height:16px;flex:0 0 auto"> Collect remaining ${curO(_uOut,_uo)} now</label>${payMethodField('u_balMethod','','How was the balance paid?')}<div class="sd" style="color:var(--text-faint);margin-top:4px">Tick if the client paid the balance on ${_isDeliv?'delivery':'pickup'}. It'll be recorded as income and the order marked paid.</div></div>`:''}
     ${(can('canQC')&&!isBatch(_uo)&&!isGroup(_uo))?`<div class="field"><button class="btn sm ghost" onclick="openQC('${updateDraft.id}')">Quality check ›</button></div>`:''}
-    <div class="field"><label>Who did this work?</label><select class="fld" id="u_worker">${workerOpts}</select><div class="sd" style="color:var(--text-faint);margin-top:6px">Credited for traceability &amp; performance: who cut, sewed, finished, etc.</div></div>
+    <div class="field"><label>Who did this work?</label><select class="fld" id="u_worker">${workerOpts}</select></div>
     ${(function(){
       if(!fabricCheckNeeded(_uo))return '';
       const theirs=orderHasTheirFabric(_uo);
@@ -9448,7 +9442,7 @@ function branchAssignField(prefix,rec,label){
   if(!multiBranch())return '';
   const on=branchesOf(rec);
   return '<div class="field"><label>'+esc(label||'Which studios use this')+'</label>'
-    +'<div class="sd" style="color:var(--text-faint);margin-bottom:8px">Leave them all unticked if it applies to the whole business. Ticking some limits it to those, without hiding it from your own records.</div>'
+    +''
     +branchNames().map(function(n,i){
         return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;margin-bottom:5px">'
           +'<input type="checkbox" id="'+prefix+'_br_'+i+'" '+(on.indexOf(n)>=0?'checked':'')+'> '+esc(n)+'</label>';
@@ -9662,8 +9656,8 @@ function openBill(id){if(!can('money'))return;const b=id?getBills().find(x=>x.id
     <div class="field"><label>Bill name</label><input class="fld" id="b_label" value="${b?esc(b.label):''}" placeholder="e.g. Studio rent, NEPA, Adobe"></div>
     <div class="field"><label>Amount each time (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="b_amt" value="${b&&b.amount?fmtNum(b.amount):''}" placeholder="0"></div>
     <div class="field"><label>How often</label><select class="fld" id="b_every">${BILL_CADENCES.map(c=>`<option value="${c.k}" ${billCadence(b).k===c.k?'selected':''}>${esc(c.label)}</option>`).join('')}</select>
-      <div class="sd" style="color:var(--text-faint);margin-top:5px">A yearly bill is logged once a year, not twelve times. Change it and the next period starts fresh.</div></div>
-    ${multiBranch()?'<div class="field"><label>Which studio pays this</label><select class="fld" id="b_branch"><option value="">The whole business</option>'+branchNames().map(function(n){return '<option value="'+esc(n)+'" '+((b&&b.branch===n)?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select><div class="sd" style="color:var(--text-faint);margin-top:4px">Rent and electricity belong to a studio. A subscription usually belongs to the whole business.</div></div>':''}
+      </div>
+    ${multiBranch()?'<div class="field"><label>Which studio pays this</label><select class="fld" id="b_branch"><option value="">The whole business</option>'+branchNames().map(function(n){return '<option value="'+esc(n)+'" '+((b&&b.branch===n)?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></div>':''}
     <div class="field"><label>Note (optional)</label><input class="fld" id="b_note" value="${b?esc(b.note||''):''}" placeholder="Due date, account…"></div>
     <div class="modal-foot">${b?`<button class="btn danger sm" onclick="delBill('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveBill('${b?b.id:''}')">${b?'Update':'Save'}</button></div>`);}
 function b_existingBranch(id){const b=id?getBills().find(x=>x.id===id):null;return b?(b.branch||''):'';}
@@ -10475,7 +10469,7 @@ function renderStorageMeter(){const el=document.getElementById('storageMeter');i
     ? `<div class="sd" style="color:var(--text-faint);margin-top:6px">${pending} photo${pending===1?'':'s'} still on this device, waiting for signal. ${pending===1?'It uploads':'They upload'} on its own.</div>`
     : '';
 
-  el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(shownUsed)} used${st.known?'':` <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span>`}</span><span style="color:var(--text-dim)">${esc(currentPlan().name)} · ${fmtBytes(shownCap)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${shownPct}%;background:${col};border-radius:5px"></div></div>${notice}${more}${pendingNote}<div class="sd" style="color:var(--text-faint);margin-top:8px">Photos are what fill this up. Records take almost no space.</div>`;
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${fmtBytes(shownUsed)} used${st.known?'':` <span style="color:var(--text-faint)">· ${u.photos} image${u.photos===1?'':'s'}</span>`}</span><span style="color:var(--text-dim)">${esc(currentPlan().name)} · ${fmtBytes(shownCap)}</span></div><div style="height:9px;border-radius:5px;background:var(--panel-2);overflow:hidden"><div style="height:100%;width:${shownPct}%;background:${col};border-radius:5px"></div></div>${notice}${more}${pendingNote}`;
 }
 /* Extra space is sold, not switched on. It is an override an operator sets
    on that one studio after agreeing a price, so saying yes to a big brand
@@ -10649,18 +10643,18 @@ function renderPayrollSetup(){
     <div style="text-align:right;margin-bottom:14px"><button class="btn ghost sm" onclick="removePayLine(${i})">Remove this line</button></div>`).join('');
   box.innerHTML=`
     <div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="pay_allow_on" ${c.allowances.enabled?'checked':''} onchange="renderPayrollSetupLive()"> Pay housing &amp; transport allowances</label>
-      <div class="sd" style="color:var(--text-faint);margin-top:4px">A share of basic paid on top of it. Common once a business is established; skip it while you are growing.</div></div>
+      </div>
     <div class="row2" id="pay_allow_rows" style="${c.allowances.enabled?'':'display:none'}">
       <div class="field"><label>Housing (% of basic)</label><input class="fld" type="number" min="0" max="200" step="0.5" id="pay_housing" value="${c.allowances.housingPct}"></div>
       <div class="field"><label>Transport (% of basic)</label><input class="fld" type="number" min="0" max="200" step="0.5" id="pay_transport" value="${c.allowances.transportPct}"></div>
     </div>
     <div class="field" style="margin-top:14px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="pay_pension_on" ${c.pension.enabled?'checked':''} onchange="renderPayrollSetupLive()"> Run a pension scheme</label>
-      <div class="sd" style="color:var(--text-faint);margin-top:4px">Voluntary per person. Nothing is deducted from anyone until you record that they agreed to it, on their own profile.</div></div>
+      </div>
     <div class="field" id="pay_pension_rows" style="${c.pension.enabled?'':'display:none'}"><label>Standard employee rate (% of basic)</label>
       <input class="fld" type="number" min="0" max="100" step="0.5" id="pay_pension_rate" value="${c.pension.defaultRate}">
-      <div class="sd" style="color:var(--text-faint);margin-top:4px">The rate a new enrolment starts on. Each person's rate can differ.</div></div>
+      </div>
     <div class="bd-sub" style="margin-top:18px">Your own pay lines</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:10px">Anything else this business runs: a meal allowance, a staff loan repayment, a union due, a tax your country requires. Add as many as you need.</div>
+    
     ${lineRows||'<div class="kv" style="color:var(--text-faint);margin-bottom:10px">No lines of your own yet.</div>'}
     <button class="btn ghost sm" style="width:100%" onclick="addPayLine()">＋ Add a pay line</button>`;
 }
@@ -11946,8 +11940,8 @@ function openSupply(id,prefill){
     <div class="msub">Inventory item</div>
     <div class="field"><label>Item name</label><input class="fld" id="s_name" value="${s?esc(s.name):''}" placeholder="e.g. Royal-blue aso-oke"></div>
     <div class="row2">
-      <div class="field"><label>Category</label><select class="fld" id="s_cat" onchange="onSupCatChange()">${invCatNames().map(c=>`<option ${c===curCat?'selected':''}>${esc(c)}</option>`).join('')}${(s&&!invCatNames().includes(s.cat))?`<option selected>${esc(s.cat)}</option>`:''}<option value="__new__">+ New category…</option></select><div class="sd" style="color:var(--text-faint);margin-top:5px">Pick “+ New category…” to add one right here.</div></div>
-      <div class="field"><label>Subcategory</label><input class="fld" id="s_subcat" list="s_sublist" value="${esc(curSub)}" placeholder="Type or pick…">${subcatDatalist(curCat)}<div class="sd" style="color:var(--text-faint);margin-top:5px">Type a new one to add it to this category.</div></div>
+      <div class="field"><label>Category</label><select class="fld" id="s_cat" onchange="onSupCatChange()">${invCatNames().map(c=>`<option ${c===curCat?'selected':''}>${esc(c)}</option>`).join('')}${(s&&!invCatNames().includes(s.cat))?`<option selected>${esc(s.cat)}</option>`:''}<option value="__new__">+ New category…</option></select></div>
+      <div class="field"><label>Subcategory</label><input class="fld" id="s_subcat" list="s_sublist" value="${esc(curSub)}" placeholder="Type or pick…">${subcatDatalist(curCat)}</div>
     </div>
     ${invCatProd(curCat)?'<div class="sd" id="s_prodhint" style="color:var(--gold);margin:-6px 0 12px">● Production material, affects outfit costing</div>':'<div class="sd" id="s_prodhint" style="display:none"></div>'}
     <div class="field"><label>Photo (optional)</label>
@@ -11957,7 +11951,7 @@ function openSupply(id,prefill){
         <button class="btn ghost sm" id="supPhotoRm" type="button" onclick="removeSupplyPhoto()">Remove</button>
         <input type="file" id="supPhotoFile" accept="image/*" style="display:none" onchange="uploadSupplyPhoto(this)">
       </div>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">A picture of the item: box, fabric swatch, metal tag, label, thank-you card, etc.</div>
+      
     </div>
     <div class="row2">
       <div class="field"><label>Quantity in stock</label><input class="fld" type="number" id="s_qty" value="${s?(+s.qty||0):''}" placeholder="0"></div>
@@ -11968,7 +11962,7 @@ function openSupply(id,prefill){
       <div class="field"><label>Cost per unit (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="s_cost" value="${s&&s.cost?fmtNum(s.cost):''}" placeholder="0"></div>
     </div>
     <div class="field"><label>Supplier (optional)</label><select class="fld" id="s_supplierId"><option value="">None</option>${getSuppliers().slice().sort((a,b)=>((b.preferred?1:0)-(a.preferred?1:0))||a.business.localeCompare(b.business)).map(sp=>`<option value="${sp.id}" ${s&&s.supplierId===sp.id?'selected':''}>${sp.preferred?'★ ':''}${esc(sp.business)}${sp.type?' · '+esc(sp.type):''}</option>`).join('')}</select>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">Add suppliers under the Suppliers tab. <span style="cursor:pointer;color:var(--gold)" onclick="newSupplierFromSupply()">+ New supplier</span></div></div>
+      </div>
     <div class="field"><label>Note (optional)</label><input class="fld" id="s_note" value="${s?esc(s.note||''):''}" placeholder="Lead time, size, link…"></div>
     <div class="modal-foot">
       ${s?`<button class="btn danger sm" onclick="delSupply('${s.id}')">Delete</button>`:''}
@@ -12215,7 +12209,7 @@ function offerFeedback(id){const o=rawOrders().find(x=>x.id===id);if(!o){closeMo
     </div>
     <div class="bd-sub">Or log their rating yourself</div>
     <div style="font-size:26px;margin:6px 0;letter-spacing:3px">${[1,2,3,4,5].map(n=>`<span onclick="setSatisfaction('${o.id}',${n});offerFeedback('${o.id}')" style="cursor:pointer;color:${n<=(+o.satisfaction||0)?'var(--gold)':'var(--text-faint)'}">★</span>`).join('')}</div>
-    <div class="sd" style="color:var(--text-faint)">Ratings show on the client's profile under Customers.</div>
+    
     <div class="modal-foot"><button class="btn ghost" onclick="openDetail('${o.id}')">← Back to order</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>`);
 }
 function reopenOrder(id){
@@ -12453,10 +12447,10 @@ function renderProductModal(){
     <div class="row2"><div class="field"><label>Category</label>${selOther('pp_category',productTypes(),p.category||productTypes()[0],'Type of item')}</div><div class="field"><label>Selling price (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="pp_price" value="${p.price?fmtNum(p.price):''}" placeholder="0"></div></div>
     <div class="field"><label>Cost to make / buy per unit (${SETTINGS.currency}) <span style="color:var(--text-faint);font-weight:400">(for profit)</span></label><input class="fld money" type="text" inputmode="decimal" id="pp_cost" value="${p.cost?fmtNum(p.cost):''}" placeholder="0"></div>
     <div class="bd-sub" style="margin-top:8px">Sizes / colours & stock</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Add a row per size and/or colour you stock. Leave both blank for a one-size item.</div>
+    
     ${vrows}
     <button class="btn ghost sm" style="width:100%;margin:4px 0 6px" onclick="addVariant()">＋ Add size / colour</button>
-    <div class="field"><label>Product code / SKU (optional)</label><input class="fld" id="pp_sku" value="${esc(p.sku||'')}" placeholder="e.g. LIN-SHIRT-01"><div class="sd" style="color:var(--text-faint);margin-top:4px">Used to match orders coming in from your website. Leave it blank and they match on the name.</div></div>
+    <div class="field"><label>Product code / SKU (optional)</label><input class="fld" id="pp_sku" value="${esc(p.sku||'')}" placeholder="e.g. LIN-SHIRT-01"></div>
     <div class="field"><label>Note (optional)</label><input class="fld" id="pp_note" value="${esc(p.note||'')}" placeholder="Fabric, fit, care, anything"></div>
     <div class="modal-foot">${p.id?`<button class="btn danger sm" onclick="delProduct('${p.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveProduct()">Save</button></div>`);
 }
@@ -15126,12 +15120,12 @@ function renderStaffModal(){
     <div class="row2"><div class="field"><label>Employment type</label><select class="fld" id="st_emp">${opts(EMP_TYPES,s.employmentType||'Full Time')}</select></div>
       <div class="field"><label>Start date</label><input class="fld" type="date" id="st_start" value="${esc(s.startDate||'')}"></div></div>
     <div class="row2"><div class="field"><label>Status</label><select class="fld" id="st_status">${opts(STAFF_STATUS,s.status||'Active')}</select></div>
-      <div class="field"><label>Reports to</label><select class="fld" id="st_mgr">${mgrOpts}</select><div class="sd" style="color:var(--text-faint);margin-top:4px">Who supervises this person. Anyone can supervise anyone, it isn’t tied to their role.</div></div></div>
+      <div class="field"><label>Reports to</label><select class="fld" id="st_mgr">${mgrOpts}</select></div></div>
     ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('st_branch',branchNames(),s.branch||defaultBranchName(),'Type a branch')}</div>`:''}
     <div class="row2"><div class="field"><label>Work location</label><input class="fld" id="st_location" value="${esc(s.location||'')}" placeholder="e.g. Lagos studio"></div>
       <div class="field"><label>Specialisation</label><input class="fld" id="st_specialty" value="${esc(s.specialty||'')}" placeholder="Tailor, Cutter, Embroiderer…"></div></div>
     <div class="field"><label>Skills</label><input class="fld" id="st_skills" value="${esc(s.skills||'')}" placeholder="e.g. Agbada, hand embroidery, beading"></div>
-    <div class="field"><label>Max active orders (workload capacity)</label><input class="fld" type="number" min="1" id="st_maxLoad" value="${s.maxLoad||10}" placeholder="10"><div class="sd" style="color:var(--text-faint);margin-top:4px">Used by the Workforce dashboard to show who's overloaded.</div></div>
+    <div class="field"><label>Max active orders (workload capacity)</label><input class="fld" type="number" min="1" id="st_maxLoad" value="${s.maxLoad||10}" placeholder="10"></div>
     <div class="field"><label>Notes</label><textarea class="fld" id="st_notes" placeholder="Anything else">${esc(s.notes||'')}</textarea></div>
     ${money?`<div class="bd-sub" style="margin-top:10px">Payroll</div>
     <div class="row2"><div class="field"><label>Payment method</label><select class="fld" id="st_salType">${opts(SALARY_TYPES,({'Per Piece':'Commission','Hybrid':'Salary + Commission'}[s.salaryType])||s.salaryType||'Monthly Salary')}</select></div>
@@ -15141,23 +15135,23 @@ function renderStaffModal(){
       <option value="pctValue"${cm==='pctValue'?' selected':''}>Percentage of order value</option>
       <option value="pctProfit"${cm==='pctProfit'?' selected':''}>Percentage of profit</option>
     </select></div>
-    ${(cm==='pctValue'||cm==='pctProfit')?`<div class="field"><label>Percentage ${cm==='pctProfit'?'of order profit':'of order value'} (%)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_commPct" value="${s.commPct||''}" placeholder="e.g. 10"><div class="sd" style="color:var(--text-faint);margin-top:4px">Worked out automatically on each order they make, and still editable per order.</div></div>`
+    ${(cm==='pctValue'||cm==='pctProfit')?`<div class="field"><label>Percentage ${cm==='pctProfit'?'of order profit':'of order value'} (%)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_commPct" value="${s.commPct||''}" placeholder="e.g. 10"></div>`
     :`<div class="field"><label>Default commission / item (${SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="st_rate" value="${s.rate?fmtNum(s.rate):''}" placeholder="0 if none"></div>
     <div class="field"><label>Commission by ${tradeWord()} type</label>
-      <div class="sd" style="color:var(--text-faint);margin-bottom:8px">e.g. Kaftan ${SETTINGS.currency}40,000 · Agbada ${SETTINGS.currency}65,000. Editable on each order.</div>
+      
       ${rateRows}<button class="btn ghost sm" style="width:100%" onclick="addStaffRate()">＋ Add ${tradeWord()} rate</button></div>`}
     ${payrollSetup().pension.enabled?(()=>{const pn=staffPension(s);return `<div class="field" style="margin-top:12px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0"><input type="checkbox" id="st_pension_on" ${pn.optedIn?'checked':''}> Enrolled in the pension scheme</label>
-      <div class="sd" style="color:var(--text-faint);margin-top:4px">Voluntary. Nothing is deducted until you tick this, and you should have their agreement on file first.</div></div>
+      </div>
     <div class="row2"><div class="field"><label>Employee rate (% of basic)</label><input class="fld" type="number" min="0" max="100" step="0.5" id="st_pension_rate" value="${pn.rate}"></div>
       <div class="field"><label>Agreed on</label><input class="fld" type="date" id="st_pension_date" value="${esc(pn.agreedOn||'')}"></div></div>`;})():''}
     ${(()=>{const opt=payrollSetup().lines.filter(l=>l.optIn);if(!opt.length)return '';const on=(s.payLines||{});return `<div class="field" style="margin-top:12px"><label>Optional pay lines</label>
-      <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Lines your studio runs for some people but not everyone. Tick the ones that apply to ${esc((s.name||'this person').split(' ')[0]||'this person')}.</div>
+      
       ${opt.map(l=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:6px"><input type="checkbox" id="st_pl_${l.id}" ${on[l.id]?'checked':''}> ${esc(l.name)} <span style="color:var(--text-faint)">${l.kind==='earning'?'earning':'deduction'} · ${l.basis==='fixed'?cur(l.value):((+l.value||0)+'% of '+(l.of==='gross'?'gross':'basic'))}</span></label>`).join('')}</div>`;})()}
     <div class="row2"><div class="field"><label>Bank name</label><input class="fld" id="st_bank" value="${esc(s.bankName||'')}"></div>
       <div class="field"><label>Account number</label><input class="fld" id="st_accNo" value="${esc(s.accountNo||'')}"></div></div>
     <div class="field"><label>Account name</label><input class="fld" id="st_accName" value="${esc(s.accountName||'')}"></div>`:''}
     <div class="bd-sub" style="margin-top:10px">Documents</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Contract, ID, passport photo, CV, certificates. Small files only on this device. Large scans need the hosted version.</div>
+    
     ${docRows}
     <div class="row2" style="margin-bottom:6px"><span>${selOther('st_docType',DOC_TYPES,DOC_TYPES[0],'What document is this?')}</span><button class="btn ghost sm" onclick="document.getElementById('stDocFile').click()">Upload document</button></div>
     <input type="file" id="stDocFile" style="display:none" onchange="uploadStaffDoc(this)">
@@ -15650,7 +15644,7 @@ const CORR_KINDS={
 function correspondenceHtml(key,data){
   const ev=correspondenceOf(key,data);
   if(!ev.length)return '<div class="kv" style="color:var(--text-faint)">Nothing recorded for this client yet. Notes you log, comments posted on their orders, measurements, payments and appointments all collect here.</div>';
-  const head=`<div class="sd" style="color:var(--text-faint);margin-bottom:10px">${ev.length} entr${ev.length===1?'y':'ies'} · notes, order comments, measurements, payments and appointments, newest first.</div>`;
+  const head=``;
   const rows=ev.map(e=>{
     const meta=CORR_KINDS[e.kind]||{label:e.kind,hue:'var(--text-dim)'};
     const when=e.at?new Date(e.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
@@ -15786,7 +15780,7 @@ function openCampaign(segKey){
       <div class="sd" style="color:var(--text-faint);margin-top:6px">Attach images or PDFs. Download first, then attach them in your mail or WhatsApp app.</div></div>
     <div class="field"><label>Recipients, tap to open ${nlChannel==='email'?'email':'WhatsApp'} (${recipientList.length})</label>
       <div style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:10px">${(nlChannel==='email'?seg.list.filter(c=>c.email):seg.list.filter(c=>c.whatsapp)).map(c=>`<div class="bd-row"><span class="bl">${esc(c.name)}<span style="color:var(--text-faint);font-size:12px"> · ${esc(nlChannel==='email'?c.email:c.whatsapp)}</span></span><button class="btn sm ghost" onclick="openContact('${nlChannel}','${esc(nlChannel==='email'?c.email:c.whatsapp)}')">${nlChannel==='email'?'Email ›':'WhatsApp ›'}</button></div>`).join('')||'<div class="kv" style="color:var(--text-faint);padding:10px">No '+(nlChannel==='email'?'email addresses':'WhatsApp numbers')+' in this segment.</div>'}</div>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">Tapping opens ${nlChannel==='email'?'your mail app':'WhatsApp'} with the message ready.</div></div>
+      </div>
     <div class="modal-foot" style="flex-wrap:wrap;gap:8px"><button class="btn ghost sm" onclick="copyNewsletter()">Copy message</button>${nlChannel==='email'&&emails.length?`<button class="btn ghost sm" onclick="emailCampaign()">Open email draft</button>`:''}${nlChannel==='whatsapp'&&wa.length?`<button class="btn ghost sm" onclick="waCampaign()">Open WhatsApp</button>`:''}<span style="flex:1"></span><button class="btn" onclick="markCampaignSent()">Mark as sent</button></div>`);
   renderNlAttach();
 }
@@ -15875,14 +15869,14 @@ function renderMyWork(){
     <div class="row2"><div class="field"><label>Bank</label><input class="fld" id="mw_bank" value="${esc(pend?pend.bank:s.bankName||'')}"></div><div class="field"><label>Account number</label><input class="fld" id="mw_accNo" value="${esc(pend?pend.no:s.accountNo||'')}"></div></div>
     <div class="field"><label>Account name</label><input class="fld" id="mw_accName" value="${esc(pend?pend.name:s.accountName||'')}"></div>
     <button class="btn ghost" onclick="submitBankChange()">Submit bank change for approval</button>
-    <div class="sd" style="color:var(--text-faint);margin-top:8px">For security, bank changes take effect only after the owner approves them.</div>
+    
     `:`
     ${kv('Phone',s.phone)+kv('Email',s.email)+kv('Address',s.address)||'<div class="kv" style="color:var(--text-faint)">No contact details on file.</div>'}
     <div class="bd-sub" style="margin-top:12px">Emergency contact</div>
     ${kv('Name',s.emergencyName)+kv('Phone',s.emergencyPhone)+kv('Relationship',s.emergencyRel)||'<div class="kv" style="color:var(--text-faint)">None on file.</div>'}
     <div class="bd-sub" style="margin-top:12px">Bank details</div>
     <div class="kv" style="color:var(--text-dim)">${s.bankName?esc(s.bankName)+' · '+esc(s.accountNo||'')+' · '+esc(s.accountName||''):'none on file'}</div>
-    <div class="sd" style="color:var(--text-faint);margin-top:10px">Your contact, emergency, bank and document details are kept by the studio. To change anything here, ask your manager or HR.</div>
+    
     `}
     <div style="height:1px;background:var(--line);margin:16px 0"></div>
     <button class="btn ghost" onclick="openMyAccount()">Change my password</button>
@@ -15900,7 +15894,7 @@ function renderMyWork(){
     ${pendItems.length?pendItems.map(i=>`<div class="bd-row"><span class="bl">${esc(i.client)} · ${esc(i.work)} <span style="color:var(--text-faint)">${fmtDateShort(i.at)}</span></span><span class="bv" style="color:var(--amber)">${cur(i.amount)}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">Nothing pending.</div>'}
     <div class="bd-sub" style="margin-top:10px">Payment history</div>
     ${paidItems.length?paidItems.map(i=>`<div class="bd-row"><span class="bl">${esc(i.client)} · ${esc(i.work)} <span style="color:var(--text-faint)">${fmtDateShort(i.at)}</span></span><span class="bv" style="color:var(--green)">${cur(i.amount)} ✓</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No payments recorded yet.</div>'}
-    <div class="sd" style="color:var(--text-faint);margin-top:8px">Your pay rates are set by the studio owner and aren't shown or editable here.</div>
+    
   </div>
 
   </div><div class="ptab-pane" data-pane="work" style="display:none">${(()=>{const kind=staffKind(s);
@@ -15926,12 +15920,12 @@ function renderMyWork(){
     </div>
     <div class="bd-sub" style="margin-top:8px">Assigned jobs</div>
     ${active.length?active.sort((a,b)=>(daysUntil(a.due)??999)-(daysUntil(b.due)??999)).map(o=>{const du=daysUntil(o.due);const lbl=du==null?'':du<0?`${-du}d late`:du===0?'due today':`due in ${du}d`;return`<div class="bd-row" style="cursor:pointer" onclick="openDetail('${o.id}')"><span class="bl">${esc(o.client)} · ${esc(o.garment)} <span style="color:var(--text-faint)">${esc(STAGES[o.stageIndex])}</span></span><span class="bv" style="color:${du!=null&&du<0?'var(--red)':'var(--text-dim)'}">${lbl}</span></div>`;}).join(''):'<div class="kv" style="color:var(--text-faint)">No active jobs assigned.</div>'}
-    ${P.avgDays!=null?`<div class="sd" style="color:var(--text-faint);margin-top:8px">Average turnaround: ${P.avgDays} day${P.avgDays===1?'':'s'} per piece.</div>`:''}</div>`;})()}
+    ${P.avgDays!=null?``:''}</div>`;})()}
 
   ${(()=>{const myTasks=getTasks().filter(t=>t.who===s.id).sort((a,b)=>(a.done?1:0)-(b.done?1:0)||(a.due||'9999').localeCompare(b.due||'9999'));const open=myTasks.filter(t=>!t.done).length;
     return `<div class="panel"><div class="panel-head"><h3>My Tasks</h3><span class="page-sub">${open} open</span></div>
     ${myTasks.length?myTasks.map(t=>{const du=t.due?daysUntil(t.due):null;const late=du!==null&&du<0&&!t.done;return`<div class="srow"><div class="smain" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" ${t.done?'checked':''} onchange="toggleMyTask('${t.id}')" style="width:18px;height:18px;accent-color:var(--gold);margin-top:2px"><div><div class="sup-name" style="${t.done?'text-decoration:line-through;opacity:.6':''}">${esc(t.title)}</div><div class="sup-meta">${t.due?'due '+new Date(t.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):''}${late?' <span style="color:var(--red)">overdue</span>':''}${t.note?' · '+esc(t.note):''}</div></div></div><div class="sacts"><button class="btn sm ghost" onclick="addTaskNote('${t.id}')">Note</button></div></div>`;}).join(''):'<div class="kv" style="color:var(--text-faint)">No tasks assigned to you right now.</div>'}
-    <div class="sd" style="color:var(--text-faint);margin-top:6px">Tick a task when done, or add a note for your manager. Tasks are assigned by your manager.</div></div>`;})()}
+    </div>`;})()}
 
   </div><div class="ptab-pane" data-pane="payslips" style="display:none"><div class="panel"><div class="panel-head"><h3>My Payslips</h3><span class="page-sub">tap a month to open &amp; download</span></div>
     ${(()=>{const byMonth={};E.items.forEach(e=>{const d=e.at?new Date(e.at):new Date();const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');const lbl=d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});(byMonth[k]=byMonth[k]||{lbl,total:0}).total+=e.amount;});const ks=Object.keys(byMonth).sort().reverse();return ks.length?ks.map(k=>`<div class="bd-row" style="cursor:pointer" onclick="openPayslip('${s.id}','${k}')"><span class="bl">${byMonth[k].lbl} <span style="color:var(--gold)">›</span></span><span class="bv">${cur(byMonth[k].total)} commission${+s.basic>0?` <span style="color:var(--text-faint)">+ ${cur(s.basic)} basic</span>`:''}</span></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No payslips yet. They appear once you have earnings in a month.</div>';})()}
@@ -15948,7 +15942,7 @@ function renderMyWork(){
   </div><div class="ptab-pane" data-pane="documents" style="display:none"><div class="panel"><div class="panel-head"><h3>My Documents</h3></div>
     ${(s.docs||[]).length?(s.docs||[]).map((d,i)=>`<div class="srow"><div class="smain"><div class="sup-name">${esc(d.type)}</div><div class="sup-meta">${esc(d.name||'')}${d.size?' · '+Math.round(d.size/1024)+'KB':''}${d.at?' · '+fmtDateShort(d.at):''}</div></div><div class="sacts">${d.data?`<a class="btn sm ghost" href="${d.data}" download="${esc(d.name||'document')}">Open</a>`:''}${true?`<button class="btn sm ghost" onclick="removeMyDoc('${d.id}')">Remove</button>`:''}</div></div>`).join(''):'<div class="kv" style="color:var(--text-faint)">No documents uploaded yet.</div>'}
     ${true?`<div class="row2" style="margin-top:10px"><div class="field"><label>Document type</label>${selOther('mw_docType',['ID','Contract','NDA','Certificate','Other'],'ID','Type')}</div><div class="field"><label>&nbsp;</label><button class="btn ghost" style="width:100%" onclick="document.getElementById('mwDocFile').click()">Upload document</button><input type="file" id="mwDocFile" style="display:none" onchange="uploadMyDoc(this)"></div></div>
-    <div class="sd" style="color:var(--text-faint)">Upload a new version any time: your ID, contract, NDA or certificates.</div>`:'<div class="sd" style="color:var(--text-faint);margin-top:8px">Documents are managed by the studio. Ask your manager or HR to add or update them.</div>'}
+    `:''}
   </div></div></div>
   </div>
   `;
@@ -16141,7 +16135,7 @@ function renderPlannerEntry(){
      ):'')
     +'<div class="field"><label>Repeats</label><select class="fld" id="pl_repeat">'+repeatOpts+'</select></div>'
     +'<div class="field"><label>'+(isMeeting?'Invite team members':'Who is this for')+'</label>'
-      +'<div class="sd" style="color:var(--text-faint);margin-bottom:6px">'+(isMeeting?'They will see it in their own planner.':'Leave everybody unticked to keep it for the whole studio.')+'</div>'
+      +''
       +invitees+'</div>'
     +'<div class="field"><label>Notes (optional)</label><textarea class="fld" id="pl_notes" rows="3">'+esc(d.notes||'')+'</textarea></div>'
     +'<div class="modal-foot">'+(d.id?'<button class="btn danger sm" onclick="delPlannerEntry(\''+d.id+'\')">Delete</button>':'')
@@ -16580,15 +16574,15 @@ function openUser(id){if(!can('users'))return;if(liveMode)return openUserCloud(i
     </div>
     <div class="row2">
       <div class="field"><label>Role</label><select class="fld" id="us_role">${roles.map(r=>`<option value="${r.id}" ${u&&u.roleId===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div>
-      <div class="field"><label>Linked staff (optional)</label><select class="fld" id="us_staff" onchange="acctStaffSync()"><option value="">None</option>${staff.map(s=>`<option value="${s.id}" ${u&&u.staffId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select><div class="sd" style="color:var(--text-faint);margin-top:4px">One login maps to one person’s pay &amp; attendance record.</div></div>
+      <div class="field"><label>Linked staff (optional)</label><select class="fld" id="us_staff" onchange="acctStaffSync()"><option value="">None</option>${staff.map(s=>`<option value="${s.id}" ${u&&u.staffId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
     </div>
     ${!u?`<div id="us_makeStaffWrap" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:2px 0 10px;${(u&&u.staffId)?'display:none':''}">
       <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer"><input type="checkbox" id="us_makeStaff" style="width:18px;height:18px;accent-color:var(--gold)"> Also add <b id="us_makeStaffName">this person</b> to the team?</label>
-      <div class="sd" style="color:var(--text-faint);margin-top:4px">A staff record carries pay, attendance and commissions.</div>
+      
       ${multiBranch()?`<div class="field" style="margin-top:8px;margin-bottom:0"><label>Studio for their staff record</label>${selOther('us_makeStaffBranch',branchNames(),(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName(),'Studio')}</div>`:''}
     </div>`:''}
     <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="us_active" ${(!u||u.active!==false)?'checked':''} style="width:18px;height:18px;accent-color:var(--gold)"> Active (can sign in)</label>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Linking to a staff record credits production work and pay to this person.</div>
+    
     <div class="modal-foot">${u&&u.id!=='u-owner'?`<button class="btn danger sm" onclick="delUser('${u.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveUser('${u?u.id:''}')">${u?'Update':'Create'}</button></div>`);}
 function acctNameSync(){const n=(fv('us_name')||'').trim();const el=document.getElementById('us_makeStaffName');if(el)el.textContent=n||'this person';}
 function acctStaffSync(){const wrap=document.getElementById('us_makeStaffWrap');if(!wrap)return;const linked=!!fv('us_staff');wrap.style.display=linked?'none':'';const cb=document.getElementById('us_makeStaff');if(linked&&cb)cb.checked=false;}
@@ -16662,10 +16656,10 @@ function openUserCloud(id){
     </div>
     ${u?`<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
       <label style="text-transform:none;letter-spacing:0;font-weight:600;margin:0">Password</label>
-      <div class="sd" style="color:var(--text-faint);margin:6px 0 10px">You cannot see or set it. Send them a reset and they choose their own, which is the only way their account stays theirs.</div>
+      
       <button class="btn ghost sm" onclick="resetUserCloud('${u.id}')">Send password reset</button>
-    </div>`:`<div class="sd" style="color:var(--text-faint);margin-bottom:8px">Nobody is ever sent a password. They get an invitation at that address, pick their own, and land in the app.</div>`}
-    <div class="sd" style="color:var(--text-faint);margin-bottom:8px">Linking a staff record carries their pay, attendance &amp; reporting line.</div>
+    </div>`:``}
+    
     <div class="modal-foot">${u?`<button class="btn danger sm" onclick="delUserCloud('${u.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveUserCloud('${u?u.id:''}')">${u?'Update':'Send invitation'}</button></div>`);}
 async function saveUserCloud(id){const name=(fv('us_name')||'').trim();const email=(fv('us_email')||'').trim().toLowerCase();const role_id=fv('us_role')||'cre';const staff_id=fv('us_staff')||null;
   if(!name){alert('Name is required.');return;}

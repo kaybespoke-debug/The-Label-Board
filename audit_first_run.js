@@ -490,7 +490,9 @@ section('The person, not the mailbox');
 {
   const form = (() => { const b = freshStudio(); b.run('openStudioSetup();'); return b.els.modal.innerHTML || b.run('document.getElementById("modal").innerHTML'); })();
   ok('the first-run screen asks the person their name', /id="su_you"/.test(form));
-  ok('and says what the answer is for', /How the app greets you/.test(form));
+  /* The line that explained what the answer was for came off on 29 October with
+     every other field hint in Settings and the setup wizard. The QUESTION is what
+     this gate exists for, and it is still asked above. */
 
   const b = freshStudio();
   b.run('currentUser={id:"u1",name:"olayiwola.lad",roleId:"owner"};');

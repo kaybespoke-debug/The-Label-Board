@@ -118,7 +118,7 @@ run("SETTINGS.branches=SETTINGS.__b;setStaff(SETTINGS.__s);delete SETTINGS.__b;d
       if (plain(win).split(/\s+/).filter(w => w && w !== 'X').length >= 5) prose++;
     }
   });
-  const CEILING = 113;   // measured at 111 on 29 Oct 2026 (comments stripped), two of slack
+  const CEILING = 71;    // 69 on 29 Oct 2026 after the field hints came off, two of slack
   if (prose > CEILING) F('the app now ships ' + prose + ' lines of prose, over the ' + CEILING +
     ' agreed on 29 October. Either it is consequence and belongs somewhere tighter, or it is story. Raise this number in the same commit and say which.');
   console.log('  prose lines shipped: ' + prose + ' (ceiling ' + CEILING + ')');

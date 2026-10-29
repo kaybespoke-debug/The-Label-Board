@@ -52,7 +52,46 @@ never say done without green gates and a rendered test.
 - **Checked the other three apps.** `admin/`, `partners/` and `web/` use none
   of these classes, and none of the cut phrases survive anywhere in the repo.
 
+### Then, the same day: the field hints too (layi-v76)
+
+*"this is like the biggest for me, please take them off."*
+
+- **64 removed across 24 screens**: the whole Settings view, the setup wizard,
+  payroll setup, the staff record, the user/login form, bills, supply items,
+  products, notification settings, the studio switcher, My Work, the storage
+  meter and the rest. Done as a nesting-aware scan from each `class="sd"` to its
+  matching close, not 45 hand-written anchors, because a hand-written anchor list
+  is how the last three sweeps missed things. Only the markup inside the
+  surrounding quotes is removed, so a hint inside a string concatenation leaves
+  `''` behind and the expression still parses.
+- **25 kept**, each named in the script with its reason: what a control DOES
+  (a money one, an irreversible one, a consent one) or what a figure COUNTS.
+  Three of those were caught by reading the list rather than trusting the class:
+  the offline photo queue, the expected-materials line and the next-plan
+  description all wear the hint class and are status, data and content.
+- **Four gates went red and all four were read before anything was touched.**
+  `audit_fabric` twice and `audit_method` were right: the client-own-cloth
+  warning and the shelf-piece chip are a warning before an irreversible act and
+  feedback on a choice, not descriptions of a field. Both restored.
+  `audit_first_run` was asserting the hint under the name question rather than
+  the question itself, so that one assertion came out with its reason written in
+  beside the one that stays.
+- **Prose shipped: 111 to 69.** The `audit_simplicity` ratchet is retightened
+  to 71.
+- **Every config form rendered at 375px and read back**: setup wizard, user
+  form, bill, supply, order form, post update, Settings itself. No empty hint
+  wrappers introduced; the two that render empty in the order form are
+  conditional notes that predate this pass.
+
+### Open from this pass
+
+- **Settings still carries three `.page-sub` paragraphs**, 91 words in total,
+  above Download everything, Close the studio and Diagnostics. Each sits over a
+  destructive or support action, which is why they survived the rule.
+  **Kayode to rule on these three.**
+
 ### Open
+
 
 - **~45 field hints in Settings and the setup wizard** are untouched. They are
   the "Leave this off if it is just you" kind: not on a working screen, read
