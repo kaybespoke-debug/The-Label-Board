@@ -2805,7 +2805,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v78';
+const APP_VERSION='layi-v79';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -6520,6 +6520,12 @@ function go(view){
   if(view==='orders')renderOrders();if(view==='invoices')renderInvoices();
   if(view==='team')renderTeam();if(view==='rota')renderRota();if(view==='calendar')renderCalendar();if(view==='attendance')renderAttendance();
   if(view==='leave')renderLeave();if(view==='companylog')renderCompanyLog();if(view==='expenses')renderExpensesView();if(view==='audit')renderAudit();if(view==='mywork')renderMyWork();
+  /* AFTER the view has built its own panels, never before. renderAll fires at
+     load, when Settings has not grouped itself yet and Expenses has not made
+     its approval panel, so wiring there alone silently did nothing. */
+  if(typeof makeSettingsCollapsible==='function')makeSettingsCollapsible();
+  if(typeof collapsePhonePanels==='function')collapsePhonePanels();
+  if(typeof capStatGrids==='function')capStatGrids();
 }
 function toggleMore(){const m=document.getElementById('moreSheet');const open=m.classList.toggle('show');document.getElementById('mobMore').classList.toggle('active',open);}
 function toggleDrawer(){const s=document.querySelector('.sidebar');const o=document.getElementById('drawerOverlay');if(!s)return;const open=s.classList.toggle('open');if(o)o.classList.toggle('show',open);}
@@ -13014,12 +13020,35 @@ function unwirePanel(p){
    Transactions both carry their own .panel-collapse) are not re-wrapped; only
    their default changes. And once somebody has tapped a panel themselves,
    togglePanel stamps data-tog and this stops deciding for them. */
-function collapseViewPanels(viewId,keepOpen){
+/* Turn the panels of a view into title rows on a phone.
+
+   keep   an array of panel ids, or "last" / "first" — the panel that IS the
+          page and so stays expanded. "last" means the last panel that has a
+          heading, which is where a list lives on nearly every screen here.
+   skip   panels to leave entirely alone. Needs Attention is one: its head
+          already carries toggleAttn(), and setting an onclick would have
+          thrown that away.
+
+   Where a title already does something — Sales by category drills, Money in
+   by channel opens the breakdown, Branches opens the report — the head is NOT
+   made a toggle, because one tap would fire both. Only the chevron toggles,
+   and it stops the event so it never double-fires.
+
+   Panels already wired by hand in the markup are re-defaulted, not re-wrapped.
+   Once somebody taps one, togglePanel stamps data-tog and this stops deciding
+   for them. */
+function collapseViewPanels(viewId,keep,skip){
   const v=document.getElementById(viewId);if(!v)return;
   const phone=window.matchMedia&&window.matchMedia("(max-width:680px)").matches;
-  const keep=keepOpen||[];
-  v.querySelectorAll(".panel").forEach(function(p){
-    const head=p.querySelector(".panel-head");if(!head)return;
+  const skipIds=skip||[];
+  const all=[].slice.call(v.querySelectorAll(".panel")).filter(function(p){
+    return p.querySelector(".panel-head")&&p.querySelector(".panel-head h3")&&skipIds.indexOf(p.id)<0;
+  });
+  let keepIds=[];
+  if(keep==="last"&&all.length)keepIds=[all[all.length-1]];
+  else if(keep==="first"&&all.length)keepIds=[all[0]];
+  all.forEach(function(p){
+    const head=p.querySelector(".panel-head");
     let body=p.querySelector(":scope > .panel-collapse");
     if(!body){
       body=document.createElement("div");
@@ -13031,21 +13060,34 @@ function collapseViewPanels(viewId,keepOpen){
     if(!p.id)p.id="vpan_"+Math.random().toString(36).slice(2,8);
     if(!head.classList.contains("pcol")){
       head.classList.add("pcol");
-      head.setAttribute("onclick","togglePanel('"+p.id+"')");
+      const titleActs=!!head.querySelector("h3[onclick]");
+      const headTaken=!!(head.getAttribute("onclick")||"");
+      if(!titleActs&&!headTaken)head.setAttribute("onclick","togglePanel('"+p.id+"')");
       const chev=document.createElement("span");
       chev.className="collapse-chev";chev.textContent="\u25be";
+      chev.setAttribute("onclick","event.stopPropagation();togglePanel('"+p.id+"')");
       head.appendChild(chev);
     }
-    if(!p.dataset.tog)p.classList.toggle("collapsed",!!phone&&keep.indexOf(p.id)<0);
+    const stayOpen=(keepIds.indexOf(p)>=0)||(Array.isArray(keep)&&keep.indexOf(p.id)>=0);
+    if(!p.dataset.tog)p.classList.toggle("collapsed",!!phone&&!stayOpen);
   });
 }
-/* Which panel IS each page. Money has none: the four cards at the top are the
-   answer and the rest are sections. Clients is absent on purpose — its one
-   panel is the client list, so there is nothing to collapse that is not the
-   page itself. */
+/* Which panel IS each page, and which pages are left alone.
+
+   Absent on purpose, and the gate checks the absence: customers, orders,
+   products, sales, audit, companylog, leave and invoices each have ONE panel
+   and it is the list — shutting it leaves a page with nothing on it. And
+   attendance, rota and payroll fall under the 150px line, rota also having a
+   panel with no heading, which would collapse to a blank row. */
 function collapsePhonePanels(){
   collapseViewPanels("view-finance",[]);
   collapseViewPanels("view-production",["prodFocusPanel"]);
+  collapseViewPanels("view-activity",[],["attnPanel"]);
+  collapseViewPanels("view-expenses","last");
+  collapseViewPanels("view-logistics","last");
+  collapseViewPanels("view-pots","last");
+  collapseViewPanels("view-team",[]);   // the team list below has no heading, so it is never wired; the announcements box is all there is to shut
+  collapseViewPanels("view-marketing","first");
 }
 function makeSettingsCollapsible(){
   const v=document.getElementById("view-settings");if(!v)return;

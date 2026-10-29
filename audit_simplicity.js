@@ -147,18 +147,71 @@ run("SETTINGS.branches=SETTINGS.__b;setStaff(SETTINGS.__s);delete SETTINGS.__b;d
      collapsePhonePanels and that absence is checked — a later pass that
      "does every page" and pads the one that was already fine is the same
      dishonesty as one that skips the page that was not. */
-  if (!/function collapseViewPanels\(viewId,keepOpen\)/.test(shipped)) F('the panel stacks on Money and Production no longer collapse on a phone');
+  if (!/function collapseViewPanels\(viewId,keep,skip\)/.test(shipped)) F('the panel stacks no longer collapse on a phone');
+
+  /* TWO CONFLICTS the 375px measurement turned up, neither of them visible in
+     the markup, and both of which would have broken a working control:
+
+       Needs Attention already carries toggleAttn() on its head. Wiring it as
+       well would have overwritten that handler with togglePanel.
+
+       Sales by category, Money in by channel and Branches each carry a drill
+       on the <h3>. Making the whole head a toggle fires both on one tap, so
+       where a title already does something only the chevron toggles — and the
+       chevron stops the event so it never double-fires either. */
+  if (!/collapseViewPanels\("view-activity",\[\],\["attnPanel"\]\)/.test(shipped)) F('Needs Attention is being wired again, which overwrites its own toggleAttn handler');
+  if (!/head\.querySelector\("h3\[onclick\]"\)/.test(shipped)) F('a panel whose title already drills can have the whole head made a toggle again, so one tap fires both');
+  if (!/event\.stopPropagation\(\);togglePanel/.test(shipped)) F('the chevron no longer stops the event, so a tap on it toggles twice');
+  if (!/\.panel-head h3"\)&&skipIds/.test(shipped)) F('a panel with no heading can be collapsed again, which leaves a blank row (this is why rota is left alone)');
   if (!/capStatGrids\(\);makeSettingsCollapsible\(\);collapsePhonePanels\(\)/.test(shipped)) F('collapsePhonePanels is defined but never called');
   {
     const fn = (shipped.match(/function collapsePhonePanels\(\)\{[\s\S]*?\n\}/) || [''])[0];
     if (!/collapseViewPanels\("view-finance",\[\]\)/.test(fn)) F('Money no longer collapses every panel; its four cards are the page and the rest are sections');
     if (!/collapseViewPanels\("view-production",\["prodFocusPanel"\]\)/.test(fn)) F('Production no longer keeps Workroom focus open, which is what that page is for');
-    if (/view-customers/.test(fn)) F('Clients is being collapsed: its one panel IS the client list, so there is nothing to shut that is not the page');
+    /* THE RULE: collapse a page's non-primary panels when they come to 150px
+       or more. Below that the gain is noise and the tap is a cost.
+
+       Six pages qualify. The ones NOT listed are not an oversight and each has
+       a reason, so the absence is what is checked — a later pass that "does
+       every page" and shuts a list is the same failure as one that skips a
+       page that needed it.
+
+         one panel and it IS the list   customers orders products sales audit
+                                        companylog leave invoices
+         under the 150px line           attendance (112) payroll (123)
+         a panel with no heading        rota */
+    for (const v of ['view-customers', 'view-orders', 'view-products', 'view-sales',
+                     'view-audit', 'view-companylog', 'view-leave', 'view-invoices',
+                     'view-attendance', 'view-payroll', 'view-rota']) {
+      if (new RegExp('"' + v + '"').test(fn)) F(v + ' is being collapsed; it is either one panel that IS the list, under the 150px line, or has a panel with no heading');
+    }
+    /* view-team takes [] and not "last": its list has no heading of its own,
+       so it is never wired and never shut, and "last" picked the announcements
+       box above it and kept that open — leaving the page the length it was.
+       Found by rendering it, not by reading it. */
+    for (const [v, how] of [['view-expenses', '"last"'], ['view-logistics', '"last"'],
+                            ['view-pots', '"last"'], ['view-team', '\\[\\]'],
+                            ['view-marketing', '"first"']]) {
+      if (!new RegExp('collapseViewPanels\\("' + v + '",' + how).test(fn)) F(v + ' no longer keeps its ' + (how === '"last"' ? 'list' : 'main panel') + ' open');
+    }
   }
   /* and a shut row is a title, its button and a chevron — not a chart's
      reserved height, not a segmented control for content that is not shown. */
   if (!/\.panel\.collapsed\{min-height:0\}/.test(shipped)) F('a shut chart panel reserves 200px for a chart it is not drawing');
   if (!/\.panel\.collapsed > \.panel-head \.seg\{display:none!important\}/.test(shipped)) F('a shut panel still shows a period toggle for content that is not on screen (the seg carries an inline display:flex, so this needs !important)');
+
+  /* AND THE ONE THAT MATTERED MOST. Both passes used to run only from
+     renderAll(), which fires at load — before Settings has grouped its 23
+     panels and before Expenses has built its approval panel. So the guard
+     inside makeSettingsCollapsible returned early and nothing called it again,
+     and Settings in v77 shipped not collapsing at all on a real phone. It only
+     looked right because the probe called the function by hand afterwards.
+     They now also run at the END of go(), after the view builds itself. */
+  if (!/makeSettingsCollapsible\(\);\s*$[\s\S]{0,200}?collapsePhonePanels\(\);/m.test(shipped)
+      && !/if\(typeof makeSettingsCollapsible==='function'\)makeSettingsCollapsible\(\);/.test(shipped)) {
+    F('the collapse passes run only from renderAll again, which is before a view builds its own panels — this is what made v77 ship a Settings that never collapsed');
+  }
+  if (!/if\(typeof collapsePhonePanels==='function'\)collapsePhonePanels\(\);/.test(shipped)) F('go() no longer re-runs the panel collapse after the view renders');
 
   /* NO SLACK. It had two, and two is exactly how many sentences can be added
      before anybody notices. 69 is what the app ships on 29 October 2026 with

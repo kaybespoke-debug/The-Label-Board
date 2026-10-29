@@ -5,7 +5,7 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 29 October 2026 (thirtieth session)
+Last updated: 29 October 2026 (thirty-first session)
 
 ## 29 October 2026 — the story, swept rather than spotted (layi-v75)
 
@@ -51,6 +51,56 @@ never say done without green gates and a rendered test.
   Re-run as an owner.
 - **Checked the other three apps.** `admin/`, `partners/` and `web/` use none
   of these classes, and none of the cut phrases survive anywhere in the repo.
+
+### Every remaining page, and the bug that made v77 a lie (layi-v79)
+
+**`makeSettingsCollapsible` and `collapsePhonePanels` ran only from
+`renderAll()`, which fires at load — before Settings groups its 23 panels and
+before Expenses builds its approval panel.** The guard inside returned early
+and nothing called it again. **Settings in v77 shipped not collapsing at all on
+a real phone.** It measured as ten rows only because the probe called the
+function by hand afterwards. Both passes now also run at the END of `go()`,
+after the view has built itself, and the gate holds that.
+
+That is the second time in two days that forcing state in a probe hid the
+truth. The first was signing in as nobody and reading an empty permission set.
+A measurement that works because the harness helped it is not a measurement.
+
+### The remaining pages, measured at 375px then fixed
+
+| Page | Before | After | |
+|---|---|---|---|
+| Home (activity) | 2,253px / 9 panels | **674** | 8 shut |
+| Expenses | 1,421 / 3 | **1,068** | 2 shut, list open |
+| Pots | 1,683 / 2 | **1,575** | summary shut, list open |
+| Logistics | 927 / 2 | **733** | courier shut |
+| Marketing | 840 / 2 | **703** | history shut, segments open |
+| Team | 575 / 2 | **503** | announcements shut |
+| Settings | (never worked) | **225** | now actually collapses |
+
+**The rule, written down:** collapse a page's non-primary panels when they come
+to 150px or more. Below that the gain is noise and the tap is a cost.
+
+**Left alone on purpose, and the gate checks each absence:**
+
+- **one panel that IS the list** — clients, orders, products, sales, audit,
+  companylog, leave, invoices. A shut list is a page with nothing on it.
+- **under the 150px line** — attendance (112px), payroll (123px).
+- **a panel with no heading** — rota, which would collapse to a blank row.
+
+### Two conflicts the measurement found, neither visible in the markup
+
+- **Needs Attention already carries `toggleAttn()` on its head.** Wiring it
+  would have overwritten that handler with `togglePanel`. It is skipped, and
+  the gate names it.
+- **Sales by category, Money in by channel and Branches each drill from the
+  `<h3>`.** Making the whole head a toggle fires both on one tap. Where a
+  title already does something, only the chevron toggles, and the chevron stops
+  the event so it never double-fires.
+
+Both proved by clicking: the drill title still drills, the chevron opens the
+panel to 424px of content, a plain head still toggles on a tap anywhere, and no
+page anywhere shows a blank collapsed row.
 
 ### The same pass on Production, Money and Clients (layi-v78)
 
