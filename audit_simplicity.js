@@ -43,6 +43,87 @@ run("setStaff(getStaff().concat([{id:'s2',name:'New hire',active:true,status:'Ac
 if(run("teamToolsOn()")!==true) F('adding a second teammate should reveal team tools automatically (auto)');
 run("SETTINGS.branches=SETTINGS.__b;setStaff(SETTINGS.__s);delete SETTINGS.__b;delete SETTINGS.__s;delete SETTINGS.teamTools;");
 
+/* ===================================================================================
+   5) NO NARRATION — 29 October.
+
+   "we made some corrections yesterday only for me to see them in other places and it
+   kind of broke my heart and i feel you might not have been too thorough."
+
+   Three separate sessions cut explanation text off the screen Kayode photographed and
+   left the same shape of line on the next one. So this is the whole pattern rather than
+   the screen: an inventory was taken of all 130 prose lines in the app and the rule
+   applied to every one of them was
+
+     CUT   narration: how the app works, that it works, or a restatement of what is
+           already on the screen. Nothing is lost by deleting it.
+     KEEP  consequence — what a control does when you press it, above all a money or an
+           irreversible one — and what a figure counts, on a screen where somebody
+           decides something from the figure.
+     KEEP  empty states. They only show when there is nothing to show.
+
+   Two halves below. The first names the lines that were cut, so they cannot come back
+   by somebody restoring an old block. The second is a RATCHET on the total, because the
+   failure mode here is not one bad line, it is drift: nobody ever adds story on purpose,
+   it arrives one helpful sentence at a time. If a new line is genuinely needed, raise
+   the ceiling in the same commit and say why. =================================== */
+{
+  const CUT = [
+    ['the order timeline footnote',      'no extra logging'],
+    ['the empty timeline',               'story builds here automatically'],
+    ['the correspondence list',          'typed twice'],
+    ['the batch order form',             'Tracked wave by wave'],
+    ['the per-item modal',               'not made the same way'],
+    ['the per-item subtitle',            'each one tracked on its own'],
+    ['the import screen',                'Moving from another app'],
+    ['the branch form',                  'drives the whole app'],
+    ['the feedback form',                'A person reads every one'],
+    ['the payslip list',                 'Tap a month to open its payslip'],
+    ['the measurement source field',     'fitting problem later has an answer'],
+    ['the run modal',                    'making its own rail'],
+    ['the campaign screen',              'comes with the backend'],
+  ];
+  /* Comments out first. The repo explains itself in block comments, and one of
+     them says 'not made the same way' to record why that line went. Reading a
+     comment as shipped text is the same miss that cost a cycle on the Duplicate
+     gate yesterday. */
+  const shipped = html.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  CUT.forEach(function (p) {
+    if (shipped.indexOf(p[1]) >= 0) F(p[0] + ' is telling the story again: "' + p[1] + '"');
+  });
+
+  /* and the two that are NOT narration, both guarded by gates of their own
+     (audit_runs, audit_pieces): a screen naming a concept the reader has never
+     met. Checked here too so a future no-story sweep sees why they survived. */
+  if (shipped.indexOf('Materials in, stock out') < 0) F('the run screen no longer says what a run is (audit_runs guards this too)');
+  if (shipped.indexOf('own stages') < 0) F('the per-item screen no longer says why two pieces sit at different stages');
+
+  /* THE RATCHET. Count every line of prose the app ships, the way the inventory
+     did: strip inner tags first, or a hint carrying a <b> reads as four words
+     and is missed — which is exactly how the first run of this sweep lost the
+     QC modal. */
+  const plain = s => s.replace(/<[^>]*>/g, ' ')
+                      .replace(/\$\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, ' X ')
+                      .replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+  let prose = 0;
+  ['sd', 'ad', 'otl-foot', 'msub'].forEach(function (c) {
+    const re = new RegExp('class="' + c + '"', 'g');
+    let m;
+    while ((m = re.exec(shipped))) {
+      const after = shipped.slice(m.index);
+      const gt = after.indexOf('>');
+      if (gt < 0) continue;
+      let win = after.slice(gt + 1, gt + 1 + 420);
+      const end = win.indexOf('</div>');
+      if (end >= 0) win = win.slice(0, end);
+      if (plain(win).split(/\s+/).filter(w => w && w !== 'X').length >= 5) prose++;
+    }
+  });
+  const CEILING = 113;   // measured at 111 on 29 Oct 2026 (comments stripped), two of slack
+  if (prose > CEILING) F('the app now ships ' + prose + ' lines of prose, over the ' + CEILING +
+    ' agreed on 29 October. Either it is consequence and belongs somewhere tighter, or it is story. Raise this number in the same commit and say which.');
+  console.log('  prose lines shipped: ' + prose + ' (ceiling ' + CEILING + ')');
+}
+
 console.log('Simplicity / progressive-disclosure audit:');
 console.log('  cluster gated: '+CLUSTER.join(' · '));
 console.log(fails.length? 'FAILURES ('+fails.length+'):\n'+fails.map(f=>'  ✗ '+f).join('\n') : '  ✓ solo shops hide the team & HR cluster, hidden views redirect, and tools reveal on hire or via Settings');

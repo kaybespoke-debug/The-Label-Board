@@ -2794,7 +2794,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v74';
+const APP_VERSION='layi-v75';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4509,7 +4509,7 @@ function openMeasRecord(key,recId){if(!can('customers'))return;const h=measHisto
   openModal(`<h3>${rec?'Measurement record':'New measurement record'}</h3><div class="msub">${esc((getCustomers()[key]||{}).name||key)}</div>
     <div class="row2"><div class="field"><label>Date taken</label><input class="fld" type="date" id="mr_date" value="${rec&&rec.at?rec.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div>
     <div class="field"><label>Preferred fit</label><select class="fld" id="mr_fit"><option value="">—</option>${FIT_STYLES.map(x=>`<option ${rec&&rec.fit===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
-    <div class="row2"><div class="field"><label>How was it taken?</label><select class="fld" id="mr_source"><option value="">—</option>${MEAS_SOURCES.map(s=>`<option value="${s.k}" ${rec&&rec.source===s.k?'selected':''}>${esc(s.label)}</option>`).join('')}</select><div class="sd" style="color:var(--text-faint);margin-top:5px">Numbers a client sent are recorded as theirs, so a fitting problem later has an answer.</div></div>
+    <div class="row2"><div class="field"><label>How was it taken?</label><select class="fld" id="mr_source"><option value="">—</option>${MEAS_SOURCES.map(s=>`<option value="${s.k}" ${rec&&rec.source===s.k?'selected':''}>${esc(s.label)}</option>`).join('')}</select></div>
     <div class="field"><label>Who took it?</label><select class="fld" id="mr_takenBy"><option value="">—</option>${(function(){
       const staff=getStaff().filter(s=>s.active!==false);
       /* Default to whoever is doing this, when they have a staff record — the
@@ -7254,8 +7254,8 @@ function renderGroupModal(){
         <button class="btn sm" ${si>=dispI?'disabled':''} onclick="groupStep(${i},1)">Advance →</button>
       </div></div>`;}).join('');
   const n=(o.outfits||[]).length;
-  openModal(`<h3>${esc(o.client)} · ${grp?'group order':'item by item'}</h3><div class="msub">${o.id} · ${n} ${grp?(n===1?'person':'people'):(n===1?'item':'items')} · each one tracked on its own</div>
-    <div class="sd" style="color:var(--text-faint);margin-bottom:12px">${grp?'Move each person through the stages individually.':'These pieces are not made the same way, so each one walks its own stages.'} Delivery is marked from Logistics once everything is dispatched.</div>
+  openModal(`<h3>${esc(o.client)} · ${grp?'group order':'item by item'}</h3><div class="msub">${o.id} · ${n} ${grp?(n===1?'person':'people'):(n===1?'item':'items')}</div>
+    <div class="sd" style="color:var(--text-faint);margin-bottom:12px">${grp?'Each person walks their own stages.':'These pieces walk their own stages.'}</div>
     <div class="slist">${rows||`<div class="kv">No ${grp?'people':'items'} on this order.</div>`}</div>`);
 }
 function groupStep(i,delta){
@@ -7623,7 +7623,7 @@ function renderOrderModal(){
         :''}</div>`;})()}
     ${branchField}`;
   const stageSection=isBatch(draft)
-    ? `<div class="sd" style="color:var(--text-faint)">Tracked wave by wave from the Production card.</div>`
+    ? ''
     : `<div class="field" style="margin-bottom:0"><label>Stage</label><select class="fld" id="f_stage">${stageOpts}</select></div>`;
   openModal(`
     <h3>${editingOrderId?'Edit order':'New order'}</h3>
@@ -7816,8 +7816,8 @@ function buildOrderTimeline(o){
     const owed=orderNet(o)-(+o.paid||0);const dd=o.due?new Date(o.due).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
     rows+=`<div class="otl-ev future"><span class="od">○</span><div class="oda">${dd?'Due '+dd:'No due date'}</div><div class="ot">${o.stageIndex>=RFD?'Ready for collection':'Delivered & collected'}</div>${(can('money')&&owed>0)?`<div class="ox">${curO(owed,o)} balance due on collection.</div>`:''}</div>`;
   }
-  if(!ev.length)return `<div class="kv" style="color:var(--text-faint);margin-bottom:10px">As you post updates and payments, the order\u2019s story builds here automatically.</div><div class="otl">${rows}</div>`;
-  return `<div class="otl">${rows}</div><div class="otl-foot">Captured automatically as you work \u2014 no extra logging.</div>`;
+  if(!ev.length)return `<div class="otl">${rows}</div>`;
+  return `<div class="otl">${rows}</div>`;
 }
 var orderTab='overview';
 function setOrderTab(t){orderTab=t;document.querySelectorAll('.otab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));document.querySelectorAll('.opane').forEach(p=>{p.style.display=(p.dataset.pane===t)?'':'none';});}
@@ -8634,7 +8634,7 @@ function renderRunModal(){
       +'</div></div>'
     : '';
   openModal('<h3>'+(d.id?'Edit production run':'New production run')+'</h3>'
-    +'<div class="msub">Materials in, stock out. No client, no invoice '+'—'+' this is the studio making its own rail.</div>'
+    +'<div class="msub">Materials in, stock out. No client, no invoice.</div>'
     +'<div class="field"><label>What are you making</label><select class="fld" id="r_product" onchange="runPickProduct()">'
       +prods.map(x=>'<option value="'+x.id+'" '+(d.productId===x.id?'selected':'')+'>'+esc(x.name||'')+'</option>').join('')+'</select>'
       +'<div class="sd" style="color:var(--text-faint);margin-top:5px">It goes on this product\u2019s shelf when the run is done.</div></div>'
@@ -10762,7 +10762,6 @@ function renderFeedbackModal(){
       </div>`).join(''):'<div class="kv" style="color:var(--text-faint)">You have not sent us anything yet.</div>'}
   `;
   openModal(`<h3>Help &amp; feedback</h3>
-    <div class="msub">A person reads every one.</div>
     <div class="toolbar" style="gap:8px;margin:12px 0">
       <button class="chip${feedbackTab==='new'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('new')">Send something</button>
       <button class="chip${feedbackTab==='sent'?' active':''}" onclick="syncFeedbackDraft();setFeedbackTab('sent')">What you have sent${sent.length?' ('+sent.length+')':''}</button>
@@ -11192,7 +11191,7 @@ const IMPORTERS=[
 function impById(key){return IMPORTERS.find(function(x){return x.key===key;});}
 function openImportMigrate(){_impState={};openModal(
   '<h3>Bring your data across</h3>'+
-  '<div class="msub">Moving from another app? Import your history one list at a time. Re-importing is safe, matched records are updated, not duplicated.</div>'+
+  '<div class="msub">Re-importing is safe: matched records are updated, not duplicated.</div>'+
   '<div class="imp-from"><span>Works with a CSV or Excel export from</span><span class="pill">almost any app</span><span class="pill">a spreadsheet</span><span class="pill">your old website</span><span class="pill">a notebook you typed up</span></div>'+
   '<div id="impCards"></div>'+
   '<div class="imp-note"><b>Two notes.</b> Client photos usually cannot be exported from your old app, so those come over by hand. And if your old software exports nothing clean, send us the file you can pull and we will shape it for you once, then you upload it here.</div>'+
@@ -13520,7 +13519,7 @@ function renderBranchEdit(){
         <div style="display:flex;gap:8px"><button class="btn sm" onclick="beAddType()">Add type</button><button class="btn ghost sm" onclick="beCancelAdd()">Cancel</button></div>
       </div>`
     : `<div onclick="beStartAdd()" style="cursor:pointer;border:1.5px dashed var(--line);border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:13.5px">\uff0b Add a type</div>`;
-  openModal(`<h3>${b.id?'Edit branch':'Add branch / outlet'}</h3><div class="msub">What a studio does drives the whole app: which tabs it shows, and how orders, sales, stock &amp; finance are tagged.</div>
+  openModal(`<h3>${b.id?'Edit branch':'Add branch / outlet'}</h3>
     <div class="field"><label>Name</label><input class="fld" id="be_name" value="${esc(b.name)}" placeholder="e.g. Lagos studio"></div>
     <div class="field"><label>Location <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="be_loc" value="${esc(b.location)}" placeholder="City / area"></div>
     <div class="field"><label>What it does <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick everything this studio does)</span></label>
@@ -15062,7 +15061,7 @@ function openStaffDetail(id){
   else if(kind==='production')perfPane=perfBlock;
   else perfPane=supportBlock;
   const commPane=`<div class="bd-row"><span class="bl">Owed \u00b7 completed jobs, ready to pay</span><span class="bv" style="color:var(--amber)">${cur(unpaid)}</span></div>${pendingComm>0?`<div class="bd-row"><span class="bl">Pending \u00b7 jobs still in progress</span><span class="bv" style="color:var(--text-faint)">${cur(pendingComm)}</span></div>`:''}<div class="bd-row"><span class="bl">Commission this month</span><span class="bv">${cur(monthComm)}</span></div><div class="bd-sub" style="margin-top:12px">Jobs done, each commission</div>${jobRows}${unpaid>0?`<div style="margin-top:12px"><button class="btn" onclick="payCommission('${id}')">Pay commission (${cur(unpaid)})</button></div>`:''}`;
-  const payPane=`<div class="bd-sub">Pay setup</div>${payroll||'<div class="kv" style="color:var(--text-faint)">No pay details set.</div>'}${pendingBankHtml}<div class="bd-sub" style="margin-top:14px">Monthly pay history</div><div class="sd" style="color:var(--text-faint);margin-bottom:6px">Tap a month to open its payslip: a full breakdown of how the pay was calculated.</div>${monthRows}${+s.basic>0?`<div style="margin-top:12px"><button class="btn" onclick="payBasic('${id}')">Pay salary (${cur(s.basic)})</button></div>`:''}`;
+  const payPane=`<div class="bd-sub">Pay setup</div>${payroll||'<div class="kv" style="color:var(--text-faint)">No pay details set.</div>'}${pendingBankHtml}<div class="bd-sub" style="margin-top:14px">Monthly pay history</div>${monthRows}${+s.basic>0?`<div style="margin-top:12px"><button class="btn" onclick="payBasic('${id}')">Pay salary (${cur(s.basic)})</button></div>`:''}`;
   const reviewsPane=`<div style="margin-bottom:10px">${can('team')?`<button class="btn sm ghost" onclick="addTimelineEntry('${id}')">+ Add review / note</button>`:''}</div>${timeline}`;
   openModal(`<div style="display:flex;gap:14px;align-items:center;margin-bottom:6px"><div style="width:54px;height:54px;border-radius:50%;overflow:hidden;background:var(--panel-2);border:1px solid var(--line);display:grid;place-items:center;font-size:18px;color:var(--text-faint);flex:none">${s.photo?`<img src="${s.photo}" style="width:100%;height:100%;object-fit:cover">`:esc((s.name||'?')[0])}</div><div><h3 style="margin:0">${esc(s.name)} <span class="sup-status ${statusCls}" style="vertical-align:middle">${esc(st)}</span></h3><div class="msub" style="margin:0">${s.staffId?esc(s.staffId)+' · ':''}${esc(s.role||'')}${s.department?' · '+esc(s.department):''}</div></div></div>
     ${money?`<div class="cust-stats"><div class="cust-stat"><div class="cv">${cur(s.basic||0)}</div><div class="cl">Monthly basic</div></div><div class="cust-stat"><div class="cv">${cur(monthComm)}</div><div class="cl">Commission MTD</div></div><div class="cust-stat"><div class="cv" style="color:var(--amber)">${cur(unpaid)}</div><div class="cl">Owed</div></div></div>`:''}
@@ -15651,7 +15650,7 @@ const CORR_KINDS={
 function correspondenceHtml(key,data){
   const ev=correspondenceOf(key,data);
   if(!ev.length)return '<div class="kv" style="color:var(--text-faint)">Nothing recorded for this client yet. Notes you log, comments posted on their orders, measurements, payments and appointments all collect here.</div>';
-  const head=`<div class="sd" style="color:var(--text-faint);margin-bottom:10px">${ev.length} entr${ev.length===1?'y':'ies'} · notes, order comments, measurements, payments and appointments, newest first. Nothing here is typed twice — it is the same record you see on the order or the note itself.</div>`;
+  const head=`<div class="sd" style="color:var(--text-faint);margin-bottom:10px">${ev.length} entr${ev.length===1?'y':'ies'} · notes, order comments, measurements, payments and appointments, newest first.</div>`;
   const rows=ev.map(e=>{
     const meta=CORR_KINDS[e.kind]||{label:e.kind,hue:'var(--text-dim)'};
     const when=e.at?new Date(e.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
@@ -15787,7 +15786,7 @@ function openCampaign(segKey){
       <div class="sd" style="color:var(--text-faint);margin-top:6px">Attach images or PDFs. Download first, then attach them in your mail or WhatsApp app.</div></div>
     <div class="field"><label>Recipients, tap to open ${nlChannel==='email'?'email':'WhatsApp'} (${recipientList.length})</label>
       <div style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:10px">${(nlChannel==='email'?seg.list.filter(c=>c.email):seg.list.filter(c=>c.whatsapp)).map(c=>`<div class="bd-row"><span class="bl">${esc(c.name)}<span style="color:var(--text-faint);font-size:12px"> · ${esc(nlChannel==='email'?c.email:c.whatsapp)}</span></span><button class="btn sm ghost" onclick="openContact('${nlChannel}','${esc(nlChannel==='email'?c.email:c.whatsapp)}')">${nlChannel==='email'?'Email ›':'WhatsApp ›'}</button></div>`).join('')||'<div class="kv" style="color:var(--text-faint);padding:10px">No '+(nlChannel==='email'?'email addresses':'WhatsApp numbers')+' in this segment.</div>'}</div>
-      <div class="sd" style="color:var(--text-faint);margin-top:6px">Tapping opens ${nlChannel==='email'?'your mail app':'WhatsApp'} with the message ready. One-click bulk send comes with the backend.</div></div>
+      <div class="sd" style="color:var(--text-faint);margin-top:6px">Tapping opens ${nlChannel==='email'?'your mail app':'WhatsApp'} with the message ready.</div></div>
     <div class="modal-foot" style="flex-wrap:wrap;gap:8px"><button class="btn ghost sm" onclick="copyNewsletter()">Copy message</button>${nlChannel==='email'&&emails.length?`<button class="btn ghost sm" onclick="emailCampaign()">Open email draft</button>`:''}${nlChannel==='whatsapp'&&wa.length?`<button class="btn ghost sm" onclick="waCampaign()">Open WhatsApp</button>`:''}<span style="flex:1"></span><button class="btn" onclick="markCampaignSent()">Mark as sent</button></div>`);
   renderNlAttach();
 }

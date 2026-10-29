@@ -5,7 +5,65 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 28 October 2026 (twenty-seventh session)
+Last updated: 29 October 2026 (twenty-eighth session)
+
+## 29 October 2026 — the story, swept rather than spotted (layi-v75)
+
+Standing instruction from Kayode, recorded in memory as
+`labelboard-sweep-everywhere`: *"we made some corrections yesterday only for me
+to see them in other places."* One complaint is one PATTERN, not one screen.
+Sweep the whole codebase, list every hit, fix all of them, show the list, and
+never say done without green gates and a rendered test.
+
+### Done
+
+- **Every line of prose in the app was inventoried**, not grepped for: 130
+  across 65 screens. The sweep script itself had the bug it was written to
+  catch — it matched text up to the first `<`, so any hint containing a `<b>`
+  read as four words and was dropped, which hid the QC modal. Fixed, then
+  re-run.
+- **The rule applied to all 130**, so the next person applies the same one:
+  CUT narration (how the app works, that it works, a restatement of what is
+  already on screen); KEEP consequence (what a control does when pressed,
+  what a figure counts); KEEP empty states.
+- **Thirteen lines cut**, eleven of them kept out: the order timeline's
+  footnote and its empty state, the correspondence list, the batch order form,
+  the per-item modal and its subtitle, the import screen's first sentence, the
+  branch form, the feedback form, the payslip list, the measurement source
+  field, the run modal's definition, and a roadmap promise on the campaign
+  screen.
+- **Two went back**, shorter, because gates require them: `audit_runs` wants
+  the run screen to say what a run is and that there is no client,
+  `audit_pieces` wants the per-item screen to say why two pieces sit at
+  different stages. Both name a concept the reader has never met, which the
+  no-story rule does not cover. Kayode can overrule and the gate assertions
+  come out with it.
+- **`audit_simplicity` section 5, NO NARRATION.** Names all thirteen cut
+  phrases so an old block cannot restore them, re-asserts the two that stayed,
+  and RATCHETS the total at 113 (measured 111, comments stripped). Drift is the
+  failure mode here: nobody adds story on purpose, it arrives one helpful
+  sentence at a time. Raise the ceiling in the same commit and say why.
+  Mutation-drilled.
+- **Every changed screen was rendered at 375px and read back**, not grepped.
+  Ten screens clean, and the two kept lines confirmed still present. The first
+  pass of that test proved nothing, because the fresh browser profile had no
+  signed-in user so `currentRole()` was null and half the modals never opened.
+  Re-run as an owner.
+- **Checked the other three apps.** `admin/`, `partners/` and `web/` use none
+  of these classes, and none of the cut phrases survive anywhere in the repo.
+
+### Open
+
+- **~45 field hints in Settings and the setup wizard** are untouched. They are
+  the "Leave this off if it is just you" kind: not on a working screen, read
+  once while a studio is being set up. **Kayode's call** whether they go too.
+- **The black haze at the top of the phone** still needs the home-screen icon
+  removed and re-added. The fix is live; iOS keeps the status-bar setting it
+  had at install.
+- **The Today strip** is four more dashboard cards, multi-branch only, so he
+  has never seen it. Not capped.
+- **A second owner per studio** — blocker is `team-admin`'s
+  `['manager','staff','viewer']` allow-list.
 
 ## 28 October 2026 — cutting the phone down (layi-v74)
 
