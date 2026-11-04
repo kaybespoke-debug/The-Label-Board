@@ -5,7 +5,81 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 29 October 2026 (thirty-first session)
+Last updated: 4 November 2026 (thirty-second session)
+
+## 4 November 2026 — the drill-down, on trial (layi-v80)
+
+Kayode came back after clicking through the apps: *"i dont think we are ready
+or even close ... lots of changes still need to be made, long endless
+scrolls."* Measured every screen at 375px before touching anything. The
+collapsing work was finished as a lever: Money has nine panels, all nine
+already shut, and it was still 1,073px. What was left is the block of figure
+cards on 18 of 23 screens and the rows under them.
+
+He rejected the first proposal, which split one long form into sections, with
+the right objection: *"this looks like you just divided everything under
+different topics on the same topic."* What he wants is the LAYI shop's browse
+flow: *"you click a categories then it takes you to a different screen ...
+selecting the product opens up another with the products and details on it."*
+
+### What shipped
+
+Three tabs, phone only:
+
+| Tab | Before | Hub | What level two is |
+|---|---|---|---|
+| Orders | 1,711px | **395** | being made / overdue / ready / delivered / all |
+| Clients | 1,282px | **395** | owing / to follow up / ordered recently / all |
+| Stock | 1,221px | **541** | the studio's own categories, running low, products |
+
+Level three is the record modal that already existed, untouched.
+
+**Level two is not a second list.** It sets the filter the view already has
+(`ordersFilter`, `custFilter`, `supTab`) and lets the view render itself, so
+branch scope, permissions, the money rules, sorting and search keep working
+from one copy. That is what `audit_drill.js` mostly exists to hold.
+
+**`ordersFilter` gained one key, `making`.** `active` means "not delivered",
+which includes the ones finished and waiting, so tiles built on it showed 16
+in progress out of 16 orders with 6 of those also counted as ready. Being
+made + ready + delivered now equals the list.
+
+**Money is deliberately untouched**, as the one tab to compare the pattern
+against. The gate checks that absence so a later pass does not quietly drill
+it before he has judged the three.
+
+### Still open on this
+
+- **His verdict, 5 November.** Keep, revert or modify. `DRILL_ON=false` in
+  `site/layi_dashboard.html` reverts all three tabs in one line.
+- **`audit_drill.js` is not wired into `verify.js`**, on purpose: the feature
+  is on trial and a gate in the suite would have to come out with it. Wire it
+  in if he keeps it.
+- **Which tabs get it next.** Workroom, Products, Vendors, Team and Expenses
+  have natural groupings. Rota, Attendance and the Audit trail do not, and
+  forcing categories on them would be worse than the list.
+- **Are the tiles the right ones.** Orders is split by state; it could be by
+  branch, by the month something is due, or by who is making it. This is his
+  call, not mine, and it is the first question to ask tomorrow.
+
+### Found while measuring, not yet fixed
+
+- **The order page is 1,939px with 14 tappable things**, two of which are the
+  same thing: `Message` in the top bar and `Message client` further down.
+- **Vendors is 2,359px**, the longest screen in the app, because it opens in
+  Tiles on a phone. List is already built and is one line away from being the
+  default under 680px.
+- **The Face ID banner sits over the bottom tab bar** on every screen until
+  it is dismissed.
+- **Settings is 79 buttons.** The ten group rows are right; what is behind
+  them is a wall.
+- **Products is 1,939px with 14 buttons**, the same stack as Orders had.
+
+### Corrected from the first report
+
+I listed "+ New order asks whether you meant an invoice" as a defect. It is
+not. He asked for it on 21 September and approved it the same day as *"2 doors
+is okay"*, and the reason is in the code beside it. Left alone.
 
 ## 29 October 2026 — the story, swept rather than spotted (layi-v75)
 

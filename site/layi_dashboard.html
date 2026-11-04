@@ -1122,6 +1122,47 @@ body.modal-open{overflow:hidden}
   .oledger th{padding:9px 4px}
   .oledger td{padding:10px 4px}
 }
+/* ===== DRILL-DOWN, PHONE ONLY =========================================
+   Kayode, 4 November: "on layi website ... you click a categories then it
+   takes you to a different screen ... selecting the product opens up another
+   with the products and details on it, that kind flow."
+
+   Level one is a screen of tiles and nothing else on it.
+   Level two is the view's OWN list with the view's OWN filter set to that
+     group, and a back button named after where it goes.
+   Level three is the record modal that already existed, untouched.
+
+   The tones are the same five the stat cards use, so a tile reads correctly
+   in all four themes without inventing a colour. Desktop never sees any of
+   this, because the complaint was the length of a phone page. DRILL_ON in
+   the script turns the whole thing off in one line. */
+.drillhub{display:none}
+.drill-bar{display:none}
+.drill-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dtile{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 13px;text-align:left;font-family:inherit;color:var(--text);cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:104px;box-shadow:0 1px 2px rgba(17,24,39,.05)}
+.dtile .di{width:28px;height:28px;border-radius:9px;background:var(--panel-2);color:var(--gold);display:grid;place-items:center;margin-bottom:7px}
+.dtile .di svg{width:15px;height:15px}
+.dtile .dv{font-family:'Playfair Display',serif;font-size:26px;line-height:1}
+.dtile .dn{font-size:13px;font-weight:600;line-height:1.3;margin-top:3px}
+.dtile .ds{font-size:11px;color:var(--text-faint);line-height:1.4;margin-top:auto;padding-top:5px}
+.dtile.good{background:rgba(22,101,52,.16);background:color-mix(in srgb,var(--green) 30%,var(--panel));border-color:color-mix(in srgb,var(--green) 46%,var(--panel))}.dtile.good .dv,.dtile.good .di{color:var(--green)}
+.dtile.alert{background:rgba(179,38,30,.16);background:color-mix(in srgb,var(--red) 30%,var(--panel));border-color:color-mix(in srgb,var(--red) 46%,var(--panel))}.dtile.alert .dv,.dtile.alert .di{color:var(--red)}
+.dtile.warn{background:rgba(138,90,18,.16);background:color-mix(in srgb,var(--amber) 30%,var(--panel));border-color:color-mix(in srgb,var(--amber) 46%,var(--panel))}.dtile.warn .dv,.dtile.warn .di{color:var(--amber)}
+.dtile.money{background:rgba(23,56,92,.14);background:color-mix(in srgb,var(--gold) 26%,var(--panel));border-color:color-mix(in srgb,var(--gold) 42%,var(--panel))}.dtile.money .dv,.dtile.money .di{color:var(--gold)}
+.dtile.wide{grid-column:1 / -1;min-height:0;flex-direction:row;align-items:center;gap:12px;padding:12px 13px}
+.dtile.wide .di{margin:0;flex:none}
+.dtile.wide .dn{flex:1;margin:0}
+.dtile.wide .ds{margin:0;padding:0;text-align:right}
+.drill-act{margin-top:12px}
+.drill-bar .bk{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:8px 12px;cursor:pointer;font-size:13px;font-family:inherit}
+.drill-bar .bt{font-size:13px;color:var(--text-faint)}
+@media(max-width:680px){
+  .view.drilling > *:not(.drillhub){display:none!important}
+  .view.drilling > .drillhub{display:block}
+  .view.drilled > .drill-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .view.drilled .stat-grid,.view.drilled .statmore{display:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -2805,7 +2846,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v79';
+const APP_VERSION='layi-v80';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4260,6 +4301,9 @@ const setStaff=v=>save('layi_dash_staff',v);
 const getPots=()=>load('layi_dash_pots',[]);
 const setPots=v=>save('layi_dash_pots',v);
 let supFilter='all';
+/* Which group of clients the list is showing. Set by the drill tiles; 'all'
+   is what every other way into the tab leaves it on. */
+let custFilter='all';
 let suprFilter='all';
 let supTab='overview';let supCat='all';let teamDept='all';let invCatView='';
 let logFilter='all';
@@ -6526,7 +6570,182 @@ function go(view){
   if(typeof makeSettingsCollapsible==='function')makeSettingsCollapsible();
   if(typeof collapsePhonePanels==='function')collapsePhonePanels();
   if(typeof capStatGrids==='function')capStatGrids();
+  /* Last, after the view has drawn itself, so the tiles count what the
+     list would have shown. */
+  if(typeof drillStart==='function')drillStart(view);
 }
+/* ===== DRILL-DOWN ======================================================
+   The shop's browse flow, applied to a studio. A tab opens on a screen of
+   groups; tapping one shows that group's list; tapping a row opens the
+   record. Each level is its own screen with a back button that says where
+   it goes, the way "Back to Collections" does on the website.
+
+   It deliberately reuses what is already there. Level two does not build a
+   second list: it sets the filter the view already has (ordersFilter,
+   supTab, custFilter) and lets the view render itself, so sorting, search,
+   branch scope, permissions and the money rules all keep working with no
+   second copy to drift. Level three is openDetail / openCustomer /
+   openSupplyLedger exactly as before.
+
+   Phone only, because the complaint was the length of a phone page, and a
+   desktop has the room. One switch puts every tab back as it was. */
+const DRILL_ON=true;
+function drillPhone(){try{return !!(window.matchMedia&&window.matchMedia('(max-width:680px)').matches);}catch(e){return false;}}
+/* Three icons the nav does not already have. Drawn, never an emoji. */
+const DICO={
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6L21.4 20H2.6z"/><path d="M12 10v4M12 17h.01"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>',
+  star:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6l2.7 5.6 6.1.9-4.4 4.2 1.1 6.1L12 17.5l-5.5 2.9 1.1-6.1L3.2 10l6.1-.9z"/></svg>',
+  bag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 11a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M8.5 8V6a3.5 3.5 0 0 1 7 0v2"/></svg>'
+};
+/* What each drilled tab is made of. A tile either names a key the view's own
+   filter understands, or carries its own go() for something that already has
+   a screen of its own. */
+const DRILL={
+  orders:{
+    title:'Orders', root:'all',
+    add:{label:'+ New order',on:'newOrder()'},
+    tiles:function(){
+      const DELI=STAGES.indexOf('Delivered'),DIS=STAGES.indexOf('Dispatched'),RFD=STAGES.indexOf('Ready for Delivery');
+      let a=getOrders().filter(inBranch).filter(function(o){return showsBespoke()?isClientOrder(o):o.kind==='sale';});
+      a=a.filter(function(o){return !isQuote(o);});
+      if(ownJobsOnly())a=a.filter(isMyJob);
+      const mk=a.filter(function(o){return o.stageIndex<RFD;});
+      const od=a.filter(function(o){var du=daysUntil(o.due);return o.stageIndex<DIS&&du!==null&&du<0;});
+      const rd=a.filter(function(o){return o.stageIndex>=RFD&&o.stageIndex<DELI;});
+      const dl=a.filter(function(o){return o.stageIndex>=DELI;});
+      /* A figure nobody may see is absent, never a confident zero. */
+      const owed=function(k){
+        if(!can('money'))return k.length+(k.length===1?' order':' orders');
+        return cur(k.reduce(function(s,o){return s+toBase(orderOutstanding(o),o);},0))+' owed';
+      };
+      return [
+        {k:'making',n:'Being made',v:mk.length,s:owed(mk),icon:NAV_ICO.attendance},
+        {k:'overdue',n:'Overdue',v:od.length,s:od.length?owed(od):'nothing late',tone:od.length?'alert':'good',icon:DICO.warn},
+        {k:'ready',n:'Ready',v:rd.length,s:'waiting to go out',tone:rd.length?'good':'',icon:DICO.check},
+        {k:'delivered',n:'Delivered',v:dl.length,s:'finished and gone',icon:MB_ICONS.orders},
+        {k:'all',n:'All orders',s:a.length+', newest first',wide:true,icon:DICO.list}
+      ];
+    },
+    label:function(k){return {active:'In progress',overdue:'Overdue',ready:'Ready',delivered:'Delivered',all:'All orders'}[k]||'Orders';},
+    apply:function(k){ordersFilter=k;},
+    draw:function(){renderOrders();}
+  },
+  customers:{
+    title:'Clients', root:'all',
+    add:{label:'+ Add client',on:'openNewCustomer()'},
+    tiles:function(){
+      const d=buildCustomerData();
+      const owing=d.filter(function(c){return c.outstanding>0;});
+      const fu=d.filter(function(c){return custFollowUp(c);});
+      const now=Date.now();
+      const recent=d.filter(function(c){var l=custLastDate(c);return l&&(now-l)<30*86400000;});
+      return [
+        {k:'owing',n:'Owing',v:owing.length,
+         s:can('money')?cur(owing.reduce(function(s,c){return s+c.outstanding;},0))+' between them':'money on the table',
+         tone:owing.length?'alert':'good',icon:DICO.warn},
+        {k:'followup',n:'To follow up',v:fu.length,s:fu.length?'nobody has chased them':'all up to date',tone:fu.length?'warn':'good',icon:DICO.star},
+        {k:'recent',n:'Ordered recently',v:recent.length,s:'in the last 30 days',icon:NAV_ICO.calendar},
+        {k:'all',n:'All clients',s:d.length+' on your books',wide:true,icon:DICO.list}
+      ];
+    },
+    label:function(k){return {owing:'Owing',followup:'To follow up',recent:'Ordered recently',all:'All clients'}[k]||'Clients';},
+    apply:function(k){custFilter=k;},
+    draw:function(){renderCustomers();}
+  },
+  supplies:{
+    title:'Stock', root:'overview',
+    add:{label:'+ Add item',on:'openSupply()'},
+    tiles:function(){
+      const all=getSupplies().filter(inBranch);
+      const prods=(typeof getProducts==='function')?getProducts():[];
+      const low=all.filter(function(s){return supStatus(s)!=='ok';}).length+
+                prods.filter(function(p){return productLow(p)!=='ok';}).length;
+      /* Built from the studio's OWN category list, the same one the chips
+         above the list use, so a category somebody made themselves gets a
+         tile instead of being reachable only through Everything. */
+      const names=(typeof invCatNames==='function')?invCatNames():[];
+      const cats=[];
+      ['fabric','haberdashery'].forEach(function(k){
+        cats.push({k:k,n:k==='fabric'?'Fabric':'Haberdashery',
+          v:all.filter(function(s){return invCatMatch(s.cat,k);}).length,
+          s:k==='fabric'?'rolls and cuts':'thread, buttons, zips',
+          icon:k==='fabric'?NAV_ICO.supplies:DICO.bag});
+      });
+      names.forEach(function(c){
+        if(invCatProd(c))return;                                  // products have their own tile
+        if(invCatMatch(c,'fabric')||invCatMatch(c,'haberdashery'))return;
+        cats.push({k:c,n:c,v:all.filter(function(s){return s.cat===c;}).length,
+          s:'in this category',icon:NAV_ICO.supplies});
+      });
+      const tiles=cats.concat([
+        {go:"invDrill('low')",n:'Running low',v:low,s:low?'reorder these':'all above their level',tone:low?'alert':'good',icon:DICO.warn}
+      ]);
+      if(can('products'))tiles.push({k:'products',n:'Shop products',v:prods.length,s:'finished pieces',icon:NAV_ICO.sales});
+      tiles.push({k:'overview',n:'Everything',s:(all.length+prods.length)+' items tracked',wide:true,icon:DICO.list});
+      return tiles;
+    },
+    label:function(k){return {fabric:'Fabric',haberdashery:'Haberdashery',products:'Shop products',overview:'Everything'}[k]||k||'Stock';},
+    apply:function(k){supTab=k;supFilter='all';},
+    draw:function(){renderSupplies();}
+  }
+};
+function drillCfg(view){return (DRILL_ON&&DRILL[view])?DRILL[view]:null;}
+/* Level one. Built fresh every time, because the counts on it are the point. */
+function drillHub(view){
+  const cfg=drillCfg(view);const v=document.getElementById('view-'+view);if(!cfg||!v)return;
+  let hub=v.querySelector(':scope > .drillhub');
+  if(!hub){hub=document.createElement('div');hub.className='drillhub';v.insertBefore(hub,v.firstChild);}
+  const tiles=cfg.tiles().map(function(t){
+    const on=t.go?t.go:("drillInto('"+view+"','"+t.k+"')");
+    return '<button type="button" class="dtile '+(t.tone||'')+(t.wide?' wide':'')+'" onclick="'+on+'">'+
+      '<span class="di">'+t.icon+'</span>'+
+      (t.v!=null?'<span class="dv">'+t.v+'</span>':'')+
+      '<span class="dn">'+esc(t.n)+'</span>'+
+      (t.s?'<span class="ds">'+esc(t.s)+'</span>':'')+'</button>';
+  }).join('');
+  hub.innerHTML='<div class="drill-tiles">'+tiles+'</div>'+
+    (cfg.add?'<div class="drill-act"><button class="btn" style="width:100%" onclick="'+cfg.add.on+'">'+esc(cfg.add.label)+'</button></div>':'');
+}
+/* Level two. The view's own list, its own filter, and a back button named
+   after where it goes rather than a bare arrow. */
+function drillInto(view,key){
+  const cfg=drillCfg(view);const v=document.getElementById('view-'+view);if(!cfg||!v)return;
+  cfg.apply(key);
+  v.classList.remove('drilling');v.classList.add('drilled');
+  let bar=v.querySelector(':scope > .drill-bar');
+  if(!bar){bar=document.createElement('div');bar.className='drill-bar';
+    const hub=v.querySelector(':scope > .drillhub');
+    v.insertBefore(bar,hub?hub.nextSibling:v.firstChild);}
+  bar.innerHTML='<button type="button" class="bk" onclick="drillBack(\''+view+'\')">\u2039 Back to '+esc(cfg.title)+'</button>'+
+                '<span class="bt">'+esc(cfg.label(key))+'</span>';
+  /* One back at a time. The topbar's is for moving between tabs and would
+     read as a second way out of the same screen. */
+  const tb=document.getElementById('backBtn');if(tb)tb.style.display='none';
+  cfg.draw();
+  const mn=document.querySelector('.main');if(mn)mn.scrollTop=0;
+}
+function drillBack(view){
+  const v=document.getElementById('view-'+view);if(!v)return;
+  v.classList.remove('drilled');
+  drillStart(view,true);
+  const mn=document.querySelector('.main');if(mn)mn.scrollTop=0;
+}
+/* Called at the end of go(), after the view has rendered itself, so the
+   counts on the tiles are the ones the list would show. */
+function drillStart(view,force){
+  const v=document.getElementById('view-'+view);if(!v)return;
+  const cfg=drillCfg(view);
+  if(!cfg||!drillPhone()){v.classList.remove('drilling','drilled');return;}
+  /* Back at level one the view's filter goes to whatever it is on when a tab
+     is opened any other way, so leaving the drill never leaves a tab filtered
+     by something the person cannot see. */
+  cfg.apply(cfg.root);
+  drillHub(view);
+  v.classList.add('drilling');v.classList.remove('drilled');
+}
+
 function toggleMore(){const m=document.getElementById('moreSheet');const open=m.classList.toggle('show');document.getElementById('mobMore').classList.toggle('active',open);}
 function toggleDrawer(){const s=document.querySelector('.sidebar');const o=document.getElementById('drawerOverlay');if(!s)return;const open=s.classList.toggle('open');if(o)o.classList.toggle('show',open);}
 // Collapsible panels: toggle + remember (once toggled, we stop auto-collapsing it on mobile).
@@ -14398,7 +14617,7 @@ function renderOrders(){
     }
   }
   // status filter (single-line select)
-  const filters=[['all','All statuses'],['active','In progress'],['ready','Ready / dispatched'],['delivered','Delivered'],['overdue','Overdue'],['unpaid','Unpaid']];
+  const filters=[['all','All statuses'],['making','Being made'],['active','In progress'],['ready','Ready / dispatched'],['delivered','Delivered'],['overdue','Overdue'],['unpaid','Unpaid']];
   const fsel=document.getElementById('ordersStatusSel');if(fsel)fsel.innerHTML=filters.map(([k,l])=>`<option value="${k}" ${ordersFilter===k?'selected':''}>${l}</option>`).join('');
   // search + status filtering
   const q=(document.getElementById('ordersSearch')?.value||'').toLowerCase();
@@ -14407,6 +14626,9 @@ function renderOrders(){
   if(ordersPeriod==='today'){listBase=orders.filter(o=>o.stageIndex<RFD||(o.stageIndex<DIS&&(daysUntil(o.due)??0)<0)||isToday(o.createdAt)||(o.updates||[]).some(u=>u.stage==='Dispatched'&&isToday(u.at)));}
   let rows=listBase.filter(o=>{
     if(ordersFilter==='active'&&!(o.stageIndex<DELI))return false;
+    /* 'making' is 'active' minus the ones already finished and waiting, so
+       the drill tiles add up to the list instead of double-counting. */
+    if(ordersFilter==='making'&&!(o.stageIndex<RFD))return false;
     if(ordersFilter==='ready'&&!(o.stageIndex>=RFD&&o.stageIndex<DELI))return false;
     if(ordersFilter==='delivered'&&!(o.stageIndex>=DELI))return false;
     if(ordersFilter==='overdue'){const du=daysUntil(o.due);if(!(o.stageIndex<DIS&&du!==null&&du<0))return false;}
@@ -15586,6 +15808,9 @@ function renderCustomers(){
   {const _cs=document.getElementById('custStats');if(_cs){_cs.innerHTML='';_cs.style.display='none';}}
   const q=(document.getElementById('custSearch')?.value||'').toLowerCase();
   let list=data.filter(c=>!q||c.name.toLowerCase().includes(q));
+  if(custFilter==='owing')list=list.filter(c=>c.outstanding>0);
+  else if(custFilter==='followup')list=list.filter(c=>custFollowUp(c));
+  else if(custFilter==='recent'){const _cut=Date.now()-30*86400000;list=list.filter(c=>{const l=custLastDate(c);return l&&l>=_cut;});}
   const followCount=data.filter(c=>custFollowUp(c)).length;
   document.getElementById('custSub').textContent=data.length+(data.length===1?' customer':' customers')+(followCount?' · '+followCount+' to follow up':'');
   if(!data.length){document.getElementById('custList').innerHTML=emptyBlock('♚','No customers yet','Add a customer, or they are created automatically when you add an order.',can('customers')?'+ Add customer':null,'openNewCustomer()');return;}
