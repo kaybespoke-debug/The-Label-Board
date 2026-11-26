@@ -5,7 +5,102 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 4 November 2026 (thirty-second session)
+Last updated: 26 November 2026 (thirty-third session)
+
+## 26 November 2026 — one thing per screen (layi-v81)
+
+Three weeks of nothing, then Kayode came back rusty and asked for a catch-up
+list before anything else. Nothing had moved since 4 November: v80 live, repo
+clean, the drill-down still unjudged. The list is published as an artifact and
+every claim on it was checked against the repository rather than recalled.
+
+### The drawer takes the app's colour
+
+*"Instead of the navigation bar or the sidebar being white, it can be a dark
+navy, like it can be the colour of the app. This is for the light theme, not
+the dark one."*
+
+It reads the **accent**, not a hardcoded navy, so if a second accent is ever
+added to the picker the drawer follows it. `applyAccent()` sets `--gold`
+inline on `body` in white mode, so the value is captured as `--side-ground`
+first: one rule cannot both read a custom property and redefine it.
+
+Inside the drawer every **token** is redefined rather than every rule
+overridden, so the brand, the group headings, the badges, the footer and the
+avatar all follow with no second copy of their styles. `--gold` becomes a
+light gold in there, because the accent cannot be both the ground and the
+mark on it. The per-view icon hues are mid-tones chosen against white, so
+they are lifted with a filter rather than replaced, which keeps the colour
+coding.
+
+The phone drawer IS that element, so this is the side drawer too. Dark theme
+untouched, checked both ways.
+
+### The order form as windows
+
+*"Rather than having a long list that goes down the page, that just causes
+unnecessary scrolling, we can have you click one thing, then it takes you to
+a different window where you fill in the this, and then you're able to go back
+to continue the other things. But while you're there, it saves what you
+saved."*
+
+He was asked two questions and answered *"do this"*, so both calls were made
+here:
+
+- **The tab bar goes** while you are inside the form. It already did: the form
+  is a modal and the overlay covers the bar. Keeping it would mean a
+  half-written order had to survive wandering off to another tab, which is a
+  real feature and a much larger one.
+- **Three deep and no further.** The order, a window, and whatever that window
+  already opens inside itself.
+
+| | before | after |
+|---|---|---|
+| New order, the first screen | 2,459px, 39 fields | **1,252px, 4 fields** |
+| An item | part of that scroll | its own 1,013px window |
+| Price and payment | 394px of the scroll | its own 625px window |
+
+Eight rows on the first screen: the item, Price and payment, and the six
+sections that were accordions.
+
+**Why nothing is lost, which is the whole job.** Every move calls
+`syncOrderDraft()` and then REBUILDS from `draft`. It never replays saved
+markup. The modal stack's own `modalBack()` does replay markup, and markup
+does not carry what somebody typed, so a lazier version of this would take you
+into the price window, bring you back, and hand you an empty form.
+
+Reading the form while one window is on screen is safe because
+`syncOrderDraft()` guards **every single assignment** behind
+`if(fv('f_x')!==undefined)` or `if(document.getElementById('f_x'))`. A field
+that is not rendered keeps the value it had. That guard predates this feature
+and is the reason the feature is small; `audit_order_windows.js` now treats it
+as load-bearing rather than incidental.
+
+Proved end to end rather than asserted: typed a client on the first screen, a
+name and price in the item window, an amount paid and a date in the money
+window, pressed Back twice and Save, and the saved order carried all five.
+
+### On trial, both of them
+
+`ORDER_WINDOWS=false` puts the order form back to one page on every device.
+`DRILL_ON=false` still reverts the three drilled tabs. Neither
+`audit_order_windows.js` (32 checks) nor `audit_drill.js` (28) is wired into
+`verify.js`, on purpose: a gate for a trial would have to come out with the
+trial. Wire both in once he keeps them.
+
+### A mistake worth recording
+
+A patch was written as `node -e` through bash and the shell ate `${...}` as
+command substitution, corrupting the file; the script printed success and the
+gates went red immediately after. `labelboard-heredoc-regex` already says never
+to put a regex or a path through a heredoc. It now has to say the same about
+`$` in a template literal. Recovered from the backup taken before the patch,
+which is why that backup gets taken.
+
+### Still open, unchanged
+
+The whole of the 4 November list, plus the verdict on the drill-down, which is
+now twenty-two days old and still the thing blocking what comes next.
 
 ## 4 November 2026 — the drill-down, on trial (layi-v80)
 

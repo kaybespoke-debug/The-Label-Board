@@ -1163,6 +1163,43 @@ body.modal-open{overflow:hidden}
   .view.drilled .stat-grid,.view.drilled .statmore{display:none!important}
 }
 
+/* ===== THE DRAWER TAKES THE APP'S COLOUR, LIGHT THEME ONLY =============
+   Kayode, 26 November: "instead of the navigation bar or the sidebar being
+   white, it can be a dark navy, like it can be the colour of the app. This
+   is for the light theme, not the dark one."
+
+   It reads the accent, not a hardcoded navy, so it follows the picker. The
+   accent is set inline on body by applyAccent(), so it is captured under its
+   own name first: a rule cannot both read --gold and redefine it.
+
+   Tokens are redefined on the drawer rather than rules overridden, so the
+   brand, groups, badges, footer and avatar all follow with no second copy.
+   The accent cannot be both the ground and the mark on it, so --gold becomes
+   a light gold in here: the active rail and the count badges have to lift off
+   the navy rather than sink into it.
+
+   The phone drawer IS this element, so this is the side drawer too. */
+body.white-mode{--side-ground:var(--gold);--side-ground-2:var(--gold-bright)}
+body.white-mode .sidebar{
+  background:linear-gradient(180deg,var(--side-ground),var(--side-ground-2));
+  border-right-color:rgba(255,255,255,.14);
+  --panel:rgba(255,255,255,.13);
+  --panel-2:rgba(255,255,255,.17);
+  --text:#ffffff;
+  --text-dim:rgba(255,255,255,.82);
+  --text-faint:rgba(255,255,255,.60);
+  --line:rgba(255,255,255,.24);
+  --line-soft:rgba(255,255,255,.15);
+  --gold:#e9c98d;
+  --gold-bright:#f4ddb2;
+  --on-accent:#13263f;
+}
+/* The per-view icon hues are mid-tones chosen against a white drawer. They
+   keep their identity on navy but have to be lifted to be seen at all. */
+body.white-mode .sidebar .nav-item .ni{filter:brightness(1.9) saturate(1.12)}
+body.white-mode .sidebar .who .av{background:rgba(255,255,255,.16)}
+body.white-mode .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.28)}
+
 </style>
 </head>
 <body>
@@ -2846,7 +2883,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v80';
+const APP_VERSION='layi-v81';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -7376,6 +7413,43 @@ function recalcProfit(){
   const unit=outfitsTotal(draft.outfits);const gross=isBatch(draft)?unit*((draft.batch&&+draft.batch.qty)||1):unit;
   const otb=document.getElementById('orderTotalBase');if(otb)otb.textContent=isBase?'':('≈ '+cur(gross*rate)+' at 1 '+ocur(draft)+' = '+fmtNum(draft.fx||1)+' '+SETTINGS.currency);
 }
+/* ===== THE ORDER FORM AS WINDOWS, PHONE ONLY ==========================
+   Kayode, 26 November: "you click one thing, then it takes you to a different
+   window where you fill in the this, and then you're able to go back to
+   continue the other things. But while you're there, it saves what you
+   saved."
+
+   orderWin is which window is open, or null for the order itself. Every move
+   reads the form into draft and then REBUILDS from draft; it never replays
+   saved markup, because markup does not carry what somebody typed and that is
+   how this would quietly lose a client's name.
+
+   Reading the form while one window is on screen is safe because
+   syncOrderDraft() guards every assignment behind a check that the field is
+   actually there. A field that is not rendered keeps the value it had.
+
+   Three deep and no further: the order, a window, and whatever that window
+   already opens inside itself. */
+let orderWin=null;
+/* On trial, like the drill-down. False puts the order form back to the one
+   long page it was, on every device. Every path into a window goes through
+   orderWinPhone(), so this really is the whole switch. */
+const ORDER_WINDOWS=true;
+function orderWinPhone(){
+  if(!ORDER_WINDOWS)return false;
+  try{return !!(window.matchMedia&&window.matchMedia('(max-width:680px)').matches);}catch(e){return false;}
+}
+function openOrderWindow(k){syncOrderDraft();orderWin=k;reRenderOrderTop();}
+function closeOrderWindow(){syncOrderDraft();orderWin=null;reRenderOrderTop();}
+/* Like reRenderOrder, but a window opens at ITS top rather than where the
+   screen behind it happened to be scrolled to. keepModalView() is still
+   called, because it is what sets __omKeep and stops openModal pushing the
+   form onto the modal stack and drawing a second Back button beside ours. */
+function reRenderOrderTop(){
+  keepModalView();
+  window.__omScroll=0;window.__omFocus=null;
+  renderOrderModal.call(window);
+}
 function syncOrderDraft(){
   if(!draft)return;
   if(fv('f_client')!==undefined)draft.client=fv('f_client');
@@ -7857,6 +7931,76 @@ function renderOrderModal(){
   const stageSection=isBatch(draft)
     ? ''
     : `<div class="field" style="margin-bottom:0"><label>Stage</label><select class="fld" id="f_stage">${stageOpts}</select></div>`;
+  /* Every window the order can open, by key: a title and the body that was
+     already being built for the accordion. The bodies are unchanged, so a
+     window and the desktop accordion show exactly the same fields. */
+  const OWINS={
+    client:['Client details',clientSection],
+    stage:['Where it has got to',stageSection],
+    people:['Who is making it',assignSection+potSection],
+    fabric:['Fabric and stock used',costsField+stockSection],
+    profit:['What it made you',can('money')?pnlSection:''],
+    van:['Getting it to them',deliverySection],
+    money:['Price and payment',moneyRow]
+  };
+  draft.outfits.forEach(function(o,i){
+    /* The same accordion the card has on a desktop. Rendered flat the window
+       is every detail of the piece at once, which is the long scroll this
+       exists to end, one level further in. */
+    OWINS['item'+i]=[(o.name||o.type||('Item '+(i+1))),
+      itemHead(o,i)+(invoiceOnly?'':`
+      <details class="osec osec-in">
+        <summary>${OSEC_ICO.piece}<span class="osec-t">Cloth &amp; making</span><span class="osec-n">${itemSectionNote(o,draft)}</span><span class="osec-c">${OSEC_ICO.chev}</span></summary>
+        <div class="osec-b">${itemExtras(i)}</div>
+      </details>`)];
+  });
+  /* A window: its own Back, its own title, and Done, which is the same thing
+     as Back. Nothing else on the screen. */
+  if(orderWin&&OWINS[orderWin]&&orderWinPhone()){
+    openModal(`
+    <div class="owin-top">
+      <button type="button" class="btn ghost sm" onclick="closeOrderWindow()">\u2039 Back to the order</button>
+    </div>
+    <h3>${esc(OWINS[orderWin][0])}</h3>
+    ${OWINS[orderWin][1]}
+    <div class="modal-foot">
+      <span style="flex:1"></span>
+      <button class="btn" onclick="closeOrderWindow()">Done</button>
+    </div>`);
+    return;
+  }
+  /* On a phone an item is a row that opens its own window. On a desktop it is
+     the card it has always been. */
+  const moneyNote=function(){
+    const bits=[];
+    if(can('money'))bits.push(curO(draft.paid||0,draft)+' paid');
+    if(draft.due)bits.push('ready '+esc(draft.due));
+    return bits.join(' · ')||'nothing set yet';
+  };
+  const itemRow=function(o,i){
+    const bits=[];
+    if(+o.qty>1)bits.push(o.qty+' \u00d7');
+    if(can('money'))bits.push(curO(o.price||0,draft));
+    const note=invoiceOnly?'':itemSectionNote(o,draft);
+    if(note)bits.push(note);
+    return `<button type="button" class="navrow" onclick="openOrderWindow('item${i}')">
+      <span class="navrow-i">${OSEC_ICO.piece}</span>
+      <span class="navrow-t"><b>${esc(o.name||o.type||('Item '+(i+1)))}</b><span>${esc(bits.join(' \u00b7 '))||'tap to fill in'}</span></span>
+      <span class="navrow-c">${OSEC_ICO.chevR}</span></button>`;
+  };
+  const itemsBlock=orderWinPhone()?draft.outfits.map(itemRow).join(''):outfitsHtml;
+  /* A section is a row on a phone and the accordion it always was elsewhere.
+     Same title, same note, same body. */
+  const row=function(k,ico,title,note){
+    if(!orderWinPhone())return null;
+    return `<button type="button" class="navrow" onclick="openOrderWindow('${k}')">
+      <span class="navrow-i">${OSEC_ICO[ico]}</span>
+      <span class="navrow-t"><b>${title}</b><span>${note||''}</span></span>
+      <span class="navrow-c">${OSEC_ICO.chevR}</span></button>`;
+  };
+  const sectOrRow=function(k,ico,title,note,body,id){
+    return row(k,ico,title,note)||sect(ico,title,note,body,id);
+  };
   openModal(`
     <h3>${editingOrderId?'Edit order':'New order'}</h3>
     ${editingOrderId?`<div class="msub">${editingOrderId}</div>`:''}
@@ -7864,7 +8008,7 @@ function renderOrderModal(){
     ${clientField}
     ${phoneField}
     <div class="bd-sub">What are you making</div>
-    ${outfitsHtml}
+    ${itemsBlock}
     <button class="btn ghost sm" style="width:100%;margin-bottom:10px" onclick="addOutfit()">${isGroup(draft)?'＋ Add another person':'＋ Add another item'}</button>
     <div class="field" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel-2)">
       <label style="margin:0;cursor:pointer" onclick="toggleOrderSpecial()">Batch run or group / party?<span style="float:right;color:var(--gold);font-weight:400;text-transform:none;letter-spacing:0">${(orderSpecialOpen||isBatch(draft)||isGroup(draft))?'Hide':'Choose'}</span></label>
@@ -7875,14 +8019,14 @@ function renderOrderModal(){
       `:''}
     </div>
     ${totalBlock}
-    ${moneyRow}
+    ${orderWinPhone()?row('money','profit','Price and payment',moneyNote()):moneyRow}
     <div class="bd-sub">More</div>
-    ${sect('client','Client details',[draft.email?'email':'',draft.address?'address':'',(draft.meas&&Object.keys(draft.meas).length)?'measurements':''].filter(Boolean).join(', ')||'email, address, measurements',clientSection)}
-    ${sect('stage','Where it has got to',isBatch(draft)?'wave by wave':esc(STAGES[draft.stageIndex]||STAGES[0]),stageSection)}
-    ${sect('people','Who is making it',_teamNames.length?esc(_teamNames.join(', ')):'nobody yet',assignSection+potSection)}
-    ${sect('fabric','Fabric &amp; stock used',can('money')?(_costTotal?cur(_costTotal):'nothing recorded'):'',costsField+stockSection,'osecStock')}
-    ${can('money')?sect('profit','What it made you',cur(retained),pnlSection):''}
-    ${sect('van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery',deliverySection)}
+    ${sectOrRow('client','client','Client details',[draft.email?'email':'',draft.address?'address':'',(draft.meas&&Object.keys(draft.meas).length)?'measurements':''].filter(Boolean).join(', ')||'email, address, measurements',clientSection)}
+    ${sectOrRow('stage','stage','Where it has got to',isBatch(draft)?'wave by wave':esc(STAGES[draft.stageIndex]||STAGES[0]),stageSection)}
+    ${sectOrRow('people','people','Who is making it',_teamNames.length?esc(_teamNames.join(', ')):'nobody yet',assignSection+potSection)}
+    ${sectOrRow('fabric','fabric','Fabric &amp; stock used',can('money')?(_costTotal?cur(_costTotal):'nothing recorded'):'',costsField+stockSection,'osecStock')}
+    ${can('money')?sectOrRow('profit','profit','What it made you',cur(retained),pnlSection):''}
+    ${sectOrRow('van','van','Getting it to them',_dl.enabled?(esc(_dl.company||'courier not set')+(_dl.fee?' · '+curO(_dl.fee,draft):'')):'no delivery',deliverySection)}
     <div class="modal-foot">
       ${editingOrderId&&can('del')?`<button class="btn danger sm" onclick="deleteOrder()">Delete</button>`:''}
       <span style="flex:1"></span>
