@@ -229,7 +229,7 @@ if(!/if\(!id&&planStop\('seats'/.test(html))
   const box=run("(document.getElementById('planBox')||{}).innerHTML")||'';
   if(!box)F('there is nowhere for a studio to see what plan it is on');
   if(!/Pro/.test(box))F('the plan panel does not name the plan');
-  if(!/Studios/.test(box)||!/Team accounts/.test(box))F('the plan panel does not show usage against the limits');
+  if(!/Outlets/.test(box)||!/Team accounts/.test(box))F('the plan panel does not show usage against the limits');
   if(!/never hides anything/.test(box))F('the plan panel does not tell them going over is safe');
 }
 

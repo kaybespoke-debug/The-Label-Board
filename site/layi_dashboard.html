@@ -1320,7 +1320,7 @@ body.white-mode .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2
         <div id="dashSalesTrio"></div>
         <div class="dash-bottom" id="dashBottomRow">
           <div class="panel"><div class="panel-head"><h3>Appointments</h3><div class="appt-toggle" id="apptToggle"></div></div><div id="dashAppts"></div></div>
-          <div class="panel" id="branchCard" style="display:none"><div class="panel-head"><h3 style="cursor:pointer" onclick="openBranchReport()">Branches</h3><span class="page-sub" id="branchCardPeriod"></span></div><div id="branchCardBody"></div></div>
+          <div class="panel" id="branchCard" style="display:none"><div class="panel-head"><h3 style="cursor:pointer" onclick="openBranchReport()">Outlets</h3><span class="page-sub" id="branchCardPeriod"></span></div><div id="branchCardBody"></div></div>
         </div>
         <div class="panel attn-panel" id="attnPanel"><div class="panel-head" style="cursor:pointer;user-select:none" onclick="toggleAttn()"><h3>Needs Attention <span id="attnChev" style="color:var(--gold);font-size:12px">▸</span></h3><span class="page-sub" id="attnSub"></span></div><div id="attention" style="display:none"></div></div>
         </div>
@@ -1696,7 +1696,7 @@ body.white-mode .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2
           <button class="btn" id="defSaveBtn" onclick="saveDefaults()">Save defaults</button>
         </div>
         <div class="panel" data-setperm="setBranches">
-          <div class="panel-head"><h3>Branches &amp; outlets</h3></div>
+          <div class="panel-head"><h3>Outlets</h3></div>
           
           <div id="unplacedNotice"></div>
           <div id="branchBox"></div>
@@ -1790,6 +1790,7 @@ body.white-mode .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2
         <div class="panel" data-setperm="setData">
           <div class="panel-head"><h3>Your data, from the server</h3></div>
           
+          <div id="syncQuiet" style="display:none;margin-bottom:12px"></div>
           <button class="btn" id="srvExportBtn" onclick="exportStudioFromServer()">⤓ Download everything</button>
         </div>
         <div class="panel" data-setperm="setData" id="closingPanel">
@@ -2184,7 +2185,7 @@ const PERM_PAGES=[
   {k:'logistics',l:'Logistics'},
   {k:'supplies',l:'Supplies & suppliers'},
   {k:'team',l:'Team'},
-  {k:'branchSwitch',l:'Switch branches',hint:'Move between studios using the top switcher. Off = locked to their own branch.'},
+  {k:'branchSwitch',l:'Switch outlets',hint:'Move between outlets using the top switcher. Off = locked to their own outlet.'},
   {k:'attendance',l:'Attendance'},
   {k:'finance',l:'Finance'},
   {k:'expenses',l:'Expenses',hint:'The Expenses tab: rent, salaries, bills & other money out. Off = can still see prices but not the company\u2019s outgoings'},
@@ -2211,7 +2212,7 @@ const PERM_FUNCS=[
   {k:'setCatalog',l:'Settings: catalog & tiers',hint:'Loyalty tiers, inventory categories & QC checklist'},
   {k:'setCompany',l:'Settings: company details',hint:'Business name, logo, bank details & invoice info'},
   {k:'setWorkflow',l:'Settings: workflow & recipes',hint:'Production stages, presets & materials per item type'},
-  {k:'setBranches',l:'Settings: branches & outlets',hint:'Add and manage shops/outlets'},
+  {k:'setBranches',l:'Settings: outlets',hint:'Add and manage shops and outlets'},
   {k:'setData',l:'Import, backup & wipe data',hint:'CSV import, backups and clearing all data'},
 ];
 const PERM_GROUPS=[{g:'Pages this role can open',items:PERM_PAGES},{g:'What this role can do',items:PERM_FUNCS}];
@@ -2883,7 +2884,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v81';
+const APP_VERSION='layi-v82';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -3121,6 +3122,14 @@ function memberOf(biz){
 function outboxUnresolved(){return outbox().filter(function(x){return !x.business_id;});}
 function outboxFailures(){return outbox().filter(function(x){return x.tries>=OUTBOX_MAX_TRIES;});}
 function outboxPending(){return outbox().filter(function(x){return x.tries<OUTBOX_MAX_TRIES;});}
+/* WHAT BELONGS TO THE STUDIO, which is not everything in the queue.
+
+   A fault report is ours: telemetry this device queued so we can see what
+   broke. When the server refused one, the pill told the studio "1 change
+   not saved" and the list underneath it read "fault:f_k3a9". Nothing of
+   theirs was unsaved. The queue still carries it, retries it and gives up
+   on it; it is just never again described to somebody as their work. */
+function outboxTheirs(list){return (list||[]).filter(function(x){return x&&x.kind!=="fault";});}
 
 /* Backoff, so a server that is down is asked politely rather than by
    every tab at once: 1s, 2s, 4s, up to a minute. */
@@ -3158,6 +3167,11 @@ async function drainOutbox(){
       cur[i].lastError=res.error||"";
       cur[i].fatal=!!res.fatal;
       if(res.fatal)cur[i].tries=OUTBOX_MAX_TRIES;   // retrying a refusal is noise
+      /* "It never drops work silently" is about the studio's work. A crash
+         report the server has finished refusing is ours, the device loses
+         nothing by it, and one per fault would otherwise sit in storage for
+         good — invisible now that the pill ignores them. */
+      if(cur[i].kind==="fault"&&cur[i].tries>=OUTBOX_MAX_TRIES)cur.splice(i,1);
       setOutbox(cur);
       if(res.revoked){onMembershipRevoked();break;}
     }
@@ -3364,13 +3378,23 @@ function onMembershipRevoked(){
    Three states and no jargon: everything saved, still sending, or
    something did not send. The third one is a button, because a failure
    nobody can act on is just an apology. */
+/* The red state is off at Kayode's request, 26 November. True puts it
+   back and nothing else needs changing. The amber "saving" state is not
+   affected: it clears itself, and it does not accuse anybody of anything.
+   What this costs is written up at the top of sync_alarm_off.js and in
+   OUTSTANDING: nothing in the top bar will say that a studio's own work has
+   not reached the server. The queue still holds it, and Settings still
+   shows it. */
+const SYNC_ALARM=false;
+function syncStuck(){return outboxTheirs(outboxFailures()).length;}
 function syncState(){
-  const failed=outboxFailures().length,pending=outboxPending().length;
-  if(failed)return {kind:"failed",n:failed};
+  const failed=outboxTheirs(outboxFailures()).length,pending=outboxTheirs(outboxPending()).length;
+  if(failed&&SYNC_ALARM)return {kind:"failed",n:failed};
   if(pending)return {kind:"pending",n:pending};
   return {kind:"ok",n:0};
 }
 function updateSyncPill(){
+  try{renderSyncQuiet();}catch(e){}
   const el=document.getElementById("syncPill");if(!el)return;
   const st=syncState();
   const offline=("onLine" in navigator)&&!navigator.onLine;
@@ -3385,31 +3409,97 @@ function updateSyncPill(){
     if(t)t.textContent=offline?("Offline"+(st.n?" \u00b7 "+st.n+" waiting":"")):(st.n+" saving\u2026");
   }
 }
+/* Where the fact lives now the pill does not carry it. In Settings, beside
+   the button that downloads everything the server has, which is the same
+   question asked a different way. Renders nothing at all when there is
+   nothing, so it is not a row anybody has to read past. */
+function renderSyncQuiet(){
+  const el=document.getElementById("syncQuiet");if(!el)return;
+  const n=(typeof syncStuck==="function")?syncStuck():0;
+  if(!n){el.style.display="none";el.innerHTML="";return;}
+  el.style.display="block";
+  el.innerHTML='<div class="sd" style="color:var(--text-dim);margin-bottom:8px">'
+    +n+" change"+(n===1?"":"s")+" here "+(n===1?"has":"have")+" not reached the server.</div>"
+    +'<button class="btn ghost" onclick="showSyncTrouble()">See what they are</button>';
+}
 function showSyncTrouble(){
-  const failed=outboxFailures();
+  const failed=outboxTheirs(outboxFailures());
   if(!failed.length){
-    const p=outboxPending().length;
+    const p=outboxTheirs(outboxPending()).length;
     openModal("Saving","<div class=\"sd\">"+(p?p+" change"+(p===1?"":"s")+" still going up. This screen is safe to close; they will finish on their own.":"Everything on this device is saved.")+"</div><div class=\"modal-foot\"><button class=\"btn\" onclick=\"closeModal()\">Close</button></div>");
     return;
   }
   const rows=failed.map(function(f){
     return "<div style=\"padding:10px 0;border-bottom:1px solid var(--line)\"><b>"+esc(outboxLabel(f))+"</b>"
-      +"<div class=\"sd\" style=\"color:var(--text-dim)\">"+esc(f.lastError||"Could not reach the server")+"</div></div>";
+      +"<div class=\"sd\" style=\"color:var(--text-dim)\">"+esc(f.lastError||"Could not reach the server")+"</div>"
+      +"<div class=\"sd\" style=\"color:var(--text-faint);margin-top:2px\">"+esc(outboxWhen(f))+"</div>"
+      +"<div style=\"margin-top:8px\"><button class=\"btn ghost sm\" onclick=\"outboxGiveUp('"+esc(f.id)+"')\">Stop trying to send this</button></div></div>";
   }).join("");
   openModal("Some changes did not save",
     "<div class=\"sd\" style=\"margin-bottom:8px\">These are still on this device and nothing has been lost. "
     +"They stopped being retried because the server refused them or could not be reached.</div>"
     +rows
+    +"<div class=\"sd\" style=\"color:var(--text-faint);margin-top:10px\">Stopping does not delete anything on this device. It only stops this phone offering that version to the server, so another device would go on showing the older one.</div>"
+    +"<div style=\"margin-top:8px\"><button class=\"btn ghost sm\" onclick=\"copySyncTrouble()\">Copy the details</button></div>"
     +"<div class=\"modal-foot\"><button class=\"btn ghost\" onclick=\"closeModal()\">Close</button>"
     +"<span style=\"flex:1\"></span><button class=\"btn\" onclick=\"retryOutbox()\">Try again</button></div>");
 }
+function outboxWhen(f){
+  try{const d=new Date(f&&f.at);return isNaN(d.getTime())?"":("Waiting since "+d.toLocaleString());}catch(e){return "";}
+}
+/* THE DOOR THIS SCREEN DID NOT HAVE.
+
+   "Try again" is the right answer when the server might take it next time.
+   It is no answer at all for a change the server will never take: a studio
+   this person has left, an entry from a build that did not stamp the studio,
+   any refusal. Try again failed in the same second and the pill came
+   straight back, and there was no second button, so the warning was
+   permanent for everybody it ever happened to.
+
+   NOTHING ON THE DEVICE IS DELETED BY THIS. Every queued write is a copy of
+   something already saved here: logAudit() writes the row locally and then
+   queues it, pushState() queues what load() just read back, and the orders
+   entry carries no payload at all because it reads the device's own array.
+   Stopping means this device stops offering that version to the server. The
+   consequence worth stating is the one on the screen: another device would
+   go on showing the older version, so this is a choice and not a tidy-up. */
+function outboxGiveUp(id){
+  const f=outbox().find(function(x){return x.id===id;});
+  if(!f)return;
+  if(!confirm("Stop trying to send "+String(outboxLabel(f)).toLowerCase()+"?\n\nIt stays on this device. The server will not have this version, so another device would go on showing the older one."))return;
+  outboxDrop(id);
+  try{toast("Stopped. This device will not offer it again.");}catch(e){}
+  if(!outboxTheirs(outboxFailures()).length&&!outboxTheirs(outboxPending()).length){closeModal();return;}
+  try{keepModalView();}catch(e){}
+  showSyncTrouble();
+}
+/* Enough for somebody to be helped, and nothing that is the studio's own
+   business: no payload, so no client, no figure, no address. */
+function copySyncTrouble(){
+  const rows=outboxTheirs(outboxFailures()).map(function(f){
+    return [outboxLabel(f),f.kind,f.key,f.business_id||"(no studio)",f.at,(f.tries||0)+" tries",f.lastError||""].join(" | ");
+  });
+  const txt="The Label Board "+((typeof APP_VERSION!=="undefined")?APP_VERSION:"")+"\n"
+    +(rows.length?rows.join("\n"):"nothing is waiting");
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){try{toast("Details copied");}catch(e){}},function(){alert(txt);});
+  }else alert(txt);
+}
+/* THE WORD FOR IT ON A STUDIO'S SCREEN. Eleven of the seventeen synced
+   keys were missing from this map and fell through to the key itself, so a
+   failure on any of them printed "layi_dash_pots" at somebody. */
 function outboxLabel(f){
   const names={layi_dash_orders:"Orders",layi_dash_txns:"Payments",layi_dash_settings:"Settings",
     layi_dash_staff:"Team records",layi_dash_supplies:"Stock",layi_dash_products:"Shop items",
-    layi_dash_appts:"Appointments",layi_dash_audit:"Audit trail"};
+    layi_dash_appts:"Appointments",layi_dash_audit:"Audit trail",layi_dash_roles:"Roles",
+    layi_dash_bills:"Bills",layi_dash_pots:"Savings pots",layi_dash_tasks:"Tasks",
+    layi_dash_anns:"Announcements",layi_dash_attendance:"Attendance",layi_dash_leave:"Time off",
+    layi_dash_shifts:"The rota",layi_dash_campaigns:"Campaigns",layi_dash_log:"The diary",
+    layi_dash_planner:"The planner"};
   if(f.kind==="orders")return "Orders";
   if(f.kind==="audit")return "Audit trail";
-  return names[f.key]||f.key||"Changes";
+  if(f.kind==="fault")return "A crash report";
+  return names[f.key]||"Changes";
 }
 function retryOutbox(){
   setOutbox(outbox().map(function(x){return Object.assign({},x,{tries:0,lastError:"",fatal:false});}));
@@ -4763,10 +4853,10 @@ function renderUnplacedNotice(){
   const bits=Object.keys(byKind).map(k=>byKind[k]+' '+k.toLowerCase()+(byKind[k]===1?'':'s'));
   const places=Array.from(new Set(list.map(r=>r.at).filter(Boolean)));
   el.innerHTML='<div class="kv" style="border:1px solid var(--amber);border-radius:10px;padding:11px 13px;margin-bottom:12px">'
-    +'<b style="color:var(--amber)">'+list.length+' record'+(list.length===1?'':'s')+' not assigned to a studio</b><br>'
+    +'<b style="color:var(--amber)">'+list.length+' record'+(list.length===1?'':'s')+' not assigned to an outlet</b><br>'
     +'<span style="color:var(--text-dim);font-size:13px">'+esc(bits.join(' \u00b7 '))
-    +(places.length?('. '+(places.length===1?'It names ':'They name ')+esc(places.join(', '))+', which '+(places.length===1?'is not a studio':'are not studios')+' on this list.'):'.')
-    +' They show under All studios but in none of the individual ones, so nobody working in a single studio can see them.</span></div>';
+    +(places.length?('. '+(places.length===1?'It names ':'They name ')+esc(places.join(', '))+', which '+(places.length===1?'is not an outlet':'are not outlets')+' on this list.'):'.')
+    +' They show under All outlets but in none of the individual ones, so nobody working in a single outlet can see them.</span></div>';
 }
 function recordsNeedingAStudio(){
   const out=[];
@@ -5446,7 +5536,7 @@ const OWNER_ONLY_PANELS=['What your studio does','How the owner is paid',
   /* Phase 0: the permission table is the owner's. The database refuses it to
      everybody else whatever this list says. */
   'Roles & permissions','Roles \u0026 permissions',
-  'Company details','Branches & outlets','Production workflow',
+  'Company details','Outlets','Production workflow',
   'Pay, allowances & deductions','Your plan'];
 function applyOwnerOnlyVisibility(){
   const sec=document.getElementById('view-settings');if(!sec)return;
@@ -5602,16 +5692,16 @@ function setupStudiosHtml(){
         return '<span onclick="setupStudioToggleCraft('+i+',\''+c+'\')" style="cursor:pointer;display:inline-block;border:1.5px solid '+(on?'var(--gold)':'var(--line)')+';background:'+(on?'var(--panel-2)':'transparent')+';color:'+(on?'var(--text)':'var(--text-faint)')+';border-radius:999px;padding:5px 11px;font-size:12.5px">'+esc(label)+'</span>';
       }).join('')+'</div>'):'';
     const del=(d.studios.length>min)
-      ? '<button class="btn ghost sm" onclick="setupRemoveStudio('+i+')" style="flex:none" aria-label="Remove this studio">Remove</button>':'';
+      ? '<button class="btn ghost sm" onclick="setupRemoveStudio('+i+')" style="flex:none" aria-label="Remove this outlet">Remove</button>':'';
     return '<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px">'
       +'<div style="display:flex;gap:8px;align-items:center">'
-      +'<input class="fld" id="su_st_'+i+'" value="'+esc(s.name||'')+'" placeholder="Studio '+(i+1)+' name, e.g. '+(i===0?'Lekki':'Ikeja')+'" style="margin:0">'
+      +'<input class="fld" id="su_st_'+i+'" value="'+esc(s.name||'')+'" placeholder="Outlet '+(i+1)+' name, e.g. '+(i===0?'Lekki':'Ikeja')+'" style="margin:0">'
       +del+'</div>'+chips+'</div>';
   }).join('');
   return '<div class="field"><label>Name your studios</label>'
     +''
     +rows
-    +'<button class="btn ghost sm" onclick="setupAddStudio()">+ Add another studio</button></div>';
+    +'<button class="btn ghost sm" onclick="setupAddStudio()">+ Add another outlet</button></div>';
 }
 function setupPick(field,k){
   setupSync();
@@ -5671,7 +5761,7 @@ function renderStudioSetup(keepScroll){
     +'<div class="field"><label>How many people work with you? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
     +'<div style="padding-top:2px">'+setupBandRow('team',SETUP_TEAM)+'</div>'
     +'</div>'
-    +'<div class="field"><label>How many studios or outlets do you run? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
+    +'<div class="field"><label>How many outlets do you run? <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label>'
     +'<div style="padding-top:2px">'+setupBandRow('outlets',SETUP_OUTLETS)+'</div>'
     +'</div>'
     +setupStudiosHtml()
@@ -5706,7 +5796,7 @@ function saveStudioSetup(){
      screen was changed to stop happening. Ask rather than guess. */
   if(outletsMin(d.outlets)>1){
     const namedCount=(d.studios||[]).filter(function(s){return String(s.name||'').trim();}).length;
-    if(namedCount<2){alert('Give each studio a name, so the app can keep their orders, stock and takings apart.');return;}
+    if(namedCount<2){alert('Give each outlet a name, so the app can keep their orders, stock and takings apart.');return;}
   }
 
   SETTINGS.company=Object.assign({},SETTINGS.company||{},{name:name});
@@ -5815,7 +5905,7 @@ function saveStudioSetup(){
   if(typeof reportTenantPresence==='function'){try{reportTenantPresence();}catch(e){}}
   /* If they said there are more of them, or more than one outlet, say where
      those live rather than leaving them to find it. */
-  const nextStep=outletsN>1?'Add your other studios in Settings › Branches.'
+  const nextStep=outletsN>1?'Add your other outlets in Settings › Outlets.'
     :(teamN>1?'Add your team in the Team tab whenever you are ready.':'');
   if(typeof toast==='function')toast('Welcome to '+name+(nextStep?' · '+nextStep:''));
 }
@@ -6158,7 +6248,7 @@ async function saveMyAccount(){
 
 /* ===== NAV ===== */
 const TITLES={activity:[()=>{const _t=(typeof tenantName==='function')?tenantName():'';
-    if(multiBranch()&&activeBranchView==='all')return 'Today across your studios';
+    if(multiBranch()&&activeBranchView==='all')return 'Today across your outlets';
     if(multiBranch()&&activeBranchView&&activeBranchView!=='all')return 'Today at '+activeBranchView;
     return 'Today at '+(_t||'the studio');},()=>today.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})],
   /* A PAGE HEADING IS A NAME, NOT A SENTENCE.
@@ -6944,7 +7034,19 @@ function dedupeModalFoot(root,hasBack){
     if(!f.querySelector('button'))f.remove();
   });
 }
-function openModal(html){openStaffId=null;const modalEl=document.getElementById('modal');if(!window.__modalStack)window.__modalStack=[];const ovShown=document.getElementById('overlay').classList.contains('show');if(ovShown&&!window.__omKeep&&modalEl.innerHTML){window.__modalStack.push(modalEl.innerHTML);if(window.__modalStack.length>15)window.__modalStack.shift();}const back=window.__modalStack.length?'<button class="btn ghost sm" onclick="modalBack()">‹ Back</button>':'';modalEl.innerHTML='<div class="modal-topbar">'+back+'<button class="btn ghost sm" onclick="closeModal()">✕ Close</button></div><div class="modal-page">'+html+'</div>';dedupeModalFoot(modalEl,!!back);const ov=document.getElementById('overlay');ov.classList.add('show');if(window.__omKeep){const _s=window.__omScroll||0;window.__omKeep=false;restoreModalView(ov,_s);}else{ov.scrollTop=0;}const mn=document.querySelector('.main');if(mn)mn.classList.add('locked');document.body.classList.add('modal-open');}
+/* TWO ARGUMENTS MEANS A TITLE AND A BODY.
+
+   This took one argument and five callers passed two, so five modals
+   rendered their title and silently dropped everything else: the studio
+   switcher, both sync screens and both conflict screens. Each of them
+   became a sentence with no buttons. The callers were right about what
+   they wanted and the signature was the thing that was wrong.
+
+   The title is escaped, because it is a sentence somebody wrote and not
+   markup; the body is markup, as it is in every other call. */
+function openModal(html,body){
+  if(body!==undefined&&body!==null)html='<h3>'+esc(String(html))+'</h3>'+body;
+  openStaffId=null;const modalEl=document.getElementById('modal');if(!window.__modalStack)window.__modalStack=[];const ovShown=document.getElementById('overlay').classList.contains('show');if(ovShown&&!window.__omKeep&&modalEl.innerHTML){window.__modalStack.push(modalEl.innerHTML);if(window.__modalStack.length>15)window.__modalStack.shift();}const back=window.__modalStack.length?'<button class="btn ghost sm" onclick="modalBack()">‹ Back</button>':'';modalEl.innerHTML='<div class="modal-topbar">'+back+'<button class="btn ghost sm" onclick="closeModal()">✕ Close</button></div><div class="modal-page">'+html+'</div>';dedupeModalFoot(modalEl,!!back);const ov=document.getElementById('overlay');ov.classList.add('show');if(window.__omKeep){const _s=window.__omScroll||0;window.__omKeep=false;restoreModalView(ov,_s);}else{ov.scrollTop=0;}const mn=document.querySelector('.main');if(mn)mn.classList.add('locked');document.body.classList.add('modal-open');}
 function modalBack(){if(!window.__modalStack||!window.__modalStack.length){closeModal();return;}const html=window.__modalStack.pop();const modalEl=document.getElementById('modal');modalEl.innerHTML=html;const ov=document.getElementById('overlay');if(ov)ov.scrollTop=0;}
 function closeModal(){window.__modalStack=[];const _ov=document.getElementById('overlay');if(_ov)_ov.scrollTop=0;document.getElementById('overlay').classList.remove('show');const mn=document.querySelector('.main');if(mn)mn.classList.remove('locked');document.body.classList.remove('modal-open');draft=null;updateDraft=null;}
 const fv=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
@@ -7878,7 +7980,7 @@ function renderOrderModal(){
   /* Only on the invoice form. The order form reaches the same figure through its
      Delivery section, which also asks who is carrying it and where to. */
   const invDeliveryField=invoiceOnly?`<div class="field"><label>Delivery charged (${CUR_SYM[ocur(draft)]||ocur(draft)})</label><input class="fld money" type="text" inputmode="decimal" id="f_invdel" value="${orderDelivery(draft)?fmtNum(orderDelivery(draft)):''}" placeholder="0" oninput="recalcProfit()"></div>`:'';
-  const branchField=multiBranch()?`<div class="field"><label>Branch</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type a branch')}</div>`:'';
+  const branchField=multiBranch()?`<div class="field"><label>Outlet</label>${selOther('f_branch',branchNames(),draft.branch||defaultBranchName(),'Type an outlet')}</div>`:'';
 
   /* ---- The invoice form ---------------------------------------------------------------
      23 September: "Invoice page has no business with measurements and everything on image
@@ -8812,7 +8914,7 @@ function stockSheetInner(){
   const prodTot=prods.reduce((x,p)=>x+((typeof productStockValue==='function')?productStockValue(p):0),0);
   return `<div style="font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;max-width:720px;margin:0 auto;background:#fff;padding:30px">
     ${docHeader('STOCK LIST')}
-    <div style="font-size:13px;color:#666;margin-bottom:14px">${(activeBranchView&&activeBranchView!=='all')?esc(activeBranchView):'All studios'} · ${sup.length+prods.length} item${(sup.length+prods.length)===1?'':'s'}</div>
+    <div style="font-size:13px;color:#666;margin-bottom:14px">${(activeBranchView&&activeBranchView!=='all')?esc(activeBranchView):'All outlets'} · ${sup.length+prods.length} item${(sup.length+prods.length)===1?'':'s'}</div>
     ${sup.length?`<div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Materials &amp; stock</div><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px"><thead>${head}</thead><tbody>${supRows}</tbody></table>`:''}
     ${prods.length?`<div style="color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Shop products</div><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px"><thead>${head}</thead><tbody>${prodRows}</tbody></table>`:''}
     ${money?`<div style="text-align:right;font-size:15px;font-weight:700;border-top:2px solid #ddd;padding-top:10px">Total stock value: ${cur(supTot+prodTot)}</div>`:''}
@@ -9342,12 +9444,12 @@ function renderPlanPanel(){
   }).join('');
   box.innerHTML='<div class="kv" style="margin-bottom:10px"><b>'+esc(cur.name)+'</b> \u00b7 '+priceOf(cur)
       +'<div style="color:var(--text-dim);font-size:13px">'+esc(cur.blurb)+'</div></div>'
-    +row('Studios',use.studios,cur.studios)
+    +row('Outlets',use.studios,cur.studios)
     +row('Team accounts',use.seats,cur.seats)
     +'<div class="bd-row"><span class="bl">Storage</span><span class="bv">'+fmtBytes(storageUsage().bytes)+' of '+cur.storageGb+' GB</span></div>'
     +featRows
     +(next?'<div class="sd" style="color:var(--text-faint);margin-top:10px">'+esc(next.name)+' gives you '
-      +(next.studios===PLAN_UNLIMITED?'as many studios as you need':next.studios+' studios')+' and '+seatsOf(next)
+      +(next.studios===PLAN_UNLIMITED?'as many outlets as you need':next.studios+' outlets')+' and '+seatsOf(next)
       +', '+priceOf(next)+'. The Subscription panel below takes the payment.</div>':'')
     +'<div class="sd" style="color:var(--text-faint);margin-top:8px">Going over a limit never hides anything you already have. It only stops you adding more.</div>';
 }
@@ -9823,7 +9925,7 @@ const COMPANY_STORES=[
 function branchAssignField(prefix,rec,label){
   if(!multiBranch())return '';
   const on=branchesOf(rec);
-  return '<div class="field"><label>'+esc(label||'Which studios use this')+'</label>'
+  return '<div class="field"><label>'+esc(label||'Which outlets use this')+'</label>'
     +''
     +branchNames().map(function(n,i){
         return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;margin-bottom:5px">'
@@ -9852,7 +9954,7 @@ function inCompanyScope(rec){
    so on screen, so a shared row never reads as a leak. */
 function companyScopeLabel(rec){
   const a=branchesOf(rec);
-  if(!a.length)return multiBranch()?'All studios':'';
+  if(!a.length)return multiBranch()?'All outlets':'';
   return a.join(', ');
 }
 /* One-off: give every branch-owned record a branch.
@@ -9899,7 +10001,7 @@ function migrateBranchOwnership(){
   // Only worth telling the owner about the first time. After that this is
   // housekeeping that runs on every load and finds nothing.
   if(touched&&!SETTINGS.branchScopeV1&&typeof logAudit==='function')
-    logAudit('Branch scope migration',touched+' record'+(touched===1?'':'s')+' assigned to '+home);
+    logAudit('Outlet scope migration',touched+' record'+(touched===1?'':'s')+' assigned to '+home);
   if(!SETTINGS.branchScopeV1){SETTINGS.branchScopeV1=true;save('layi_dash_settings',SETTINGS);}
   return touched;
 }
@@ -9912,14 +10014,14 @@ function renderBranchSwitch(){const sel=document.getElementById('branchSwitch');
   if(!multiBranch()){activeBranchView=names[0];sel.style.display='none';return;}
   if(activeBranchView!=='all'&&!names.includes(activeBranchView))activeBranchView='all'; // default to the all-studios view, not a single branch
   sel.style.display='';
-  sel.innerHTML=`<option value="all" ${activeBranchView==='all'?'selected':''}>All studios</option>`+names.map(n=>`<option value="${esc(n)}" ${activeBranchView===n?'selected':''}>${esc(n)}</option>`).join('');
+  sel.innerHTML=`<option value="all" ${activeBranchView==='all'?'selected':''}>All outlets</option>`+names.map(n=>`<option value="${esc(n)}" ${activeBranchView===n?'selected':''}>${esc(n)}</option>`).join('');
   sel.value=activeBranchView;}
 function openExpense(id){if(!can('money'))return;const x=id?getTxns().find(t=>t.id===id):null;openModal(`<h3>${x?'Edit expense':'Add expense'}</h3>
   <div class="field"><label>What was it for?</label><input class="fld" id="t_label" placeholder="e.g. Studio rent, courier, electricity" value="${x?esc(x.label||''):''}"></div>
   <div class="row2"><div class="field"><label>Amount (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="t_amt" value="${x&&x.amount?fmtNum(x.amount):''}"></div><div class="field"><label>Date</label><input class="fld" type="date" id="t_date" value="${x&&x.at?x.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div></div>
   <div class="row2"><div class="field"><label>Category</label>${selOther('t_cat',EXPENSE_CATS,(x&&x.category)||EXPENSE_CATS[0],'Type a category')}</div><div class="field"><label>Department</label>${selOther('t_dept',FIN_DEPARTMENTS,(x&&x.dept)||'Operations','Type a department')}</div></div>
   <div class="row2"><div class="field"><label>Vendor / paid to</label><input class="fld" id="t_vendor" placeholder="e.g. Meta, PHCN, landlord" value="${x?esc(x.vendor||''):''}"></div><div class="field"><label>Payment method</label>${selOther('t_method',PAY_METHODS,(x&&x.method)||PAY_METHODS[0],'How was it paid?')}</div></div>
-  <div class="row2">${multiBranch()?`<div class="field"><label>Branch</label>${selOther('t_branch',branchNames(),(x&&x.branch)||defaultBranchName(),'Type a branch')}</div>`:''}<div class="field"><label>Project <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="t_project" placeholder="e.g. Fashion week, Shop fit-out" value="${x?esc(x.project||''):''}"></div></div>
+  <div class="row2">${multiBranch()?`<div class="field"><label>Outlet</label>${selOther('t_branch',branchNames(),(x&&x.branch)||defaultBranchName(),'Type an outlet')}</div>`:''}<div class="field"><label>Project <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="t_project" placeholder="e.g. Fashion week, Shop fit-out" value="${x?esc(x.project||''):''}"></div></div>
   <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);margin-bottom:6px;cursor:pointer"><input type="checkbox" id="t_recur" style="width:18px;height:18px;accent-color:var(--gold)" ${x&&x.recurring?'checked':''}> Recurring subscription (e.g. monthly software, rent)</label>
   <div class="modal-foot">${x?`<button class="btn danger sm" onclick="delTxn('${x.id}');closeModal()">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${x?x.id:''}')">${x?'Update':'Save'}</button></div>`);}
 function expenseCounts(t){return t.dir!=='out'||(t.approval!=='Rejected'&&t.approval!=='Pending');}
@@ -9987,7 +10089,7 @@ function openLogPayment(){
       <div class="field"><label>Method (how they paid)</label><select class="fld" id="lp_method">${IN_METHODS.map(m=>`<option${m==='Transfer'?' selected':''}>${m}</option>`).join('')}</select></div></div>
     <div class="field"><label>Who from <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="lp_who" list="lpClients" placeholder="Client name"><datalist id="lpClients">${dl}</datalist></div>
     <div class="field"><label>What it was for <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="lp_note" placeholder="e.g. deposit on ankara gown, balance for cap"></div>
-    ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('lp_branch',branchNames(),payDraft.branch,'Type a branch')}</div>`:''}
+    ${multiBranch()?`<div class="field"><label>Outlet</label>${selOther('lp_branch',branchNames(),payDraft.branch,'Type an outlet')}</div>`:''}
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveLogPayment()">Record payment</button></div>`);
 }
 function saveLogPayment(){
@@ -10039,7 +10141,7 @@ function openBill(id){if(!can('money'))return;const b=id?getBills().find(x=>x.id
     <div class="field"><label>Amount each time (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="b_amt" value="${b&&b.amount?fmtNum(b.amount):''}" placeholder="0"></div>
     <div class="field"><label>How often</label><select class="fld" id="b_every">${BILL_CADENCES.map(c=>`<option value="${c.k}" ${billCadence(b).k===c.k?'selected':''}>${esc(c.label)}</option>`).join('')}</select>
       </div>
-    ${multiBranch()?'<div class="field"><label>Which studio pays this</label><select class="fld" id="b_branch"><option value="">The whole business</option>'+branchNames().map(function(n){return '<option value="'+esc(n)+'" '+((b&&b.branch===n)?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></div>':''}
+    ${multiBranch()?'<div class="field"><label>Which outlet pays this</label><select class="fld" id="b_branch"><option value="">The whole business</option>'+branchNames().map(function(n){return '<option value="'+esc(n)+'" '+((b&&b.branch===n)?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></div>':''}
     <div class="field"><label>Note (optional)</label><input class="fld" id="b_note" value="${b?esc(b.note||''):''}" placeholder="Due date, account…"></div>
     <div class="modal-foot">${b?`<button class="btn danger sm" onclick="delBill('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveBill('${b?b.id:''}')">${b?'Update':'Save'}</button></div>`);}
 function b_existingBranch(id){const b=id?getBills().find(x=>x.id===id):null;return b?(b.branch||''):'';}
@@ -10100,7 +10202,7 @@ function openAppt(id){if(!can('appts'))return;const e=id?getAppts().find(x=>x.id
   <div class="field"><label>Client</label><input class="fld" id="a_client" value="${e?esc(e.client||''):''}"></div>
   <div class="row2"><div class="field"><label>Phone</label><input class="fld" type="tel" id="a_phone" placeholder="e.g. 080…" value="${e?esc(e.phone||''):''}"></div><div class="field"><label>Summary note</label><input class="fld" id="a_note" placeholder="e.g. Second fitting" value="${e?esc(e.note||''):''}"></div></div>
   <div class="field"><label>Location</label><input class="fld" id="a_location" placeholder="Studio, client address, venue…" value="${e?esc(e.location||''):''}"></div>
-  ${multiBranch()?`<div class="field"><label>Branch / studio</label>${selOther('a_branch',branchNames(),(e&&e.branch)||(activeBranchView!=='all'?activeBranchView:defaultBranchName()),'Which studio')}</div>`:''}
+  ${multiBranch()?`<div class="field"><label>Outlet</label>${selOther('a_branch',branchNames(),(e&&e.branch)||(activeBranchView!=='all'?activeBranchView:defaultBranchName()),'Which outlet')}</div>`:''}
   <div class="bd-sub" style="margin-top:14px">Fitting record <span style="color:var(--text-faint);font-weight:400">(fill in during or after the session)</span></div>
   <div class="field"><label>What was done</label><textarea class="fld" id="a_outcome" rows="2" placeholder="e.g. Took the agbada in at the shoulders, marked hem length">${e?esc(e.outcome||''):''}</textarea></div>
   <div class="field"><label>Adjustments needed</label><textarea class="fld" id="a_adjust" rows="2" placeholder="e.g. Take sleeves up 2cm, re-cut the collar">${e?esc(e.adjust||''):''}</textarea></div>
@@ -10121,7 +10223,7 @@ function openApptDetail(id){const a=getAppts().find(x=>x.id===id);if(!a){closeMo
   const linkedOrder=getOrders().find(o=>isClientOrder(o)&&o.client&&nameKey(o.client)===nameKey(a.client||''));
   const rec=(l,v)=>v?`<div class="field" style="margin-bottom:8px"><label>${l}</label><div style="padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);white-space:pre-wrap">${esc(v)}</div></div>`:'';
   const hasRecord=a.outcome||a.adjust||a.feedback;
-  const info=[['When',fmtD(a.date)+(a.time?' · '+esc(a.time):'')],['Type',esc(tp)],a.location?['Location',esc(a.location)]:null,(multiBranch()&&apptBranch(a))?['Branch',esc(apptBranch(a))]:null,a.completedAt?['Completed',new Date(a.completedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})]:null].filter(Boolean);
+  const info=[['When',fmtD(a.date)+(a.time?' · '+esc(a.time):'')],['Type',esc(tp)],a.location?['Location',esc(a.location)]:null,(multiBranch()&&apptBranch(a))?['Outlet',esc(apptBranch(a))]:null,a.completedAt?['Completed',new Date(a.completedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})]:null].filter(Boolean);
   openModal(`<h3>${esc(a.client||'Client')} <span class="sup-status" style="border-color:${stCol};color:${stCol};font-size:11px;vertical-align:middle">${esc(st)}</span></h3>
     <div class="msub">${esc(tp)}${a.note?' · '+esc(a.note):''}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px">
@@ -10152,7 +10254,7 @@ const SET_ICONS={
 };
 const SET_GROUPS=[
   {key:'appearance',hue:'#6d5dd3',t:'Appearance & app',s:'Theme, accent, install',heads:['Theme & display','Theme','Settings']},
-  {key:'business',hue:'#2563a8',t:'Your business',s:'Type, team, branches, your pay',heads:['What your studio does','Branches','How the owner is paid']},
+  {key:'business',hue:'#2563a8',t:'Your business',s:'Type, team, outlets, your pay',heads:['What your studio does','Outlets','How the owner is paid']},
   {key:'company',hue:'#0f8a80',t:'Company & invoices',s:'Details, banks, messages',heads:['Company details','Message templates']},
   {key:'money',hue:'#1f9d57',t:'Money & pricing',s:'Currency, defaults, tiers, pay',heads:['Order defaults','Defaults','Loyalty tiers','How you get paid','Pay, allowances & deductions']},
   {key:'rules',hue:'#c47d12',t:'Rules & inventory',s:'Workflow, quality, stock',heads:['Production workflow','Products & materials','Stock used per product','Quality control','Inventory categories']},
@@ -10230,7 +10332,7 @@ const PLANS=[
   {id:'trial',   name:'Trial',   monthly:0,     studios:1, seats:3, storageGb:2,
    blurb:'14 days, everything in Pro', features:['chase','funds','inventory','suppliers','team','payroll','companylog','marketing','reporting','reports']},
   {id:'starter', name:'Basic',   monthly:20000, studios:1, seats:5, storageGb:20,
-   blurb:'One studio, up to five people', features:[]},
+   blurb:'One outlet, up to five people', features:[]},
   /* Pro is the full product: no feature is held back. It used to sell
      unlimited staff, which left storage as the only thing protecting margin.
      From 20 Sep 2026 it is 5 studios and 50 logins, which is a ceiling no
@@ -10238,7 +10340,7 @@ const PLANS=[
      is a number here, on the website and in the database rather than a
      quieter form of words. */
   {id:'pro',     name:'Pro',     monthly:49000, studios:5, seats:50, storageGb:200,
-   blurb:'Everything, up to five studios and fifty people', features:['chase','funds','inventory','suppliers','team','payroll','companylog','marketing','reporting','reports']},
+   blurb:'Everything, up to five outlets and fifty people', features:['chase','funds','inventory','suppliers','team','payroll','companylog','marketing','reporting','reports']},
   /* Priced per business, so it carries no monthly figure to quote. An operator
      types the negotiated price when they move a studio onto it. */
   {id:'premium', name:'Bespoke', monthly:0, invoiceOnly:true, studios:0, seats:0, storageGb:1000,
@@ -11227,14 +11329,14 @@ function renderBranchesSettings(){const box=document.getElementById('branchBox')
   box.innerHTML=branchDraft.map((b,i)=>{
     const chips=craftPickerHtml(b.does,'bsToggleCraft','bsToggleMode','bsRemoveType',i+',');
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:14px 14px 10px;margin-bottom:12px">
-     <div class="cost-line"><input class="fld" id="br_name_${i}" value="${esc(b.name)}" placeholder="Branch / outlet name"><input class="fld" id="br_loc_${i}" value="${esc(b.location)}" placeholder="Location (optional)"><span class="rm" onclick="removeBranchRow(${i})">\u2715</span></div>
+     <div class="cost-line"><input class="fld" id="br_name_${i}" value="${esc(b.name)}" placeholder="Outlet name"><input class="fld" id="br_loc_${i}" value="${esc(b.location)}" placeholder="Location (optional)"><span class="rm" onclick="removeBranchRow(${i})">\u2715</span></div>
      <div style="margin-top:12px"><label style="${lbl}">What it does <span style="text-transform:none;letter-spacing:0">(tick all that apply)</span></label><div style="display:flex;flex-wrap:wrap;gap:8px">${chips}<span onclick="bsAddType(${i})" style="cursor:pointer;border:1.5px dashed var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--gold)">\uff0b Add type</span></div></div>
      <div style="margin-top:12px"><label style="${lbl}">Sells via</label><div style="display:flex;gap:16px">
        <label style="font-size:13.5px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="br_ch_show_${i}" ${b.channels.includes('showroom')?'checked':''}> Showroom</label>
        <label style="font-size:13.5px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="br_ch_onl_${i}" ${b.channels.includes('online')?'checked':''}> Online</label>
      </div></div>
     </div>`;}).join('')
-    +`<button class="btn ghost sm" style="width:100%;margin:6px 0" onclick="addBranchRow()">\uff0b Add branch / outlet</button><button class="btn" id="branchSaveBtn" onclick="saveBranches()">Save branches</button>`;
+    +`<button class="btn ghost sm" style="width:100%;margin:6px 0" onclick="addBranchRow()">\uff0b Add outlet</button><button class="btn" id="branchSaveBtn" onclick="saveBranches()">Save outlets</button>`;
 }
 function bsToggleCraft(i,c){syncBranchDraft();const b=branchDraft[i];if(!b)return;b.does=doesToggleCraft(b.does,c);renderBranchesSettings();}
 function bsToggleMode(i,c,m){syncBranchDraft();const b=branchDraft[i];if(!b)return;b.does=doesToggleMode(b.does,c,m);renderBranchesSettings();}
@@ -11264,7 +11366,7 @@ function addBranchRow(){
   // three studios whether or not Save has been pressed yet.
   const drafted=branchDraft.filter(b=>b&&(b.name||'').trim()).length;
   const lim=currentPlan().studios;
-  if(lim!==PLAN_UNLIMITED&&Math.max(drafted,planUsage().studios)>=lim){if(planStop('studios','studios'))return;}
+  if(lim!==PLAN_UNLIMITED&&Math.max(drafted,planUsage().studios)>=lim){if(planStop('studios','outlets'))return;}
   branchDraft.push({id:uid('br'),name:'',location:'',does:[],channels:['showroom']});renderBranchesSettings();}
 function removeBranchRow(i){syncBranchDraft();branchDraft.splice(i,1);renderBranchesSettings();}
 function saveBranches(){
@@ -11279,7 +11381,7 @@ syncBranchDraft();const named=(branchDraft||[]).filter(b=>b.name&&b.name.trim())
   const seen={};for(const b of clean){const k=b.name.toLowerCase();if(seen[k]){alert('Duplicate branch: '+b.name);return;}seen[k]=1;}
   const prevById={};getBranches().forEach(b=>{if(b.id)prevById[b.id]=b.name;});
   clean.forEach(b=>{if(b.id&&prevById[b.id]&&prevById[b.id]!==b.name)renameBranchRefs(prevById[b.id],b.name);});
-  SETTINGS.branches=clean;save('layi_dash_settings',SETTINGS);logAudit('Branches updated',clean.map(b=>b.name).join(', '));branchDraft=null;renderBranchesSettings();renderAll();flashSaved('branchSaveBtn','Save branches');}
+  SETTINGS.branches=clean;save('layi_dash_settings',SETTINGS);logAudit('Outlets updated',clean.map(b=>b.name).join(', '));branchDraft=null;renderBranchesSettings();renderAll();flashSaved('branchSaveBtn','Save branches');}
 function flashSaved(id,base){const el=document.getElementById(id);if(!el)return;el.textContent='✓ Saved';el.disabled=true;setTimeout(()=>{el.disabled=false;el.textContent=base;},1500);}
 /* A toast is a nicety. It must never be able to break the thing that triggered it:
    recording a payment and then throwing on the way to saying so would leave the studio
@@ -11859,7 +11961,7 @@ function importData(input){
    not agbadas.
    ========================================================================= */
 const EXAMPLE_STUDIOS=[
-  {key:'multi',    label:'Multi-studio label',   blurb:'Four studios, bespoke and ready-to-wear',
+  {key:'multi',    label:'Multi-outlet label',   blurb:'Four outlets, bespoke and ready-to-wear',
    solo:false},
   {key:'bespoke',  label:'Bespoke tailor',        blurb:'One workroom, made to order',
    solo:true, company:'Adé Bespoke', does:['garments:make'], stages:'bespoke',
@@ -11875,7 +11977,7 @@ const EXAMPLE_STUDIOS=[
 
   {key:'leather',  label:'Bag & leather maker',   blurb:'Bags, belts and small leather goods',
    solo:true, company:'Ìfé Leather', does:['leather:make','leather:stock'], stages:'leather',
-   branch:{name:'The studio',location:'Lekki, Lagos'},
+   branch:{name:'The workshop',location:'Lekki, Lagos'},
    items:['Tote bag','Weekender holdall','Belt','Card wallet','Laptop sleeve','Crossbody bag'],
    catalogue:[['Tote bag','Bag'],['Weekender holdall','Bag'],['Crossbody bag','Bag'],['Belt','Accessory'],['Card wallet','Accessory']]},
 
@@ -12469,7 +12571,7 @@ function openSupplier(id,prefillType){
     <div class="field"><label>Email</label><input class="fld" id="sp_email" value="${s?esc(s.email||''):''}" placeholder="name@email.com"></div>
     <div class="field"><label>Location / address</label><textarea class="fld" id="sp_location" placeholder="Market, city…">${s?esc(s.location||''):''}</textarea></div>
     <div class="field"><label>Notes</label><textarea class="fld" id="sp_notes" placeholder="Lead time, what they supply, pricing…">${s?esc(s.notes||''):''}</textarea></div>
-    ${branchAssignField('sp',s,'Which studios use this vendor')}
+    ${branchAssignField('sp',s,'Which outlets use this vendor')}
     <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="sp_pref" ${s&&s.preferred?'checked':''} style="width:18px;height:18px;accent-color:var(--gold)"> ★ Preferred supplier</label>
     <div class="modal-foot">
       ${s?`<button class="btn danger sm" onclick="delSupplier('${s.id}')">Delete</button>`:''}
@@ -12914,7 +13016,7 @@ function renderSaleModal(){
     ${payMethodField('sale_method',d.payMethod,'How was it paid?')}
     <div class="reinvest" id="saleSummary" style="margin:4px 0 12px">${saleSummaryHtml(lineTotal,paid,profit)}</div>
     <div class="field"><label>Customer <span style="color:var(--text-faint);font-weight:400">(optional, leave blank for a walk-in)</span></label><input class="fld" id="sale_client" list="saleClients" value="${esc(d.client)}" placeholder="Walk-in"><datalist id="saleClients">${dl}</datalist></div>
-    ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('sale_branch',branchNames(),d.branch||defaultBranchName(),'Type a branch')}</div>`:''}
+    ${multiBranch()?`<div class="field"><label>Outlet</label>${selOther('sale_branch',branchNames(),d.branch||defaultBranchName(),'Type an outlet')}</div>`:''}
     <div class="modal-foot"><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="recordSale()">Record sale</button></div>`);
 }
 function saleSummaryHtml(lineTotal,paid,profit){
@@ -13689,7 +13791,7 @@ function openOrgView(){
     return `<div class="bd-sub" style="cursor:pointer" onclick="openStaffDetail('${sup.id}')">${esc(sup.name)}${sup.role?` <span style="color:var(--text-faint);font-weight:400">· ${esc(sup.role)}</span>`:''} <span style="color:var(--text-faint);font-weight:400">(${reps.length})</span></div>${rows}`;
   }).join('');
   const orphans=inView.filter(s=>!reportsToId(s.id)&&!directReports(s.id,{scoped:true}).length);
-  openModal(`<h3>Reporting lines</h3><div class="msub">${activeBranchView==='all'?'All studios':esc(activeBranchView)} · who reports to whom</div>${supers.length?blocks:'<div class="kv" style="color:var(--text-faint)">No reporting lines set yet. Open a staff profile and set “Reports to”.</div>'}${orphans.length?`<div class="bd-sub" style="margin-top:14px;color:var(--text-faint)">Not on a reporting line</div>${orphans.map(s=>`<div class="bd-row" style="cursor:pointer" onclick="openStaffDetail('${s.id}')"><span class="bl">${esc(s.name)}</span><span class="bv"><span style="color:var(--gold)">›</span></span></div>`).join('')}`:''}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+  openModal(`<h3>Reporting lines</h3><div class="msub">${activeBranchView==='all'?'All outlets':esc(activeBranchView)} · who reports to whom</div>${supers.length?blocks:'<div class="kv" style="color:var(--text-faint)">No reporting lines set yet. Open a staff profile and set “Reports to”.</div>'}${orphans.length?`<div class="bd-sub" style="margin-top:14px;color:var(--text-faint)">Not on a reporting line</div>${orphans.map(s=>`<div class="bd-row" style="cursor:pointer" onclick="openStaffDetail('${s.id}')"><span class="bl">${esc(s.name)}</span><span class="bv"><span style="color:var(--gold)">›</span></span></div>`).join('')}`:''}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 /* ===== DASHBOARD DRILL-DOWN (opens in a modal, stays on the dashboard) ===== */
 function openOrderListModal(title,list,sub){
@@ -13841,8 +13943,8 @@ function renderBranchCard(){
   const tot=rows.reduce((a,r)=>({rev:a.rev+r.rev,net:a.net+r.net}),{rev:0,net:0});
   const body=document.getElementById('branchCardBody');if(!body)return;
   body.innerHTML=rows.map(r=>`<div class="brow2"><span class="bn2">${esc(r.name)}</span><span class="bar2"><i style="width:${Math.round(r.rev/maxRev*100)}%"></i></span><span class="rev2">${cur(r.rev)}</span><span class="net2" style="color:${r.net>=0?'var(--green)':'var(--red)'}">${r.net>=0?'+':''}${cur(r.net)}</span></div>`).join('')
-    +`<div class="bcomb2"><span>All studios</span><span style="display:flex;gap:16px;align-items:baseline"><span class="rev2">${cur(tot.rev)}</span><span class="net2" style="color:${tot.net>=0?'var(--green)':'var(--red)'}">${tot.net>=0?'+':''}${cur(tot.net)}</span></span></div>`
-    +`<div class="bfoot2" onclick="openBranchReport()">Tap for the full branch report ›</div>`;
+    +`<div class="bcomb2"><span>All outlets</span><span style="display:flex;gap:16px;align-items:baseline"><span class="rev2">${cur(tot.rev)}</span><span class="net2" style="color:${tot.net>=0?'var(--green)':'var(--red)'}">${tot.net>=0?'+':''}${cur(tot.net)}</span></span></div>`
+    +`<div class="bfoot2" onclick="openBranchReport()">Tap for the full outlet report ›</div>`;
 }
 function openBranchPreview(name){
   const m=branchMetrics().find(r=>r.name===name); if(!m){setBranchView(name);return;}
@@ -13857,7 +13959,7 @@ function openBranchPreview(name){
   if(money)cells.push(stat('Outstanding',cur(m.owed),'awaiting payment',m.owed>0?'red':'green','outstanding'));
   openModal(`<h3>${esc(name)}</h3><div class="msub">${esc(typeLabel)} · tap a figure for the detail</div>
     <div class="bpv-grid">${cells.join('')}</div>
-    <div class="modal-foot">${can('setBranches')?`<button class="btn ghost sm" onclick="closeModal();openBranchEdit('${(m.id||'').replace(/'/g,"\\'")}')">\u270e Edit</button>`:''}<button class="btn ghost" onclick="closeModal();openBranchReport()">Full report ›</button><span style="flex:1"></span><button class="btn" onclick="closeModal();setBranchView('${(name||'').replace(/'/g,"\\'")}')">View this branch ›</button></div>`);
+    <div class="modal-foot">${can('setBranches')?`<button class="btn ghost sm" onclick="closeModal();openBranchEdit('${(m.id||'').replace(/'/g,"\\'")}')">\u270e Edit</button>`:''}<button class="btn ghost" onclick="closeModal();openBranchReport()">Full report ›</button><span style="flex:1"></span><button class="btn" onclick="closeModal();setBranchView('${(name||'').replace(/'/g,"\\'")}')">View this outlet ›</button></div>`);
 }
 function openBranchReport(){
   const money=can('money')||can('finance')||canSeeProfit();
@@ -13873,11 +13975,11 @@ function openBranchReport(){
     let topC='',topV=0;Object.keys(byC).forEach(k=>{if(byC[k]>topV){topV=byC[k];topC=k;}});
     return Object.assign({},r,{inv,teamN:team.length,payroll,topC,topV});});
   const tot=data.reduce((a,r)=>({rev:a.rev+r.rev,spend:a.spend+r.spend,net:a.net+r.net,owed:a.owed+r.owed,active:a.active+r.active,overdue:a.overdue+r.overdue,inv:a.inv+r.inv,teamN:a.teamN+r.teamN,payroll:a.payroll+r.payroll}),{rev:0,spend:0,net:0,owed:0,active:0,overdue:0,inv:0,teamN:0,payroll:0});
-  const totTiles=[money?stat('Revenue',cur(tot.rev),periodLabel(branchPeriod,branchCustom),''):'',money?stat('Expenses',cur(tot.spend),'across all studios',''):'',money?stat('Net profit',cur(tot.net),tot.net>=0?'in profit':'in the red',tot.net>=0?'up':'down'):'',money?stat('Outstanding',`<span style="color:var(--red)">${cur(tot.owed)}</span>`,'owed now',tot.owed>0?'warn':'up'):'',stat('In production',tot.active,tot.overdue?tot.overdue+' overdue':'on track',tot.overdue?'warn':''),money?stat('Inventory value',cur(tot.inv),'materials in stock',''):'',stat('Team',tot.teamN,money&&tot.payroll?cur(tot.payroll)+'/mo':'people','')].filter(Boolean).join('');
+  const totTiles=[money?stat('Revenue',cur(tot.rev),periodLabel(branchPeriod,branchCustom),''):'',money?stat('Expenses',cur(tot.spend),'across all outlets',''):'',money?stat('Net profit',cur(tot.net),tot.net>=0?'in profit':'in the red',tot.net>=0?'up':'down'):'',money?stat('Outstanding',`<span style="color:var(--red)">${cur(tot.owed)}</span>`,'owed now',tot.owed>0?'warn':'up'):'',stat('In production',tot.active,tot.overdue?tot.overdue+' overdue':'on track',tot.overdue?'warn':''),money?stat('Inventory value',cur(tot.inv),'materials in stock',''):'',stat('Team',tot.teamN,money&&tot.payroll?cur(tot.payroll)+'/mo':'people','')].filter(Boolean).join('');
   const drill=(bn,type)=>`openBranchDrill('${String(bn).replace(/'/g,"\\'")}','${type}')`;
   const metric=(l,v,click,color)=>`<div class="brep-metric"${click?` onclick="${click}"`:''}><div class="bm-l">${l}</div><div class="bm-v"${color?` style="color:${color}"`:''}>${v}</div></div>`;
   const cards=data.map(r=>`<div class="brep-card">
-    <div class="brep-card-head"><h3 onclick="${drill(r.name,'summary')}" style="cursor:pointer;flex:1">${esc(r.name)} <span style="color:var(--gold);font-size:13px">\u203a</span></h3>${can('setBranches')?`<span title="Edit what this studio does" style="cursor:pointer;color:var(--text-faint);font-size:15px;padding:0 4px" onclick="event.stopPropagation();closeModal();openBranchEdit('${r.id||''}')">\u270e</span>`:''}${money?`<span class="brep-net" style="color:${r.net>=0?'var(--green)':'var(--red)'}">${r.net>=0?'+':''}${cur(r.net)}</span>`:''}</div>
+    <div class="brep-card-head"><h3 onclick="${drill(r.name,'summary')}" style="cursor:pointer;flex:1">${esc(r.name)} <span style="color:var(--gold);font-size:13px">\u203a</span></h3>${can('setBranches')?`<span title="Edit what this outlet does" style="cursor:pointer;color:var(--text-faint);font-size:15px;padding:0 4px" onclick="event.stopPropagation();closeModal();openBranchEdit('${r.id||''}')">\u270e</span>`:''}${money?`<span class="brep-net" style="color:${r.net>=0?'var(--green)':'var(--red)'}">${r.net>=0?'+':''}${cur(r.net)}</span>`:''}</div>
     <div class="brep-grid">
       ${money?metric('Revenue',cur(r.rev),drill(r.name,'revenue')):''}
       ${money?metric('Expenses',cur(r.spend),drill(r.name,'expenses'),'var(--red)'):''}
@@ -13888,12 +13990,12 @@ function openBranchReport(){
       ${metric('Top customer',r.topC?esc(r.topC)+(money?' \u00b7 '+cur(r.topV):''):'\u2014',drill(r.name,'customer'))}
     </div>
   </div>`).join('');
-  openModal(`<h3>Branch report</h3><div class="msub">${periodLabel(branchPeriod,branchCustom)} \u00b7 a 360\u00b0 view across all your studios</div>
-    <div class="bd-sub" style="margin-top:8px">All studios combined</div>
+  openModal(`<h3>Outlet report</h3><div class="msub">${periodLabel(branchPeriod,branchCustom)} \u00b7 a 360\u00b0 view across all your outlets</div>
+    <div class="bd-sub" style="margin-top:8px">All outlets combined</div>
     <div class="stat-grid" style="margin:6px 0 4px">${totTiles}</div>
-    <div class="bd-sub" style="margin-top:14px">By studio \u2014 tap any figure to open it</div>
+    <div class="bd-sub" style="margin-top:14px">By outlet \u2014 tap any figure to open it</div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:6px">${cards}</div>
-    <div class="modal-foot">${can('setBranches')?`<button class="btn ghost sm" onclick="closeModal();openBranchEdit()">＋ Add branch / outlet</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Close</button></div>`);
+    <div class="modal-foot">${can('setBranches')?`<button class="btn ghost sm" onclick="closeModal();openBranchEdit()">＋ Add outlet</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Close</button></div>`);
 }
 function openBranchDrill(bn,type){
   const money=can('money')||can('finance')||canSeeProfit();
@@ -13901,8 +14003,8 @@ function openBranchDrill(bn,type){
   const DIS=STAGES.indexOf('Dispatched');   // overdue is counted up to Dispatched, matching branchMetrics()
   const inBN=x=>branchOf(x)===bn;
   const plabel=periodLabel(branchPeriod,branchCustom);
-  const back=`<button class="btn ghost" onclick="closeModal();openBranchReport()">\u2039 Branch report</button>`;
-  const viewBtn=`<button class="btn ghost" onclick="closeModal();setBranchView('${String(bn).replace(/'/g,"\\'")}')">View this branch \u203a</button>`;
+  const back=`<button class="btn ghost" onclick="closeModal();openBranchReport()">\u2039 Outlet report</button>`;
+  const viewBtn=`<button class="btn ghost" onclick="closeModal();setBranchView('${String(bn).replace(/'/g,"\\'")}')">View this outlet \u203a</button>`;
   const foot=`<div class="modal-foot">${back}<span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`;
   const row=(l,v,c,click)=>`<div class="bd-row"${click?` style="cursor:pointer" onclick="${click}"`:''}><span class="bl">${l}${click?' <span style="color:var(--gold)">\u203a</span>':''}</span><span class="bv"${c?` style="color:${c}"`:''}>${v}</span></div>`;
   let title='',sub='',body='',footHtml=foot;
@@ -13949,8 +14051,8 @@ function openBranchDrill(bn,type){
       +`<div class="bd-total"><span>Total inventory value</span><b>${cur(total)}</b></div>`;
   }else if(type==='team'){
     const team=getStaff().filter(s=>s.active!==false&&(s.status||'Active')!=='Left Company'&&staffBranch(s)===bn);
-    const payroll=team.reduce((s,x)=>s+(+x.basic||0),0);title='Team';sub=team.length+' at this studio';
-    body=(team.length?team.map(s=>row(esc(s.name)+(s.role?' <span style="color:var(--text-faint);font-size:11px">\u00b7 '+esc(s.role)+'</span>':''),money&&+s.basic>0?cur(s.basic)+'/mo':'',' ',`closeModal();openStaffDetail('${s.id}')`)).join(''):'<div class="kv" style="color:var(--text-faint)">No team assigned to this studio yet.</div>')
+    const payroll=team.reduce((s,x)=>s+(+x.basic||0),0);title='Team';sub=team.length+' at this outlet';
+    body=(team.length?team.map(s=>row(esc(s.name)+(s.role?' <span style="color:var(--text-faint);font-size:11px">\u00b7 '+esc(s.role)+'</span>':''),money&&+s.basic>0?cur(s.basic)+'/mo':'',' ',`closeModal();openStaffDetail('${s.id}')`)).join(''):'<div class="kv" style="color:var(--text-faint)">No team assigned to this outlet yet.</div>')
       +(money&&payroll?`<div class="bd-total"><span>Monthly payroll</span><b>${cur(payroll)}</b></div>`:'');
   }else if(type==='customer'){
     const bo=getOrders().filter(o=>inBN(o)&&o.client);const byC={};bo.forEach(o=>{const k=o.client;if(!byC[k])byC[k]={n:0,rev:0};byC[k].n++;byC[k].rev+=(o.kind==='sale'?(+o.value||0):orderNetBase(o));});
@@ -14039,30 +14141,30 @@ function renderBranchEdit(){
         <div style="display:flex;gap:8px"><button class="btn sm" onclick="beAddType()">Add type</button><button class="btn ghost sm" onclick="beCancelAdd()">Cancel</button></div>
       </div>`
     : `<div onclick="beStartAdd()" style="cursor:pointer;border:1.5px dashed var(--line);border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:13.5px">\uff0b Add a type</div>`;
-  openModal(`<h3>${b.id?'Edit branch':'Add branch / outlet'}</h3>
+  openModal(`<h3>${b.id?'Edit outlet':'Add outlet'}</h3>
     <div class="field"><label>Name</label><input class="fld" id="be_name" value="${esc(b.name)}" placeholder="e.g. Lagos studio"></div>
     <div class="field"><label>Location <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(optional)</span></label><input class="fld" id="be_loc" value="${esc(b.location)}" placeholder="City / area"></div>
-    <div class="field"><label>What it does <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick everything this studio does)</span></label>
+    <div class="field"><label>What it does <span style="color:var(--text-faint);text-transform:none;letter-spacing:0">(tick everything this outlet does)</span></label>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:2px">${chips}${addBlock}</div></div>
     <div class="field"><label>Sells via</label><div style="display:flex;gap:20px;padding-top:4px">
       <label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="be_show" ${b.channels.includes('showroom')?'checked':''}> Showroom</label>
       <label style="font-size:14px;cursor:pointer;color:var(--text-dim)"><input type="checkbox" id="be_onl" ${b.channels.includes('online')?'checked':''}> Online</label>
     </div></div>
-    <div class="modal-foot">${(b.id&&getBranches().length>1)?`<button class="btn danger sm" onclick="deleteBranch('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="${b.id?`openBranchPreview('${String(b.name).replace(/'/g,"\\'")}')`:'closeModal()'}">Cancel</button><button class="btn" onclick="saveBranchEdit()">${b.id?'Save changes':'Add branch'}</button></div>`);
+    <div class="modal-foot">${(b.id&&getBranches().length>1)?`<button class="btn danger sm" onclick="deleteBranch('${b.id}')">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="${b.id?`openBranchPreview('${String(b.name).replace(/'/g,"\\'")}')`:'closeModal()'}">Cancel</button><button class="btn" onclick="saveBranchEdit()">${b.id?'Save changes':'Add outlet'}</button></div>`);
 }
 function saveBranchEdit(){
   if(!ownerOnlySetting('the branches'))return;
 
   if(!can('setBranches')||!beDraft)return;beSync();
   const id=beDraft.id;const name=(beDraft.name||'').trim();if(!name){alert('Give the branch a name.');return;}
-  if(!beDraft.does.length){alert('Tick at least one thing this studio does.');return;}
+  if(!beDraft.does.length){alert('Tick at least one thing this outlet does.');return;}
   const branches=getBranches().slice();
   if(branches.find(x=>x.name.toLowerCase()===name.toLowerCase()&&x.id!==id)){alert('There\u2019s already a branch called '+name+'.');return;}
   const rec={name:name,location:(beDraft.location||'').trim(),does:beDraft.does.slice(),type:summaryType(beDraft.does),channels:beDraft.channels&&beDraft.channels.length?beDraft.channels.slice():['showroom'],active:true};
   if(id){const t=branches.find(x=>x.id===id);if(t){const oldName=t.name;Object.assign(t,rec);if(oldName!==name)renameBranchRefs(oldName,name);}}
   else{branches.push(Object.assign({id:uid('br')},rec));}
   SETTINGS.branches=branches;save('layi_dash_settings',SETTINGS);
-  logAudit(id?'Branch updated':'Branch added',name+' \u00b7 '+rec.does.map(activityLabel).join(', '));
+  logAudit(id?'Outlet updated':'Outlet added',name+' \u00b7 '+rec.does.map(activityLabel).join(', '));
   beDraft=null;branchDraft=null;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();renderAll();closeModal();openBranchReport();
 }
 function deleteBranch(id){
@@ -14072,7 +14174,7 @@ function deleteBranch(id){
   if(!confirm('Delete '+b.name+'? Its orders, sales, stock and staff will move to '+(branches.find(x=>x.id!==id)||{}).name+'.'))return;
   const remaining=branches.filter(x=>x.id!==id);const fallback=remaining[0].name;
   renameBranchRefs(b.name,fallback);
-  SETTINGS.branches=remaining;save('layi_dash_settings',SETTINGS);logAudit('Branch deleted',b.name);
+  SETTINGS.branches=remaining;save('layi_dash_settings',SETTINGS);logAudit('Outlet deleted',b.name);
   if(activeBranchView===b.name)activeBranchView='all';
   branchDraft=null;if(typeof applyBizVisibility==='function')applyBizVisibility();renderBranchSwitch();renderAll();closeModal();openBranchReport();
 }
@@ -14230,7 +14332,7 @@ function openApptList(){
   const past=getAppts().filter(a=>apptInBranch(a)&&a.date&&a.date<todayKey()).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const rowOf=a=>{const st=apptStatus(a);const sc=stCol[st]||'var(--gold)';return `<div class="bd-row" style="cursor:pointer" onclick="closeModal();openApptDetail('${a.id}')"><span class="bl"><b>${esc(a.client||'Client')}</b>${branchTag(apptBranch(a))} <span style="color:var(--text-faint)">· ${esc(apptTypeOf(a))}${a.note?' · '+esc(a.note):''}</span><br><span style="color:var(--text-faint);font-size:11px">${fmtD(a.date)}${a.time?' · '+esc(a.time):''}${a.location?' · '+esc(a.location):''}</span></span><span class="bv"><span class="sup-status" style="border-color:${sc};color:${sc};font-size:10px">${esc(st)}</span></span></div>`;};
   const body=`${listSearch('Search client, type or note…','.bd-row',upcoming.length+past.length)}${upcoming.length?`<div class="bd-sub">Upcoming</div>${upcoming.map(rowOf).join('')}`:'<div class="kv" style="color:var(--text-faint)">No upcoming appointments.</div>'}${past.length?`<div class="bd-sub" style="margin-top:12px">Past</div>${past.slice(0,12).map(rowOf).join('')}`:''}`;
-  openModal(`<h3>Appointments</h3><div class="msub">${activeBranchView==='all'?'all studios':esc(activeBranchView)} · fittings, consultations & collections</div>${body}<div class="modal-foot">${can('appts')?`<button class="btn sm" onclick="closeModal();openAppt()">+ Add appointment</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal();go('calendar')">Open calendar ›</button><button class="btn" onclick="closeModal()">Close</button></div>`);
+  openModal(`<h3>Appointments</h3><div class="msub">${activeBranchView==='all'?'all outlets':esc(activeBranchView)} · fittings, consultations & collections</div>${body}<div class="modal-foot">${can('appts')?`<button class="btn sm" onclick="closeModal();openAppt()">+ Add appointment</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal();go('calendar')">Open calendar ›</button><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 function renderAttention(orders){
   const READY=STAGES.indexOf('Ready for Delivery'),QC=STAGES.indexOf('Quality Check');
@@ -14289,7 +14391,7 @@ function openAttnSupply(id){
     ?`There is none of this left in stock${(multiBranch()&&s.branch)?' at '+esc(s.branch):''}. Anything that needs it is blocked until it\u2019s restocked.`
     :`Only ${qty} ${esc(unit)} left${reorder?', at or below the reorder level of '+reorder+' '+esc(unit):''}. Restock before it runs out.`;
   const sup=(typeof getSuppliers==='function'&&s.supplierId)?(getSuppliers().find(x=>x.id===s.supplierId)||{}).name:'';
-  const info=[['Item',esc(s.name)],['In stock',qty+' '+esc(unit)],reorder?['Reorder level',reorder+' '+esc(unit)]:null,(multiBranch()&&s.branch)?['Branch',esc(s.branch)]:null,sup?['Supplier',esc(sup)]:null,(+s.cost>0)?['Unit cost',cur(s.cost)]:null].filter(Boolean);
+  const info=[['Item',esc(s.name)],['In stock',qty+' '+esc(unit)],reorder?['Reorder level',reorder+' '+esc(unit)]:null,(multiBranch()&&s.branch)?['Outlet',esc(s.branch)]:null,sup?['Supplier',esc(sup)]:null,(+s.cost>0)?['Unit cost',cur(s.cost)]:null].filter(Boolean);
   openModal(`<h3>${esc(s.name)}</h3><div class="msub">${[s.cat,s.subcat].filter(Boolean).map(esc).join(' \u00b7 ')||'Inventory item'}</div>
     <div style="border:1px solid ${sev};border-left:4px solid ${sev};background:var(--panel-2);border-radius:10px;padding:12px 14px;margin:10px 0 6px"><b style="color:${sev}">\u26a0 ${heading}</b><div style="font-size:13.5px;color:var(--text-dim);margin-top:4px">${reason}</div><div style="font-size:13px;color:var(--text);margin-top:8px"><b>What to do:</b> ${out?'Reorder now':'Reorder soon'}${can('money')?' and log it as an expense so stock and spend stay in sync.':'.'}</div></div>
     <div class="bd-list" style="margin-top:8px">${info.map(([l,v])=>`<div class="bd-row"><span class="bl">${l}</span><span class="bv" style="color:var(--text-dim);text-align:right">${v}</span></div>`).join('')}</div>
@@ -14311,7 +14413,7 @@ function renderTodayStrip(){
   const dispatchedToday=all.filter(o=>sameDay(o.dispatchedAt)&&!sameDay(o.deliveredAt)).length;
   const newToday=all.filter(o=>sameDay(o.createdAt)).length;
   const dueToday=all.filter(o=>o.stageIndex<DELI&&daysUntil(o.due)===0).length;
-  const scope=activeBranchView==='all'?'across your studios':esc(activeBranchView);
+  const scope=activeBranchView==='all'?'across your outlets':esc(activeBranchView);
   const cards=[['Delivered today',deliveredToday,'green','delivered'],['Due today',dueToday,'amber','due'],['New orders',newToday,'gold','new'],['Dispatched',dispatchedToday,'','dispatched']];
   el.innerHTML=`<div class="today-wrap"><div class="today-h">Today <span>· ${scope}</span></div><div class="today-strip">${cards.map(c=>`<div class="tcard ${c[2]}" style="cursor:pointer" onclick="todayDrill('${c[3]}')"><div class="tn">${c[1]}</div><div class="tl">${c[0]} \u203a</div></div>`).join('')}</div></div>`;
 }
@@ -14365,7 +14467,7 @@ function plCostGroup(cat){return DIRECT_COST_CATS.includes(cat)?'direct':'overhe
 function renderPL(){
   const el=document.getElementById('finPL');if(!el)return;
   const note=document.getElementById('plPeriodNote');if(note)note.innerHTML=periodInlineHTML(finPeriod,finCustom,'setFinPeriod','setFinCustom');
-  const opts=[['statement','Statement']];if(multiBranch())opts.push(['branch','By branch']);opts.push(['dept','By department']);
+  const opts=[['statement','Statement']];if(multiBranch())opts.push(['branch','By outlet']);opts.push(['dept','By department']);
   if(!opts.some(o=>o[0]===plView))plView='statement';
   const tg=document.getElementById('plToggle');if(tg)tg.innerHTML=opts.map(([k,l])=>`<button class="chip ${plView===k?'active':''}" onclick="setPLView('${k}')">${l}</button>`).join('');
   const txns=getTxns().filter(inBranch).filter(t=>inPeriod(t.at,finPeriod,finCustom));
@@ -14378,7 +14480,7 @@ function renderPL(){
   const income=retail+bespoke;
   if(plView==='branch'){
     const rows=branchNames().map(bn=>{const inc=ins.filter(t=>(t.branch||defaultBranchName())===bn).reduce((s,t)=>s+(+t.amount||0),0);const sp=outs.filter(t=>(t.branch||defaultBranchName())===bn).reduce((s,t)=>s+(+t.amount||0),0);return{name:bn,inc,sp,net:inc-sp,click:"finBranchDrill('"+bn.replace(/'/g,"\\'")+"')"};});
-    el.innerHTML=plAreaTable('Branch',rows);return;}
+    el.innerHTML=plAreaTable('Outlet',rows);return;}
   if(plView==='dept'){
     const rev={Production:bespoke,Sales:retail,Marketing:0,Operations:0,Admin:0};
     const rows=FIN_DEPARTMENTS.map(d=>{const sp=outs.filter(t=>(t.dept||'Operations')===d).reduce((s,t)=>s+(+t.amount||0),0);const inc=rev[d]||0;return{name:d,inc,sp,net:inc-sp,click:"finCatDrill('"+d.replace(/'/g,"\\'")+"')"};});
@@ -14433,7 +14535,7 @@ function salesCategoryDrill(){
   const rows=keys.map((k,i)=>{const pct=Math.round(val[k]/tot*100);const color=MIX_COLORS[i%MIX_COLORS.length];
     return `<div class="bd-row" style="cursor:pointer" onclick="salesCategoryItems('${String(k).replace(/'/g,"\\'")}')"><span class="bl"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:9px;vertical-align:middle"></span>${esc(k)} <span style="color:var(--text-faint);font-size:12px">· ${cnt[k]} item${cnt[k]===1?'':'s'}</span></span><span class="bv">${useRev?cur(val[k]):cnt[k]} <span style="color:var(--text-faint);font-weight:400">${pct}%</span> <span style="color:var(--gold)">›</span></span></div>`;}).join('');
   const total=`<div class="bd-total"><span>Total ${useRev?'sales':'items'}</span><b>${useRev?cur(Math.round(tot)):tot}</b></div>`;
-  openModal(`<h3>Sales by category</h3><div class="msub">${activeBranchView==='all'?'all studios':esc(activeBranchView)} · ${periodLabel(dashApptPeriod,dashApptCustom)} · ${keys.length} categor${keys.length===1?'y':'ies'}</div>${keys.length?(listSearch('Search category…','.bd-row',keys.length)+rows+total):'<div class="kv" style="color:var(--text-faint)">No sales in this period.</div>'}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+  openModal(`<h3>Sales by category</h3><div class="msub">${activeBranchView==='all'?'all outlets':esc(activeBranchView)} · ${periodLabel(dashApptPeriod,dashApptCustom)} · ${keys.length} categor${keys.length===1?'y':'ies'}</div>${keys.length?(listSearch('Search category…','.bd-row',keys.length)+rows+total):'<div class="kv" style="color:var(--text-faint)">No sales in this period.</div>'}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 // Drill from a category to the individual order lines that make up its figure — with a photo of each piece.
 function salesCategoryItems(cat){
@@ -14447,7 +14549,7 @@ function salesCategoryItems(cat){
   const rows=items.map(it=>{const thumb=it.photo?`<img src="${it.photo}" onclick="event.stopPropagation();lightbox('${it.photo}')" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;cursor:zoom-in" onerror="this.style.visibility='hidden'">`:`<div style="width:44px;height:44px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--text-faint);flex:none;font-size:17px">${it.sale?'🏷':'✂'}</div>`;
     return `<div class="bd-row" style="cursor:pointer;align-items:center" onclick="closeModal();${it.sale?`openSaleDetail('${it.orderId}')`:`openDetail('${it.orderId}')`}"><span class="bl" style="display:flex;align-items:center;gap:12px">${thumb}<span style="min-width:0"><b>${esc(it.client)}</b> <span style="color:var(--text-faint);font-size:12px">· ${esc(it.name)}${it.qty>1?' ×'+it.qty:''}</span>${it.style?`<div style="color:var(--text-faint);font-size:11px">${esc(it.style)}</div>`:''}<div style="color:var(--text-faint);font-size:11px">${it.date?fmtDateShort(it.date):''} · ${it.sale?'retail sale':'bespoke order'} ${it.orderId}</div></span></span><span class="bv" style="white-space:nowrap">${useRev?cur(it.value):it.qty} <span style="color:var(--gold)">›</span></span></div>`;}).join('');
   const total=`<div class="bd-total"><span>${esc(cat)} total</span><b>${useRev?cur(Math.round(totV)):totQ}</b></div>`;
-  openModal(`<h3>${esc(cat)}</h3><div class="msub">${activeBranchView==='all'?'all studios':esc(activeBranchView)} · ${periodLabel(dashApptPeriod,dashApptCustom)} · ${items.length} order line${items.length===1?'':'s'}${useRev?' · '+totQ+' item'+(totQ===1?'':'s'):''}</div>${items.length?(listSearch('Search client or piece…','.bd-row',items.length)+rows+total):'<div class="kv" style="color:var(--text-faint)">Nothing in this category for the current period.</div>'}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+  openModal(`<h3>${esc(cat)}</h3><div class="msub">${activeBranchView==='all'?'all outlets':esc(activeBranchView)} · ${periodLabel(dashApptPeriod,dashApptCustom)} · ${items.length} order line${items.length===1?'':'s'}${useRev?' · '+totQ+' item'+(totQ===1?'':'s'):''}</div>${items.length?(listSearch('Search client or piece…','.bd-row',items.length)+rows+total):'<div class="kv" style="color:var(--text-faint)">Nothing in this category for the current period.</div>'}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 function setProdFilter(f,el){prodFilter=f;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderProduction();}
 var prodPeriod='all';var prodCustom='';
@@ -14901,7 +15003,7 @@ function openChaseList(){
   }).join(''):'<div class="kv" style="color:var(--text-faint)">Nobody owes anything right now \u2014 all balances are settled.</div>';
   const hr=historyToReview();
   const hrRow=hr.length?`<div class="bd-row" style="cursor:pointer;border-top:1px solid var(--line);margin-top:8px" onclick="closeModal();openHistoryReview()"><span class="bl"><b>From imported history \u2014 review</b> <span style="color:var(--text-faint)">\u00b7 ${hr.length} balance${hr.length===1?'':'s'}, not being chased</span></span><span class="bv" style="color:var(--text-faint)">${cur(hr.reduce((s,o)=>s+orderOutstandingBase(o),0))} \u203a</span></div>`:'';
-  openModal(`<h3>Balances to chase</h3><div class="msub">${activeBranchView==='all'?'all studios':esc(activeBranchView)} \u00b7 ${list.length} client${list.length===1?'':'s'} \u00b7 ${cur(total)} outstanding</div>${listSearch('Search client…','.bd-row',list.length)}${rows}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
+  openModal(`<h3>Balances to chase</h3><div class="msub">${activeBranchView==='all'?'all outlets':esc(activeBranchView)} \u00b7 ${list.length} client${list.length===1?'':'s'} \u00b7 ${cur(total)} outstanding</div>${listSearch('Search client…','.bd-row',list.length)}${rows}<div class="modal-foot"><span style="flex:1"></span><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 /* ---- What to do with a balance that came in from a spreadsheet -----------------------
    An imported balance is one of three things and only the owner knows which: still owed,
@@ -14996,7 +15098,7 @@ function openProfitBreakdown(period,custom){
   const catMap={};outs.forEach(t=>{const c=t.category||'Other';catMap[c]=(catMap[c]||0)+(+t.amount||0);});
   const cats=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]);
   const row=(l,v,c,click)=>`<div class="bd-row"${click?` style="cursor:pointer" onclick="${click}"`:''}><span class="bl">${l}${click?' <span style="color:var(--gold)">\u203a</span>':''}</span><span class="bv"${c?` style="color:${c}"`:''}>${v}</span></div>`;
-  const scope=activeBranchView==='all'?'all studios':esc(activeBranchView);
+  const scope=activeBranchView==='all'?'all outlets':esc(activeBranchView);
   let body='<div class="bd-sub">Money in</div>';
   body+=row('Bespoke order payments',cur(bespoke),'var(--green)',bespoke?`openFlowBreakdown('in','${period}','${custom}')`:'');
   body+=row('Retail sales',cur(retail),'var(--green)','');
@@ -15650,7 +15752,7 @@ function renderStaffModal(){
       <div class="field"><label>Start date</label><input class="fld" type="date" id="st_start" value="${esc(s.startDate||'')}"></div></div>
     <div class="row2"><div class="field"><label>Status</label><select class="fld" id="st_status">${opts(STAFF_STATUS,s.status||'Active')}</select></div>
       <div class="field"><label>Reports to</label><select class="fld" id="st_mgr">${mgrOpts}</select></div></div>
-    ${multiBranch()?`<div class="field"><label>Branch</label>${selOther('st_branch',branchNames(),s.branch||defaultBranchName(),'Type a branch')}</div>`:''}
+    ${multiBranch()?`<div class="field"><label>Outlet</label>${selOther('st_branch',branchNames(),s.branch||defaultBranchName(),'Type an outlet')}</div>`:''}
     <div class="row2"><div class="field"><label>Work location</label><input class="fld" id="st_location" value="${esc(s.location||'')}" placeholder="e.g. Lagos studio"></div>
       <div class="field"><label>Specialisation</label><input class="fld" id="st_specialty" value="${esc(s.specialty||'')}" placeholder="Tailor, Cutter, Embroiderer…"></div></div>
     <div class="field"><label>Skills</label><input class="fld" id="st_skills" value="${esc(s.skills||'')}" placeholder="e.g. Agbada, hand embroidery, beading"></div>
@@ -16977,7 +17079,7 @@ function renderRota(){
     <div class="rc-big floor"><div class="n">${onFloor}</div><div class="l">On the floor</div></div>
     <div class="rc-big free"><div class="n">${freeNow}</div><div class="l">Free now</div></div>
     <div class="rc-big leave"><div class="n">${onLeave}</div><div class="l">On leave</div></div>
-    <div class="rc-big"><div class="n">${studioLoad}%</div><div class="l">Studio load</div></div>
+    <div class="rc-big"><div class="n">${studioLoad}%</div><div class="l">Team load</div></div>
   </div>`;
   const deptSet=[...new Set(staff.map(s=>deptOf(s)).filter(Boolean))];
   const orderedDepts=DEPARTMENTS.filter(d=>deptSet.includes(d)).concat(deptSet.filter(d=>DEPARTMENTS.indexOf(d)<0));
@@ -17111,7 +17213,7 @@ function openUser(id){if(!can('users'))return;if(liveMode)return openUserCloud(i
     ${!u?`<div id="us_makeStaffWrap" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:2px 0 10px;${(u&&u.staffId)?'display:none':''}">
       <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer"><input type="checkbox" id="us_makeStaff" style="width:18px;height:18px;accent-color:var(--gold)"> Also add <b id="us_makeStaffName">this person</b> to the team?</label>
       
-      ${multiBranch()?`<div class="field" style="margin-top:8px;margin-bottom:0"><label>Studio for their staff record</label>${selOther('us_makeStaffBranch',branchNames(),(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName(),'Studio')}</div>`:''}
+      ${multiBranch()?`<div class="field" style="margin-top:8px;margin-bottom:0"><label>Outlet for their staff record</label>${selOther('us_makeStaffBranch',branchNames(),(activeBranchView&&activeBranchView!=='all')?activeBranchView:defaultBranchName(),'Outlet')}</div>`:''}
     </div>`:''}
     <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="us_active" ${(!u||u.active!==false)?'checked':''} style="width:18px;height:18px;accent-color:var(--gold)"> Active (can sign in)</label>
     

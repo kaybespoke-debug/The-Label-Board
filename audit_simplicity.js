@@ -217,7 +217,11 @@ run("SETTINGS.branches=SETTINGS.__b;setStaff(SETTINGS.__s);delete SETTINGS.__b;d
      before anybody notices. 69 is what the app ships on 29 October 2026 with
      page-sub counted. Adding a line means raising this number in the same
      commit and saying which of the two it is. */
-  const CEILING = 69;
+  /* 70 from 26 November: the line in Settings saying a change has not
+     reached the server. CONSEQUENCE, not story — it is what somebody is told
+     instead of the red "1 change not saved" pill, which came off the top bar
+     in the same release. One line of prose in place of a permanent alarm. */
+  const CEILING = 70;
   if (prose > CEILING) F('the app now ships ' + prose + ' lines of prose, over the ' + CEILING +
     ' agreed on 29 October. Either it is consequence and belongs somewhere tighter, or it is story. Raise this number in the same commit and say which.');
   console.log('  prose lines shipped: ' + prose + ' (ceiling ' + CEILING + ')');

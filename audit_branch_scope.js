@@ -208,7 +208,7 @@ run("activeBranchView='all';");
   // and the owner is actually shown it
   run("SETTINGS.branches=SETTINGS.branches;renderUnplacedNotice();");
   const shown=run("(document.getElementById('unplacedNotice')||{}).innerHTML")||'';
-  if(!/not assigned to a studio/.test(shown))F('the Branches page does not tell the owner about unplaced records');
+  if(!/not assigned to an outlet/.test(shown))F('the Outlets page does not tell the owner about unplaced records');
   if(!/Somewhere that closed/.test(shown))F('the notice does not say which studio the record is pointing at');
 }
 

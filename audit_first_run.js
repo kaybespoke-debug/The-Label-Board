@@ -379,7 +379,7 @@ section('How many of you, and how many outlets');
   a.run('openStudioSetup();');
   const form = a.run('renderStudioSetup(),(document.getElementById("modal")||{}).innerHTML') || '';
   ok('the setup screen asks how many people work with them', /How many people work with you/.test(form));
-  ok('and how many studios or outlets they run', /How many studios or outlets/.test(form));
+  ok('and how many outlets they run', /How many outlets/.test(form));
   /* The heading and the answers are two different things. Checking only the
      heading passed against a version where the question was there and every
      option had gone, which is a question nobody can answer. */

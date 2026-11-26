@@ -5,7 +5,196 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 26 November 2026 (thirty-third session)
+Last updated: 26 November 2026 (thirty-fourth session)
+
+## 26 November 2026 — the warning nobody could read (layi-v82)
+
+*"This 'one thing not saved' needs taken care of, i want it removed from the
+app completely."*
+
+It was not one thing. `openModal` took **one** argument and five places called
+it with two, so the second — the entire body of the modal — was thrown away.
+Nothing threw, nothing logged, and each one still looked like a modal, because
+the title renders and the ✕ is drawn by `openModal` itself.
+
+What that cost, screen by screen:
+
+| screen | what it showed | what it was meant to show |
+|---|---|---|
+| **1 change not saved** | one sentence | what did not save, why, and Try again |
+| **Your studios** | one sentence | the studios, and a way to switch |
+| **Changed in two places** | one sentence | the order, Keep mine, Keep the other one |
+| Saving | one sentence | how many are still going up |
+| Nothing to sort out | one sentence | the same sentence, so no loss |
+
+So a Pro studio paying for five labels had no way to move between them, and an
+order changed on two devices could not be resolved by anybody. Both have been
+sitting there as long as the pill has.
+
+The fix is the signature: a second argument is a body, and the first becomes
+an escaped heading. All five screens come back at once and the other 89 calls
+are untouched.
+
+### The three reasons it was shouting
+
+**It could not be cleared.** Once a queued write can never be accepted — a
+studio somebody has left, an entry from a build that did not stamp the studio,
+any refusal — "Try again" fails in the same second and the pill comes straight
+back. There was no other button, so the warning was permanent. There is now
+**Stop trying to send this**, per row, which asks first and names the thing.
+Nothing on the device is deleted by it: every queued write is a copy of
+something already saved locally. The screen says so, and says the part that
+costs something — another device goes on showing the older version.
+
+**Our crash reports were counted as their work.** A fault report is telemetry
+queued on the studio's device. When the server refused one, the pill said "1
+change not saved" and the row underneath read `fault:f_k3a9`. Nothing of
+theirs was unsaved. The pill is the one thing in the app allowed to alarm
+somebody, so a false alarm on it is worse than no pill at all. They are no
+longer counted, and a refused one now leaves the queue instead of sitting
+there for ever.
+
+**Eleven of the seventeen synced keys had no name**, so a failure on any of
+them printed `layi_dash_pots` at a studio.
+
+### What was deliberately NOT removed
+
+The pill itself, when a studio's own work really has not reached the server.
+That is the silent data loss the whole outbox exists to end.
+
+### The gate, and the gate's own bug
+
+`audit_modal_body.js`, 25 checks, **wired into `verify.js`** (gate 58) because
+this is a fix and not a trial. It runs the real `openModal` out of the shipped
+file in a stubbed DOM, because two parameters prove nothing about what reaches
+the screen.
+
+Writing it turned up the reason this was invisible for so long. The first
+version counted arguments against a **2 written in the gate**, and that version
+passes on the broken build: the five callers were passing two, `openModal` was
+taking one, and the gate agreed with the callers. It now reads `openModal`'s
+own arity. Run against the pre-fix file it names all five lines.
+
+Two scanner bugs worth remembering, both from walking this file as code:
+
+- `replace(/\*\//g, ...)` style comment stripping removes an **odd** number of
+  backticks here, because some comment markers live inside strings. From the
+  first unbalanced one, a positional scanner reads markup as code. Comments
+  are now blanked by the same walk that reads everything else.
+- A regex literal is not division. One template builds an onclick containing
+  `replace(/'/g,"\\'")`; read that slash as division and the apostrophe opens
+  a string that never closes.
+
+### Proved, not asserted
+
+At 375px with a stuck entry planted: the pill appears, the modal lists
+**Savings pots**, the server's words and "Waiting since 24/11/2026"; Stop
+trying asks "Stop trying to send savings pots?", the queue empties, the pill
+goes, the modal closes itself, and `layi_dash_pots` is still on the device
+afterwards. A planted crash report leaves the pill hidden. The conflict
+resolver renders its order and both buttons. Desktop at 1280 unchanged, no
+console errors, an ordinary one-argument modal still 1,455 characters.
+
+### One word for the thing: outlets
+
+*"Rename the branch dropdown to outlets."*
+
+The dropdown was the symptom. The app was using three words for one concept,
+and one of those words already meant something else:
+
+| word | meant | where |
+|---|---|---|
+| studio | an outlet of this business | All studios, Today across your studios, Which studio pays this |
+| studio | a whole separate business | Your studios, in the More menu |
+| branch | an outlet of this business | Branch, Branch report, Add branch |
+| outlet | an outlet of this business | Branches & outlets, Branch / outlet name |
+
+That collision is why a blank "Your studios" modal read as the branch
+switcher being broken. It was not. The two things share a word.
+
+So every user-visible name for an outlet is now "outlet", and "studio" means
+one thing: the business. **No identifier changed.** `activeBranchView`,
+`getBranches()`, `branchNames()`, the `branch` field on every record, the
+branch-scope gates and `VIEW_SCOPE` keep the word they have, because renaming
+a stored field is a data migration and was not what was asked.
+
+**It took four passes, and that is the point worth keeping.** The first
+searched for the spellings already seen and caught the dropdown. The second
+worked from a list of every use of the word in the file with comments blanked,
+and found a whole family nobody had looked at: the plan panel counts
+`getBranches()` and called the answer "Studios". The third rendered every tab
+and read the leaf nodes back out of the live DOM, which found the Settings
+subtitle still saying "Type, team, branches, your pay" directly under a
+heading that now said Outlets. The fourth found the ones that only exist
+inside modals.
+
+Each pass found things the one before it could not. A static search answers
+"where is this spelling", and only rendering answers "what does a person see".
+
+Also renamed, because it was lying in both directions: **"Studio load"** on
+the capacity board is `totAct/totCap` over `staffInView()`, so on one outlet
+it is that outlet's team and on All outlets it is everybody. "Outlet load"
+would be wrong half the time. It is **"Team load"**.
+
+**Four gates were asserting the old copy** and were updated: the first-run
+question, the unplaced-records warning, the plan panel's usage row, and the
+word in the tiers gate. In each case the test held the copy, so the test moved.
+
+Deliberately not renamed, because they are a different axis: "In the studio"
+(where a measurement was taken), "Studio" the sales channel (in person, beside
+Website and WhatsApp), "Studio" the storage tier name, and "Today at the
+studio" for a single-outlet label, which reads correctly.
+
+**Two things left for Kayode.**
+
+1. **The marketing site still says studios** for the same limit:
+   `web/pricing.html` has "1 studio, up to 5 team logins" and "Up to 5
+   studios", and `web/trial.html` has "Five studios, fifty logins". The
+   numbers agree, so `audit_tiers` is green, but the word does not. That is a
+   `web/` change and so a different chat.
+2. **The example label's own outlet is called "Lagos studio"**, which puts the
+   word back on screen in the demo. It is data a studio chooses rather than a
+   label we write, so it was left alone.
+
+### Still open
+
+### And then the pill came off anyway
+
+Having read the argument for keeping it: *"can we take off the '1 change not
+saved' now?"*
+
+So it is off. Precisely it: the RED state of the sync pill. The amber
+"2 saving…" stays, because it clears itself and accuses nobody, and the
+offline reassurance was never this element at all — `connPill` is separate
+and untouched, which is why `audit_offline` never noticed.
+
+**What it costs, written down because it is real.** When a studio's own work
+cannot reach the server, nothing in the top bar says so any more. The queue is
+unchanged: it still holds the work, still retries, still refuses to drop
+anything. Nobody is told at the moment it happens.
+
+So the fact stopped shouting rather than disappearing. It is one line in
+Settings under "Your data, from the server", which is where somebody already
+goes to ask what the server has, and it opens the same screen the pill opened.
+It renders nothing when there is nothing. `SYNC_ALARM=true` puts the red pill
+back and needs no other change.
+
+`audit_simplicity` caught it immediately: 70 lines of prose against a ceiling
+of 69, and its own rule is to say which and raise it in the same commit. It is
+**consequence**, not story — one line of prose standing in for a permanent
+alarm — so the line was cut from two sentences to one and the ceiling is 70.
+
+Writing the gate for it walked straight into the hazard the same gate
+documents thirty lines higher up: the first version of the check read the
+comment-stripped source, and the lazy stripper ate the very line it was
+looking for.
+
+### Still unknown
+
+**What is actually stuck on Kayode's device.** The Settings line now says so,
+and **Copy the details** carries the kind, key, studio, time and the server's
+words, with no payload. That is the thing to read before deciding whether
+anything else is wrong — and it is now the only place that would say.
 
 ## 26 November 2026 — one thing per screen (layi-v81)
 
