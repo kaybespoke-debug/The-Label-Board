@@ -1550,6 +1550,7 @@ body.white-mode .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2
           <div class="toolbar"><span style="flex:1"></span><button class="btn sm ghost" onclick="openBill()">+ Recurring bill</button><button class="btn sm" onclick="openExpense()">+ Add expense</button></div>
           <div class="stat-grid" id="expStats"></div>
           <div id="expPending"></div>
+          <div id="expReview"></div>
           <div class="panel"><div class="panel-head"><h3>Recurring bills &amp; overheads</h3><button class="btn sm" onclick="logBillsThisMonth()">Log what is due</button></div><div id="billsList"></div></div>
           <div class="panel"><div class="panel-head"><h3>Expenses &amp; money out</h3><span id="expPeriodBar"></span></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><input type="text" class="fld search" id="expSearch" placeholder="Search expenses…" oninput="renderExpensesView()" style="margin:0;flex:1"><span class="page-sub" id="expSub"></span></div><div id="expList"></div></div>
         </div>
@@ -2884,7 +2885,7 @@ function rememberBusiness(id){try{store.set(BIZ_PREF_KEY,String(id||''));}catch(
    service worker's is worse than none: it tells you a fix has landed when the
    browser is still serving the build before it. Shown on the sign-in screen so
    'which build am I on' is answerable by looking, rather than by argument. */
-const APP_VERSION='layi-v82';
+const APP_VERSION='layi-v83';
 /* The other two doors. Used only to hand somebody who arrived at the wrong one
    over to the right one; nothing here reads or writes anything of theirs. */
 const PARTNER_PORTAL_URL='https://partners.thelabelboard.com';
@@ -4248,6 +4249,13 @@ function normalizeWebOrder(raw){raw=raw||{};
   const order={
     ref:String(raw.ref||raw.id||raw.order_id||raw.order_number||raw.number||raw.name||'').replace(/^#/,''),
     total_ngn:+(raw.total_ngn||raw.total||raw.amount||raw.total_price||0)||0,
+    /* A discount is the difference between what was quoted and what was owed, so
+       an import that drops it reports the wrong money twice: the order is too big
+       and the balance is never settled. fx is how many base units one unit of the
+       order's currency is worth, which is what ofx() reads. */
+    discount:+(raw.discount||raw.discount_ngn||0)||0,
+    currency:String(raw.currency||raw.ccy||'NGN').toUpperCase().slice(0,4),
+    fx:+(raw.fx||raw.rate||raw.exchange_rate||0)||0,
     payment_status:(paidRaw==='paid'||paidRaw==='completed'||paidRaw==='success')?'paid':(paidRaw||'unpaid'),
     customer_name:name,email:raw.email||c.email||bill.email||'',phone:raw.phone||c.phone||bill.phone||'',
     measurements:(raw.measurements&&typeof raw.measurements==='object')?raw.measurements:((raw.meas&&typeof raw.meas==='object')?raw.meas:{}),
@@ -4312,15 +4320,15 @@ function webOrderToStudio(row,items,opts){
   row=row||{};items=items||[];opts=opts||{};
   const ref=String(row.ref||row.id||'').trim();
   const total=+row.total_ngn||0;
-  const paid=(row.payment_status==='paid')?total:0;   // a reported bank transfer is a claim, not money in
+  const paid=(row.payment_status==='paid')?Math.max(0,total-(+row.discount||0)):0;   // a reported bank transfer is a claim, not money in, and it settles the NET
   const branch=webOnlineBranch();
   const createdAt=row.created_at||new Date().toISOString();
   const meas=(row.measurements&&typeof row.measurements==='object')?row.measurements:{};
   const label=items.map(i=>i.name).filter(Boolean).join(', ');
   if(row.is_consultation) return {type:'appointment',record:{id:'wa-'+ref,client:row.customer_name||'Website enquiry',date:String(row.deadline||createdAt).slice(0,10),time:'',type:'Consultation',status:'Scheduled',note:((row.notes||'')+' · booked on the website').trim(),branch,source:'website',webRef:ref}};
-  const common={id:'web-'+ref,client:row.customer_name||'Website customer',email:row.email||'',whatsapp:row.phone||'',branch,channel:'online',source:'website',webRef:ref,createdAt,paid,discount:0,currency:'NGN',fx:1,notes:row.notes||''};
+  const common={id:'web-'+ref,client:row.customer_name||'Website customer',email:row.email||'',whatsapp:row.phone||'',branch,channel:'online',source:'website',webRef:ref,createdAt,paid,discount:+row.discount||0,currency:row.currency||'NGN',fx:+row.fx||1,notes:row.notes||''};
   if(Object.keys(meas).length||opts.forceOrder===true) // measurements captured, or the caller knows it is made work
-    return {type:'order',record:Object.assign({},common,{meas,outfits:items.map(it=>({name:it.name||'Piece',type:it.name||'Other',price:+it.price_ngn||0,photos:[],style:it.colour||'',finish:''})),value:total,garment:label||'Website order',due:row.deadline||'',stageIndex:0,costs:[],commissions:[],potContribs:[]})};
+    return {type:'order',record:Object.assign({},common,{meas,outfits:items.map(it=>({name:it.name||'Piece',type:it.name||'Other',price:+it.price_ngn||0,qty:+it.qty||1,photos:[],style:it.colour||'',finish:''})),value:total,garment:label||'Website order',due:row.deadline||'',stageIndex:0,costs:[],commissions:[],potContribs:[]})};
   return {type:'sale',record:Object.assign({},common,{kind:'sale',saleItems:items.map(it=>({productId:it.product_id||'',name:it.name||'Item',qty:+it.qty||1,unitPrice:+it.price_ngn||0,unitCost:0})),value:total,garment:label||'Website sale'})};
 }
 // Apply a batch. Idempotent: a website ref already imported is skipped, so re-running is safe.
@@ -10021,16 +10029,44 @@ function openExpense(id){if(!can('money'))return;const x=id?getTxns().find(t=>t.
   <div class="row2"><div class="field"><label>Amount (${CUR_SYM[SETTINGS.currency]||SETTINGS.currency})</label><input class="fld money" type="text" inputmode="decimal" id="t_amt" value="${x&&x.amount?fmtNum(x.amount):''}"></div><div class="field"><label>Date</label><input class="fld" type="date" id="t_date" value="${x&&x.at?x.at.slice(0,10):new Date().toISOString().slice(0,10)}"></div></div>
   <div class="row2"><div class="field"><label>Category</label>${selOther('t_cat',EXPENSE_CATS,(x&&x.category)||EXPENSE_CATS[0],'Type a category')}</div><div class="field"><label>Department</label>${selOther('t_dept',FIN_DEPARTMENTS,(x&&x.dept)||'Operations','Type a department')}</div></div>
   <div class="row2"><div class="field"><label>Vendor / paid to</label><input class="fld" id="t_vendor" placeholder="e.g. Meta, PHCN, landlord" value="${x?esc(x.vendor||''):''}"></div><div class="field"><label>Payment method</label>${selOther('t_method',PAY_METHODS,(x&&x.method)||PAY_METHODS[0],'How was it paid?')}</div></div>
+  <div class="field"><label>What was this</label><select class="fld" id="t_books">${BOOKS_KINDS.map(k=>`<option value="${k[0]}" ${String((x&&x.books)||'')===k[0]?'selected':''}>${k[1]}</option>`).join('')}</select></div>
   <div class="row2">${multiBranch()?`<div class="field"><label>Outlet</label>${selOther('t_branch',branchNames(),(x&&x.branch)||defaultBranchName(),'Type an outlet')}</div>`:''}<div class="field"><label>Project <span style="color:var(--text-faint);font-weight:400">(optional)</span></label><input class="fld" id="t_project" placeholder="e.g. Fashion week, Shop fit-out" value="${x?esc(x.project||''):''}"></div></div>
   <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);margin-bottom:6px;cursor:pointer"><input type="checkbox" id="t_recur" style="width:18px;height:18px;accent-color:var(--gold)" ${x&&x.recurring?'checked':''}> Recurring subscription (e.g. monthly software, rent)</label>
   <div class="modal-foot">${x?`<button class="btn danger sm" onclick="delTxn('${x.id}');closeModal()">Delete</button>`:''}<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${x?x.id:''}')">${x?'Update':'Save'}</button></div>`);}
-function expenseCounts(t){return t.dir!=='out'||(t.approval!=='Rejected'&&t.approval!=='Pending');}
+/* What an outgoing transaction WAS. Empty means a business cost, which is
+   every transaction written before today, so nothing already recorded changes
+   meaning. The rest left the bank without being a cost. */
+const BOOKS_KINDS=[
+  ['','A business cost'],
+  ['review','Needs a decision'],
+  ['drawing','Money you took out'],
+  ['loan','Loan repayment'],
+  ['transfer','Moved to another account'],
+  ['personal','Personal, not the business']
+];
+function booksLabel(v){var h=BOOKS_KINDS.find(function(k){return k[0]===String(v||'');});return h?h[1]:'A business cost';}
+/* A word a studio might type in a spreadsheet, turned into one of the kinds.
+   Anything unrecognised stays a cost, because that is the safe answer: it is
+   counted, it is visible, and somebody will query it. A wrong exclusion is
+   invisible and nobody ever queries it. */
+function booksFromWord(s){
+  var v=String(s||'').trim().toLowerCase();
+  if(!v)return '';
+  if(/review|unknown|unclear|verify|check|unclassified|tbc/.test(v))return 'review';
+  if(/drawing|owner|withdraw/.test(v))return 'drawing';
+  if(/loan|financ|repay/.test(v))return 'loan';
+  if(/transfer|between|own account/.test(v))return 'transfer';
+  if(/personal|private|non-business|not business/.test(v))return 'personal';
+  return '';
+}
+function isCost(t){return !(t&&t.dir==='out'&&String(t.books||'')!=='');}
+function expenseCounts(t){return t.dir!=='out'||(t.approval!=='Rejected'&&t.approval!=='Pending'&&isCost(t));}
 function canApproveExp(){return can('finance')||canSeeProfit();}
 function approveExpense(id){const t=getTxns();const x=t.find(z=>z.id===id);if(!x)return;x.approval='Approved';x.approvedBy=(typeof userLabel==='function'?userLabel():'')||'';setTxns(t);if(typeof logAudit==='function')logAudit('Expense approved',(x.label||'')+' \u00b7 '+cur(x.amount));if(typeof toast==='function')toast('Approved \u00b7 '+(x.label||''));renderExpensesView();renderFinance();renderActivity();updateNavBadges();}
 function rejectExpense(id){const t=getTxns();const x=t.find(z=>z.id===id);if(!x)return;x.approval='Rejected';setTxns(t);if(typeof logAudit==='function')logAudit('Expense rejected',(x.label||'')+' \u00b7 '+cur(x.amount));if(typeof toast==='function')toast('Rejected \u00b7 removed from the books');renderExpensesView();renderFinance();renderActivity();updateNavBadges();}
 function pendingExpenses(){return getTxns().filter(inBranch).filter(t=>t.dir==='out'&&t.approval==='Pending');}
 function saveExpense(id){const a=amt('t_amt');if(!a){alert('Enter an amount.');return;}const rec=document.getElementById('t_recur').checked;const t=getTxns();
-  const fields={label:fv('t_label')||'Expense',amount:a,at:(fv('t_date')||new Date().toISOString().slice(0,10)),recurring:rec,category:fvOther('t_cat')||'Other',dept:fvOther('t_dept')||'Operations',vendor:fv('t_vendor')||'',method:fvOther('t_method')||'',branch:(document.getElementById('t_branch')?(fvOther('t_branch')||defaultBranchName()):defaultBranchName()),project:fv('t_project')||''};
+  const fields={label:fv('t_label')||'Expense',amount:a,at:(fv('t_date')||new Date().toISOString().slice(0,10)),recurring:rec,category:fvOther('t_cat')||'Other',dept:fvOther('t_dept')||'Operations',vendor:fv('t_vendor')||'',method:fvOther('t_method')||'',branch:(document.getElementById('t_branch')?(fvOther('t_branch')||defaultBranchName()):defaultBranchName()),project:fv('t_project')||'',books:(document.getElementById('t_books')?(fv('t_books')||''):((x&&x.books)||''))};
   if(id){const x=t.find(z=>z.id===id);if(x)Object.assign(x,fields);logAudit('Expense edited',fields.label+' · '+cur(a));}
   else{const _ap=canApproveExp()?'Approved':'Pending';logAudit('Expense added',fields.label+' · '+cur(a)+(_ap==='Pending'?' · pending approval':''));t.push(Object.assign({id:uid('t'),dir:'out',cat:'expense',approval:_ap,approvedBy:_ap==='Approved'?((typeof userLabel==='function'?userLabel():'')||''):''},fields));}
   setTxns(t);closeModal();renderFinance();renderActivity();renderExpensesView();}
@@ -11542,6 +11578,7 @@ const IMP_ICO={
   stock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>',
   staff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="10" r="2.4"/><path d="M8 17c.6-2 2.1-3 4-3s3.4 1 4 3"/></svg>',
   suppliers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg>',
+  pay:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v5.2"/><path d="M9.6 5.3 12 7.7l2.4-2.4"/><rect x="3" y="10" width="18" height="10" rx="2"/><circle cx="12" cy="15" r="2.2"/><path d="M6.4 15h.01M17.6 15h.01"/></svg>',
   fin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16M8 13h5M8 16h8"/></svg>'};
 const IMPORTERS=[
  {key:'cust',hue:'#c04668',title:'Clients & measurements',sub:'Names, contact, and every measurement',preview:['name','phone','chest','waist'],
@@ -11556,8 +11593,8 @@ const IMPORTERS=[
       email:impCell(row,iEmail)||ex.email||'',whatsapp:impCell(row,iPhone)||ex.whatsapp||'',address:impCell(row,iAddr)||ex.address||'',note:impCell(row,iNote)||ex.note||'',meas:merged,measHistory:mh});
     if(isNew)added++;else updated++;}
    setCustomers(cust);if(typeof renderCustomers==='function')renderCustomers();return {added:added,updated:updated};}},
- {key:'orders',hue:'#2563a8',title:'Orders & past productions',sub:'Open and completed jobs, with status',preview:['client','item','price'],
-  template:'client,item,price,deposit,due date,status,date\n"A. Bakare","Agbada set",85000,40000,2025-02-20,partial,2025-01-30\n',
+ {key:'orders',hue:'#2563a8',title:'Orders & past productions',sub:'Open and completed jobs. Several lines sharing an invoice number are one order.',preview:['client','invoice','item','price'],
+  template:'client,invoice,item,qty,price,discount,currency,deposit,due date,status,date\n"A. Bakare",INV-1001,"Agbada set",1,85000,5000,NGN,40000,2025-02-20,partial,2025-01-30\n"A. Bakare",INV-1001,"Linen kaftan",1,45000,,,,,,\n',
   apply:function(rows,head){var iName=impCol(head,['client','customer','name','client name']),iItem=impCol(head,['item','garment','product','description','order']),iTotal=impCol(head,['price','total','amount','value','order value']),iDep=impCol(head,['deposit','paid','amount paid','part payment']),iDue=impCol(head,['due','due date','deadline','delivery date']),iStatus=impCol(head,['status','payment status','paid status']),iDate=impCol(head,['date','order date','created','created at']),iRef=impCol(head,['ref','reference','order no','order number','invoice','id']);
    /* A second column, because one 'status' cannot answer two questions. Most exports put
       the money word there (paid / partial); some put the production word (delivered /
@@ -11565,16 +11602,30 @@ const IMPORTERS=[
    var iStage=impCol(head,['stage','production status','order status','progress','fulfilment','fulfillment','job status','state']);
    var iChan=impCol(head,['channel','source','came from','where from']);
    var iPaidOn=impCol(head,['paid date','payment date','date paid','paid on']);
-   var batch=[],meta={},unknown=[];
+   /* ONE INVOICE IS ONE ORDER, HOWEVER MANY LINES IT HAS.
+
+      This read a row as a whole order with exactly one piece in it, which is
+      fine for a shop and wrong for a tailor: a real invoice is six suits, or
+      an agbada set and a kaftan. A studio bringing its back catalogue in had
+      to choose between one order per invoice with the pieces lost, or one
+      order per piece with the invoice lost. Neither is its books.
+
+      So rows that share a reference are one order now, and each row is a
+      piece on it. A file with one row per order is unchanged, because a
+      reference that appears once makes an order with one piece, and the
+      value of that piece is the value of the order exactly as before.
+
+      The order-level columns - discount, currency, deposit, due date,
+      stage - are taken from the first row of the group that fills them in,
+      so a studio only has to write them once. */
+   var iQty=impCol(head,['qty','quantity','units','pieces']);
+   var iDisc=impCol(head,['discount','less','reduction']);
+   var iCcy=impCol(head,['currency','ccy','curr']);
+   var iFx=impCol(head,['rate','fx','exchange rate','settlement rate']);
+   var batch=[],meta={},unknown=[],group={},seq=[];
    for(var r=1;r<rows.length;r++){var row=rows[r];var name=impCell(row,iName),item=impCell(row,iItem);if(!name&&!item)continue;
-    var total=impNum(impCell(row,iTotal)),dep=impNum(impCell(row,iDep)),st=impCell(row,iStatus).toLowerCase();
-    /* "unpaid" contains "paid". An unanchored test read it as settled, so a row the
-       studio had explicitly marked unpaid came in paid in full: revenue inflated and a
-       debt hidden, from one missing pair of anchors. */
+    var line=impNum(impCell(row,iTotal)),qty=(iQty>=0?impNum(impCell(row,iQty)):0)||1,dep=impNum(impCell(row,iDep)),st=impCell(row,iStatus).toLowerCase();
     var stClean=st.replace(/[^a-z ]/g,'').trim();
-    var saysPaid=/^(paid|paid in full|fully paid|complete|completed|settled|closed)$/.test(stClean);
-    var saysUnpaid=/^(unpaid|not paid|no payment|owing|outstanding|pending)$/.test(stClean);
-    var paid=(!saysUnpaid&&(saysPaid||(total>0&&dep>=total)))?'paid':(dep>0?'partial':'unpaid');
     var ref=impCell(row,iRef)||('csv-'+nameKey(name)+'-'+item.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,10)+'-'+impDate(impCell(row,iDate)));
     /* The stage column wins; failing that, the status column may be a production word
        rather than a money one, and importStageFor() knows the difference. */
@@ -11589,16 +11640,46 @@ const IMPORTERS=[
     }
     if(stray&&unknown.indexOf(stray)<0)unknown.push(stray);
     var createdAt=impCell(row,iDate)?impDate(impCell(row,iDate)):new Date().toISOString();
-    meta['web-'+ref]={deposit:dep,stage:stg.index,createdAt:createdAt,
-      channel:(iChan>=0?impCell(row,iChan):''),paidAt:(iPaidOn>=0&&impCell(row,iPaidOn))?impDate(impCell(row,iPaidOn)):createdAt};
-    batch.push({order:{ref:ref,customer_name:name||'Customer',total:total,payment_status:paid,_deposit:dep,items:[{name:item||'Order',price:total}],deadline:impCell(row,iDue)?impDate(impCell(row,iDue)):'',created_at:createdAt,notes:'Imported'}});}
+    var g=group[ref];
+    if(!g){g=group[ref]={ref:ref,name:name,items:[],value:0,dep:0,disc:0,ccy:'',fx:0,due:'',createdAt:createdAt,stage:stg.index,chan:'',paidAt:'',stWord:stClean};seq.push(ref);}
+    g.items.push({name:item||'Order',price:line,qty:qty});
+    g.value+=line*qty;
+    /* First row that answers each question wins. A studio that repeats the order
+       total on every line must not have it counted once per piece. */
+    if(!g.name&&name)g.name=name;
+    if(!g.dep&&dep)g.dep=dep;
+    if(!g.disc&&iDisc>=0)g.disc=impNum(impCell(row,iDisc));
+    if(!g.ccy&&iCcy>=0)g.ccy=impCell(row,iCcy);
+    if(!g.fx&&iFx>=0)g.fx=impNum(impCell(row,iFx));
+    if(!g.due&&iDue>=0&&impCell(row,iDue))g.due=impDate(impCell(row,iDue));
+    if(!g.chan&&iChan>=0)g.chan=impCell(row,iChan);
+    if(!g.paidAt&&iPaidOn>=0&&impCell(row,iPaidOn))g.paidAt=impDate(impCell(row,iPaidOn));
+    if(!g.stWord&&stClean)g.stWord=stClean;
+    if(stg.known&&!g.stageSet){g.stage=stg.index;g.stageSet=true;}
+   }
+   seq.forEach(function(ref){var g=group[ref];
+    /* Owed is what the invoice came to after its discount, so a fully-settled
+       order with a discount on it is not read as still owing the discount. */
+    var owed=Math.max(0,g.value-(+g.disc||0));
+    /* "unpaid" contains "paid". An unanchored test read it as settled, so a row the
+       studio had explicitly marked unpaid came in paid in full: revenue inflated and a
+       debt hidden, from one missing pair of anchors. */
+    var saysPaid=/^(paid|paid in full|fully paid|complete|completed|settled|closed)$/.test(g.stWord||'');
+    var saysUnpaid=/^(unpaid|not paid|no payment|owing|outstanding|pending)$/.test(g.stWord||'');
+    var paid=(!saysUnpaid&&(saysPaid||(owed>0&&g.dep>=owed)))?'paid':(g.dep>0?'partial':'unpaid');
+    meta['web-'+ref]={deposit:g.dep,stage:g.stage,createdAt:g.createdAt,
+      channel:g.chan,paidAt:g.paidAt||g.createdAt};
+    batch.push({order:{ref:ref,customer_name:g.name||'Customer',total:g.value,payment_status:paid,_deposit:g.dep,
+      discount:+g.disc||0,currency:g.ccy||'NGN',fx:+g.fx||0,
+      items:g.items,deadline:g.due,created_at:g.createdAt,notes:'Imported'}});});
    /* A row in this file is a job the studio made, not something off the rail. */
    var res=importWebOrders(batch,{historical:true,forceOrder:true});
    /* Second pass over what actually landed: the deposit, the stage, and the money. */
    var ords=getOrders(),changed=false,toFinished=0,onBoard=0;
    ords.forEach(function(o){var m=meta[o.id];if(!m||!isHistorical(o))return;
     var d=+m.deposit||0;
-    if(d>0&&d<(+o.value||0)&&(+o.paid||0)!==d){o.paid=d;changed=true;}
+    var _net=(typeof orderNet==='function')?orderNet(o):Math.max(0,(+o.value||0)-(+o.discount||0));
+    if(d>0&&d<=_net&&(+o.paid||0)!==d){o.paid=d;changed=true;}
     if((+o.stageIndex||0)!==m.stage){o.stageIndex=m.stage;changed=true;}
     if(m.stage>=STAGES.indexOf('Delivered')&&STAGES.indexOf('Delivered')>=0){o.deliveredAt=o.deliveredAt||m.createdAt;changed=true;}
    });
@@ -11613,6 +11694,63 @@ const IMPORTERS=[
    return {added:res.added||0,updated:0,skipped:res.skipped||0,historical:res.added||0,
      toFinished:toFinished,onBoard:onBoard,txns:money.created,revenueByYear:money.byYear,
      unknownStatuses:unknown};}},
+ /* ===== PAYMENTS AGAINST AN INVOICE =================================
+    The orders importer records ONE payment per order, out of its deposit
+    column, and that is all there has ever been. A studio whose client paid
+    a deposit and then a balance could not bring the second one in: the
+    finances importer takes money but cannot attach it to an order, so the
+    order went on showing a debt that had been settled months earlier.
+
+    Worse for the books than that, it put the money in the wrong month. An
+    instalment in October and the balance in November is two months of
+    takings; recorded as one deposit it is one.
+
+    So: a row is a payment, matched to an order by its invoice reference,
+    and it ADDS to what the order has been paid rather than replacing it.
+    Idempotent on reference + date + amount, because a client really can pay
+    the same amount twice on different days, and really can pay twice on the
+    same day, but the same row imported twice is the same payment.
+
+    The amount is in the ORDER'S currency, like every other figure on it, and
+    the transaction carries both that and the base-currency value, exactly as
+    importOrderPayments does. */
+ {key:'pay',hue:'#0e7490',title:'Payments received',sub:'Money a client has paid, matched to its invoice',preview:['invoice','date','amount'],
+  template:'invoice,date,amount,method,note\nINV-1001,2025-02-01,40000,Bank transfer,"Deposit"\nINV-1001,2025-03-14,45000,Bank transfer,"Balance on collection"\n',
+  apply:function(rows,head){
+   var iRef=impCol(head,['invoice','ref','reference','order','order no','order number','id']),
+       iDate=impCol(head,['date','paid date','payment date','when','date paid']),
+       iAmt=impCol(head,['amount','paid','value','sum','received']),
+       iMethod=impCol(head,['method','payment method','paid by','how','mode']),
+       iNote=impCol(head,['note','notes','description','details','memo','label']);
+   if(iRef<0)return {error:'Your file needs an "invoice" column naming the order each payment belongs to.'};
+   if(iAmt<0)return {error:'Your file needs an "amount" column.'};
+   var ords=getOrders(),t=getTxns(),added=0,dup=0,missing=[],touched={};
+   var seen={};t.forEach(function(x){if(x.importRef)seen[x.importRef]=1;});
+   for(var r=1;r<rows.length;r++){
+    var row=rows[r];var ref=impCell(row,iRef);var amt=impNum(impCell(row,iAmt));
+    if(!ref||!amt)continue;
+    /* An order carries the reference it was imported under, and its id is that
+       reference with a prefix. Both are accepted, because a studio reading its
+       own screen sees the id and reading its own invoice book sees the ref. */
+    var o=ords.find(function(x){return String(x.webRef||'')===ref||x.id===ref||x.id==='web-'+ref;});
+    if(!o){if(missing.indexOf(ref)<0)missing.push(ref);continue;}
+    var at=impDate(impCell(row,iDate));
+    var key='pay:'+o.id+':'+String(at).slice(0,10)+':'+amt;
+    if(seen[key]){dup++;continue;}
+    seen[key]=1;
+    o.paid=(+o.paid||0)+amt;
+    touched[o.id]=1;
+    t.push({id:uid('t'),dir:'in',
+      label:(o.client||'Client')+' \u00b7 '+(impCell(row,iNote)||'payment')+' ('+o.id+')',
+      amount:amt*ofx(o),ccy:ocur(o),amtCcy:amt,at:at,orderId:o.id,branch:branchOf(o),
+      method:(iMethod>=0?impCell(row,iMethod):''),channel:'Imported',historical:true,importRef:key});
+    added++;
+   }
+   if(added){save('layi_dash_orders',ords);setTxns(t);
+    if(typeof logAudit==='function')logAudit('Imported payments',added+' payment(s)');
+    if(typeof renderAll==='function')renderAll();}
+   return {added:added,updated:0,dup:dup,orders:Object.keys(touched).length,
+     unmatched:missing};}},
  {key:'stock',hue:'#c47d12',title:'Stock & inventory',sub:'Fabrics, trims and ready-to-wear items',preview:['item','category','quantity','cost'],
   template:'item,category,quantity,unit,cost,reorder,note\n"Ankara Blue floral","Fabric",12,yards,2500,4,"Bestseller"\n',
   apply:function(rows,head){var list=getSupplies(),added=0,updated=0;var cats=(typeof invCatNames==='function'?invCatNames():[])||[];
@@ -11648,16 +11786,32 @@ const IMPORTERS=[
     var data={business:name,type:mType,contact:impCell(row,iPhone),phone:impCell(row,iPhone),whatsapp:'',email:impCell(row,iEmail),location:'',notes:impCell(row,iNote),preferred:false};
     if(ex){Object.assign(ex,data);updated++;}else{list.push(Object.assign({id:uid('sp')},data));added++;}}
    setSuppliers(list);if(typeof renderSuppliers==='function')renderSuppliers();return {added:added,updated:updated};}},
- {key:'fin',hue:'#1f9d57',title:'Finances & transactions',sub:'Past income and expenses for your books',preview:['date','type','amount'],
-  template:'date,type,amount,category,note\n2025-01-15,income,50000,sales,"Order deposit"\n2025-01-16,expense,12000,supply,"Thread & trims"\n',
+ {key:'fin',hue:'#1f9d57',title:'Finances & transactions',sub:'Past income and expenses, with who was paid and the bank reference',preview:['date','type','amount'],
+  template:'date,type,amount,category,paid to,reference,treat as,note\n2025-01-15,income,50000,Sales,,,,"Order deposit"\n2025-01-16,expense,12000,Materials & supplies,"Lagos Fabrics",TRF-0099,,"Thread & trims"\n2025-01-17,expense,80000,Other,"Yourself",TRF-0100,drawing,"Transfer to personal account"\n',
   apply:function(rows,head){var t=getTxns(),added=0,dup=0;
    var iDate=impCol(head,['date','when','day']),iType=impCol(head,['type','direction','dir','kind','in/out']),iAmt=impCol(head,['amount','value','total','sum']),iCat=impCol(head,['category','cat','account']),iMethod=impCol(head,['method','payment method','paid by','how','mode','channel']),iNote=impCol(head,['note','notes','label','description','details','memo']);
-   var seen={},dates=[];t.forEach(function(x){seen[(x.at||'')+'|'+(x.amount||'')+'|'+String(x.label||'').toLowerCase()]=1;});
+   var iVendor=impCol(head,['vendor','paid to','recipient','supplier','payee','counterparty','beneficiary','from','to']),
+       iRefN=impCol(head,['reference','bank reference','transaction id','txn id','transaction ref','statement ref','ref']),
+       iBooks=impCol(head,['books','treat as','classification','expense type','what was this']),
+       iDept=impCol(head,['department','dept','team']);
+   /* The bank's own reference joins the duplicate test, so forty-eight charges
+      of the same tiny amount on the same day are forty-eight charges and not one.
+      A file imported twice still repeats its references, so re-running is still
+      safe, which is the property this test exists for. */
+   var seen={},dates=[];t.forEach(function(x){seen[(x.at||'')+'|'+(x.amount||'')+'|'+String(x.label||'').toLowerCase()+'|'+String(x.ref||'')]=1;});
    for(var r=1;r<rows.length;r++){var row=rows[r];var amt=impNum(impCell(row,iAmt));if(!amt)continue;
     var typ=impCell(row,iType).toLowerCase();var dir=/in|income|credit|sale|revenue|received|deposit/.test(typ)?'in':(/out|expense|debit|cost|paid|purchase|bill/.test(typ)?'out':(amt<0?'out':'in'));
     var label=impCell(row,iNote)||impCell(row,iCat)||(dir==='in'?'Income':'Expense');var at=impDate(impCell(row,iDate));var abs=Math.abs(amt);
-    var k=at+'|'+abs+'|'+label.toLowerCase();if(seen[k]){dup++;continue;}seen[k]=1;
-    t.push({id:uid('t'),dir:dir,label:label,amount:abs,at:at,cat:(impCell(row,iCat)||'other').toLowerCase(),method:(iMethod>=0?impCell(row,iMethod):'')});added++;dates.push(String(at).slice(0,10));}
+    var bref=(iRefN>=0?impCell(row,iRefN):'');
+    var k=at+'|'+abs+'|'+label.toLowerCase()+'|'+bref;if(seen[k]){dup++;continue;}seen[k]=1;
+    /* category is the readable one the expense screens group by; cat stays the
+       kind it always was, because that is what the commission test reads. */
+    t.push({id:uid('t'),dir:dir,label:label,amount:abs,at:at,cat:(impCell(row,iCat)||'other').toLowerCase(),
+      category:(iCat>=0?impCell(row,iCat):'')||'Other',
+      dept:(iDept>=0?impCell(row,iDept):'')||'Operations',
+      vendor:(iVendor>=0?impCell(row,iVendor):''),ref:bref,
+      books:(dir==='out'&&iBooks>=0)?booksFromWord(impCell(row,iBooks)):'',
+      method:(iMethod>=0?impCell(row,iMethod):'')});added++;dates.push(String(at).slice(0,10));}
    setTxns(t);if(typeof renderFinance==='function'&&(typeof can!=='function'||can('money')))renderFinance();
    /* The orders file may already have brought this money in as deposits. We cannot know
       whether these rows are the same money, so we say what is already there for the same
@@ -15196,7 +15350,7 @@ function renderFinance(){
   if(ft){ft.innerHTML=comboChartSVG(m6.map(m=>m.lbl),[{color:'#3fae6a',lineColor:'#2e8b57',values:m6.map(m=>m.inc)},{color:'#cf7b6b',lineColor:'#c0392b',values:m6.map(m=>m.out)}],{fmt:cur,height:200,noLines:true})
     +`<div style="display:flex;gap:16px;justify-content:center;margin-top:6px;font-size:12px;color:var(--text-dim)"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#3fae6a;display:inline-block"></span>Money in</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#cf7b6b;display:inline-block"></span>Money out</span></div>`;}
   // ===== Expense-by-category donut (selected period) =====
-  const exP=pTxns.filter(t=>t.dir==='out');
+  const exP=pTxns.filter(t=>t.dir==='out'&&expenseCounts(t));
   const catMap={};exP.forEach(t=>{const c=t.category||'Other';catMap[c]=(catMap[c]||0)+(+t.amount||0);});
   const ed=document.getElementById('finExpDonut');
   if(ed){const keys=Object.keys(catMap).filter(k=>catMap[k]>0).sort((a,b)=>catMap[b]-catMap[a]);
@@ -15274,9 +15428,26 @@ function renderExpensesView(){
     if(canApproveExp()&&pend.length){const pt=pend.reduce((s,t)=>s+(+t.amount||0),0);
       pe.innerHTML=`<div class="panel" style="border-color:var(--amber)"><div class="panel-head"><h3>Pending approval <span class="sup-status low" style="margin-left:6px">${pend.length}</span></h3><span class="page-sub">${cur(pt)} awaiting your sign-off</span></div>`+pend.slice().sort((a,b)=>new Date(b.at)-new Date(a.at)).map(t=>`<div class="bd-row"><span class="bl" style="cursor:pointer;flex:1" onclick="openExpense('${t.id}')"><b>${esc(t.label)}</b> <span style="color:var(--text-faint)">\u00b7 ${esc(t.category||'Other')}${t.vendor?' \u00b7 '+esc(t.vendor):''} \u00b7 ${new Date(t.at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span></span><span style="display:flex;align-items:center;gap:8px;white-space:nowrap"><b style="color:var(--red)">\u2212${cur(t.amount)}</b><button class="btn sm" onclick="event.stopPropagation();approveExpense('${t.id}')">Approve</button><button class="btn ghost sm" onclick="event.stopPropagation();rejectExpense('${t.id}')">Reject</button></span></div>`).join('')+`</div>`;
     }else pe.innerHTML='';}}
+  /* The ones nobody has placed yet. They are already out of every cost figure
+     on this screen, because expenseCounts() drops them. They are listed here so
+     that being out of them is a decision somebody can act on rather than a
+     silence. */
+  {const re=document.getElementById('expReview');
+   if(re){const need=outAll.filter(function(t){return String(t.books||'')==='review';});
+    if(need.length){var nt=need.reduce(function(s,t){return s+(+t.amount||0);},0);var _q=String.fromCharCode(39);
+     re.innerHTML='<div class="panel" style="border-color:var(--amber)"><div class="panel-head">'
+      +'<h3>Needs a decision <span class="sup-status low" style="margin-left:6px">'+need.length+'</span></h3>'
+      +'<span class="page-sub" id="expReviewSub">'+cur(nt)+'</span></div>'
+      +need.slice(0,40).map(function(t){
+        return '<div style="display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line-soft);cursor:pointer" onclick="openExpense('+_q+t.id+_q+')">'
+          +'<span>'+esc(t.label||'Payment')+'<span style="color:var(--text-faint)"> · '+new Date(t.at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'</span></span>'
+          +'<b style="white-space:nowrap">'+cur(t.amount)+'</b></div>';}).join('')
+      +(need.length>40?'<div class="sd" style="color:var(--text-faint);padding-top:8px">and '+(need.length-40)+' more</div>':'')
+      +'</div>';
+    }else re.innerHTML='';}}
   const sub=document.getElementById('expSub');if(sub)sub.textContent=list.length?(list.length+' entries · '+cur(periodTot)+' '+periodLabel(expPeriod,expCustom)):'';
   document.getElementById('expList').innerHTML=list.length?(`<div class="exp-total-bar"><span>Total spent · ${periodLabel(expPeriod,expCustom)}${pendTotP>0?` · <span style="color:var(--amber)">${cur(pendTotP)} pending</span>`:''}</span><b>${cur(periodTot)}</b></div><table class="oledger"><tr><th>Date</th><th>Item</th><th class="hide-sm">Category</th><th class="hide-sm">Vendor</th><th class="num">Amount</th></tr>`+list.map(t=>{
-    const meta=[t.category,t.dept,t.vendor].filter(Boolean).map(esc).join(' · ');
+    const meta=[isCost(t)?'':booksLabel(t.books),t.category,t.dept,t.vendor].filter(Boolean).map(esc).join(' · ');
     const appBadge=(t.approval&&t.approval!=='Approved')?` <span class="sup-status ${t.approval==='Rejected'?'out':'low'}" style="font-size:10px">${esc(t.approval)}</span>`:'';
     return `<tr class="orow" style="cursor:pointer" onclick="openExpense('${t.id}')"><td style="white-space:nowrap">${new Date(t.at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</td><td><div class="oref">${esc(t.label)}${branchTag(branchOf(t))}</div>${t.recurring?'<div class="sup-itemmeta" style="color:var(--gold)">↻ recurring</div>':''}${(t.approval&&t.approval!=='Approved')?`<div class="sup-itemmeta"><span class="sup-status ${t.approval==='Rejected'?'out':'low'}" style="padding:1px 7px">${esc(t.approval)}</span></div>`:''}</td><td class="hide-sm">${t.category?esc(t.category):'<span style="color:var(--text-faint)">—</span>'}</td><td class="hide-sm">${t.vendor?esc(t.vendor):'<span style="color:var(--text-faint)">—</span>'}</td><td class="num" style="color:var(--red);font-weight:600">–${cur(t.amount)}</td></tr>`;}).join('')+`</table>`)
     :(q?'<div class="kv" style="color:var(--text-faint)">No expenses match your search.</div>':emptyBlock('⊟','No expenses logged yet','Record rent, materials, courier fees and other outgoings so your profit is accurate.','+ Add expense','openExpense()'));

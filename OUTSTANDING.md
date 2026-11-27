@@ -5,7 +5,117 @@ the end of every session. Nothing is removed until it is actually done — if
 something turns out not to be worth doing, it moves to **Decided against**
 with the reason, so it does not get re-raised in six months.
 
-Last updated: 26 November 2026 (thirty-fourth session)
+Last updated: 27 November 2026 (thirty-fifth session)
+
+## 27 November 2026 — bringing a real studio's history in (layi-v83)
+
+Kayode asked for his own company's books to be loaded into the app: five
+invoices, 21 garments, six payments and a 154-row bank statement covering
+21 October to 26 November, with his own control figures to reconcile against.
+Every one of those figures checked out against the file before anything was
+built, which is the only reason the rest of this was worth doing.
+
+He framed it as a data import and it was not one. The importers could not
+express four things his data needed, and he had anticipated that: *"where the
+application structure does not support a requested feature, explain the
+limitation and propose an appropriate solution."*
+
+### What was missing, found by reading the importers rather than guessing
+
+**An invoice with more than one piece on it.** The orders importer built
+`items:[{name,price}]` from each row, so a row was a whole order with exactly
+one piece. That is a shop, not a tailor. A studio bringing its back catalogue
+across had to choose between one order per invoice with the pieces lost, or
+one order per piece with the invoice lost. Neither is its books.
+
+**A second payment on an order.** `importOrderPayments()` writes one
+transaction per order, out of the deposit column, and there was no other way
+to attach money to an order at all. Abdulrahman paid in October and November;
+recorded as one deposit that is one month of takings instead of two, and the
+October/November split is most of what he wanted to see.
+
+**A discount or a currency.** `webOrderToStudio` hardcoded `discount:0,
+currency:'NGN', fx:1`. Three of his five invoices carry a discount and one is
+in dollars, so four of the five would have imported with the wrong total. The
+order MODEL has carried all three since the invoice work; only the import path
+could not say them.
+
+**An outflow that is not a cost.** `expenseCounts()` excluded a rejected
+expense and one awaiting approval, and nothing else. Every other penny that
+left the account was a business cost. In his five weeks that is NGN 2,293,401
+of transfers to himself across 28 payments and NGN 1,266,086 of loan
+movements: 62% of everything that left the bank, which would have put the
+trading figure out by about NGN 3.5m. Not specific to him. Every owner-run
+studio moves money between its own accounts.
+
+### And one that was quietly destroying data
+
+The finances importer's duplicate test was date + amount + label. A bank
+statement has 48 VAT charges of NGN 0.75 and 46 stamp duties of NGN 50, and
+several of each fall on the same day with identical wording. **Every one after
+the first was discarded as a duplicate**, and the import reported them as
+duplicates skipped, so it looked deliberate. A bank reference on the row makes
+each one distinct; the test still catches a file imported twice, because the
+references repeat too.
+
+### The five changes
+
+All generic, none bespoke to Layi, all backwards compatible:
+
+1. Rows sharing an invoice reference are one order with many pieces. A file
+   with one row per order is unchanged, because a reference that appears once
+   makes an order with one piece at the same value as before.
+2. `discount`, `currency`, `rate` and `qty` survive an import.
+3. A seventh importer, **Payments received**, matching money to an invoice and
+   ADDING to what it has been paid. Idempotent on reference + date + amount.
+4. `books` on an outgoing transaction. Empty means a business cost, which is
+   what every transaction ever written has, so nothing already on a device
+   changes meaning. Expenses gains a **Needs a decision** panel and the expense
+   editor asks "What was this".
+5. The finances importer keeps the payee, the bank reference, the readable
+   category and the books kind.
+
+Two settled questions from him: widen the importers rather than force the data
+into what existed, and park the transfers outside profit rather than guess.
+
+### Proved against his own figures
+
+`audit_layi_import.js` runs all five generated files through the app's own
+importers in a stubbed DOM and checks 25 things: 5 clients, 5 orders from 22
+lines, every invoice's value, discount, net, paid and outstanding, the
+October/November split, the dollar order held at $700 and NGN 948,087, 101
+costs at NGN 1,909,802.25, 39 parked at NGN 3,742,082.00, all 47 surviving VAT
+charges present, and a second run adding nothing.
+
+**That file and the five CSVs live in `Downloads\\Layi Studio import`, outside
+the repo on purpose.** They carry clients' names, phone numbers and bank
+references, and every folder here is either published to the web or pushed to
+GitHub. `audit_import.js` carries the generic half of the same cover, with
+invented data, and that is in the repo.
+
+### What was deliberately not imported, and the honest reason
+
+Six customer receipts, because they come in against their invoices and
+importing both would double the revenue. Six reversal rows, net zero on cash
+and profit. And two receipts the app cannot describe honestly: a NGN 10,000
+transfer in and NGN 691.22 of bank interest. **Every incoming transaction
+counts as revenue and there is no way to mark income as not-sales**, so
+importing them would overstate takings by NGN 10,691.22. The same "what was
+this" idea applied to money coming in is the obvious next piece.
+
+### Still open on this
+
+- **The 39 parked payments, NGN 3,742,082.** Only Kayode can say what they
+  were. Until he does there is no true profit figure and the report says so
+  twice.
+- **No production cost is allocated to any order**, so order profitability is
+  incomplete rather than zero. "monogram for wasola" on 6 November names its
+  order outright and is the obvious first one.
+- **The NGN 50 difference** between his printed closing balance and the file's
+  own. No balancing entry was invented.
+- Every order sits at the first production stage, because payment status and
+  production status are separate and nothing was marked delivered for having
+  been paid for.
 
 ## 26 November 2026 — the warning nobody could read (layi-v82)
 

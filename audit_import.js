@@ -16,8 +16,12 @@ function applyCsv(key,csv){run("_tImp=(function(){var rows=parseCSV("+JSON.strin
 
 // 0) Registry shape.
 const imps=J("IMPORTERS.map(function(x){return {key:x.key,hue:x.hue,hasApply:typeof x.apply==='function',hasTpl:!!x.template,ico:!!IMP_ICO[x.key]};})");
-if(imps.length!==6) F('expected 6 importers, found '+imps.length);
-if(new Set(imps.map(i=>i.hue)).size!==6) F('importer accent hues are not all distinct');
+/* 7 from 26 November: payments received. The orders importer records one
+   payment per order out of its deposit column, so a client who paid a deposit
+   and then a balance could not have the second one imported at all - and the
+   two instalments were landing in one month instead of two. */
+if(imps.length!==7) F('expected 7 importers, found '+imps.length);
+if(new Set(imps.map(i=>i.hue)).size!==7) F('importer accent hues are not all distinct');
 imps.forEach(i=>{if(!i.hasApply)F(i.key+' has no apply()');if(!i.hasTpl)F(i.key+' has no template');if(!i.ico)F(i.key+' has no icon');});
 
 // 1) Customers — add, then idempotent update, with measurements + phone mapped.
@@ -336,8 +340,79 @@ if(!/sc\.crossOrigin='anonymous'/.test(html))
 if(!/st\.blocked/.test(html))
   F('a spreadsheet that cannot be read leaves the screen saying nothing');
 
+/* ===== AN INVOICE WITH MORE THAN ONE PIECE ON IT ======================
+   A row was a whole order with exactly one piece, which is a shop and not a
+   tailor. A real invoice is six suits, or an agbada set and a kaftan, so a
+   studio bringing its back catalogue across had to choose between losing the
+   pieces or losing the invoice. Rows sharing a reference are one order now.
+
+   Checked with the money that goes wrong when it is wrong: a discount, a
+   second currency, and an invoice settled in two instalments months apart. */
+run("save('layi_dash_orders',[]);save('layi_dash_orders_done',[]);setTxns([]);");
+applyCsv('orders',
+  'client,invoice,item,qty,price,discount,currency,rate,date\n'+
+  '"K. Bello",INV-9001,"Agbada set",1,400000,50000,NGN,,2026-01-05\n'+
+  '"K. Bello",INV-9001,"Linen kaftan",1,100000,,,,\n'+
+  '"D. Abroad",INV-9002,"Silk shirt",2,120,,USD,1500,2026-01-06\n');
+const gOrds=J("getOrders().map(function(o){return {id:o.id,client:o.client,value:o.value,discount:o.discount,ccy:o.currency,fx:o.fx,n:(o.outfits||[]).length,paid:o.paid};})");
+if(gOrds.length!==2) F('two invoices across three lines should be two orders, got '+gOrds.length);
+const g1=gOrds.find(o=>o.id==='web-INV-9001')||{};
+if(g1.n!==2) F('the two-line invoice has '+g1.n+' piece(s), expected 2');
+if(+g1.value!==500000) F('the two-line invoice totals '+g1.value+', expected 500000 (the lines added up)');
+if(+g1.discount!==50000) F('the discount did not survive the import, got '+g1.discount);
+if(J("orderNet(getOrders().find(function(o){return o.id==='web-INV-9001'}))")!==450000)
+  F('net after discount is wrong, so a settled invoice would still read as owing the discount');
+const g2=gOrds.find(o=>o.id==='web-INV-9002')||{};
+if(g2.ccy!=='USD') F('an order priced in another currency imported as '+g2.ccy);
+if(+g2.fx!==1500) F('the settlement rate did not survive the import, got '+g2.fx);
+if(+g2.value!==240) F('quantity was dropped: 2 x 120 came to '+g2.value+', expected 240');
+
+/* ===== A PAYMENT AGAINST AN INVOICE ==================================
+   The orders importer writes ONE payment, out of the deposit column. A client
+   who paid a deposit and then a balance could not have the second one brought
+   in at all, and the two were landing in one month instead of two. */
+const pay1=applyCsv('pay','invoice,date,amount,method,note\nINV-9001,2026-01-10,200000,Transfer,Deposit\nINV-9001,2026-02-14,250000,Transfer,Balance\nNOPE-1,2026-02-14,999,Transfer,Unknown\n');
+if(pay1.added!==2) F('two payments against one invoice imported as '+pay1.added);
+if(!pay1.unmatched||pay1.unmatched.indexOf('NOPE-1')<0) F('a payment naming an invoice that does not exist was not reported back');
+if(J("getOrders().find(function(o){return o.id==='web-INV-9001'}).paid")!==450000)
+  F('the two payments did not add up on the order, so the balance is wrong');
+if(J("orderOutstanding(getOrders().find(function(o){return o.id==='web-INV-9001'}))")!==0)
+  F('an invoice paid in two instalments still reads as owing');
+const months=J("getTxns().filter(function(t){return t.dir==='in'}).map(function(t){return String(t.at).slice(0,7)}).sort()");
+if(months.join(',')!=='2026-01,2026-02')
+  F('the instalments did not land in the months they were paid: '+months.join(','));
+const pay2=applyCsv('pay','invoice,date,amount,method,note\nINV-9001,2026-01-10,200000,Transfer,Deposit\n');
+if(pay2.added!==0||pay2.dup!==1) F('the same payment imported twice was not caught as a duplicate');
+if(J("getOrders().find(function(o){return o.id==='web-INV-9001'}).paid")!==450000)
+  F('a re-run changed what the order had been paid');
+
+/* ===== MONEY CAN LEAVE THE BANK WITHOUT BEING A COST ==================
+   expenseCounts() excluded a rejected expense and one awaiting approval and
+   nothing else, so every transfer an owner made to themselves was a business
+   cost and the profit figure said so. Empty still means a cost, which is what
+   every transaction written before this has, so nothing already recorded
+   changes meaning. */
+run("setTxns([]);");
+const fin=applyCsv('fin',
+  'date,type,amount,category,paid to,reference,treat as,note\n'+
+  '2026-01-02,expense,5000,Materials & supplies,"Lagos Fabrics",REF-1,,"Thread"\n'+
+  '2026-01-02,expense,5000,Materials & supplies,"Lagos Fabrics",REF-2,,"Thread"\n'+
+  '2026-01-03,expense,80000,Other,"Yourself",REF-3,drawing,"To personal account"\n'+
+  '2026-01-04,expense,20000,Other,"Somebody",REF-4,review,"sent from bank"\n');
+if(fin.added!==4) F('four distinct bank lines imported as '+fin.added+' ('+fin.dup+' called duplicates)');
+const counted=J("getTxns().filter(function(t){return t.dir==='out'&&expenseCounts(t)}).reduce(function(n,t){return n+(+t.amount||0)},0)");
+if(counted!==10000) F('costs total '+counted+', expected 10000: a drawing and a parked payment must not count');
+const kept=J("getTxns().filter(function(t){return t.ref&&t.vendor}).length");
+if(kept!==4) F('only '+kept+' of 4 outgoings kept both a payee and a bank reference');
+const fin2=applyCsv('fin','date,type,amount,category,paid to,reference,treat as,note\n2026-01-02,expense,5000,Materials & supplies,"Lagos Fabrics",REF-1,,"Thread"\n');
+if(fin2.added!==0||fin2.dup!==1) F('the same bank line imported twice was not caught');
+if(!J("isCost({dir:'out'})")) F('a transaction that says nothing about itself is no longer a business cost, which changes the meaning of every one already recorded');
+if(J("isCost({dir:'out',books:'drawing'})")) F('a drawing is being counted as a business cost');
+if(!J("isCost({dir:'in',books:'drawing'})")) F('money coming in is being judged by a field that only applies to money going out');
+if(J("BOOKS_KINDS[0][0]")!=='') F('the first choice offered is not the plain business cost, so the safe answer is not the default');
+
 console.log('Import / migrate audit:');
 console.log('  importers: '+imps.map(i=>i.key).join(', '));
 console.log('  customers: +'+c1.added+' new, re-run updated '+c2.updated+'; order deposit kept: '+(ord?ord.paid:'n/a'));
-console.log(fails.length? 'FAILURES ('+fails.length+'):\n'+fails.map(f=>'  ✗ '+f).join('\n') : '  ✓ six tolerant importers, alias column-matching, idempotent upserts, orders keep the deposit, and the screen builds all six cards');
+console.log(fails.length? 'FAILURES ('+fails.length+'):\n'+fails.map(f=>'  ✗ '+f).join('\n') : '  ✓ seven tolerant importers, alias column-matching, idempotent upserts, an invoice with several pieces on it, payments matched to their order, outflows that are not costs, and the screen builds every card');
 process.exit(fails.length?1:0);
